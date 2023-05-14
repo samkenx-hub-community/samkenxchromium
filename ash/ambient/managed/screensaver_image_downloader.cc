@@ -64,6 +64,10 @@ constexpr char kCacheFileExt[] = ".cache";
 constexpr int64_t kMaxFileSizeInBytes = 8 * 1024 * 1024;  // 8 MB
 constexpr int kMaxUrlFetchRetries = 3;
 
+// This limit is specified in the policy definition for the policies
+// ScreensaverLockScreenImages and DeviceScreensaverLoginScreenImages.
+constexpr size_t kMaxUrlsToProcessFromPolicy = 25u;
+
 std::unique_ptr<network::SimpleURLLoader> CreateSimpleURLLoader(
     const std::string& url) {
   auto request = std::make_unique<network::ResourceRequest>();
@@ -106,9 +110,66 @@ bool VerifyOrCreateDownloadDirectory(const base::FilePath& download_directory) {
 
 }  // namespace
 
-ScreensaverImageDownloader::Job::Job(const std::string& image_url,
-                                     ResultCallback result_callback)
-    : image_url(image_url), result_callback(std::move(result_callback)) {}
+ScreensaverImageDownloader::ScreensaverImageDownloader(
+    scoped_refptr<network::SharedURLLoaderFactory> shared_url_loader_factory,
+    const base::FilePath& download_directory,
+    ImageListUpdatedCallback image_list_updated_callback)
+    : task_runner_(base::ThreadPool::CreateSequencedTaskRunner(
+          {base::MayBlock(), base::TaskPriority::BEST_EFFORT,
+           base::TaskShutdownBehavior::CONTINUE_ON_SHUTDOWN})),
+      shared_url_loader_factory_(shared_url_loader_factory),
+      download_directory_(download_directory),
+      image_list_updated_callback_(image_list_updated_callback) {}
+
+ScreensaverImageDownloader::~ScreensaverImageDownloader() = default;
+
+void ScreensaverImageDownloader::UpdateImageUrlList(
+    const base::Value::List& image_url_list) {
+  if (image_url_list.empty()) {
+    // If the screensaver is listening to updates, notify that the images are no
+    // longer available before deleting them.
+    image_list_updated_callback_.Run(std::vector<base::FilePath>());
+
+    ClearRequestQueue();
+    weak_ptr_factory_.InvalidateWeakPtrs();
+    DeleteDownloadedImages();
+    return;
+  }
+
+  for (size_t i = 0;
+       i < kMaxUrlsToProcessFromPolicy && i < image_url_list.size(); ++i) {
+    const base::Value& value = image_url_list[i];
+    if (!value.is_string() || value.GetString().empty()) {
+      continue;
+    }
+    // Canonicalize URLs and require HTTPS.
+    GURL url(value.GetString());
+    if (!url.is_valid() || !url.SchemeIs(url::kHttpsScheme)) {
+      LOG(WARNING) << "Ignored invalid URL: " << url;
+      continue;
+    }
+    LOG(WARNING) << "Queue URL: " << url;
+    auto job = std::make_unique<ScreensaverImageDownloader::Job>(url.spec());
+    QueueDownloadJob(std::move(job));
+  }
+}
+
+std::vector<base::FilePath> ScreensaverImageDownloader::GetScreensaverImages() {
+  return std::vector<base::FilePath>(downloaded_images_.begin(),
+                                     downloaded_images_.end());
+}
+
+void ScreensaverImageDownloader::SetImagesForTesting(
+    const std::vector<base::FilePath>& images_file_paths) {
+  downloaded_images_ = base::flat_set<base::FilePath>(images_file_paths);
+}
+
+base::FilePath ScreensaverImageDownloader::GetDowloadDirForTesting() {
+  return download_directory_;
+}
+
+ScreensaverImageDownloader::Job::Job(const std::string& image_url)
+    : image_url(image_url) {}
 
 ScreensaverImageDownloader::Job::~Job() = default;
 
@@ -117,17 +178,6 @@ std::string ScreensaverImageDownloader::Job::file_name() const {
   const std::string encoded_hash = base::HexEncode(hash.data(), hash.size());
   return encoded_hash + kCacheFileExt;
 }
-
-ScreensaverImageDownloader::ScreensaverImageDownloader(
-    scoped_refptr<network::SharedURLLoaderFactory> shared_url_loader_factory,
-    const base::FilePath& download_directory)
-    : task_runner_(base::ThreadPool::CreateSequencedTaskRunner(
-          {base::MayBlock(), base::TaskPriority::BEST_EFFORT,
-           base::TaskShutdownBehavior::CONTINUE_ON_SHUTDOWN})),
-      shared_url_loader_factory_(shared_url_loader_factory),
-      download_directory_(download_directory) {}
-
-ScreensaverImageDownloader::~ScreensaverImageDownloader() = default;
 
 void ScreensaverImageDownloader::QueueDownloadJob(
     std::unique_ptr<Job> download_job) {
@@ -272,8 +322,11 @@ void ScreensaverImageDownloader::FinishDownloadJob(
     ScreensaverImageDownloadResult result,
     absl::optional<base::FilePath> path) {
   // TODO(b/276208772): Track result with metrics
-  CHECK(!download_job->result_callback.is_null());
-  std::move(download_job->result_callback).Run(result, path);
+  if (result == ScreensaverImageDownloadResult::kSuccess) {
+    downloaded_images_.insert(*path);
+    image_list_updated_callback_.Run(std::vector<base::FilePath>(
+        downloaded_images_.begin(), downloaded_images_.end()));
+  }
 
   if (downloading_queue_.empty()) {
     queue_state_ = QueueState::kWaiting;

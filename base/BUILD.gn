@@ -1203,6 +1203,8 @@ component("base") {
       "android/event_log.cc",
       "android/event_log.h",
       "android/feature_list_jni.cc",
+      "android/feature_map.cc",
+      "android/feature_map.h",
       "android/features_jni.cc",
       "android/field_trial_list.cc",
       "android/important_file_writer_android.cc",
@@ -1676,10 +1678,7 @@ component("base") {
     }
 
     if (is_posix && !is_ios) {
-      sources += [
-        "process/kill_posix.cc",
-        "process/process_posix.cc",
-      ]
+      sources += [ "process/process_posix.cc" ]
     }
 
     if (use_blink) {
@@ -1695,6 +1694,10 @@ component("base") {
         "process/process_iterator.cc",
         "process/process_iterator.h",
       ]
+
+      if (is_posix) {
+        sources += [ "process/kill_posix.cc" ]
+      }
     }
 
     if (is_linux || is_chromeos) {
@@ -2043,13 +2046,14 @@ component("base") {
   # Mac or iOS.
   if (is_apple) {
     sources += [
+      "apple/backup_util.h",
+      "apple/backup_util.mm",
+      "apple/bridging.h",
+      "apple/bundle_locations.h",
+      "apple/bundle_locations.mm",
       "file_version_info_mac.h",
       "file_version_info_mac.mm",
       "files/file_util_mac.mm",
-      "mac/backup_util.h",
-      "mac/backup_util.mm",
-      "mac/bundle_locations.h",
-      "mac/bundle_locations.mm",
       "mac/call_with_eh_frame.cc",
       "mac/call_with_eh_frame.h",
       "mac/call_with_eh_frame_asm.S",
@@ -2138,7 +2142,6 @@ component("base") {
       "ios/ns_range.h",
       "ios/scoped_critical_action.h",
       "ios/scoped_critical_action.mm",
-      "mac/bridging.h",
       "native_library_ios.mm",
       "power_monitor/power_monitor_device_source_ios.mm",
       "process/process_metrics_ios.cc",
@@ -2436,14 +2439,6 @@ component("base") {
   if (!is_debug) {
     configs -= [ "//build/config/compiler:default_optimization" ]
     configs += [ "//build/config/compiler:optimize_max" ]
-  }
-
-  if (!use_allocation_event_dispatcher && (!is_ios || use_allocator_shim)) {
-    # The old hooks depend on PoissonAllocationSampler, which is not always enabled.
-    sources += [
-      "allocator/dispatcher/standard_hooks.cc",
-      "allocator/dispatcher/standard_hooks.h",
-    ]
   }
 }
 
@@ -3567,8 +3562,8 @@ test("base_unittests") {
     sources += [
       "allocator/partition_allocator/shim/allocator_interception_mac_unittest.mm",
       "allocator/partition_allocator/shim/malloc_zone_functions_mac_unittest.cc",
+      "apple/backup_util_unittest.mm",
       "enterprise_util_mac_unittest.mm",
-      "mac/backup_util_unittest.mm",
       "mac/bind_objc_block_unittest.mm",
       "mac/call_with_eh_frame_unittest.mm",
       "mac/dispatch_source_mach_unittest.cc",
@@ -3730,7 +3725,7 @@ test("base_unittests") {
 
     sources += [
       # Pull in specific Mac files for iOS.
-      "mac/backup_util_unittest.mm",
+      "apple/backup_util_unittest.mm",
       "mac/bind_objc_block_unittest.mm",
       "mac/foundation_util_unittest.mm",
       "mac/scoped_nsobject_unittest.mm",
@@ -3811,7 +3806,8 @@ test("base_unittests") {
       # This test requires RELRO, which is not enabled in component builds.
       # Also, require a debug build, since we only disable stack protectors in
       # debug builds in partition alloc (see below why it's needed).
-      sources += [ "allocator/partition_allocator/pkey_unittest.cc" ]
+      sources +=
+          [ "allocator/partition_allocator/thread_isolation/pkey_unittest.cc" ]
 
       # We want to test the pkey code without access to memory that is not
       # pkey-tagged. This will allow us to catch unintended memory accesses
@@ -4152,7 +4148,6 @@ if (is_android) {
       "android/java/src/org/chromium/base/annotations/CalledByNative.java",
       "android/java/src/org/chromium/base/annotations/CalledByNativeForTesting.java",
       "android/java/src/org/chromium/base/annotations/CalledByNativeUnchecked.java",
-      "android/java/src/org/chromium/base/annotations/JNIAdditionalImport.java",
       "android/java/src/org/chromium/base/annotations/JNINamespace.java",
       "android/java/src/org/chromium/base/annotations/JniIgnoreNatives.java",
       "android/java/src/org/chromium/base/annotations/NativeClassQualifiedName.java",

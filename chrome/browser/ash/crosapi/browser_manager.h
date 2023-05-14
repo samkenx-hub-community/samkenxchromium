@@ -419,7 +419,11 @@ class BrowserManager : public session_manager::SessionManagerObserver,
     // Lacros-chrome is creating a new log file to log to.
     CREATING_LOG_FILE,
 
-    // Lacros-chrome is launching.
+    // Lacros-chrome has been pre-launched at login screen, and it's waiting to
+    // be unblocked post-login.
+    PRE_LAUNCHED,
+
+    // Lacros-chrome is launching, or resuming a pre-launched instance.
     STARTING,
 
     // Mojo connection to lacros-chrome is established so, it's in
@@ -565,7 +569,8 @@ class BrowserManager : public session_manager::SessionManagerObserver,
 
   // Starts the lacros-chrome process and redirects stdout/err to file pointed
   // by |params.logfd|.
-  void StartWithLogFile(LaunchParamsFromBackground params);
+  void StartWithLogFile(bool launching_at_login_screen,
+                        LaunchParamsFromBackground params);
 
   // ash::SessionManagerClient::Observer:
   void EmitLoginPromptVisibleCalled() override;

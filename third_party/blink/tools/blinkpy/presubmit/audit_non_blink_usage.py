@@ -169,6 +169,7 @@ _CONFIG = [
 
             # //base/functional/callback.h is allowed, but you need to use
             # WTF::Bind or WTF::BindRepeating to create callbacks in Blink.
+            'base::BarrierCallback',
             'base::BarrierClosure',
             'base::NullCallback',
             'base::OnceCallback',
@@ -312,6 +313,9 @@ _CONFIG = [
             'base::DefaultTickClock',
             'base::TestMockTimeTaskRunner',
             'base::TickClock',
+
+            # State transition checking
+            'base::StateTransitions',
 
             # cc painting and raster types.
             'cc::CategorizedWorkerPool',
@@ -720,7 +724,7 @@ _CONFIG = [
             'crash_reporter::.*CrashKey.*',
 
             # Useful for platform-specific code.
-            'base::mac::(CFToNSPtrCast|NSToCFPtrCast|CFToNSOwnershipCast|NSToCFOwnershipCast)',
+            'base::apple::(CFToNSPtrCast|NSToCFPtrCast|CFToNSOwnershipCast|NSToCFOwnershipCast)',
             'base::mac::Is(AtMost|AtLeast)?OS.+',
             'base::ScopedCFTypeRef',
         ],

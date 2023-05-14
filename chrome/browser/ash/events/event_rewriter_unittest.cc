@@ -3188,6 +3188,15 @@ TEST_F(EventRewriterTest,
          ui::DomKey::F12}}});
 }
 
+TEST_F(EventRewriterTest, RecordEventRemappedToRightClick) {
+  Preferences::RegisterProfilePrefs(prefs()->registry());
+  BooleanPrefMember remap_to_right_click;
+  remap_to_right_click.Init(prefs::kEventRemappedToRightClick, prefs());
+  remap_to_right_click.SetValue(false);
+  delegate_->RecordEventRemappedToRightClick();
+  EXPECT_EQ(true, prefs()->GetBoolean(prefs::kEventRemappedToRightClick));
+}
+
 TEST_F(
     EventRewriterTest,
     TestFunctionKeysLayout2SuppressMetaTopRowKeyRewritesWithTreatTopRowAsFKeys) {
@@ -4584,6 +4593,7 @@ TEST_F(EventRewriterAshTest, TopRowKeysAreFunctionKeys) {
 // Alt+Click or Search+Click. After a transition period this will
 // default to Search+Click and the Alt+Click logic will be removed.
 void EventRewriterTest::DontRewriteIfNotRewritten(int right_click_flags) {
+  Preferences::RegisterProfilePrefs(prefs()->registry());
   ui::DeviceDataManager* device_data_manager =
       ui::DeviceDataManager::GetInstance();
   std::vector<ui::TouchpadDevice> touchpad_devices(2);
@@ -5400,6 +5410,9 @@ class ExtensionRewriterInputTest : public EventRewriterAshTest,
   }
   void SuppressModifierKeyRewrites(bool should_suppress) override {}
   void SuppressMetaTopRowKeyComboRewrites(bool should_suppress) override {}
+  void RecordEventRemappedToRightClick() override {}
+  void RecordSixPackEventRewrite(ui::KeyboardCode key_code,
+                                 bool alt_based) override {}
 
   std::map<std::string, ui::mojom::ModifierKey> modifier_remapping_;
   base::flat_set<ui::Accelerator> registered_extension_shortcuts_;
@@ -5893,5 +5906,43 @@ TEST_F(EventRewriterSettingsSplitTest, ModifierRemapping) {
          ui::DomKey::Constant<'a'>::Character},
         {ui::VKEY_A, ui::DomCode::US_A, ui::EF_CONTROL_DOWN,
          ui::DomKey::Constant<'a'>::Character}}});
+}
+
+class KeyEventRemappedToSixPackKeyTest
+    : public EventRewriterTest,
+      public testing::WithParamInterface<
+          std::tuple<ui::KeyboardCode, bool, int, const char*>> {
+ public:
+  void SetUp() override {
+    EventRewriterTest::SetUp();
+    std::tie(key_code_, alt_based_, expected_pref_value_, pref_name_) =
+        GetParam();
+  }
+
+ protected:
+  ui::KeyboardCode key_code_;
+  bool alt_based_;
+  int expected_pref_value_;
+  const char* pref_name_;
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    All,
+    KeyEventRemappedToSixPackKeyTest,
+    testing::ValuesIn(std::vector<
+                      std::tuple<ui::KeyboardCode, bool, int, const char*>>{
+        {ui::VKEY_DELETE, false, -1, prefs::kKeyEventRemappedToSixPackDelete},
+        {ui::VKEY_HOME, true, 1, prefs::kKeyEventRemappedToSixPackHome},
+        {ui::VKEY_PRIOR, false, -1, prefs::kKeyEventRemappedToSixPackPageDown},
+        {ui::VKEY_END, true, 1, prefs::kKeyEventRemappedToSixPackEnd},
+        {ui::VKEY_NEXT, false, -1, prefs::kKeyEventRemappedToSixPackPageUp}}));
+
+TEST_P(KeyEventRemappedToSixPackKeyTest, KeyEventRemappedTest) {
+  Preferences::RegisterProfilePrefs(prefs()->registry());
+  IntegerPrefMember int_pref;
+  int_pref.Init(pref_name_, prefs());
+  int_pref.SetValue(0);
+  delegate_->RecordSixPackEventRewrite(key_code_, alt_based_);
+  EXPECT_EQ(expected_pref_value_, prefs()->GetInteger(pref_name_));
 }
 }  // namespace ash

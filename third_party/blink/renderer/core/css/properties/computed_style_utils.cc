@@ -877,6 +877,27 @@ CSSPrimitiveValue* ComputedStyleUtils::ValueForFontSize(
                                 style);
 }
 
+CSSValue* ComputedStyleUtils::ValueForFontSizeAdjust(
+    const ComputedStyle& style) {
+  if (!style.HasFontSizeAdjust()) {
+    return CSSIdentifierValue::Create(CSSValueID::kNone);
+  }
+
+  FontSizeAdjust font_size_adjust = style.FontSizeAdjust();
+  if (font_size_adjust.GetMetric() == FontSizeAdjust::Metric::kExHeight) {
+    return CSSNumericLiteralValue::Create(style.FontSizeAdjust().Value(),
+                                          CSSPrimitiveValue::UnitType::kNumber);
+  }
+
+  CSSIdentifierValue* metric =
+      CSSIdentifierValue::Create(font_size_adjust.GetMetric());
+  CSSPrimitiveValue* value = CSSNumericLiteralValue::Create(
+      style.FontSizeAdjust().Value(), CSSPrimitiveValue::UnitType::kNumber);
+
+  return MakeGarbageCollected<CSSValuePair>(metric, value,
+                                            CSSValuePair::kKeepIdenticalValues);
+}
+
 CSSPrimitiveValue* ComputedStyleUtils::ValueForFontStretch(
     const ComputedStyle& style) {
   return CSSNumericLiteralValue::Create(
@@ -2209,11 +2230,21 @@ CSSValue* ComputedStyleUtils::ValueForAnimationDuration(
 }
 
 CSSValue* ComputedStyleUtils::ValueForAnimationDurationList(
-    const CSSTimingData* timing_data) {
+    const CSSAnimationData* animation_data) {
   return CreateAnimationValueList(
-      timing_data
-          ? timing_data->DurationList()
-          : Vector<absl::optional<double>>{CSSTimingData::InitialDuration()},
+      animation_data
+          ? animation_data->DurationList()
+          : Vector<absl::optional<double>>{CSSAnimationData::InitialDuration()},
+      &ValueForAnimationDuration);
+}
+
+CSSValue* ComputedStyleUtils::ValueForAnimationDurationList(
+    const CSSTransitionData* transition_data) {
+  return CreateAnimationValueList(
+      transition_data
+          ? transition_data->DurationList()
+          : Vector<
+                absl::optional<double>>{CSSTransitionData::InitialDuration()},
       &ValueForAnimationDuration);
 }
 
@@ -3746,6 +3777,15 @@ CSSValue* ComputedStyleUtils::ValueForIntrinsicLength(
   }
   list->Append(*length);
   return list;
+}
+
+CSSValue* ComputedStyleUtils::ValueForScrollStart(const ComputedStyle& style,
+                                                  const ScrollStartData& data) {
+  if (data.value_type == ScrollStartValueType::kLengthOrPercentage) {
+    return ComputedStyleUtils::ZoomAdjustedPixelValueForLength(data.value,
+                                                               style);
+  }
+  return CSSIdentifierValue::Create(data.value_type);
 }
 
 std::unique_ptr<CrossThreadStyleValue>

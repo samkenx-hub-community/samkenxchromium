@@ -51,7 +51,20 @@ CompanionPageHandler::CompanionPageHandler(
 
 CompanionPageHandler::~CompanionPageHandler() = default;
 
-void CompanionPageHandler::PrimaryPageChanged(content::Page& page) {
+void CompanionPageHandler::DidFinishNavigation(
+    content::NavigationHandle* navigation_handle) {
+  if (!navigation_handle->IsInPrimaryMainFrame() ||
+      !navigation_handle->HasCommitted()) {
+    return;
+  }
+
+  if (page_url_.GetWithoutRef() ==
+      web_contents()->GetLastCommittedURL().GetWithoutRef()) {
+    return;
+  }
+
+  page_url_ = web_contents()->GetLastCommittedURL();
+
   ukm::SourceId ukm_source_id =
       web_contents()->GetPrimaryMainFrame()->GetPageUkmSourceId();
   metrics_logger_ = std::make_unique<CompanionMetricsLogger>(ukm_source_id);
@@ -74,16 +87,18 @@ void CompanionPageHandler::ShowUI() {
     auto* active_web_contents =
         GetBrowser()->tab_strip_model()->GetActiveWebContents();
     Observe(active_web_contents);
+    page_url_ = active_web_contents->GetLastCommittedURL();
     ukm::SourceId ukm_source_id =
         web_contents()->GetPrimaryMainFrame()->GetPageUkmSourceId();
     metrics_logger_ = std::make_unique<CompanionMetricsLogger>(ukm_source_id);
     auto* helper =
         companion::CompanionTabHelper::FromWebContents(active_web_contents);
     helper->SetCompanionPageHandler(weak_ptr_factory_.GetWeakPtr());
+    metrics_logger_->RecordOpenTrigger(
+        helper->GetAndResetMostRecentSidePanelOpenTrigger());
+
     std::string initial_text_query = helper->GetTextQuery();
     if (!initial_text_query.empty()) {
-      metrics_logger_->RecordOpenTrigger(
-          companion::OpenTrigger::kContextMenuTextSearch);
       OnSearchTextQuery(initial_text_query);
       return;
     }
@@ -91,13 +106,10 @@ void CompanionPageHandler::ShowUI() {
     std::unique_ptr<side_panel::mojom::ImageQuery> image_query =
         helper->GetImageQuery();
     if (image_query) {
-      metrics_logger_->RecordOpenTrigger(
-          companion::OpenTrigger::kContextMenuImageSearch);
       OnImageQuery(*image_query);
       return;
     }
 
-    metrics_logger_->RecordOpenTrigger(companion::OpenTrigger::kOther);
     NotifyURLChanged(/*is_full_reload=*/true);
   }
 }
@@ -135,10 +147,6 @@ void CompanionPageHandler::OnImageQuery(
   page_->OnImageQuery(image_query.Clone());
 }
 
-GURL CompanionPageHandler::GetNewTabButtonUrl() {
-  return open_in_new_tab_url_;
-}
-
 void CompanionPageHandler::OnPromoAction(
     side_panel::mojom::PromoType promo_type,
     side_panel::mojom::PromoAction promo_action) {
@@ -151,7 +159,7 @@ void CompanionPageHandler::OnRegionSearchClicked() {
   CHECK(helper);
   helper->StartRegionSearch(web_contents(), /*use_fullscreen_capture=*/false);
   metrics_logger_->RecordUiSurfaceClicked(
-      side_panel::mojom::UiSurface::kRegionSearch);
+      side_panel::mojom::UiSurface::kRegionSearch, kInvalidPosition);
 }
 
 void CompanionPageHandler::OnExpsOptInStatusAvailable(bool is_exps_opted_in) {
@@ -167,19 +175,23 @@ void CompanionPageHandler::OnOpenInNewTabButtonURLChanged(
   auto* companion_helper =
       companion::CompanionTabHelper::FromWebContents(web_contents());
   DCHECK(companion_helper);
-  open_in_new_tab_url_ = url_to_open;
-  companion_helper->UpdateNewTabButtonState();
+  companion_helper->UpdateNewTabButton(url_to_open);
 }
 
 void CompanionPageHandler::RecordUiSurfaceShown(
     side_panel::mojom::UiSurface ui_surface,
-    uint32_t child_element_count) {
-  metrics_logger_->RecordUiSurfaceShown(ui_surface, child_element_count);
+    uint32_t ui_surface_position,
+    uint32_t child_element_available_count,
+    uint32_t child_element_shown_count) {
+  metrics_logger_->RecordUiSurfaceShown(ui_surface, ui_surface_position,
+                                        child_element_available_count,
+                                        child_element_shown_count);
 }
 
 void CompanionPageHandler::RecordUiSurfaceClicked(
-    side_panel::mojom::UiSurface ui_surface) {
-  metrics_logger_->RecordUiSurfaceClicked(ui_surface);
+    side_panel::mojom::UiSurface ui_surface,
+    int32_t click_position) {
+  metrics_logger_->RecordUiSurfaceClicked(ui_surface, click_position);
 }
 
 void CompanionPageHandler::OnCqCandidatesAvailable(

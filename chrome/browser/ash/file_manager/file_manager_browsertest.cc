@@ -1339,6 +1339,8 @@ WRAPPED_INSTANTIATE_TEST_SUITE_P(
         TestCase("toolbarCloudIconShouldNotShowWhenPrefDisabled")
             .EnableBulkPinning(),
         TestCase("toolbarCloudIconShouldShowOnStartupEvenIfSyncing")
+            .EnableBulkPinning(),
+        TestCase("toolbarCloudIconShouldShowWhenPausedState")
             .EnableBulkPinning()));
 
 WRAPPED_INSTANTIATE_TEST_SUITE_P(
@@ -1424,6 +1426,7 @@ WRAPPED_INSTANTIATE_TEST_SUITE_P(
         TestCase("openQuickViewUmaForCheckSelectViaContextMenu"),
         TestCase("openQuickViewUmaViaSelectionMenu"),
         TestCase("openQuickViewUmaViaSelectionMenuKeyboard"),
+        TestCase("openQuickViewEncryptedFile"),
         TestCase("closeQuickView")));
 
 WRAPPED_INSTANTIATE_TEST_SUITE_P(
@@ -1545,7 +1548,11 @@ WRAPPED_INSTANTIATE_TEST_SUITE_P(
         TestCase("driveEncryptionBadge"),
         TestCase("driveDeleteDialogDoesntMentionPermanentDelete"),
         TestCase("driveInlineSyncStatusSingleFile").EnableInlineStatusSync(),
-        TestCase("driveInlineSyncStatusParentFolder").EnableInlineStatusSync()
+        TestCase("driveInlineSyncStatusParentFolder").EnableInlineStatusSync(),
+        TestCase("driveFolderShouldShowOfflineTickWhenBulkPinningEnabled")
+            .EnableBulkPinning(),
+        TestCase("driveFoldersRetainPinnedPropertyWhenBulkPinningEnabled")
+            .EnableBulkPinning()
         // TODO(b/189173190): Enable
         // TestCase("driveEnableDocsOfflineDialog"),
         // TODO(b/189173190): Enable
@@ -2156,13 +2163,13 @@ WRAPPED_INSTANTIATE_TEST_SUITE_P(
         TestCase("searchRemovableDevice").EnableSearchV2(),
         TestCase("searchPartitionedRemovableDevice").EnableSearchV2(),
         TestCase("resetSearchOptionsOnFolderChange").EnableSearchV2(),
-        // TODO(crbug.com/1442564): Re-enable this test
-        // TestCase("showSearchResultMessageWhenSearching").EnableSearchV2(),
+        TestCase("showSearchResultMessageWhenSearching").EnableSearchV2(),
         TestCase("showsEducationNudge").EnableSearchV2(),
         TestCase("searchFromMyFiles").EnableSearchV2(),
         TestCase("selectionPath").EnableSearchV2(),
         TestCase("searchHierarchy").EnableSearchV2(),
         TestCase("hideSearchInTrash").EnableSearchV2(),
+        TestCase("searchTrashedFiles").EnableSearchV2(),
         TestCase("matchDriveFilesByName").EnableSearchV2()
         // TODO(b/189173190): Enable
         // TestCase("searchQueryLaunchParam")

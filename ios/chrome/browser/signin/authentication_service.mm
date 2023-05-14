@@ -383,10 +383,6 @@ void AuthenticationService::SignIn(id<SystemIdentity> identity,
   crash_keys::SetCurrentlySignedIn(true);
 }
 
-void AuthenticationService::SignIn(id<SystemIdentity> identity) {
-  SignIn(identity, signin_metrics::AccessPoint::ACCESS_POINT_UNKNOWN);
-}
-
 void AuthenticationService::GrantSyncConsent(
     id<SystemIdentity> identity,
     signin_metrics::AccessPoint access_point) {
@@ -429,10 +425,6 @@ void AuthenticationService::GrantSyncConsent(
   sync_service_->SetSyncFeatureRequested();
 }
 
-void AuthenticationService::GrantSyncConsent(id<SystemIdentity> identity) {
-  GrantSyncConsent(identity, signin_metrics::AccessPoint::ACCESS_POINT_UNKNOWN);
-}
-
 void AuthenticationService::SignOut(
     signin_metrics::ProfileSignout signout_source,
     bool force_clear_browsing_data,
@@ -451,7 +443,7 @@ void AuthenticationService::SignOut(
       HasPrimaryIdentityManaged(signin::ConsentLevel::kSignin);
   // Get first setup complete value before to stop the sync service.
   const bool is_first_setup_complete =
-      sync_setup_service_->IsFirstSetupComplete();
+      sync_setup_service_->IsInitialSyncFeatureSetupComplete();
 
   auto* account_mutator = identity_manager_->GetPrimaryAccountMutator();
   // GetPrimaryAccountMutator() returns nullptr on ChromeOS only.
@@ -526,6 +518,10 @@ void AuthenticationService::OnPrimaryAccountChanged(
       break;
     case signin::PrimaryAccountChangeEvent::Type::kNone:
       break;
+  }
+
+  for (auto& observer : observer_list_) {
+    observer.OnPrimaryIdentityChanged();
   }
 }
 

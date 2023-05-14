@@ -25,7 +25,6 @@
 #include "components/sync/driver/data_type_manager.h"
 #include "components/sync/driver/data_type_manager_observer.h"
 #include "components/sync/driver/data_type_status_table.h"
-#include "components/sync/driver/startup_controller.h"
 #include "components/sync/driver/sync_client.h"
 #include "components/sync/driver/sync_service.h"
 #include "components/sync/driver/sync_service_crypto.h"
@@ -61,8 +60,10 @@ class SyncServiceImpl : public SyncService,
                         public SyncServiceCrypto::Delegate,
                         public signin::IdentityManager::Observer {
  public:
-  // If AUTO_START, sync will set IsFirstSetupComplete() automatically and sync
-  // will begin syncing without the user needing to confirm sync settings.
+  // If AUTO_START, sync will set IsInitialSyncFeatureSetupComplete()
+  // automatically and sync will begin syncing without the user needing to
+  // confirm sync settings.
+  // TODO(crbug.com/1443438): Remove StartBehavior altogether.
   enum StartBehavior {
     AUTO_START,
     MANUAL_START,
@@ -119,6 +120,7 @@ class SyncServiceImpl : public SyncService,
   GoogleServiceAuthError GetAuthError() const override;
   base::Time GetAuthErrorTime() const override;
   bool RequiresClientUpgrade() const override;
+  bool IsSyncFeatureDisabledViaDashboard() const override;
   std::unique_ptr<SyncSetupInProgressHandle> GetSetupInProgressHandle()
       override;
   bool IsSetupInProgress() const override;
@@ -318,8 +320,13 @@ class SyncServiceImpl : public SyncService,
 
   void ClearUnrecoverableError();
 
-  // Kicks off asynchronous initialization of the SyncEngine.
-  void StartUpSlowEngineComponents();
+  // Posts a task to create the sync engine, if IsEngineAllowedToRun() is true
+  // and there is no engine yet (no-op otherwise). This method posts a task so
+  // callers can set up other state as necessary before the engine starts.
+  void TryStart();
+
+  // The actual synchronous implementation of TryStart().
+  void TryStartImpl();
 
   // Whether sync has been authenticated with an account ID.
   bool IsSignedIn() const;
@@ -441,7 +448,6 @@ class SyncServiceImpl : public SyncService,
   CreateHttpPostProviderFactory create_http_post_provider_factory_cb_;
 
   const StartBehavior start_behavior_;
-  std::unique_ptr<StartupController> startup_controller_;
 
   std::unique_ptr<SyncStoppedReporter> sync_stopped_reporter_;
 
@@ -460,6 +466,11 @@ class SyncServiceImpl : public SyncService,
   // is typically false on Android (to save network traffic), but true on all
   // other platforms.
   bool sessions_invalidations_enabled_;
+
+  // Set if/when Initialize() schedules a deferred task to start the engine.
+  // Cleared on the first start attempt, regardless of success and who triggered
+  // that attempt (the posted task or a new TryStart()).
+  base::Time deferring_first_start_since_;
 
   // This weak factory invalidates its issued pointers when Sync is disabled.
   base::WeakPtrFactory<SyncServiceImpl> sync_enabled_weak_factory_{this};

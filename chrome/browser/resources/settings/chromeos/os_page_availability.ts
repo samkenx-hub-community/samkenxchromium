@@ -15,138 +15,73 @@
  * visible page.
  */
 
-import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
+import {isGuest, isKerberosEnabled, isPowerwashAllowed} from './common/load_time_booleans.js';
 
 export interface OsPageAvailability {
   a11y: boolean;
-  advancedSettings: boolean;
-  appearance: {
-    bookmarksBar: boolean,
-    homeButton: boolean,
-    pageZoom: boolean,
-    setTheme: boolean,
-    setWallpaper: boolean,
-  };
-  autofill: boolean;
+  apps: boolean;
   bluetooth: boolean;
+  crostini: boolean;
   dateTime: boolean;
   device: boolean;
-  downloads: {
-    googleDrive: boolean,
-    smbShares: boolean,
-  };
-  extensions: boolean;
+  files: boolean;
   internet: boolean;
   kerberos: boolean;
-  languages: {
-    manageInputMethods: boolean,
-    inputMethodsList: boolean,
-  };
+  languages: boolean;
   multidevice: boolean;
-  onStartup: boolean;
-  people: boolean|{
-    googleAccounts: boolean,
-    lockScreen: boolean,
-    manageUsers: boolean,
-  };
+  people: boolean;
+  personalization: boolean;
   printing: boolean;
-  privacy: {
-    contentProtectionAttestation: boolean,
-    networkPrediction: boolean,
-    searchPrediction: boolean,
-    wakeOnWifi: boolean,
-  };
+  privacy: boolean;
   reset: boolean;
+  search: boolean;
 }
 
-const isGuestMode = loadTimeData.getBoolean('isGuest');
-const isAccountManagerEnabled =
-    loadTimeData.valueExists('isAccountManagerEnabled') &&
-    loadTimeData.getBoolean('isAccountManagerEnabled');
-const isKerberosEnabled = loadTimeData.valueExists('isKerberosEnabled') &&
-    loadTimeData.getBoolean('isKerberosEnabled');
-
-let osPageAvailability: OsPageAvailability;
-if (isGuestMode) {
-  osPageAvailability = {
+/**
+ * Used to create the pageAvailability object.
+ *
+ * Can be used to create the pageAvailability object with expected values after
+ * overriding load time data within tests.
+ */
+export function createPageAvailability(): OsPageAvailability {
+  if (isGuest()) {
+    return {
+      a11y: true,
+      apps: true,
+      bluetooth: true,
+      crostini: true,
+      dateTime: true,
+      device: true,
+      files: false,
+      internet: true,
+      kerberos: isKerberosEnabled(),
+      languages: true,
+      multidevice: false,
+      people: false,
+      personalization: false,
+      printing: true,
+      privacy: true,
+      reset: isPowerwashAllowed(),
+      search: true,
+    };
+  }
+  return {
     a11y: true,
-    advancedSettings: true,
-    appearance: {
-      setWallpaper: false,
-      setTheme: false,
-      homeButton: false,
-      bookmarksBar: false,
-      pageZoom: false,
-    },
-    autofill: false,
+    apps: true,
     bluetooth: true,
+    crostini: true,
     dateTime: true,
     device: true,
-    downloads: {
-      googleDrive: false,
-      smbShares: false,
-    },
-    extensions: false,
+    files: true,
     internet: true,
-    kerberos: isKerberosEnabled,
-    languages: {
-      manageInputMethods: true,
-      inputMethodsList: true,
-    },
-    multidevice: false,
-    onStartup: false,
-    people: false,
-    printing: true,
-    privacy: {
-      contentProtectionAttestation: true,
-      searchPrediction: false,
-      networkPrediction: false,
-      wakeOnWifi: true,
-    },
-    reset: false,
-  };
-} else {
-  osPageAvailability = {
-    a11y: true,
-    advancedSettings: true,
-    appearance: {
-      setWallpaper: true,
-      setTheme: true,
-      homeButton: true,
-      bookmarksBar: true,
-      pageZoom: true,
-    },
-    autofill: true,
-    bluetooth: true,
-    dateTime: true,
-    device: true,
-    downloads: {
-      googleDrive: true,
-      smbShares: true,
-    },
-    extensions: true,
-    internet: true,
-    kerberos: isKerberosEnabled,
-    languages: {
-      manageInputMethods: true,
-      inputMethodsList: true,
-    },
+    kerberos: isKerberosEnabled(),
+    languages: true,
     multidevice: true,
-    onStartup: true,
-    people: {
-      lockScreen: true,
-      googleAccounts: isAccountManagerEnabled,
-      manageUsers: true,
-    },
+    people: true,
+    personalization: true,
     printing: true,
-    privacy: {
-      contentProtectionAttestation: true,
-      searchPrediction: true,
-      networkPrediction: true,
-      wakeOnWifi: true,
-    },
-    reset: true,
+    privacy: true,
+    reset: isPowerwashAllowed(),
+    search: true,
   };
 }
-
-export {osPageAvailability};

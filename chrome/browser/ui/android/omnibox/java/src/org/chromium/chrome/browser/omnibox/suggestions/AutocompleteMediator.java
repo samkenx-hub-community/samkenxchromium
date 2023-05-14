@@ -30,7 +30,6 @@ import org.chromium.chrome.browser.omnibox.R;
 import org.chromium.chrome.browser.omnibox.UrlBarEditingTextStateProvider;
 import org.chromium.chrome.browser.omnibox.styles.OmniboxResourceProvider;
 import org.chromium.chrome.browser.omnibox.suggestions.AutocompleteController.OnSuggestionsReceivedListener;
-import org.chromium.chrome.browser.omnibox.suggestions.SuggestionsMetrics.RefineActionUsage;
 import org.chromium.chrome.browser.omnibox.suggestions.base.HistoryClustersProcessor.OpenHistoryClustersDelegate;
 import org.chromium.chrome.browser.omnibox.suggestions.basic.BasicSuggestionProcessor.BookmarkState;
 import org.chromium.chrome.browser.omnibox.voice.VoiceRecognitionHandler;
@@ -45,7 +44,10 @@ import org.chromium.chrome.browser.ui.theme.BrandedColorScheme;
 import org.chromium.components.metrics.OmniboxEventProtos.OmniboxEventProto.PageClassification;
 import org.chromium.components.omnibox.AutocompleteMatch;
 import org.chromium.components.omnibox.AutocompleteResult;
+import org.chromium.components.omnibox.OmniboxMetrics;
+import org.chromium.components.omnibox.OmniboxMetrics.RefineActionUsage;
 import org.chromium.components.omnibox.OmniboxSuggestionType;
+import org.chromium.components.omnibox.action.OmniboxActionDelegate;
 import org.chromium.content_public.browser.WebContents;
 import org.chromium.ui.base.PageTransition;
 import org.chromium.ui.modaldialog.DialogDismissalCause;
@@ -154,7 +156,8 @@ class AutocompleteMediator implements OnSuggestionsReceivedListener,
             @NonNull LocationBarDataProvider locationBarDataProvider,
             @NonNull Callback<Tab> bringTabToFrontCallback,
             @NonNull Supplier<TabWindowManager> tabWindowManagerSupplier,
-            @NonNull BookmarkState bookmarkState, @NonNull ActionChipsDelegate actionChipsDelegate,
+            @NonNull BookmarkState bookmarkState,
+            @NonNull OmniboxActionDelegate omniboxActionDelegate,
             @NonNull OpenHistoryClustersDelegate openHistoryClustersDelegate) {
         mContext = context;
         mControllerProvider = controllerProvider;
@@ -168,7 +171,7 @@ class AutocompleteMediator implements OnSuggestionsReceivedListener,
         mTabWindowManagerSupplier = tabWindowManagerSupplier;
         mSuggestionModels = mListPropertyModel.get(SuggestionListProperties.SUGGESTION_MODELS);
         mDropdownViewInfoListBuilder = new DropdownItemViewInfoListBuilder(activityTabSupplier,
-                bookmarkState, actionChipsDelegate, openHistoryClustersDelegate);
+                bookmarkState, omniboxActionDelegate, openHistoryClustersDelegate);
         mDropdownViewInfoListBuilder.setShareDelegateSupplier(shareDelegateSupplier);
         mDropdownViewInfoListManager =
                 new DropdownItemViewInfoListManager(mSuggestionModels, context);
@@ -327,10 +330,10 @@ class AutocompleteMediator implements OnSuggestionsReceivedListener,
         } else {
             stopMeasuringSuggestionRequestToUiModelTime();
             cancelAutocompleteRequests();
-            SuggestionsMetrics.recordOmniboxFocusResultedInNavigation(
+            OmniboxMetrics.recordOmniboxFocusResultedInNavigation(
                     mOmniboxFocusResultedInNavigation);
-            SuggestionsMetrics.recordRefineActionUsage(mRefineActionUsage);
-            SuggestionsMetrics.recordSuggestionsListScrolled(
+            OmniboxMetrics.recordRefineActionUsage(mRefineActionUsage);
+            OmniboxMetrics.recordSuggestionsListScrolled(
                     mDataProvider.getPageClassification(
                             mDelegate.didFocusUrlFromFakebox(), /*isPrefetch=*/false),
                     mSuggestionsListScrolled);
@@ -792,7 +795,7 @@ class AutocompleteMediator implements OnSuggestionsReceivedListener,
     private void loadUrlForOmniboxMatch(int matchIndex, @NonNull AutocompleteMatch suggestion,
             @NonNull GURL url, long inputStart, boolean inVisibleSuggestionList) {
         try (TraceEvent e = TraceEvent.scoped("AutocompleteMediator.loadUrlFromOmniboxMatch")) {
-            SuggestionsMetrics.recordFocusToOpenTime(System.currentTimeMillis() - mUrlFocusTime);
+            OmniboxMetrics.recordFocusToOpenTime(System.currentTimeMillis() - mUrlFocusTime);
 
             // Clear the deferred site load action in case it executes. Reclaims a bit of memory.
             mDeferredLoadAction = null;
@@ -988,7 +991,7 @@ class AutocompleteMediator implements OnSuggestionsReceivedListener,
      * @param suggestion The suggestion selected.
      */
     private void recordMetrics(int matchIndex, int disposition, AutocompleteMatch suggestion) {
-        SuggestionsMetrics.recordUsedSuggestionFromCache(mAutocompleteResult.isFromCachedResult());
+        OmniboxMetrics.recordUsedSuggestionFromCache(mAutocompleteResult.isFromCachedResult());
 
         // Do not attempt to record other metrics for cached suggestions if the source of the list
         // is local cache. These suggestions do not have corresponding native objects and will fail
@@ -1128,12 +1131,12 @@ class AutocompleteMediator implements OnSuggestionsReceivedListener,
 
         if (mFirstSuggestionListModelCreatedTime == null) {
             mFirstSuggestionListModelCreatedTime = SystemClock.uptimeMillis();
-            SuggestionsMetrics.recordSuggestionRequestToModelTime(/*isFirst=*/true,
+            OmniboxMetrics.recordSuggestionRequestToModelTime(/*isFirst=*/true,
                     mFirstSuggestionListModelCreatedTime - mLastSuggestionRequestTime);
         }
 
         if (isFinal) {
-            SuggestionsMetrics.recordSuggestionRequestToModelTime(
+            OmniboxMetrics.recordSuggestionRequestToModelTime(
                     /*isFirst=*/false, SystemClock.uptimeMillis() - mLastSuggestionRequestTime);
             stopMeasuringSuggestionRequestToUiModelTime();
         }

@@ -36,6 +36,7 @@
 #include "net/cookies/site_for_cookies.h"
 #include "net/filter/source_stream.h"
 #include "services/metrics/public/cpp/ukm_source_id.h"
+#include "services/network/public/cpp/attribution_reporting_runtime_features.h"
 #include "services/network/public/mojom/attribution.mojom-blink.h"
 #include "services/network/public/mojom/chunked_data_pipe_getter.mojom-blink-forward.h"
 #include "services/network/public/mojom/cors.mojom-blink-forward.h"
@@ -287,6 +288,14 @@ class PLATFORM_EXPORT ResourceRequestHead {
   bool GetBrowsingTopics() const { return browsing_topics_; }
   void SetBrowsingTopics(bool browsing_topics) {
     browsing_topics_ = browsing_topics;
+  }
+
+  // True if this is an ad auction request eligible for attaching the
+  // `Sec-Ad-Auction-Fetch` request header and processing the
+  // `X-Ad-Auction-Result` response header.
+  bool GetAdAuctionHeaders() const { return ad_auction_headers_; }
+  void SetAdAuctionHeaders(bool ad_auction_headers) {
+    ad_auction_headers_ = ad_auction_headers;
   }
 
   // True if service workers should not get events for the request.
@@ -571,6 +580,16 @@ class PLATFORM_EXPORT ResourceRequestHead {
     attribution_reporting_eligibility_ = eligibility;
   }
 
+  const network::AttributionReportingRuntimeFeatures&
+  GetAttributionReportingRuntimeFeatures() const {
+    return attribution_reporting_runtime_features_;
+  }
+
+  void SetAttributionReportingRuntimeFeatures(
+      network::AttributionReportingRuntimeFeatures runtime_features) {
+    attribution_reporting_runtime_features_ = runtime_features;
+  }
+
  private:
   const CacheControlHeader& GetCacheControlHeader() const;
 
@@ -597,6 +616,7 @@ class PLATFORM_EXPORT ResourceRequestHead {
   bool use_stream_on_response_ : 1;
   bool keepalive_ : 1;
   bool browsing_topics_ : 1;
+  bool ad_auction_headers_ : 1;
   bool allow_stale_response_ : 1;
   mojom::blink::FetchCacheMode cache_mode_;
   bool skip_service_worker_ : 1;
@@ -697,6 +717,9 @@ class PLATFORM_EXPORT ResourceRequestHead {
   network::mojom::AttributionReportingEligibility
       attribution_reporting_eligibility_ =
           network::mojom::AttributionReportingEligibility::kUnset;
+
+  network::AttributionReportingRuntimeFeatures
+      attribution_reporting_runtime_features_;
 };
 
 class PLATFORM_EXPORT ResourceRequestBody {

@@ -448,8 +448,9 @@ void RenderFrameHostManager::InitRoot(
               ? static_cast<absl::optional<BrowsingInstanceId>>(absl::nullopt)
               : site_instance->GetBrowsingInstanceId(),
           is_legacy_browsing_context_state_mode
-              ? static_cast<absl::optional<CoopRelatedGroupId>>(absl::nullopt)
-              : site_instance->GetCoopRelatedGroupId());
+              ? static_cast<absl::optional<base::UnguessableToken>>(
+                    absl::nullopt)
+              : site_instance->coop_related_group_token());
   browsing_context_state->CommitFramePolicy(initial_main_frame_policy);
   browsing_context_state->SetFrameName(name, "");
   UpdateProcessReusePolicyForProcessPerSiteWithMainFrameThreshold(
@@ -499,8 +500,9 @@ void RenderFrameHostManager::InitChild(
               ? static_cast<absl::optional<BrowsingInstanceId>>(absl::nullopt)
               : site_instance->GetBrowsingInstanceId(),
           is_legacy_browsing_context_state_mode
-              ? static_cast<absl::optional<CoopRelatedGroupId>>(absl::nullopt)
-              : site_instance->GetCoopRelatedGroupId());
+              ? static_cast<absl::optional<base::UnguessableToken>>(
+                    absl::nullopt)
+              : site_instance->coop_related_group_token());
   browsing_context_state->CommitFramePolicy(frame_policy);
   SetRenderFrameHost(CreateRenderFrameHost(
       CreateFrameCase::kInitChild, site_instance, frame_routing_id,
@@ -1567,6 +1569,26 @@ RenderFrameHostManager::GetFrameHostForNavigation(
     navigation_rfh->web_ui()->WebUIRenderFrameCreated(navigation_rfh);
   }
 
+  // The following call is here to make sure that explicit opt-out requests,
+  // made while kOriginKeyedProcessByDefault is enabled, record the opt-out
+  // status before CanAccessDataForOrigin is called below. It allows
+  // CanAccessDataForOrigin to start by assuming default isolation (as stored in
+  // the associated IsolationContext), knowing that it will be changed (during
+  // the construction of the expected ProcessLock) to being explicit opt-out due
+  // to the origin being tracked. The change occurs when we create a SiteInfo
+  // for the ProcessLock and DetermineOriginAgentClusterIsolation is called.
+  //
+  // A similar call to the one below is made in
+  // NavigationRequest::SelectFrameHostForOnResponseStarted() to handle
+  // recording opt-outs when kOriginAgentClusterDefault is enabled, although in
+  // that case process isolation isn't involved, and so the following call to
+  // CanAccessDataForOrigin isn't a problem.
+  // TODO(https://crbug.com/931895): Remove the following block (and the
+  // comments above) when the ProcessLock check below is removed.
+  const IsolationContext& isolation_context =
+      navigation_rfh->GetSiteInstance()->GetIsolationContext();
+  request->AddOriginAgentClusterStateIfNecessary(isolation_context);
+
   // If this function picked an incompatible process for the URL, except for
   // allowed cases such as navigating to an error page reusing the current
   // process, capture a crash dump to diagnose why it is occurring.
@@ -2627,34 +2649,20 @@ RenderFrameHostManager::DetermineSiteInstanceForURL(
   // SiteInstanceRelation::RELATED_IN_COOP_GROUP relations to `current_instance`
   // iff `browsing_context_group_swap.ShouldSwap()` is true.
 
-  // If this is an error page that must reuse the current process, ensure that
-  // `current_instance` is used. Note that this must be the first check to
-  // avoid picking the destination instance or other instances, to preserve the
-  //  previous behavior where we didn't call this function (or even
-  // `GetFrameHostForNavigation()`) at all and immediately picked the current
-  // SiteInstance (through picking the current RenderFrameHost directly) in
-  // `NavigationRequest::OnRequestFailedInternal()`.
+  // === Error page handling ===
+  // Note that these must be the first checks to avoid picking the destination
+  // instance or other instances.
   if (error_page_process ==
       NavigationRequest::ErrorPageProcess::kCurrentProcess) {
+    // If this is an error page that must reuse the current process, ensure that
+    // `current_instance` is used.
     AppendReason(reason,
                  "DetermineSiteInstanceForURL => error-current-instance");
     return SiteInstanceDescriptor(current_instance);
-  }
-
-  // If the entry has an instance already we should usually use it, unless it is
-  // no longer suitable.
-
-  if (dest_instance && CanUseDestinationInstance(
-                           dest_url_info, current_instance, dest_instance,
-                           error_page_process, browsing_context_group_swap)) {
-    AppendReason(reason, "DetermineSiteInstanceForURL => dest_instance");
-    return SiteInstanceDescriptor(dest_instance);
-  }
-
-  // If error page navigations should be isolated, ensure a dedicated
-  // SiteInstance is used for them.
-  if (error_page_process ==
-      NavigationRequest::ErrorPageProcess::kIsolatedProcess) {
+  } else if (error_page_process ==
+             NavigationRequest::ErrorPageProcess::kIsolatedProcess) {
+    // If error page navigations should be isolated, ensure a dedicated
+    // SiteInstance is used for them.
     CHECK(frame_tree_node_->IsErrorPageIsolationEnabled());
     // If the target URL requires a BrowsingInstance swap, put the error page
     // in a new BrowsingInstance, since the scripting relationships would
@@ -2697,6 +2705,15 @@ RenderFrameHostManager::DetermineSiteInstanceForURL(
                                   SiteInstanceRelation::UNRELATED);
   }
 
+  // If the entry has an instance already we should usually use it, unless it is
+  // no longer suitable.
+  if (dest_instance && CanUseDestinationInstance(
+                           dest_url_info, current_instance, dest_instance,
+                           error_page_process, browsing_context_group_swap)) {
+    AppendReason(reason, "DetermineSiteInstanceForURL => dest_instance");
+    return SiteInstanceDescriptor(dest_instance);
+  }
+
   // COOP: restrict-properties requires that we swap BrowsingInstance, but
   // preserve a relation to the previous BrowsingInstance.
   bool can_use_source_instance = CanUseSourceSiteInstance(
@@ -2704,9 +2721,9 @@ RenderFrameHostManager::DetermineSiteInstanceForURL(
   if (browsing_context_group_swap.type() ==
       BrowsingContextGroupSwapType::kRelatedCoopSwap) {
     // We typically expect `source_instance` to be in the same BrowsingInstance
-    // as `current_instance`. However when an extension uses the
-    // chrome.tabs.update API to navigate to about:blank, `source_instance` is
-    // set to the extension's SiteInstance, which should be in a different
+    // as `current_instance`. However when extensions use the chrome.tabs.update
+    // API to navigate to about:blank, `source_instance` is set to the
+    // extension's SiteInstance, which should be in a different
     // BrowsingInstance. In that case, `source_instance` should not be in a
     // different BrowsingInstance in the same CoopRelatedGroup as
     // `current_instance`, but use its own extension's CoopRelatedGroup. Note
@@ -3443,7 +3460,7 @@ bool RenderFrameHostManager::CreateSpeculativeRenderFrameHost(
                 ->current_replication_state()
                 .Clone(),
             frame_tree_node_->parent(), new_instance->GetBrowsingInstanceId(),
-            new_instance->GetCoopRelatedGroupId());
+            new_instance->coop_related_group_token());
 
         // Add a proxy to the outer delegate if one exists, as this is not
         // copied over to the new BrowsingContextState otherwise.
@@ -3562,7 +3579,7 @@ void RenderFrameHostManager::CreateRenderFrameProxy(
     const scoped_refptr<BrowsingContextState>& browsing_context_state,
     BatchedProxyIPCSender* batched_proxy_ipc_sender) {
   CHECK(instance);
-  TRACE_EVENT_INSTANT("navigation",
+  TRACE_EVENT_INSTANT("navigation.debug",
                       "RenderFrameHostManager::CreateRenderFrameProxy",
                       ChromeTrackEvent::kSiteInstance, *instance,
                       ChromeTrackEvent::kFrameTreeNodeInfo, *frame_tree_node_);

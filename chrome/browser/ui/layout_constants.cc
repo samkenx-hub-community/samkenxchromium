@@ -116,7 +116,8 @@ int GetLayoutConstant(LayoutConstant constant) {
         return touch_ui ? 12 : 8;
       }
     case PAGE_INFO_ICON_SIZE:
-      return 16;
+      return base::FeatureList::IsEnabled(features::kChromeRefresh2023) ? 20
+                                                                        : 16;
     case DOWNLOAD_ICON_SIZE:
       return 16;
     case TOOLBAR_CORNER_RADIUS:
@@ -157,7 +158,7 @@ gfx::Insets GetLayoutInsets(LayoutInset inset) {
 
     case TOOLBAR_INTERIOR_MARGIN:
       if (base::FeatureList::IsEnabled(features::kChromeRefresh2023)) {
-        return touch_ui ? gfx::Insets() : gfx::Insets::VH(6, 3);
+        return touch_ui ? gfx::Insets() : gfx::Insets::VH(6, 5);
       } else {
         return touch_ui ? gfx::Insets() : gfx::Insets::VH(4, 8);
       }

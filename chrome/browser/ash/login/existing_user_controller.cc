@@ -36,7 +36,6 @@
 #include "chrome/browser/ash/app_mode/kiosk_app_launch_error.h"
 #include "chrome/browser/ash/app_mode/kiosk_app_types.h"
 #include "chrome/browser/ash/arc/arc_util.h"
-#include "chrome/browser/ash/authpolicy/authpolicy_helper.h"
 #include "chrome/browser/ash/boot_times_recorder.h"
 #include "chrome/browser/ash/crosapi/browser_data_migrator.h"
 #include "chrome/browser/ash/customization/customization_document.h"
@@ -58,7 +57,6 @@
 #include "chrome/browser/ash/login/ui/signin_ui.h"
 #include "chrome/browser/ash/login/ui/user_adding_screen.h"
 #include "chrome/browser/ash/login/ui/webui_login_view.h"
-#include "chrome/browser/ash/login/user_flow.h"
 #include "chrome/browser/ash/login/users/chrome_user_manager.h"
 #include "chrome/browser/ash/login/wizard_controller.h"
 #include "chrome/browser/ash/policy/core/browser_policy_connector_ash.h"
@@ -571,23 +569,6 @@ void ExistingUserController::PerformLogin(
     login_performer_ =
         std::make_unique<ChromeLoginPerformer>(this, AuthEventsRecorder::Get());
   }
-  if (user_context.GetAccountId().GetAccountType() ==
-          AccountType::ACTIVE_DIRECTORY &&
-      user_context.GetAuthFlow() == UserContext::AUTH_FLOW_OFFLINE &&
-      user_context.GetKey()->GetKeyType() == Key::KEY_TYPE_PASSWORD_PLAIN) {
-    // Try to get kerberos TGT while we have user's password typed on the pod
-    // screen. Failure to get TGT here is OK - that could mean e.g. Active
-    // Directory server is not reachable. We don't want to have user wait for
-    // the Active Directory Authentication on the pod screen.
-    // AuthPolicyCredentialsManager will be created inside the user session
-    // which would get status about last authentication and handle possible
-    // failures.
-    AuthPolicyHelper::TryAuthenticateUser(
-        user_context.GetAccountId().GetUserEmail(),
-        user_context.GetAccountId().GetObjGuid(),
-        user_context.GetKey()->GetSecret());
-  }
-
   // If plain text password is available, computes its salt, hash, and length,
   // and saves them in `user_context`. They will be saved to prefs when user
   // profile is ready.
@@ -742,12 +723,6 @@ void ExistingUserController::OnAuthFailure(const AuthFailure& failure) {
 
   PerformLoginFinishedActions(false /* don't start auto login timer */);
 
-  if (ChromeUserManager::Get()
-          ->GetUserFlow(last_login_attempt_account_id_)
-          ->HandleLoginFailure(failure)) {
-    return;
-  }
-
   const bool is_known_user = user_manager::UserManager::Get()->IsKnownUser(
       last_login_attempt_account_id_);
   if (failure.reason() == AuthFailure::OWNER_REQUIRED) {
@@ -798,10 +773,6 @@ void ExistingUserController::OnAuthFailure(const AuthFailure& failure) {
     StartAutoLoginTimer();
   }
 
-  // Reset user flow to default, so that special flow will not affect next
-  // attempt.
-  ChromeUserManager::Get()->ResetUserFlow(last_login_attempt_account_id_);
-
   for (auto& auth_status_consumer : auth_status_consumers_)
     auth_status_consumer.OnAuthFailure(failure);
 
@@ -818,10 +789,6 @@ void ExistingUserController::OnAuthSuccess(const UserContext& user_context) {
   CHECK(login_performer_);
   password_changed_ = login_performer_->password_changed();
   auth_mode_ = login_performer_->auth_mode();
-
-  ChromeUserManager::Get()
-      ->GetUserFlow(user_context.GetAccountId())
-      ->HandleLoginSuccess(user_context);
 
   StopAutoLoginTimer();
 
@@ -931,7 +898,7 @@ void ExistingUserController::ContinueAuthSuccessAfterResumeAttempt(
     bool privacy_warnings_enabled =
         g_browser_process->local_state()->GetBoolean(
             prefs::kManagedGuestSessionPrivacyWarningsEnabled);
-    if (ChromeUserManager::Get()->IsFullManagementDisclosureNeeded(broker) &&
+    if (ash::login::IsFullManagementDisclosureNeeded(broker) &&
         privacy_warnings_enabled) {
       ShowAutoLaunchManagedGuestSessionNotification();
     }
@@ -1726,8 +1693,6 @@ void ExistingUserController::ClearActiveDirectoryState() {
       AccountType::ACTIVE_DIRECTORY) {
     return;
   }
-  // Clear authpolicyd state so nothing could leak from one user to another.
-  AuthPolicyHelper::Restart();
 }
 
 AccountId ExistingUserController::GetLastLoginAttemptAccountId() const {

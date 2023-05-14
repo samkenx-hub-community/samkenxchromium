@@ -1606,6 +1606,27 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="Accessibility.PdfOcr.ActiveWhenInaccessiblePdfOpened"
+    enum="BooleanExists" expires_after="2024-02-01">
+  <owner>kyungjunlee@google.com</owner>
+  <owner>chrome-a11y-core@google.com</owner>
+  <summary>
+    When an inaccessible PDF is loaded, true if the PDF OCR feature was turned
+    on to extract text from images. Note that, as long as the PDF OCR is on, a
+    PDF containing images will record true even if the images contain no text.
+  </summary>
+</histogram>
+
+<histogram name="Accessibility.PdfOcr.UserSelection" enum="PdfOcrUserSelection"
+    expires_after="2024-02-01">
+  <owner>kyungjunlee@google.com</owner>
+  <owner>chrome-a11y-core@google.com</owner>
+  <summary>
+    Tracks the PDF OCR menu item that the user selects to turn on or off the PDF
+    OCR feature.
+  </summary>
+</histogram>
+
 <histogram name="Accessibility.Performance.AXTree.Destroy" units="ms"
     expires_after="2023-10-08">
   <owner>agarwaltushar@google.com</owner>
@@ -1752,6 +1773,15 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="Accessibility.ReadAnything.FontName"
+    enum="ReadAnythingFontName" expires_after="2023-11-30">
+  <owner>abigailbklein@google.com</owner>
+  <owner>chrome-a11y-core@google.com</owner>
+  <summary>
+    Records the user-chosen font name for the Read Anything panel.
+  </summary>
+</histogram>
+
 <histogram name="Accessibility.ReadAnything.FontScale" units="em"
     expires_after="2023-11-30">
   <owner>abigailbklein@google.com</owner>
@@ -1776,6 +1806,16 @@ chromium-metrics-reviews@google.com.
   <owner>chrome-a11y-core@google.com</owner>
   <summary>
     Records the user-chosen line spacing for the Read Anything panel.
+  </summary>
+</histogram>
+
+<histogram name="Accessibility.ReadAnything.SettingsChange"
+    enum="ReadAnythingSettingsChange" expires_after="2023-11-30">
+  <owner>abigailbklein@google.com</owner>
+  <owner>chrome-a11y-core@google.com</owner>
+  <summary>
+    Records when the user changes a text style setting in the Read Anything
+    panel.
   </summary>
 </histogram>
 
@@ -1827,6 +1867,22 @@ chromium-metrics-reviews@google.com.
     It's being emitted when loading Screen AI libraries according to the
     configuration. Refer to ScreenAIService::LoadLibrary for details.
   </summary>
+</histogram>
+
+<histogram name="Accessibility.ScreenAI.OCR.ImageSize" units="count"
+    expires_after="2023-11-30">
+  <owner>rhalavati@chromium.org</owner>
+  <owner>chrome-a11y-core@google.com</owner>
+  <summary>
+    Records the number of pixels in the passed image to OCR request.
+  </summary>
+</histogram>
+
+<histogram name="Accessibility.ScreenAI.OCR.Time" units="ms"
+    expires_after="2023-11-30">
+  <owner>rhalavati@chromium.org</owner>
+  <owner>chrome-a11y-core@google.com</owner>
+  <summary>Records how long an OCR request in Screen AI service takes.</summary>
 </histogram>
 
 <histogram name="Accessibility.ScreenAI.Screen2xDistillationTime.{Result}"

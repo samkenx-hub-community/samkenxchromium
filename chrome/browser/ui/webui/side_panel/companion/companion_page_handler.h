@@ -10,7 +10,9 @@
 #include "chrome/browser/companion/core/constants.h"
 #include "chrome/browser/companion/core/mojom/companion.mojom.h"
 #include "chrome/browser/companion/core/msbb_delegate.h"
+#include "chrome/browser/ui/side_panel/side_panel_enums.h"
 #include "components/lens/buildflags.h"
+#include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
@@ -47,24 +49,24 @@ class CompanionPageHandler : public side_panel::mojom::CompanionPageHandler,
   void OnExpsOptInStatusAvailable(bool is_exps_opted_in) override;
   void OnOpenInNewTabButtonURLChanged(const ::GURL& url_to_open) override;
   void RecordUiSurfaceShown(side_panel::mojom::UiSurface ui_surface,
-                            uint32_t child_element_count) override;
-  void RecordUiSurfaceClicked(side_panel::mojom::UiSurface ui_surface) override;
+                            uint32_t ui_surface_position,
+                            uint32_t child_element_available_count,
+                            uint32_t child_element_shown_count) override;
+  void RecordUiSurfaceClicked(side_panel::mojom::UiSurface ui_surface,
+                              int32_t click_position) override;
   void OnCqCandidatesAvailable(
       const std::vector<std::string>& text_directives) override;
   void OnPhFeedback(side_panel::mojom::PhFeedback ph_feedback) override;
   void OnCqJumptagClicked(const std::string& text_directive) override;
 
   // content::WebContentsObserver:
-  void PrimaryPageChanged(content::Page& page) override;
+  void DidFinishNavigation(
+      content::NavigationHandle* navigation_handle) override;
 
   // Informs the page handler that a new text query to initialize / reload the
   // page with was sent from client.
   void OnSearchTextQuery(const std::string& text_query);
   void OnImageQuery(side_panel::mojom::ImageQuery image_query);
-
-  // Returns the latest set url to be used for the 'open in new tab' button in
-  // the side panel header.
-  GURL GetNewTabButtonUrl();
 
  private:
   // MsbbDelegate overrides.
@@ -93,10 +95,12 @@ class CompanionPageHandler : public side_panel::mojom::CompanionPageHandler,
   std::unique_ptr<SigninDelegate> signin_delegate_;
   std::unique_ptr<CompanionUrlBuilder> url_builder_;
   std::unique_ptr<PromoHandler> promo_handler_;
-  GURL open_in_new_tab_url_;
 
   // Logs metrics for companion page. Reset when there is a new navigation.
   std::unique_ptr<CompanionMetricsLogger> metrics_logger_;
+
+  // The current URL of the main frame.
+  GURL page_url_;
 
   base::WeakPtrFactory<CompanionPageHandler> weak_ptr_factory_{this};
 };

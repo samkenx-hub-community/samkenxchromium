@@ -5,6 +5,7 @@
 <translation id="1018219910092211213">DNS-г шийдвэрлэх боломжгүй</translation>
 <translation id="1018656279737460067">Цуцлагдсан байна</translation>
 <translation id="1022433422498218992">Ерөнхий тохиргоо</translation>
+<translation id="1022628058306505708">Earth Flow</translation>
 <translation id="1047458377670401304"><ph name="CPU_NAME" /> (<ph name="THREAD_COUNT" /> уялдаат, <ph name="CPU_MAX_CLOCK_SPEED" />Гц)</translation>
 <translation id="1047773237499189053">Шинэ онцлог боломжтой байна. Нэмэлт мэдээлэл авах бол Дээш суман товчийг ашиглана уу.</translation>
 <translation id="1059913517121127803">Скан хийхийг эхлүүлж чадсангүй</translation>
@@ -115,6 +116,7 @@
 <translation id="1801418420130173017">Бараан загварыг идэвхгүй болгох</translation>
 <translation id="1807246157184219062">Гэрэлтүүлэг</translation>
 <translation id="1827738518074806965">Уран зургийн галерей</translation>
+<translation id="1838374766361614909">Хайлтыг арилгах</translation>
 <translation id="1851218745569890714">Видео хурал</translation>
 <translation id="1852934301711881861">ChromeOS Flex-г суулгах</translation>
 <translation id="1856388568474281774">Доош сум</translation>
@@ -234,6 +236,7 @@
 <translation id="2902312830803030883">Бусад үйлдэл</translation>
 <translation id="2926057806159140518">Хэрэглэгчийн нэр болон нууц үгээ оруулах эсвэл QR кодыг скан хийнэ үү</translation>
 <translation id="2940811910881150316">Төхөөрөмжийг турших боломжгүй байна. Туршихын тулд тагийг дахин нээнэ үү.</translation>
+<translation id="2981143481017883351">Chromebook-н онцгой өмчүүд одоо боломжтой</translation>
 <translation id="3008341117444806826">ДАХИН ШИНЭЧЛЭХ</translation>
 <translation id="3009958530611748826">Хадгалах фолдероо сонгоно уу</translation>
 <translation id="3017079585324758401">Арын дэвсгэр</translation>
@@ -270,6 +273,7 @@
 <translation id="3286515922899063534"><ph name="CURRENT" />Гц</translation>
 <translation id="3291996639387199448">Түлхүүрийн чиглэл</translation>
 <translation id="3294437725009624529">Зочин</translation>
+<translation id="3303855915957856445">Хайлтын илэрц олдсонгүй</translation>
 <translation id="3310640316857623290">DNS-н хоцролт зөвшөөрөгдөх хязгаараас нэлээд өндөр байна</translation>
 <translation id="3328783797891415197">Туршилтыг ажиллуулж байна</translation>
 <translation id="3340011300870565703">Төхөөрөмжийн баруун талын чихэвчийн батарей <ph name="BATTERY_PERCENTAGE" />% байна.</translation>
@@ -278,6 +282,7 @@
 <translation id="3360306038446926262">Windows</translation>
 <translation id="3368922792935385530">Холбогдсон</translation>
 <translation id="3369013195428705271">Та хэвлэлийн бүх түүхийг арилгахдаа итгэлтэй байна уу? Таны хийж буй хэвлэлийн ажлуудыг арилгахгүй.</translation>
+<translation id="3386675685417744672">Chromebook-н онцгой</translation>
 <translation id="3404249063913988450">Дэлгэц амраагчийг идэвхжүүлэх</translation>
 <translation id="3413935475507503304">Шинэчлэлтийг үргэлжлүүлэхийн тулд Дараах дээр товшино уу.</translation>
 <translation id="3434107140712555581"><ph name="BATTERY_PERCENTAGE" />%</translation>
@@ -356,6 +361,7 @@
 <translation id="404928562651467259">АНХААРУУЛГА</translation>
 <translation id="4054683689023980771">Зураг татаж байна</translation>
 <translation id="4060260348856573701">Шинэ APN</translation>
+<translation id="4079743696465895866">Chromebook-н онцгой постерыг сонгох</translation>
 <translation id="4093865285251893588">Профайлын зураг</translation>
 <translation id="409427325554347132">Туршилтын дэлгэрэнгүйг хадгалах</translation>
 <translation id="4095829376260267438">WPA2WPA3</translation>
@@ -473,7 +479,6 @@
 <translation id="4921665434385737356"><ph name="NUM_SECONDS" /> секундэд <ph name="RATE" /> цэнэглэсэн.</translation>
 <translation id="4930320165497208503">Холболт тохируулах эсвэл шинэчлэхийн тулд <ph name="BEGIN_LINK" />Тохиргоо<ph name="END_LINK" /> руу очно уу.</translation>
 <translation id="4932733599132424254">Огноо</translation>
-<translation id="4937657825850660613">Хагас</translation>
 <translation id="4950314376641394653"><ph name="DEVICE_NAME" /> жижиг программыг <ph name="VERSION" /> хувилбар луу шинэчилсэн байна</translation>
 <translation id="4971925105143343452">Хэсэгчилсэн</translation>
 <translation id="4972592110715526173">горим өөрчлөх</translation>
@@ -622,6 +627,7 @@
 <translation id="6184793017104303157">B4</translation>
 <translation id="6189418609903030344">Батарейн хүчин чадлыг ашиглалт бууруулдаг</translation>
 <translation id="6191293864534840972">DNS алдаатай байна</translation>
+<translation id="6205145102504628069">Cloud Flow</translation>
 <translation id="6213737986933151570">CDMA1XRTT</translation>
 <translation id="6223066887782788441">Бүтэн дэлгэцийн төлөвөөс гарах</translation>
 <translation id="6223752125779001553">Боломжтой сканнер байхгүй</translation>
@@ -664,6 +670,7 @@
 <translation id="6494974875566443634">Тохируулга</translation>
 <translation id="6500818810472529210">Google Хайлтад илэрц харах</translation>
 <translation id="650266656685499220">Цомог үүсгэхийн тулд Google Зураг руу очно уу</translation>
+<translation id="6505750420152840539">Үүр цайхаас шөнө хүртэл</translation>
 <translation id="6516990319416533844">Батарейн цэнэглэх хурдыг туршихын тулд батарейгаа богино хугацаанд зарцуулна уу</translation>
 <translation id="6517239166834772319">Судлах</translation>
 <translation id="6526200165918397681">Дэлгэцийн зураг тааруулах</translation>
@@ -778,6 +785,7 @@
 <translation id="7490813197707563893">MAC хаяг</translation>
 <translation id="7491478667760509108">Хөвөгч төлөвөөс гарах</translation>
 <translation id="7497215489070763236">Серверийн CA сертификат</translation>
+<translation id="7501957181231305652">эсвэл</translation>
 <translation id="7502658306369382406">IPv6 хаяг</translation>
 <translation id="7515998400212163428">Android</translation>
 <translation id="7528507600602050979">Тусламжийн контент боломжгүй байна</translation>
@@ -794,6 +802,7 @@
 <translation id="7620771111601174153">Тусламжийн төвөөс нэмэлт мэдээлэл авах</translation>
 <translation id="763165478673169849">Хамгийн сүүлд шинэчилсэн цаг</translation>
 <translation id="7648838807254605802">Өндөр HTTPS хоцролт</translation>
+<translation id="765159867434478292">Хуваах</translation>
 <translation id="7656388927906093505">Төхөөрөмж нь хулгана байна.</translation>
 <translation id="7658239707568436148">Болих</translation>
 <translation id="7665800271478495366">Аватар өөрчлөх</translation>

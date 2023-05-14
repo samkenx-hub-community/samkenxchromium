@@ -113,43 +113,33 @@ PreloadingFailureReason ToPreloadingFailureReason(PrefetchStatus status) {
 
 // Please follow go/preloading-dashboard-updates if a new outcome enum or a
 // failure reason enum is added.
-void SetTriggeringOutcomeAndFailureReasonFromStatus(
-    const absl::optional<base::UnguessableToken>&
-        initiator_devtools_navigation_token,
+absl::optional<PreloadingTriggeringOutcome>
+SetTriggeringOutcomeAndFailureReasonFromStatus(
     PreloadingAttempt* attempt,
     FrameTreeNode* ftn,
     const GURL& url,
     absl::optional<PrefetchStatus> old_prefetch_status,
     PrefetchStatus new_prefetch_status) {
   if (old_prefetch_status &&
-      (old_prefetch_status.value() == PrefetchStatus::kPrefetchUsedNoProbe ||
-       old_prefetch_status.value() == PrefetchStatus::kPrefetchResponseUsed)) {
+      old_prefetch_status.value() == PrefetchStatus::kPrefetchResponseUsed) {
     // Skip this update if the triggering outcome has already been updated
     // to kSuccess.
-    return;
+    return absl::nullopt;
   }
 
+  absl::optional<PreloadingTriggeringOutcome> preloading_trigger_outcome;
   if (attempt) {
     switch (new_prefetch_status) {
       case PrefetchStatus::kPrefetchNotFinishedInTime:
-        if (initiator_devtools_navigation_token.has_value()) {
-          devtools_instrumentation::DidUpdatePrefetchStatus(
-              ftn, initiator_devtools_navigation_token.value(), url,
-              PreloadingTriggeringOutcome::kRunning);
-        }
+        preloading_trigger_outcome = PreloadingTriggeringOutcome::kRunning;
         attempt->SetTriggeringOutcome(PreloadingTriggeringOutcome::kRunning);
         break;
       case PrefetchStatus::kPrefetchSuccessful:
         // A successful prefetch means the response is ready to be used for the
         // next navigation.
-        if (initiator_devtools_navigation_token.has_value()) {
-          devtools_instrumentation::DidUpdatePrefetchStatus(
-              ftn, initiator_devtools_navigation_token.value(), url,
-              PreloadingTriggeringOutcome::kReady);
-        }
+        preloading_trigger_outcome = PreloadingTriggeringOutcome::kReady;
         attempt->SetTriggeringOutcome(PreloadingTriggeringOutcome::kReady);
         break;
-      case PrefetchStatus::kPrefetchUsedNoProbe:
       case PrefetchStatus::kPrefetchResponseUsed:
         if (old_prefetch_status && old_prefetch_status.value() !=
                                        PrefetchStatus::kPrefetchSuccessful) {
@@ -161,11 +151,7 @@ void SetTriggeringOutcomeAndFailureReasonFromStatus(
           // before the body is fully received.
           attempt->SetTriggeringOutcome(PreloadingTriggeringOutcome::kReady);
         }
-        if (initiator_devtools_navigation_token.has_value()) {
-          devtools_instrumentation::DidUpdatePrefetchStatus(
-              ftn, initiator_devtools_navigation_token.value(), url,
-              PreloadingTriggeringOutcome::kSuccess);
-        }
+        preloading_trigger_outcome = PreloadingTriggeringOutcome::kSuccess;
         attempt->SetTriggeringOutcome(PreloadingTriggeringOutcome::kSuccess);
         break;
       // A decoy is considered eligible because a network request is made for
@@ -178,11 +164,7 @@ void SetTriggeringOutcomeAndFailureReasonFromStatus(
       case PrefetchStatus::kPrefetchFailedInvalidRedirect:
       case PrefetchStatus::kPrefetchFailedIneligibleRedirect:
       case PrefetchStatus::kPrefetchFailedPerPageLimitExceeded:
-        if (initiator_devtools_navigation_token.has_value()) {
-          devtools_instrumentation::DidUpdatePrefetchStatus(
-              ftn, initiator_devtools_navigation_token.value(), url,
-              PreloadingTriggeringOutcome::kFailure);
-        }
+        preloading_trigger_outcome = PreloadingTriggeringOutcome::kFailure;
         attempt->SetFailureReason(
             ToPreloadingFailureReason(new_prefetch_status));
         break;
@@ -199,7 +181,6 @@ void SetTriggeringOutcomeAndFailureReasonFromStatus(
         // heldback. This is covered by attempt's holdback status. For these two
         // reasons this PrefetchStatus does not fire a `SetTriggeringOutcome`.
         break;
-      case PrefetchStatus::kPrefetchNotEligibleGoogleDomain:
       case PrefetchStatus::kPrefetchNotEligibleUserHasServiceWorker:
       case PrefetchStatus::kPrefetchNotEligibleSchemeIsNotHttps:
       case PrefetchStatus::kPrefetchNotEligibleNonDefaultStoragePartition:
@@ -213,27 +194,12 @@ void SetTriggeringOutcomeAndFailureReasonFromStatus(
       case PrefetchStatus::kPrefetchNotUsedCookiesChanged:
       case PrefetchStatus::kPrefetchIsStale:
       case PrefetchStatus::kPrefetchNotUsedProbeFailed:
-      case PrefetchStatus::kNavigatedToLinkNotOnSRP:
-      case PrefetchStatus::kPrefetchUsedNoProbeWithNSP:
-      case PrefetchStatus::kPrefetchUsedProbeSuccessWithNSP:
-      case PrefetchStatus::kPrefetchNotUsedProbeFailedWithNSP:
-      case PrefetchStatus::kPrefetchUsedNoProbeNSPAttemptDenied:
-      case PrefetchStatus::kPrefetchUsedProbeSuccessNSPAttemptDenied:
-      case PrefetchStatus::kPrefetchNotUsedProbeFailedNSPAttemptDenied:
-      case PrefetchStatus::kPrefetchUsedNoProbeNSPNotStarted:
-      case PrefetchStatus::kPrefetchUsedProbeSuccessNSPNotStarted:
-      case PrefetchStatus::kPrefetchNotUsedProbeFailedNSPNotStarted:
-      case PrefetchStatus::kPrefetchIsStaleWithNSP:
-      case PrefetchStatus::kPrefetchIsStaleNSPAttemptDenied:
-      case PrefetchStatus::kPrefetchIsStaleNSPNotStarted:
-      case PrefetchStatus::kSubresourceThrottled:
-      case PrefetchStatus::kPrefetchPositionIneligible:
-      case PrefetchStatus::kPrefetchFailedRedirectsDisabled_DEPRECATED:
       case PrefetchStatus::
           kPrefetchNotEligibleSameSiteCrossOriginPrefetchRequiredProxy:
         NOTIMPLEMENTED();
     }
   }
+  return preloading_trigger_outcome;
 }
 
 std::string GetEagernessHistogramSuffix(
@@ -345,11 +311,20 @@ PrefetchContainer::~PrefetchContainer() {
 void PrefetchContainer::SetPrefetchStatus(PrefetchStatus prefetch_status) {
   FrameTreeNode* ftn = FrameTreeNode::From(
       RenderFrameHostImpl::FromID(referring_render_frame_host_id_));
-  SetTriggeringOutcomeAndFailureReasonFromStatus(
-      initiator_devtools_navigation_token_, attempt_.get(), ftn, prefetch_url_,
-      /*old_prefetch_status=*/prefetch_status_,
-      /*new_prefetch_status=*/prefetch_status);
+
+  absl::optional<PreloadingTriggeringOutcome> preloading_trigger_outcome =
+      SetTriggeringOutcomeAndFailureReasonFromStatus(
+          attempt_.get(), ftn, prefetch_url_,
+          /*old_prefetch_status=*/prefetch_status_,
+          /*new_prefetch_status=*/prefetch_status);
   prefetch_status_ = prefetch_status;
+
+  if (initiator_devtools_navigation_token_.has_value() &&
+      preloading_trigger_outcome.has_value()) {
+    devtools_instrumentation::DidUpdatePrefetchStatus(
+        ftn, initiator_devtools_navigation_token_.value(), prefetch_url_,
+        preloading_trigger_outcome.value(), prefetch_status);
+  }
 }
 
 PrefetchStatus PrefetchContainer::GetPrefetchStatus() const {
@@ -752,12 +727,18 @@ bool PrefetchContainer::IsMatchingNoVarySearchUrl(
 }
 
 void PrefetchContainer::OnGetPrefetchToServe(bool blocked_until_head) {
+  // OnGetPrefetchToServe is called before we start waiting for head, and
+  // when the prefetch is used from `prefetches_ready_to_serve_`.
+  // If the prefetch had to wait for head, `blocked_until_head_start_time_`
+  // will already be set. Only record in the histogram when the
+  // `blocked_until_head_start_time_` is not set yet.
+  if (!blocked_until_head_start_time_) {
+    RecordWasBlockedUntilHeadWhenServingHistogram(prefetch_type_.GetEagerness(),
+                                                  blocked_until_head);
+  }
   if (blocked_until_head) {
     blocked_until_head_start_time_ = base::TimeTicks::Now();
   }
-
-  RecordWasBlockedUntilHeadWhenServingHistogram(prefetch_type_.GetEagerness(),
-                                                blocked_until_head);
 }
 
 void PrefetchContainer::OnReturnPrefetchToServe(bool served) {

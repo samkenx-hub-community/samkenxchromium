@@ -2030,6 +2030,8 @@ AutotestPrivateGetLacrosInfoFunction::ToLacrosState(
       return api::autotest_private::LacrosState::kStopped;
     case crosapi::BrowserManager::State::CREATING_LOG_FILE:
       return api::autotest_private::LacrosState::kCreatingLogFile;
+    case crosapi::BrowserManager::State::PRE_LAUNCHED:
+      return api::autotest_private::LacrosState::kPreLaunched;
     case crosapi::BrowserManager::State::STARTING:
       return api::autotest_private::LacrosState::kStarting;
     case crosapi::BrowserManager::State::RUNNING:
@@ -3945,6 +3947,7 @@ ExtensionFunction::ResponseAction AutotestPrivateGetShelfItemsFunction::Run() {
     result_item.status = GetShelfItemStatus(item.status);
     result_item.shows_tooltip = item.shows_tooltip;
     result_item.pinned_by_policy = item.pinned_by_policy;
+    result_item.pin_state_forced_by_type = item.pin_state_forced_by_type;
     result_item.has_notification = item.has_notification;
     result_items.emplace_back(std::move(result_item));
   }

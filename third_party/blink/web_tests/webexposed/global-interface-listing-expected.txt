@@ -5515,9 +5515,11 @@ interface MLGraph
     method constructor
 interface MLGraphBuilder
     attribute @@toStringTag
+    method abs
     method add
     method averagePool2d
     method build
+    method ceil
     method clamp
     method concat
     method constant
@@ -5526,6 +5528,7 @@ interface MLGraphBuilder
     method convTranspose2d
     method div
     method elu
+    method floor
     method gemm
     method hardSwish
     method input
@@ -5534,6 +5537,7 @@ interface MLGraphBuilder
     method maxPool2d
     method min
     method mul
+    method neg
     method pad
     method prelu
     method relu
@@ -5799,7 +5803,6 @@ interface MediaDevices : EventTarget
     method enumerateDevices
     method getAllScreensMedia
     method getDisplayMedia
-    method getDisplayMediaSet
     method getSupportedConstraints
     method getUserMedia
     method setCaptureHandleConfig
@@ -6371,6 +6374,7 @@ interface Navigator
     method constructor
     method createHandwritingRecognizer
     method getBattery
+    method getEnvironmentIntegrity
     method getGamepads
     method getInstalledRelatedApps
     method getUserMedia
@@ -7162,6 +7166,11 @@ interface PressureRecord
     getter time
     method constructor
     method toJSON
+interface PrivateAttribution
+    attribute @@toStringTag
+    method constructor
+    method getEncryptedMatchKey
+    method getHelperNetworks
 interface ProcessingInstruction : CharacterData
     attribute @@toStringTag
     getter sheet
@@ -12363,6 +12372,7 @@ namespace console
     getter parent
     getter performance
     getter personalbar
+    getter privateAttribution
     getter scheduler
     getter screen
     getter screenLeft
@@ -12582,6 +12592,7 @@ namespace console
     setter parent
     setter performance
     setter personalbar
+    setter privateAttribution
     setter scheduler
     setter screen
     setter screenLeft

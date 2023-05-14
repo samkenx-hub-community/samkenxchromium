@@ -30,6 +30,7 @@
 #include "ash/app_list/app_list_controller_impl.h"
 #include "ash/app_list/app_list_feature_usage_metrics.h"
 #include "ash/assistant/assistant_controller_impl.h"
+#include "ash/booting/booting_animation_controller.h"
 #include "ash/calendar/calendar_controller.h"
 #include "ash/capture_mode/capture_mode_controller.h"
 #include "ash/child_accounts/parent_access_controller_impl.h"
@@ -686,6 +687,7 @@ Shell::~Shell() {
     DCHECK(rwc->GetHost()->dispatcher()->in_shutdown());
   }
 #endif
+  booting_animation_controller_.reset();
   login_unlock_throughput_recorder_.reset();
 
   hud_display::HUDDisplayView::Destroy();
@@ -1571,6 +1573,11 @@ void Shell::Init(
 
   window_tree_host_manager_->InitHosts();
 
+  if (ash::features::IsOobeSimonEnabled()) {
+    booting_animation_controller_ =
+        std::make_unique<BootingAnimationController>();
+  }
+
   // Create virtual keyboard after WindowTreeHostManager::InitHosts() since
   // it may enable the virtual keyboard immediately, which requires a
   // WindowTreeHostManager to host the keyboard window.
@@ -1673,10 +1680,10 @@ void Shell::Init(
       clipboard_history_controller_.get()));
   chromeos::clipboard_history::SetPasteClipboardItemByIdImpl(
       base::BindRepeating(
-          [](const std::string& id, int event_flags,
+          [](const base::UnguessableToken& id, int event_flags,
              crosapi::mojom::ClipboardHistoryControllerShowSource show_source) {
             ClipboardHistoryController::Get()->PasteClipboardItemById(
-                id, event_flags, show_source);
+                id.ToString(), event_flags, show_source);
           }));
 
   for (auto& observer : shell_observers_) {

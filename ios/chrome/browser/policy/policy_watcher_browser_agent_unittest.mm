@@ -4,7 +4,7 @@
 
 #import "ios/chrome/browser/policy/policy_watcher_browser_agent.h"
 
-#import "base/mac/backup_util.h"
+#import "base/apple/backup_util.h"
 #import "base/mac/foundation_util.h"
 #import "base/path_service.h"
 #import "base/test/ios/wait_util.h"
@@ -380,7 +380,7 @@ TEST_F(PolicyWatcherBrowserAgentTest, AlertIfSyncDisabledChanges) {
   NSUserDefaults* standard_defaults = [NSUserDefaults standardUserDefaults];
   [standard_defaults setBool:NO forKey:kSyncDisabledAlertShownKey];
   browser_->GetBrowserState()->GetPrefs()->SetBoolean(
-      syncer::prefs::kSyncManaged, false);
+      syncer::prefs::internal::kSyncManaged, false);
 
   // Browser Agent under test.
   // Set up the test browser and attach the browser agents.
@@ -409,7 +409,7 @@ TEST_F(PolicyWatcherBrowserAgentTest, AlertIfSyncDisabledChanges) {
 
     // Update the pref.
     browser_->GetBrowserState()->GetPrefs()->SetBoolean(
-        syncer::prefs::kSyncManaged, true);
+        syncer::prefs::internal::kSyncManaged, true);
 
     EXPECT_OCMOCK_VERIFY(mockHandler);
     EXPECT_TRUE([standard_defaults boolForKey:kSyncDisabledAlertShownKey]);
@@ -418,7 +418,7 @@ TEST_F(PolicyWatcherBrowserAgentTest, AlertIfSyncDisabledChanges) {
 
     // Update the pref.
     browser_->GetBrowserState()->GetPrefs()->SetBoolean(
-        syncer::prefs::kSyncManaged, false);
+        syncer::prefs::internal::kSyncManaged, false);
 
     EXPECT_OCMOCK_VERIFY(mockHandler);
     EXPECT_FALSE([standard_defaults boolForKey:kSyncDisabledAlertShownKey]);
@@ -431,7 +431,7 @@ TEST_F(PolicyWatcherBrowserAgentTest, AlertIfSyncDisabledChangedAtColdStart) {
   NSUserDefaults* standard_defaults = [NSUserDefaults standardUserDefaults];
   [standard_defaults setBool:NO forKey:kSyncDisabledAlertShownKey];
   browser_->GetBrowserState()->GetPrefs()->SetBoolean(
-      syncer::prefs::kSyncManaged, true);
+      syncer::prefs::internal::kSyncManaged, true);
 
   // Browser Agent under test.
   // Set up the test browser and attach the browser agents.
@@ -467,7 +467,7 @@ TEST_F(PolicyWatcherBrowserAgentTest, AlertIfSyncDisabledChangedAtColdStart) {
 
     // Update the pref.
     browser_->GetBrowserState()->GetPrefs()->SetBoolean(
-        syncer::prefs::kSyncManaged, false);
+        syncer::prefs::internal::kSyncManaged, false);
 
     EXPECT_OCMOCK_VERIFY(mockHandler);
     EXPECT_FALSE([standard_defaults boolForKey:kSyncDisabledAlertShownKey]);
@@ -482,19 +482,19 @@ TEST_F(PolicyWatcherBrowserAgentTest, BackupPreventionChanged) {
   base::FilePath storage_dir = base::mac::GetUserLibraryPath();
 
   // Ensure that backups are allowed initially.
-  ASSERT_TRUE(base::mac::ClearBackupExclusion(storage_dir));
+  ASSERT_TRUE(base::apple::ClearBackupExclusion(storage_dir));
 
   // Disallow backups.
   browser_->GetBrowserState()->GetPrefs()->SetBoolean(
       prefs::kAllowChromeDataInBackups, false);
   task_environment_.RunUntilIdle();
-  EXPECT_TRUE(base::mac::GetBackupExclusion(storage_dir));
+  EXPECT_TRUE(base::apple::GetBackupExclusion(storage_dir));
 
   // Allow backups.
   browser_->GetBrowserState()->GetPrefs()->SetBoolean(
       prefs::kAllowChromeDataInBackups, true);
   task_environment_.RunUntilIdle();
-  EXPECT_FALSE(base::mac::GetBackupExclusion(storage_dir));
+  EXPECT_FALSE(base::apple::GetBackupExclusion(storage_dir));
 }
 
 // Tests that disabling the backup-allowed preference marks the app container
@@ -503,7 +503,7 @@ TEST_F(PolicyWatcherBrowserAgentTest, BackupDisallowedAtColdStart) {
   base::FilePath storage_dir = base::mac::GetUserLibraryPath();
 
   // Ensure that backups are allowed initially.
-  ASSERT_TRUE(base::mac::ClearBackupExclusion(storage_dir));
+  ASSERT_TRUE(base::apple::ClearBackupExclusion(storage_dir));
 
   // Disallow backups
   browser_->GetBrowserState()->GetPrefs()->SetBoolean(
@@ -512,7 +512,7 @@ TEST_F(PolicyWatcherBrowserAgentTest, BackupDisallowedAtColdStart) {
   id mockHandler = OCMProtocolMock(@protocol(PolicyChangeCommands));
   agent_->Initialize(mockHandler);
   task_environment_.RunUntilIdle();
-  EXPECT_TRUE(base::mac::GetBackupExclusion(storage_dir));
+  EXPECT_TRUE(base::apple::GetBackupExclusion(storage_dir));
 }
 
 // Tests that enabling the backup-allowed preference marks the app container
@@ -521,7 +521,7 @@ TEST_F(PolicyWatcherBrowserAgentTest, BackupAllowedAtColdStart) {
   base::FilePath storage_dir = base::mac::GetUserLibraryPath();
 
   // Ensure that backups are disallowed initially.
-  ASSERT_TRUE(base::mac::SetBackupExclusion(storage_dir));
+  ASSERT_TRUE(base::apple::SetBackupExclusion(storage_dir));
 
   // Allow backups
   browser_->GetBrowserState()->GetPrefs()->SetBoolean(
@@ -530,5 +530,5 @@ TEST_F(PolicyWatcherBrowserAgentTest, BackupAllowedAtColdStart) {
   id mockHandler = OCMProtocolMock(@protocol(PolicyChangeCommands));
   agent_->Initialize(mockHandler);
   task_environment_.RunUntilIdle();
-  EXPECT_FALSE(base::mac::GetBackupExclusion(storage_dir));
+  EXPECT_FALSE(base::apple::GetBackupExclusion(storage_dir));
 }

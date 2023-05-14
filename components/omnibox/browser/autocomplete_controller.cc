@@ -208,10 +208,12 @@ void AutocompleteController::GetMatchTypeAndExtendSubtypes(
   if (match.provider) {
     if (match.provider->type() == AutocompleteProvider::TYPE_ZERO_SUGGEST &&
         (match.type == AutocompleteMatchType::SEARCH_SUGGEST ||
+         match.type == AutocompleteMatchType::TILE_NAVSUGGEST ||
          match.type == AutocompleteMatchType::NAVSUGGEST)) {
       // Make sure changes here are reflected in UpdateAssistedQueryStats()
       // below in which the zero-prefix suggestions are counted.
-      if (match.type == AutocompleteMatchType::NAVSUGGEST) {
+      if (match.type == AutocompleteMatchType::TILE_NAVSUGGEST ||
+          match.type == AutocompleteMatchType::NAVSUGGEST) {
         subtypes->emplace(omnibox::SUBTYPE_ZERO_PREFIX_LOCAL_FREQUENT_URLS);
       }
       // We abuse this subtype and use it to for zero-suggest suggestions that
@@ -238,6 +240,14 @@ void AutocompleteController::GetMatchTypeAndExtendSubtypes(
       return;
     }
     case AutocompleteMatchType::SEARCH_SUGGEST_ENTITY: {
+      // Map `ACMatchType::SEARCH_SUGGEST_ENTITY` back to
+      // `omnibox::TYPE_CATEGORICAL_QUERY` depending on the original suggestion
+      // type.
+      if (match.suggest_type == omnibox::TYPE_CATEGORICAL_QUERY &&
+          base::FeatureList::IsEnabled(omnibox::kCategoricalSuggestions)) {
+        *type = omnibox::TYPE_CATEGORICAL_QUERY;
+        return;
+      }
       *type = omnibox::TYPE_ENTITY;
       return;
     }
@@ -247,7 +257,6 @@ void AutocompleteController::GetMatchTypeAndExtendSubtypes(
     }
     case AutocompleteMatchType::SEARCH_SUGGEST_PERSONALIZED: {
       *type = omnibox::TYPE_PERSONALIZED_QUERY;
-      ;
       subtypes->emplace(omnibox::SUBTYPE_PERSONAL);
       return;
     }
@@ -255,6 +264,7 @@ void AutocompleteController::GetMatchTypeAndExtendSubtypes(
       *type = omnibox::TYPE_ENTITY;
       return;
     }
+    case AutocompleteMatchType::TILE_NAVSUGGEST:
     case AutocompleteMatchType::NAVSUGGEST: {
       // Do not set subtype here; subtype may have been set above.
       *type = omnibox::TYPE_NAVIGATION;
@@ -1006,7 +1016,8 @@ void AutocompleteController::UpdateResult(
     // If not all providers are done, merge the old and new matches before
     // sorting.
     result_.TransferOldMatches(input_, &old_matches_to_reuse);
-  } else if (OmniboxFieldTrial::IsMlUrlScoringEnabled()) {
+  } else if (OmniboxFieldTrial::IsMlUrlScoringEnabled() &&
+             provider_client_->GetAutocompleteScoringModelService()) {
     // The async scoring model is only run once all the providers are done. Use
     // a WeakPtr since the model is not owned and `this` may no longer be alive.
     // `SortCullAndAnnotateResult()` is called when the model is done.
@@ -1125,9 +1136,10 @@ void AutocompleteController::AttachActions() {
 #if !BUILDFLAG(IS_IOS)
     // HistoryClusters is not enabled on iOS.
     AttachHistoryClustersActions(provider_client_->GetHistoryClustersService(),
-                                 provider_client_->GetPrefs(), result_);
+                                 result_);
 #endif
   }
+  result_.TrimOmniboxActions();
 }
 
 void AutocompleteController::UpdateAssociatedKeywords(
@@ -1242,6 +1254,9 @@ void AutocompleteController::UpdateAssistedQueryStats(
     auto subtypes = match->subtypes;
     omnibox::SuggestType type = omnibox::TYPE_NATIVE_CHROME;
     GetMatchTypeAndExtendSubtypes(*match, &type, &subtypes);
+    DCHECK_EQ(match->suggest_type, type)
+        << "AutocompleteMatchType: "
+        << AutocompleteMatchType::ToString(match->type);
 
     // Count any suggestions that constitute zero-prefix suggestions.
     if (subtypes.contains(omnibox::SUBTYPE_ZERO_PREFIX_LOCAL_HISTORY) ||

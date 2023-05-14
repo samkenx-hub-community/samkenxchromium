@@ -13,7 +13,7 @@ import subprocess
 
 from contextlib import AbstractContextManager
 
-from common import find_image_in_sdk, get_system_info, \
+from common import check_ssh_config_file, find_image_in_sdk, get_system_info, \
                    run_ffx_command, SDK_ROOT
 from compatible_utils import get_host_arch, get_sdk_hash
 
@@ -55,6 +55,7 @@ class FfxEmulator(AbstractContextManager):
     def _start_emulator(self) -> None:
         """Start the emulator."""
         logging.info('Starting emulator %s', self._node_name)
+        check_ssh_config_file()
         emu_command = [
             'emu', 'start', self._product_bundle, '--name', self._node_name
         ]
@@ -67,6 +68,8 @@ class FfxEmulator(AbstractContextManager):
                 ('-l', os.path.join(self._logs_dir, 'emulator_log')))
         if self._with_network:
             emu_command.extend(('--net', 'tap'))
+        else:
+            emu_command.extend(('--net', 'user'))
 
         # TODO(https://crbug.com/1336776): remove when ffx has native support
         # for starting emulator on arm64 host.
@@ -118,9 +121,8 @@ class FfxEmulator(AbstractContextManager):
                 configs = ['emu.start.timeout=90']
                 if i > 0:
                     logging.warning(
-                        'Emulator failed to start. Turning on debug')
-                    configs.append('log.level=debug')
-                run_ffx_command(emu_command, timeout=85, configs=configs)
+                        'Emulator failed to start.')
+                run_ffx_command(emu_command, timeout=100, configs=configs)
                 break
             except (subprocess.TimeoutExpired, subprocess.CalledProcessError):
                 run_ffx_command(('emu', 'stop'))

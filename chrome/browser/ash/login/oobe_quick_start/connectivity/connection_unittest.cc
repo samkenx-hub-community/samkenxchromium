@@ -156,11 +156,11 @@ TEST_F(ConnectionTest, RequestWifiCredentials) {
   int32_t session_id = 1;
 
   fake_quick_start_decoder_->SetWifiCredentialsResponse(
-      mojom::GetWifiCredentialsResponse::NewCredentials(
-          mojom::WifiCredentials::New("ssid", mojom::WifiSecurityType::kPSK,
-                                      true, "password")));
+      mojom::WifiCredentials::New("ssid", mojom::WifiSecurityType::kPSK, true,
+                                  "password"),
+      absl::nullopt);
 
-  base::test::TestFuture<absl::optional<mojom::WifiCredentialsPtr>> future;
+  base::test::TestFuture<absl::optional<mojom::WifiCredentials>> future;
 
   authenticated_connection_->RequestWifiCredentials(session_id,
                                                     future.GetCallback());
@@ -203,13 +203,13 @@ TEST_F(ConnectionTest, RequestWifiCredentials) {
   EXPECT_EQ(*wifi_request_payload.FindString("shared_secret"),
             shared_secret_base64);
 
-  const absl::optional<mojom::WifiCredentialsPtr>& credentials = future.Get();
+  const absl::optional<mojom::WifiCredentials>& credentials = future.Get();
   EXPECT_TRUE(credentials.has_value());
-  EXPECT_EQ(credentials.value()->ssid, "ssid");
-  EXPECT_EQ(credentials.value()->password, "password");
-  EXPECT_EQ(credentials.value()->security_type,
+  EXPECT_EQ(credentials.value().ssid, "ssid");
+  EXPECT_EQ(credentials.value().password, "password");
+  EXPECT_EQ(credentials.value().security_type,
             ash::quick_start::mojom::WifiSecurityType::kPSK);
-  EXPECT_TRUE(credentials.value()->is_hidden);
+  EXPECT_TRUE(credentials.value().is_hidden);
 }
 
 TEST_F(ConnectionTest, RequestWifiCredentialsReturnsEmptyOnFailure) {
@@ -217,10 +217,9 @@ TEST_F(ConnectionTest, RequestWifiCredentialsReturnsEmptyOnFailure) {
   // Random Session ID for testing
   int32_t session_id = 1;
   fake_quick_start_decoder_->SetWifiCredentialsResponse(
-      mojom::GetWifiCredentialsResponse::NewFailureReason(
-          mojom::GetWifiCredentialsFailureReason::kMissingWifiHiddenStatus));
+      nullptr, mojom::QuickStartDecoderError::kMessageDoesNotMatchSchema);
 
-  base::test::TestFuture<absl::optional<mojom::WifiCredentialsPtr>> future;
+  base::test::TestFuture<absl::optional<mojom::WifiCredentials>> future;
 
   authenticated_connection_->RequestWifiCredentials(session_id,
                                                     future.GetCallback());
@@ -451,6 +450,75 @@ TEST_F(ConnectionTest, InitiateHandshake) {
   for (size_t i = 0; i < kTargetDeviceAuthMessage.size(); i++) {
     EXPECT_EQ(kTargetDeviceAuthMessage[i], written_payload[i]);
   }
+}
+
+TEST_F(ConnectionTest, TestUserVerificationRequested_ReturnsResult) {
+  fake_quick_start_decoder_->SetUserVerificationRequested(true);
+  fake_quick_start_decoder_->SetUserVerificationResponse(
+      mojom::UserVerificationResult::kUserVerified, true);
+
+  MarkConnectionAuthenticated();
+
+  base::test::TestFuture<absl::optional<mojom::UserVerificationResponse>>
+      future;
+  authenticated_connection_->WaitForUserVerification(future.GetCallback());
+  fake_nearby_connection_->AppendReadableData(kTestBytes);
+  fake_nearby_connection_->AppendReadableData(kTestBytes);
+
+  ASSERT_TRUE(future.Get().has_value());
+  EXPECT_EQ(mojom::UserVerificationResult::kUserVerified, future.Get()->result);
+  EXPECT_TRUE(future.Get()->is_first_user_verification);
+}
+
+TEST_F(ConnectionTest,
+       TestUserVerificationRequested_ReturnsEmptyIfRequestIsEmpty) {
+  fake_quick_start_decoder_->SetDecoderError(
+      mojom::QuickStartDecoderError::kMessageDoesNotMatchSchema);
+  fake_quick_start_decoder_->SetUserVerificationResponse(
+      mojom::UserVerificationResult::kUserVerified, true);
+
+  MarkConnectionAuthenticated();
+
+  base::test::TestFuture<absl::optional<mojom::UserVerificationResponse>>
+      future;
+  authenticated_connection_->WaitForUserVerification(future.GetCallback());
+  fake_nearby_connection_->AppendReadableData(kTestBytes);
+
+  EXPECT_FALSE(future.Get().has_value());
+}
+
+TEST_F(
+    ConnectionTest,
+    TestUserVerificationRequested_ReturnsEmptyIfAwaitingUserVerificationIsFalse) {
+  fake_quick_start_decoder_->SetUserVerificationRequested(false);
+  fake_quick_start_decoder_->SetUserVerificationResponse(
+      mojom::UserVerificationResult::kUserVerified, true);
+
+  MarkConnectionAuthenticated();
+
+  base::test::TestFuture<absl::optional<mojom::UserVerificationResponse>>
+      future;
+  authenticated_connection_->WaitForUserVerification(future.GetCallback());
+  fake_nearby_connection_->AppendReadableData(kTestBytes);
+
+  EXPECT_FALSE(future.Get().has_value());
+}
+
+TEST_F(ConnectionTest,
+       TestUserVerificationRequested_ReturnsEmptyIfResponseReturnsError) {
+  fake_quick_start_decoder_->SetUserVerificationRequested(true);
+
+  MarkConnectionAuthenticated();
+
+  base::test::TestFuture<absl::optional<mojom::UserVerificationResponse>>
+      future;
+  authenticated_connection_->WaitForUserVerification(future.GetCallback());
+  fake_nearby_connection_->AppendReadableData(kTestBytes);
+  fake_quick_start_decoder_->SetDecoderError(
+      mojom::QuickStartDecoderError::kMessageDoesNotMatchSchema);
+  fake_nearby_connection_->AppendReadableData(kTestBytes);
+
+  EXPECT_FALSE(future.Get().has_value());
 }
 
 }  // namespace ash::quick_start

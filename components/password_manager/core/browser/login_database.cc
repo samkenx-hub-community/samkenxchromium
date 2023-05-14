@@ -1667,151 +1667,6 @@ DatabaseCleanupResult LoginDatabase::DeleteUndecryptableLogins() {
   return DatabaseCleanupResult::kSuccess;
 }
 
-std::unique_ptr<syncer::MetadataBatch> LoginDatabase::GetAllSyncMetadata() {
-  TRACE_EVENT0("passwords", "LoginDatabase::GetAllSyncMetadata");
-  std::unique_ptr<syncer::MetadataBatch> metadata_batch =
-      GetAllSyncEntityMetadata();
-  if (metadata_batch == nullptr) {
-    return nullptr;
-  }
-
-  std::unique_ptr<sync_pb::ModelTypeState> model_type_state =
-      GetModelTypeState();
-  if (model_type_state == nullptr) {
-    return nullptr;
-  }
-
-  metadata_batch->SetModelTypeState(*model_type_state);
-  return metadata_batch;
-}
-
-void LoginDatabase::DeleteAllSyncMetadata() {
-  TRACE_EVENT0("passwords", "LoginDatabase::DeleteAllSyncMetadata");
-  bool had_unsynced_deletions = HasUnsyncedDeletions();
-  ClearAllSyncMetadata(&db_);
-  if (had_unsynced_deletions && deletions_have_synced_callback_) {
-    // Note: At this point we can't be fully sure whether the deletions actually
-    // reached the server yet. We might have sent a commit, but haven't received
-    // the commit confirmation. Let's be conservative and assume they haven't
-    // been successfully deleted.
-    deletions_have_synced_callback_.Run(/*success=*/false);
-  }
-}
-
-bool LoginDatabase::UpdateEntityMetadata(
-    syncer::ModelType model_type,
-    const std::string& storage_key,
-    const sync_pb::EntityMetadata& metadata) {
-  TRACE_EVENT0("passwords", "LoginDatabase::UpdateSyncMetadata");
-  DCHECK_EQ(model_type, syncer::PASSWORDS);
-
-  int storage_key_int = 0;
-  if (!base::StringToInt(storage_key, &storage_key_int)) {
-    DLOG(ERROR) << "Invalid storage key. Failed to convert the storage key to "
-                   "an integer.";
-    return false;
-  }
-
-  std::string encrypted_metadata;
-  if (!OSCrypt::EncryptString(metadata.SerializeAsString(),
-                              &encrypted_metadata)) {
-    DLOG(ERROR) << "Cannot encrypt the sync metadata";
-    return false;
-  }
-
-  sql::Statement s(
-      db_.GetCachedStatement(SQL_FROM_HERE,
-                             "INSERT OR REPLACE INTO sync_entities_metadata "
-                             "(storage_key, metadata) VALUES(?, ?)"));
-
-  s.BindInt(0, storage_key_int);
-  s.BindString(1, encrypted_metadata);
-
-  bool had_unsynced_deletions = HasUnsyncedDeletions();
-  bool result = s.Run();
-  if (result && had_unsynced_deletions && !HasUnsyncedDeletions() &&
-      deletions_have_synced_callback_) {
-    deletions_have_synced_callback_.Run(/*success=*/true);
-  }
-  return result;
-}
-
-bool LoginDatabase::ClearEntityMetadata(syncer::ModelType model_type,
-                                        const std::string& storage_key) {
-  TRACE_EVENT0("passwords", "LoginDatabase::ClearSyncMetadata");
-  DCHECK_EQ(model_type, syncer::PASSWORDS);
-
-  int storage_key_int = 0;
-  if (!base::StringToInt(storage_key, &storage_key_int)) {
-    DLOG(ERROR) << "Invalid storage key. Failed to convert the storage key to "
-                   "an integer.";
-    return false;
-  }
-
-  sql::Statement s(
-      db_.GetCachedStatement(SQL_FROM_HERE,
-                             "DELETE FROM sync_entities_metadata WHERE "
-                             "storage_key=?"));
-  s.BindInt(0, storage_key_int);
-
-  bool had_unsynced_deletions = HasUnsyncedDeletions();
-  bool result = s.Run();
-  if (result && had_unsynced_deletions && !HasUnsyncedDeletions() &&
-      deletions_have_synced_callback_) {
-    deletions_have_synced_callback_.Run(/*success=*/true);
-  }
-  return result;
-}
-
-bool LoginDatabase::UpdateModelTypeState(
-    syncer::ModelType model_type,
-    const sync_pb::ModelTypeState& model_type_state) {
-  TRACE_EVENT0("passwords", "LoginDatabase::UpdateModelTypeState");
-  DCHECK_EQ(model_type, syncer::PASSWORDS);
-
-  // Make sure only one row is left by storing it in the entry with id=1
-  // every time.
-  sql::Statement s(db_.GetCachedStatement(
-      SQL_FROM_HERE,
-      "INSERT OR REPLACE INTO sync_model_metadata (id, model_metadata) "
-      "VALUES(1, ?)"));
-  s.BindString(0, model_type_state.SerializeAsString());
-
-  return s.Run();
-}
-
-bool LoginDatabase::ClearModelTypeState(syncer::ModelType model_type) {
-  TRACE_EVENT0("passwords", "LoginDatabase::ClearModelTypeState");
-  DCHECK_EQ(model_type, syncer::PASSWORDS);
-
-  sql::Statement s(db_.GetCachedStatement(
-      SQL_FROM_HERE, "DELETE FROM sync_model_metadata WHERE id=1"));
-
-  return s.Run();
-}
-
-void LoginDatabase::SetDeletionsHaveSyncedCallback(
-    base::RepeatingCallback<void(bool)> callback) {
-  deletions_have_synced_callback_ = std::move(callback);
-}
-
-bool LoginDatabase::HasUnsyncedDeletions() {
-  TRACE_EVENT0("passwords", "LoginDatabase::HasUnsyncedDeletions");
-
-  std::unique_ptr<syncer::MetadataBatch> batch = GetAllSyncEntityMetadata();
-  if (!batch) {
-    return false;
-  }
-  for (const auto& metadata_entry : batch->GetAllMetadata()) {
-    // Note: No need for an explicit "is unsynced" check: Once the deletion is
-    // committed, the metadata entry is removed.
-    if (metadata_entry.second->is_deleted()) {
-      return true;
-    }
-  }
-  return false;
-}
-
 bool LoginDatabase::BeginTransaction() {
   TRACE_EVENT0("passwords", "LoginDatabase::BeginTransaction");
   return db_.BeginTransaction();
@@ -1827,37 +1682,19 @@ bool LoginDatabase::CommitTransaction() {
   return db_.CommitTransaction();
 }
 
-LoginDatabase::PrimaryKeyAndPassword LoginDatabase::GetPrimaryKeyAndPassword(
-    const PasswordForm& form) const {
-  DCHECK(!id_and_password_statement_.empty());
-  sql::Statement s(db_.GetCachedStatement(SQL_FROM_HERE,
-                                          id_and_password_statement_.c_str()));
-
-  s.BindString(0, form.url.spec());
-  s.BindString16(1, form.username_element);
-  s.BindString16(2, form.username_value);
-  s.BindString16(3, form.password_element);
-  s.BindString(4, form.signon_realm);
-
-  if (s.Step()) {
-    PrimaryKeyAndPassword result = {s.ColumnInt(0)};
-    s.ColumnBlobAsString(1, &result.encrypted_password);
-    if (DecryptedString(result.encrypted_password,
-                        &result.decrypted_password) !=
-        ENCRYPTION_RESULT_SUCCESS) {
-      result.decrypted_password.clear();
-    }
-    return result;
-  }
-  return {-1, std::string(), std::u16string()};
+LoginDatabase::SyncMetadataStore::SyncMetadataStore(sql::Database* db)
+    : db_(db) {
+  CHECK(db);
 }
 
+LoginDatabase::SyncMetadataStore::~SyncMetadataStore() = default;
+
 std::unique_ptr<syncer::MetadataBatch>
-LoginDatabase::GetAllSyncEntityMetadata() {
+LoginDatabase::SyncMetadataStore::GetAllSyncEntityMetadata() {
   auto metadata_batch = std::make_unique<syncer::MetadataBatch>();
-  sql::Statement s(db_.GetCachedStatement(SQL_FROM_HERE,
-                                          "SELECT storage_key, metadata FROM "
-                                          "sync_entities_metadata"));
+  sql::Statement s(db_->GetCachedStatement(SQL_FROM_HERE,
+                                           "SELECT storage_key, metadata FROM "
+                                           "sync_entities_metadata"));
 
   while (s.Step()) {
     int storage_key_int = s.ColumnInt(0);
@@ -1886,9 +1723,10 @@ LoginDatabase::GetAllSyncEntityMetadata() {
   return metadata_batch;
 }
 
-std::unique_ptr<sync_pb::ModelTypeState> LoginDatabase::GetModelTypeState() {
+std::unique_ptr<sync_pb::ModelTypeState>
+LoginDatabase::SyncMetadataStore::GetModelTypeState() {
   auto state = std::make_unique<sync_pb::ModelTypeState>();
-  sql::Statement s(db_.GetCachedStatement(
+  sql::Statement s(db_->GetCachedStatement(
       SQL_FROM_HERE,
       "SELECT model_metadata FROM sync_model_metadata WHERE id=1"));
 
@@ -1905,6 +1743,179 @@ std::unique_ptr<sync_pb::ModelTypeState> LoginDatabase::GetModelTypeState() {
     return state;
   }
   return nullptr;
+}
+
+std::unique_ptr<syncer::MetadataBatch>
+LoginDatabase::SyncMetadataStore::GetAllSyncMetadata() {
+  TRACE_EVENT0("passwords", "SyncMetadataStore::GetAllSyncMetadata");
+  std::unique_ptr<syncer::MetadataBatch> metadata_batch =
+      GetAllSyncEntityMetadata();
+  if (metadata_batch == nullptr) {
+    return nullptr;
+  }
+
+  std::unique_ptr<sync_pb::ModelTypeState> model_type_state =
+      GetModelTypeState();
+  if (model_type_state == nullptr) {
+    return nullptr;
+  }
+
+  metadata_batch->SetModelTypeState(*model_type_state);
+  return metadata_batch;
+}
+
+void LoginDatabase::SyncMetadataStore::DeleteAllSyncMetadata() {
+  TRACE_EVENT0("passwords", "SyncMetadataStore::DeleteAllSyncMetadata");
+  bool had_unsynced_deletions = HasUnsyncedDeletions();
+  ClearAllSyncMetadata(db_);
+  if (had_unsynced_deletions && deletions_have_synced_callback_) {
+    // Note: At this point we can't be fully sure whether the deletions actually
+    // reached the server yet. We might have sent a commit, but haven't received
+    // the commit confirmation. Let's be conservative and assume they haven't
+    // been successfully deleted.
+    deletions_have_synced_callback_.Run(/*success=*/false);
+  }
+}
+
+bool LoginDatabase::SyncMetadataStore::UpdateEntityMetadata(
+    syncer::ModelType model_type,
+    const std::string& storage_key,
+    const sync_pb::EntityMetadata& metadata) {
+  TRACE_EVENT0("passwords", "SyncMetadataStore::UpdateSyncMetadata");
+  DCHECK_EQ(model_type, syncer::PASSWORDS);
+
+  int storage_key_int = 0;
+  if (!base::StringToInt(storage_key, &storage_key_int)) {
+    DLOG(ERROR) << "Invalid storage key. Failed to convert the storage key to "
+                   "an integer.";
+    return false;
+  }
+
+  std::string encrypted_metadata;
+  if (!OSCrypt::EncryptString(metadata.SerializeAsString(),
+                              &encrypted_metadata)) {
+    DLOG(ERROR) << "Cannot encrypt the sync metadata";
+    return false;
+  }
+
+  sql::Statement s(
+      db_->GetCachedStatement(SQL_FROM_HERE,
+                              "INSERT OR REPLACE INTO sync_entities_metadata "
+                              "(storage_key, metadata) VALUES(?, ?)"));
+
+  s.BindInt(0, storage_key_int);
+  s.BindString(1, encrypted_metadata);
+
+  bool had_unsynced_deletions = HasUnsyncedDeletions();
+  bool result = s.Run();
+  if (result && had_unsynced_deletions && !HasUnsyncedDeletions() &&
+      deletions_have_synced_callback_) {
+    deletions_have_synced_callback_.Run(/*success=*/true);
+  }
+  return result;
+}
+
+bool LoginDatabase::SyncMetadataStore::ClearEntityMetadata(
+    syncer::ModelType model_type,
+    const std::string& storage_key) {
+  TRACE_EVENT0("passwords", "SyncMetadataStore::ClearSyncMetadata");
+  DCHECK_EQ(model_type, syncer::PASSWORDS);
+
+  int storage_key_int = 0;
+  if (!base::StringToInt(storage_key, &storage_key_int)) {
+    DLOG(ERROR) << "Invalid storage key. Failed to convert the storage key to "
+                   "an integer.";
+    return false;
+  }
+
+  sql::Statement s(
+      db_->GetCachedStatement(SQL_FROM_HERE,
+                              "DELETE FROM sync_entities_metadata WHERE "
+                              "storage_key=?"));
+  s.BindInt(0, storage_key_int);
+
+  bool had_unsynced_deletions = HasUnsyncedDeletions();
+  bool result = s.Run();
+  if (result && had_unsynced_deletions && !HasUnsyncedDeletions() &&
+      deletions_have_synced_callback_) {
+    deletions_have_synced_callback_.Run(/*success=*/true);
+  }
+  return result;
+}
+
+bool LoginDatabase::SyncMetadataStore::UpdateModelTypeState(
+    syncer::ModelType model_type,
+    const sync_pb::ModelTypeState& model_type_state) {
+  TRACE_EVENT0("passwords", "SyncMetadataStore::UpdateModelTypeState");
+  DCHECK_EQ(model_type, syncer::PASSWORDS);
+
+  // Make sure only one row is left by storing it in the entry with id=1
+  // every time.
+  sql::Statement s(db_->GetCachedStatement(
+      SQL_FROM_HERE,
+      "INSERT OR REPLACE INTO sync_model_metadata (id, model_metadata) "
+      "VALUES(1, ?)"));
+  s.BindString(0, model_type_state.SerializeAsString());
+
+  return s.Run();
+}
+
+bool LoginDatabase::SyncMetadataStore::ClearModelTypeState(
+    syncer::ModelType model_type) {
+  TRACE_EVENT0("passwords", "SyncMetadataStore::ClearModelTypeState");
+  DCHECK_EQ(model_type, syncer::PASSWORDS);
+
+  sql::Statement s(db_->GetCachedStatement(
+      SQL_FROM_HERE, "DELETE FROM sync_model_metadata WHERE id=1"));
+
+  return s.Run();
+}
+
+void LoginDatabase::SyncMetadataStore::SetDeletionsHaveSyncedCallback(
+    base::RepeatingCallback<void(bool)> callback) {
+  deletions_have_synced_callback_ = std::move(callback);
+}
+
+bool LoginDatabase::SyncMetadataStore::HasUnsyncedDeletions() {
+  TRACE_EVENT0("passwords", "SyncMetadataStore::HasUnsyncedDeletions");
+
+  std::unique_ptr<syncer::MetadataBatch> batch = GetAllSyncEntityMetadata();
+  if (!batch) {
+    return false;
+  }
+  for (const auto& metadata_entry : batch->GetAllMetadata()) {
+    // Note: No need for an explicit "is unsynced" check: Once the deletion is
+    // committed, the metadata entry is removed.
+    if (metadata_entry.second->is_deleted()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+LoginDatabase::PrimaryKeyAndPassword LoginDatabase::GetPrimaryKeyAndPassword(
+    const PasswordForm& form) const {
+  DCHECK(!id_and_password_statement_.empty());
+  sql::Statement s(db_.GetCachedStatement(SQL_FROM_HERE,
+                                          id_and_password_statement_.c_str()));
+
+  s.BindString(0, form.url.spec());
+  s.BindString16(1, form.username_element);
+  s.BindString16(2, form.username_value);
+  s.BindString16(3, form.password_element);
+  s.BindString(4, form.signon_realm);
+
+  if (s.Step()) {
+    PrimaryKeyAndPassword result = {s.ColumnInt(0)};
+    s.ColumnBlobAsString(1, &result.encrypted_password);
+    if (DecryptedString(result.encrypted_password,
+                        &result.decrypted_password) !=
+        ENCRYPTION_RESULT_SUCCESS) {
+      result.decrypted_password.clear();
+    }
+    return result;
+  }
+  return {-1, std::string(), std::u16string()};
 }
 
 FormRetrievalResult LoginDatabase::StatementToForms(

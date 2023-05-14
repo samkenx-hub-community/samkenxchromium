@@ -463,6 +463,8 @@ testcase.toolbarCloudIconShouldShowForInProgress = async () => {
   // hidden.
   await sendTestMessage({name: 'setBulkPinningEnabledPref', enabled: true});
   await remoteCall.waitForElementLost(appId, '#cloud-button[hidden]');
+  await remoteCall.waitForElement(
+      appId, '#cloud-button > xf-icon[type="cloud_sync"]');
 };
 
 /**
@@ -482,6 +484,8 @@ testcase.toolbarCloudIconShowsWhenNotEnoughDiskSpaceIsReturned = async () => {
   // error, there is a UI state to show so the toolbar should still be visible.
   await sendTestMessage({name: 'setBulkPinningEnabledPref', enabled: true});
   await remoteCall.waitForElementLost(appId, '#cloud-button[hidden]');
+  await remoteCall.waitForElement(
+      appId, '#cloud-button > xf-icon[type="cloud_error"]');
 };
 
 
@@ -540,19 +544,7 @@ testcase.toolbarCloudIconWhenPressedShouldOpenCloudPanel = async () => {
 
   // Click the cloud icon and wait for the dialog to move into space.
   await remoteCall.waitAndClickElement(appId, '#cloud-button:not([hidden])');
-  const caller = getCaller();
-  await repeatUntil(async () => {
-    const styles = await remoteCall.waitForElementStyles(
-        appId, ['xf-cloud-panel', 'cr-action-menu', 'dialog'], ['left']);
-
-    if (styles.renderedHeight > 0 && styles.renderedWidth > 0 &&
-        styles.renderedTop > 0 && styles.renderedLeft > 0) {
-      return true;
-    }
-
-    return pending(
-        caller, `Waiting for xf-cloud-panel to appear on left click.`);
-  });
+  await remoteCall.waitForCloudPanelVisible(appId);
 };
 
 /**
@@ -572,19 +564,44 @@ testcase.toolbarCloudIconShouldNotShowWhenPrefDisabled = async () => {
       {name: 'setSpacedFreeSpace', freeSpace: 1024 * 1024 * 1024});
 
   // Set the bulk pinning manager to enter offline mode. This will surface a
-  // `PAUSED` state which has a UI representation iff the pref is enabled. This
-  // is done to ensure the bulk pinning doesn't finish before our assertions are
-  // able to run (small amount of test files make this finish super quick).
+  // `PAUSED` state which has a UI representation iff the pref is enabled.
+  // This is done to ensure the bulk pinning doesn't finish before our
+  // assertions are able to run (small amount of test files make this finish
+  // super quick).
   await sendTestMessage({name: 'setBulkPinningOnline', enabled: false});
 
-  // Force the bulk pinning to calculate required space which will kick it into
-  // a `PAUSED` state from a `STOPPED` state.
+  // Force the bulk pinning to calculate required space which will kick it
+  // into a `PAUSED` state from a `STOPPED` state.
   await sendTestMessage({name: 'forceBulkPinningCalculateRequiredSpace'});
 
   // Assert the stage is `PAUSED` and the cloud button is still hidden.
-  const stage = await sendTestMessage({name: 'getBulkPinningStage'});
-  chrome.test.assertEq('Paused', stage);
+  await remoteCall.waitForBulkPinningStage('Paused');
   await remoteCall.waitForElement(appId, '#cloud-button[hidden]');
+};
+
+/**
+ * Tests that the cloud icon should show if bulk pinning is paused (which
+ * represents an offline state) and the user preference is enabled.
+ */
+testcase.toolbarCloudIconShouldShowWhenPausedState = async () => {
+  const appId =
+      await setupAndWaitUntilReady(RootPath.DRIVE, [], BASIC_DRIVE_ENTRY_SET);
+  await remoteCall.waitForElement(appId, '#cloud-button[hidden]');
+
+  // Force the bulk pinning preference on.
+  await sendTestMessage({name: 'setSpacedFreeSpace', freeSpace: 1 << 30});
+  await sendTestMessage({name: 'setBulkPinningEnabledPref', enabled: true});
+
+  // Set the bulk pinning manager to enter offline mode. This will surface a
+  // `PAUSED` state which has a UI representation iff the pref is enabled.
+  await sendTestMessage({name: 'setBulkPinningOnline', enabled: false});
+
+  // Assert the stage is `PAUSED`, the cloud button is visible and the icon is
+  // the offline icon.
+  await remoteCall.waitForBulkPinningStage('Paused');
+  await remoteCall.waitForElement(appId, '#cloud-button:not([hidden])');
+  await remoteCall.waitForElement(
+      appId, '#cloud-button > xf-icon[type="bulk_pinning_offline"]');
 };
 
 /**
@@ -603,14 +620,7 @@ testcase.toolbarCloudIconShouldShowOnStartupEvenIfSyncing = async () => {
 
   // Wait until the pin manager enters the syncing stage otherwise the next
   // syncing event will get ignored.
-  const caller = getCaller();
-  await repeatUntil(async () => {
-    const stage = await sendTestMessage({name: 'getBulkPinningStage'});
-    if (stage === 'Syncing') {
-      return true;
-    }
-    return pending(caller, 'Still waiting for syncing stage');
-  });
+  await remoteCall.waitForBulkPinningStage('Syncing');
 
   // Mock the Drive pinning event completing downloading all the data.
   await sendTestMessage({
@@ -623,19 +633,7 @@ testcase.toolbarCloudIconShouldShowOnStartupEvenIfSyncing = async () => {
   // Wait until the bulk pinning required space reaches 0 (no bytes left to
   // pin). This indicates the bulk pinning manager has finished. When Files app
   // starts after this, no event will go via onBulkPinProgress.
-  await repeatUntil(async () => {
-    const stage = await sendTestMessage({name: 'getBulkPinningStage'});
-    if (stage !== 'Syncing') {
-      return pending(caller, 'Still waiting for syncing stage');
-    }
-    const requiredSpace =
-        await sendTestMessage({name: 'getBulkPinningRequiredSpace'});
-    const parsedSpace = parseInt(requiredSpace, 10);
-    if (parsedSpace > 0) {
-      return pending(caller, 'Still waiting for required space to be 0');
-    }
-    return true;
-  });
+  await remoteCall.waitForBulkPinningRequiredSpace(0);
 
   // Open a new window to the Drive root and ensure the cloud button is not
   // hidden. The cloud button will show on startup as it relies on the bulk
@@ -649,20 +647,6 @@ testcase.toolbarCloudIconShouldShowOnStartupEvenIfSyncing = async () => {
   // the cloud button is visible the `<xf-cloud-panel>` should have it's data
   // set. To bypass async issues, only wait 10s to check the data is available
   // to ensure its done prior to the 60s free disk space check.
-  const futureDate = new Date();
-  futureDate.setSeconds(futureDate.getSeconds() + 10);
-  await repeatUntil(async () => {
-    chrome.test.assertTrue(
-        new Date() < futureDate,
-        'Timed out waiting for data to appear on xf-cloud-panel');
-    const cloudPanel = await remoteCall.callRemoteTestUtil(
-        'deepQueryAllElements', appId,
-        ['xf-cloud-panel[percentage="100"][items="1"]']);
-    if (cloudPanel && cloudPanel.length === 1) {
-      return true;
-    }
-    return pending(
-        caller,
-        'Still waiting for xf-cloud-panel to have items and percentage set');
-  });
+  await remoteCall.waitForCloudPanelState(
+      appId, /*items=*/ 1, /*percentage=*/ 100);
 };

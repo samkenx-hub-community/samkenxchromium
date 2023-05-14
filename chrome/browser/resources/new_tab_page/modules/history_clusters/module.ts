@@ -49,6 +49,7 @@ export enum HistoryClusterElementType {
   VISIT = 0,
   SUGGEST = 1,
   SHOW_ALL = 2,
+  CART = 3,
 }
 
 /**
@@ -165,6 +166,10 @@ export class HistoryClustersModuleElement extends I18nMixin
     this.recordClick_(HistoryClusterElementType.SUGGEST);
   }
 
+  private onCartTileClick_() {
+    this.recordClick_(HistoryClusterElementType.CART);
+  }
+
   private recordClick_(type: HistoryClusterElementType) {
     chrome.metricsPrivate.recordEnumerationValue(
         `NewTabPage.HistoryClusters.Layout${this.layoutType}.Click`, type,
@@ -227,7 +232,8 @@ export class HistoryClustersModuleElement extends I18nMixin
   private onOpenAllInTabGroupClick_() {
     const urls = [this.searchResultPage, ...this.cluster.visits].map(
         visit => visit.normalizedUrl);
-    HistoryClustersProxyImpl.getInstance().handler.openUrlsInTabGroup(urls);
+    HistoryClustersProxyImpl.getInstance().handler.openUrlsInTabGroup(
+        urls, this.cluster.tabGroupName ?? null);
   }
 
   private shouldShowCartTile_(cart: Object): boolean {

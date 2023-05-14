@@ -178,8 +178,9 @@ class PermissionRequestManagerBrowserTest : public InProcessBrowserTest {
     // In response, simulate the website automatically triggering a
     // renderer-initiated cross-origin navigation without user gesture.
     content::TestNavigationObserver navigation_observer(web_contents);
-    ASSERT_TRUE(content::ExecuteScriptWithoutUserGesture(
-        web_contents, "window.location = \"" + kSecondURL.spec() + "\";"));
+    ASSERT_TRUE(content::ExecJs(
+        web_contents, "window.location = \"" + kSecondURL.spec() + "\";",
+        content::EXECUTE_SCRIPT_NO_USER_GESTURE));
     navigation_observer.Wait();
 
     bubble_factory()->ResetCounts();
@@ -503,7 +504,8 @@ IN_PROC_BROWSER_TEST_F(PermissionRequestManagerBrowserTest,
 
   content::WebContents* web_contents =
       browser()->tab_strip_model()->GetActiveWebContents();
-  EXPECT_TRUE(content::ExecuteScript(web_contents, "requestGeolocation();"));
+  EXPECT_TRUE(content::ExecJs(web_contents, "requestGeolocation();",
+                              content::EXECUTE_SCRIPT_NO_RESOLVE_PROMISES));
   bubble_factory()->WaitForPermissionBubble();
   EXPECT_EQ(1, bubble_factory()->show_count());
   EXPECT_EQ(1, bubble_factory()->TotalRequestCount());
@@ -547,8 +549,9 @@ IN_PROC_BROWSER_TEST_F(PermissionRequestManagerBrowserTest,
   // In response, simulate the website automatically triggering a
   // renderer-initiated cross-origin navigation without user gesture.
   content::TestNavigationObserver navigation_observer(web_contents);
-  ASSERT_TRUE(content::ExecuteScriptWithoutUserGesture(
-      web_contents, "window.location = \"" + kSecondURL.spec() + "\";"));
+  ASSERT_TRUE(content::ExecJs(
+      web_contents, "window.location = \"" + kSecondURL.spec() + "\";",
+      content::EXECUTE_SCRIPT_NO_USER_GESTURE));
   navigation_observer.Wait();
 
   // Request the notification permission again from a different origin.
@@ -592,7 +595,7 @@ IN_PROC_BROWSER_TEST_F(PermissionRequestManagerBrowserTest,
   TriggerAndExpectPromptCooldownToBeStillActiveAfterNavigationAction(
       [](content::WebContents* web_contents, const GURL& url) {
         content::TestNavigationObserver navigation_observer(web_contents);
-        EXPECT_TRUE(content::ExecuteScript(
+        EXPECT_TRUE(content::ExecJs(
             web_contents, "window.location = \"" + url.spec() + "\";"));
         navigation_observer.Wait();
       },
@@ -605,8 +608,8 @@ IN_PROC_BROWSER_TEST_F(PermissionRequestManagerBrowserTest,
   TriggerAndExpectPromptCooldownToBeStillActiveAfterNavigationAction(
       [](content::WebContents* web_contents, const GURL& unused_url) {
         content::TestNavigationObserver navigation_observer(web_contents);
-        EXPECT_TRUE(content::ExecuteScriptWithoutUserGesture(
-            web_contents, "window.location.reload();"));
+        EXPECT_TRUE(content::ExecJs(web_contents, "window.location.reload();",
+                                    content::EXECUTE_SCRIPT_NO_USER_GESTURE));
         navigation_observer.Wait();
       },
       true /* expect_cooldown */);
@@ -619,8 +622,9 @@ IN_PROC_BROWSER_TEST_F(
   TriggerAndExpectPromptCooldownToBeStillActiveAfterNavigationAction(
       [](content::WebContents* web_contents, const GURL& url) {
         content::TestNavigationObserver navigation_observer(web_contents);
-        EXPECT_TRUE(content::ExecuteScriptWithoutUserGesture(
-            web_contents, "window.location = \"" + url.spec() + "\";"));
+        EXPECT_TRUE(content::ExecJs(web_contents,
+                                    "window.location = \"" + url.spec() + "\";",
+                                    content::EXECUTE_SCRIPT_NO_USER_GESTURE));
         navigation_observer.Wait();
       },
       true /* expect_cooldown */);

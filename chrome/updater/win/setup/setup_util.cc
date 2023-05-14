@@ -519,7 +519,9 @@ bool RegisterWakeTaskWorkItem::DoImpl() {
 
   if (!task_scheduler->RegisterTask(
           task_name.c_str(), GetTaskDisplayName(scope_).c_str(), run_command_,
-          TaskScheduler::TriggerType::TRIGGER_TYPE_HOURLY, true)) {
+          TaskScheduler::TriggerType::TRIGGER_TYPE_HOURLY |
+              TaskScheduler::TriggerType::TRIGGER_TYPE_LOGON,
+          true)) {
     return false;
   }
 

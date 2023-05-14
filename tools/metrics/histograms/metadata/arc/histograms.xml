@@ -269,7 +269,7 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="Arc.AndroidBootTime" units="ms" expires_after="2023-09-01">
+<histogram name="Arc.AndroidBootTime" units="ms" expires_after="2023-11-05">
   <owner>khmel@google.com</owner>
   <owner>arc-performance@google.com</owner>
   <summary>The time elapsed for booting up the ARC instance.</summary>
@@ -2131,7 +2131,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Arc.Runtime.Performance.Generic.Jankiness" units="%"
-    expires_after="2023-09-01">
+    expires_after="2023-11-05">
   <owner>khmel@google.com</owner>
   <owner>alanding@google.com</owner>
   <summary>
@@ -2348,6 +2348,19 @@ chromium-metrics-reviews@google.com.
   <summary>
     Counts user interactions with ARC by type, such as ARC app launches via the
     shelf or launcher.
+  </summary>
+</histogram>
+
+<histogram name="Arc.VmDataMigration.AccessDeniedAtOpenSourceFileFailureType"
+    enum="ArcVmDataMigrationAccessDeniedAtOpenFileFailureType"
+    expires_after="2024-01-01">
+  <owner>momohatt@google.com</owner>
+  <owner>youkichihosoi@google.com</owner>
+  <owner>arc-storage@google.com</owner>
+  <summary>
+    The detailed cause of an access denied error at opening a source file during
+    ARCVM /data migration. Reported each time when the migrator encounters such
+    an error.
   </summary>
 </histogram>
 

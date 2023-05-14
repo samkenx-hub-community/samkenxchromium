@@ -152,6 +152,7 @@
               "fast/backgrounds",
               "paint/background",
               "paint/invalidation/background",
+              "external/wpt/acid/acid2/reftest.html",
               "external/wpt/css/CSS2/backgrounds",
               "external/wpt/css/css-backgrounds",
               "external/wpt/css/css-break/background-image-000.html",
@@ -168,7 +169,7 @@
     "bases": ["wpt_internal/attribution-reporting"],
     "exclusive_tests": "ALL",
     "args": ["--attribution-reporting-debug-mode",
-             "--enable-features=AttributionReportingCrossAppWeb,AttributionReportingReportVerification",
+             "--enable-features=AttributionReportingCrossAppWeb,AttributionReportingReportVerification,PrivacySandboxAdsAPIsOverride",
              "--additional-private-state-token-key-commitments={\"https://web-platform.test:8444\":{\"PrivateStateTokenV3VOPRF\":{\"protocol_version\":\"PrivateStateTokenV3VOPRF\",\"id\":1,\"batchsize\":1,\"keys\":{\"0\":{\"Y\":\"AAAAAASqh8oivosFN46xxx7zIK10bh07Younm5hZ90HgglQqOFUC8l2/VSlsOlReOHJ2CrfJ6CG1adnTkKJhZ0BtbSPWBwviQtdl64MWJc7sSg9HPvWfTjDigX5ihbzihG8V8aA=\",\"expiry\":\"253402300799000000\"}}}}}"],
     "expires": "Jul 1, 2023"
   },
@@ -177,7 +178,7 @@
     "platforms": ["Linux", "Mac", "Win"],
     "bases": ["http/tests/inspector-protocol/attribution-reporting/os"],
     "exclusive_tests": "ALL",
-    "args": ["--enable-features=AttributionReportingCrossAppWeb"],
+    "args": ["--enable-features=AttributionReportingCrossAppWeb,PrivacySandboxAdsAPIsOverride"],
     "expires": "Jul 1, 2023"
   },
   {
@@ -249,6 +250,8 @@
              "--force-raster-color-profile=color-spin-gamma24"],
     "expires": "Jul 1, 2023"
   },
+  "The stable suite tests for conformance to HTML/web specifications, and",
+  "detects unintentional changes to web exposed surface, so should not expire.",
   {
     "prefix": "stable",
     "platforms": ["Linux", "Mac", "Win", "Fuchsia"],
@@ -268,7 +271,7 @@
     "args": ["--stable-release-mode",
              "--disable-auto-wpt-origin-isolation",
              "--disable-field-trial-config"],
-    "expires": "Jul 1, 2023"
+    "expires": "never"
   },
   {
     "prefix": "feature-policy-permissions",
@@ -279,13 +282,15 @@
              "--use-fake-ui-for-media-stream"],
     "expires": "Jul 1, 2023"
   },
+  "The origin trials suite tests that OT-controlled features are exposed to",
+  "the web as expected, so should not expire.",
   {
     "prefix": "origin-trials-runtimeflags-disabled",
     "platforms": ["Linux", "Mac", "Win"],
     "bases": ["http/tests/origin_trials/webexposed"],
     "args": ["--disable-origin-trial-controlled-blink-features",
              "--stable-release-mode"],
-    "expires": "Jul 1, 2023"
+    "expires": "never"
   },
   {
     "prefix": "android",
@@ -350,10 +355,33 @@
   {
     "prefix": "composite-clip-path-animation",
     "platforms": ["Linux", "Mac", "Win"],
-    "bases": ["external/wpt/css/css-masking/clip-path/animations"],
+    "bases": ["external/wpt/css/css-masking/clip-path/animations",
+              "animations/responsive/interpolation/clip-path-responsive.html",
+              "css3/masking/clip-path-animation.html",
+              "fast/css/clip-path-crash.html",
+              "http/tests/devtools/animation/animation-timeline.js",
+              "http/tests/devtools/animation/animation-web-anim-negative-start-time.js",
+              "paint/invalidation/svg/invalid-clip-path-crash.html",
+              "transitions/webkit-clip-path-equality.html"],
+    "exclusive_tests": "ALL",
     "args": ["--enable-blink-features=CompositeClipPathAnimation",
              "--enable-threaded-compositing"],
     "expires": "Jul 1, 2023"
+  },
+  {
+    "prefix": "main-thread-clip-path-animation",
+    "platforms": ["Linux", "Mac", "Win"],
+    "bases": ["external/wpt/css/css-masking/clip-path/animations",
+              "animations/responsive/interpolation/clip-path-responsive.html",
+              "css3/masking/clip-path-animation.html",
+              "fast/css/clip-path-crash.html",
+              "http/tests/devtools/animation/animation-timeline.js",
+              "http/tests/devtools/animation/animation-web-anim-negative-start-time.js",
+              "paint/invalidation/svg/invalid-clip-path-crash.html",
+              "transitions/webkit-clip-path-equality.html"],
+    "exclusive_tests": "ALL",
+    "args": ["--disable-blink-features=CompositeClipPathAnimation"],
+    "expires": "never"
   },
   {
     "prefix": "fractional-scroll-offsets",
@@ -1221,6 +1249,16 @@
     "expires": "Jul 1, 2023"
   },
   {
+    "prefix": "force-renderer-accessibility-form-controls",
+    "platforms": ["Linux", "Mac", "Win"],
+    "bases": ["external/wpt/accessibility/crashtests/bdo-table-cell.html",
+              "external/wpt/accessibility/crashtests/displaylocked-serialize.html",
+              "external/wpt/accessibility/crashtests/img-map-pseudo.html",
+              "external/wpt/accessibility/crashtests/map-inside-map.html"],
+    "args": ["--force-renderer-accessibility=form-controls"],
+    "expires": "never"
+  },
+  {
     "prefix": "no-alloc-direct-call",
     "platforms": ["Linux"],
     "bases": ["fast/canvas"],
@@ -1261,9 +1299,22 @@
     "expires": "Jul 1, 2023"
   },
   {
+    "prefix": "view-transition-mpa-serialization",
+    "platforms": ["Linux", "Mac", "Win"],
+    "bases": ["external/wpt/css/css-view-transitions",
+              "wpt_internal/view-transition",
+              "view-transition",
+              "inspector-protocol/css/css-get-styles-for-view-transition.js",
+              "external/wpt/soft-navigation-heuristics/navigation-api-view-transition.tentative.html"],
+    "exclusive_tests": "ALL",
+    "args": ["--enable-threaded-compositing",
+             "--enable-blink-features=SerializeViewTransitionStateInSPA"],
+    "expires": "Feb 1, 2024"
+  },
+  {
     "prefix": "popover-hint-disabled",
     "platforms": ["Linux", "Mac", "Win"],
-    "bases": [],
+    "bases": ["external/wpt/html/semantics/popovers/"],
     "args": ["--enable-blink-features=HTMLPopoverAttribute",
       "--disable-blink-features=HTMLPopoverHint"],
     "expires": "Jan 1, 2024"
@@ -1307,7 +1358,7 @@
       "http/tests/inspector-protocol/storage/interest-groups.js"
     ],
     "args": [
-      "--enable-features=InterestGroupStorage,AdInterestGroupAPI,Fledge,PrivacySandboxAdsAPIsOverride,FencedFrames:implementation_type/mparch,FencedFramesAPIChanges"
+      "--enable-features=InterestGroupStorage,AdInterestGroupAPI,Fledge,FledgeBiddingAndAuctionServer,PrivacySandboxAdsAPIsOverride,FencedFrames:implementation_type/mparch,FencedFramesAPIChanges"
     ],
     "expires": "Dec 1, 2023"
   },
@@ -1677,7 +1728,7 @@
     ],
     "exclusive_tests": "ALL",
     "args": [
-      "--enable-blink-features=SpeculationRulesPrefetchProxy,SpeculationRulesFetchFromHeader,SpeculationRulesDocumentRules,NoVarySearchPrefetch,SpeculationRulesEagerness,SpeculationRulesDocumentRulesSelectorMatches",
+      "--enable-blink-features=SpeculationRulesPrefetchProxy,SpeculationRulesFetchFromHeader,SpeculationRulesDocumentRules,NoVarySearchPrefetch,SpeculationRulesNoVarySearchHint,SpeculationRulesEagerness,SpeculationRulesDocumentRulesSelectorMatches",
       "--enable-features=SpeculationRulesPrefetchProxy,PrefetchUseContentRefactor",
       "--bypass-prefetch-proxy-for-host=not-web-platform.test"
     ],
@@ -1691,7 +1742,7 @@
     ],
     "exclusive_tests": "ALL",
     "args": [
-      "--enable-blink-features=NoVarySearchPrefetch",
+      "--enable-blink-features=NoVarySearchPrefetch,SpeculationRulesNoVarySearchHint",
       "--enable-features=PrefetchUseContentRefactor"
     ],
     "expires": "Jul 1, 2023"

@@ -116,6 +116,8 @@
   v4l2_fourcc('Q', '1', '0', 'C') /* Qualcomm 10-bit compressed */
 #endif
 
+#define V4L2_PIX_FMT_INVALID v4l2_fourcc('0', '0', '0', '0')
+
 namespace gfx {
 struct NativePixmapPlane;
 }  // namespace gfx
@@ -674,11 +676,10 @@ class MEDIA_GPU_EXPORT V4L2Device
     : public base::RefCountedThreadSafe<V4L2Device> {
  public:
   // Utility format conversion functions
-  // If there is no corresponding single- or multi-planar format, returns 0.
+  // If there is no corresponding single- or multi-planar format, returns
+  // V4L2_PIX_FMT_INVALID.
   static uint32_t VideoCodecProfileToV4L2PixFmt(VideoCodecProfile profile,
                                                 bool slice_based);
-  std::vector<VideoCodecProfile> V4L2PixFmtToVideoCodecProfiles(
-      uint32_t pix_fmt);
   // Calculates the largest plane's allocation size requested by a V4L2 device.
   static gfx::Size AllocatedSizeFromV4L2Format(
       const struct v4l2_format& format);
@@ -806,8 +807,6 @@ class MEDIA_GPU_EXPORT V4L2Device
   VideoEncodeAccelerator::SupportedRateControlMode
   GetSupportedRateControlMode();
 
-  std::vector<uint32_t> EnumerateSupportedPixelformats(v4l2_buf_type buf_type);
-
   // NOTE: The below methods to query capabilities have a side effect of
   // closing the previously-open device, if any, and should not be called after
   // Open().
@@ -821,8 +820,7 @@ class MEDIA_GPU_EXPORT V4L2Device
   // Return supported profiles for decoder, including only profiles for given
   // fourcc |pixelformats|.
   virtual VideoDecodeAccelerator::SupportedProfiles GetSupportedDecodeProfiles(
-      const size_t num_formats,
-      const uint32_t pixelformats[]) = 0;
+      const std::vector<uint32_t>& pixelformats) = 0;
 
   // Return supported profiles for encoder.
   virtual VideoEncodeAccelerator::SupportedProfiles
@@ -878,8 +876,7 @@ class MEDIA_GPU_EXPORT V4L2Device
   virtual ~V4L2Device();
 
   VideoDecodeAccelerator::SupportedProfiles EnumerateSupportedDecodeProfiles(
-      const size_t num_formats,
-      const uint32_t pixelformats[]);
+      const std::vector<uint32_t>& pixelformats);
 
   VideoEncodeAccelerator::SupportedProfiles EnumerateSupportedEncodeProfiles();
 

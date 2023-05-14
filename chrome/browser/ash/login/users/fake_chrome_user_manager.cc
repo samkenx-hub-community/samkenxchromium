@@ -20,11 +20,8 @@
 #include "chrome/browser/ash/login/users/chrome_user_manager_util.h"
 #include "chrome/browser/ash/login/users/default_user_image/default_user_images.h"
 #include "chrome/browser/ash/login/users/fake_supervised_user_manager.h"
-#include "chrome/browser/ash/policy/core/browser_policy_connector_ash.h"
 #include "chrome/browser/ash/profiles/profile_helper.h"
 #include "chrome/browser/ash/settings/cros_settings.h"
-#include "chrome/browser/browser_process.h"
-#include "chrome/browser/browser_process_platform_part.h"
 #include "chrome/browser/ui/ash/wallpaper_controller_client_impl.h"
 #include "chrome/test/base/testing_profile.h"
 #include "chromeos/ash/components/login/login_state/login_state.h"
@@ -246,34 +243,6 @@ UserImageManager* FakeChromeUserManager::GetUserImageManager(
   return mgr_raw;
 }
 
-void FakeChromeUserManager::SetUserFlow(const AccountId& account_id,
-                                        UserFlow* flow) {
-  ResetUserFlow(account_id);
-  specific_flows_[account_id] = flow;
-}
-
-UserFlow* FakeChromeUserManager::GetCurrentUserFlow() const {
-  if (!IsUserLoggedIn())
-    return GetDefaultUserFlow();
-  return GetUserFlow(GetActiveUser()->GetAccountId());
-}
-
-UserFlow* FakeChromeUserManager::GetUserFlow(
-    const AccountId& account_id) const {
-  FlowMap::const_iterator it = specific_flows_.find(account_id);
-  if (it != specific_flows_.end())
-    return it->second;
-  return GetDefaultUserFlow();
-}
-
-void FakeChromeUserManager::ResetUserFlow(const AccountId& account_id) {
-  FlowMap::iterator it = specific_flows_.find(account_id);
-  if (it != specific_flows_.end()) {
-    delete it->second;
-    specific_flows_.erase(it);
-  }
-}
-
 void FakeChromeUserManager::SwitchActiveUser(const AccountId& account_id) {
   active_account_id_ = account_id;
   active_user_ = nullptr;
@@ -337,12 +306,6 @@ user_manager::UserList FakeChromeUserManager::GetUsersAllowedForMultiProfile()
   }
 
   return result;
-}
-
-UserFlow* FakeChromeUserManager::GetDefaultUserFlow() const {
-  if (!default_flow_.get())
-    default_flow_ = std::make_unique<DefaultUserFlow>();
-  return default_flow_.get();
 }
 
 void FakeChromeUserManager::SetOwnerId(const AccountId& account_id) {
@@ -690,10 +653,6 @@ bool FakeChromeUserManager::IsEnterpriseManaged() const {
   return is_enterprise_managed_;
 }
 
-void FakeChromeUserManager::PerformPostUserListLoadingActions() {
-  NOTREACHED();
-}
-
 void FakeChromeUserManager::PerformPostUserLoggedInActions(
     bool browser_restart) {
   NOTREACHED();
@@ -724,11 +683,6 @@ void FakeChromeUserManager::SetUserAffiliationForTesting(
   }
   user->SetAffiliation(is_affiliated);
   NotifyUserAffiliationUpdated(*user);
-}
-
-bool FakeChromeUserManager::IsFullManagementDisclosureNeeded(
-    policy::DeviceLocalAccountPolicyBroker* broker) const {
-  return true;
 }
 
 user_manager::User* FakeChromeUserManager::GetActiveUserInternal() const {

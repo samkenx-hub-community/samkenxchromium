@@ -289,6 +289,10 @@ void CheckInstallation(UpdaterScope scope,
                       L"*/components/update_client/*=2,"
                       L"*/chrome/updater/*=2"})
             .c_str());
+
+    EXPECT_EQ(task_info.trigger_types,
+              TaskScheduler::TriggerType::TRIGGER_TYPE_HOURLY |
+                  TaskScheduler::TriggerType::TRIGGER_TYPE_LOGON);
   } else {
     task_scheduler->ForEachTaskWithPrefix(
         base::ASCIIToWide(PRODUCT_FULLNAME_STRING),
@@ -882,8 +886,7 @@ void ExpectMarshalInterfaceSucceeds(UpdaterScope scope) {
   // Marshal and unmarshal an IUpdaterInternal object.
   Microsoft::WRL::ComPtr<IUpdaterInternal> updater_internal;
   EXPECT_HRESULT_SUCCEEDED(
-      Microsoft::WRL::MakeAndInitialize<UpdaterInternalImpl>(
-          &updater_internal));
+      MakeAndInitializeComObject<UpdaterInternalImpl>(updater_internal));
 
   Microsoft::WRL::ComPtr<IStream> stream;
   EXPECT_HRESULT_SUCCEEDED(::CoMarshalInterThreadInterfaceInStream(

@@ -199,8 +199,7 @@ const CGFloat kShiftTilesUpAnimationDuration = 0.1;
     AddSameConstraints(_backgroundGradientView, self.view);
     [self updateModularHomeBackgroundColorForUserInterfaceStyle:
               self.traitCollection.userInterfaceStyle];
-    self.view.backgroundColor =
-        [UIColor colorNamed:@"ntp_background_light_mode_only_color"];
+    self.view.backgroundColor = [UIColor colorNamed:@"ntp_background_color"];
   } else {
     self.view.backgroundColor = ntp_home::NTPBackgroundColor();
   }
@@ -387,7 +386,6 @@ const CGFloat kShiftTilesUpAnimationDuration = 0.1;
         -([self stickyOmniboxHeight] + [self feedHeaderHeight]);
     [self.contentSuggestionsViewController.view setNeedsLayout];
     [self.contentSuggestionsViewController.view layoutIfNeeded];
-    [self.ntpContentDelegate reloadContentSuggestions];
   }
 
   if (previousTraitCollection.preferredContentSizeCategory !=
@@ -1393,6 +1391,8 @@ const CGFloat kShiftTilesUpAnimationDuration = 0.1;
   return adjustedOffset;
 }
 
+// Background gradient view will be used when in dark mode, the assigned
+// background color to this view's otherwise.
 - (void)updateModularHomeBackgroundColorForUserInterfaceStyle:
     (UIUserInterfaceStyle)style {
   _backgroundGradientView.hidden = style == UIUserInterfaceStyleLight;

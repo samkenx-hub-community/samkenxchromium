@@ -527,7 +527,7 @@ NSString* const kGoogleServicesEnterpriseImage = @"google_services_enterprise";
 }
 
 - (BOOL)syncConsentGiven {
-  return self.syncSetupService->IsFirstSetupComplete();
+  return self.syncSetupService->IsInitialSyncFeatureSetupComplete();
 }
 
 #pragma mark - ManageSyncSettingsTableViewControllerModelDelegate
@@ -887,7 +887,7 @@ NSString* const kGoogleServicesEnterpriseImage = @"google_services_enterprise";
 #pragma mark - Properties
 
 - (BOOL)isSyncDisabledByAdministrator {
-  return self.syncService->GetDisableReasons().Has(
+  return self.syncService->HasDisableReason(
       syncer::SyncService::DISABLE_REASON_ENTERPRISE_POLICY);
 }
 

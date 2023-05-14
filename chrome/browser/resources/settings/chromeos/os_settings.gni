@@ -89,7 +89,7 @@ web_component_files = [
   "chromeos/internet_page/passpoint_subpage.ts",
   "chromeos/internet_page/settings_traffic_counters.ts",
   "chromeos/internet_page/tether_connection_dialog.ts",
-  "chromeos/kerberos_page/kerberos_accounts.ts",
+  "chromeos/kerberos_page/kerberos_accounts_subpage.ts",
   "chromeos/kerberos_page/kerberos_add_account_dialog.ts",
   "chromeos/kerberos_page/kerberos_page.ts",
   "chromeos/keyboard_shortcut_banner/keyboard_shortcut_banner.ts",
@@ -302,6 +302,7 @@ foreach(f, css_files) {
 non_web_component_files = [
   "chromeos/assert_extras.ts",
   "chromeos/common/global_scroll_target_mixin.ts",
+  "chromeos/common/load_time_booleans.ts",
   "chromeos/common/setting_id_param_util.ts",
   "chromeos/common/types.ts",
   "chromeos/os_files_page/google_drive_browser_proxy.ts",

@@ -52,31 +52,33 @@ using mojom::AcceleratorConfigResult;
 using HiddenAcceleratorMap =
     std::map<AcceleratorActionId, std::vector<ui::Accelerator>>;
 
+constexpr size_t kMaxAcceleratorsAllowed = 5;
+
 // Raw accelerator data may result in the same shortcut being displayed multiple
 // times in the frontend. GetHiddenAcceleratorMap() is used to collect such
 // accelerators and hide them from display.
 const HiddenAcceleratorMap& GetHiddenAcceleratorMap() {
   static auto hiddenAcceleratorMap = base::NoDestructor<HiddenAcceleratorMap>(
-      {{TOGGLE_APP_LIST,
+      {{AcceleratorAction::kToggleAppList,
         {ui::Accelerator(ui::VKEY_BROWSER_SEARCH, ui::EF_SHIFT_DOWN,
                          ui::Accelerator::KeyState::PRESSED),
          ui::Accelerator(ui::VKEY_LWIN, ui::EF_SHIFT_DOWN,
                          ui::Accelerator::KeyState::RELEASED)}},
-       {SHOW_SHORTCUT_VIEWER,
+       {AcceleratorAction::kShowShortcutViewer,
         {ui::Accelerator(ui::VKEY_F14, ui::EF_NONE,
                          ui::Accelerator::KeyState::PRESSED),
          ui::Accelerator(
              ui::VKEY_OEM_2,
              ui::EF_SHIFT_DOWN | ui::EF_CONTROL_DOWN | ui::EF_ALT_DOWN,
              ui::Accelerator::KeyState::PRESSED)}},
-       {OPEN_GET_HELP,
+       {AcceleratorAction::kOpenGetHelp,
         {ui::Accelerator(ui::VKEY_OEM_2,
                          ui::EF_SHIFT_DOWN | ui::EF_CONTROL_DOWN,
                          ui::Accelerator::KeyState::PRESSED)}},
-       {TOGGLE_FULLSCREEN,
+       {AcceleratorAction::kToggleFullscreen,
         {ui::Accelerator(ui::VKEY_ZOOM, ui::EF_SHIFT_DOWN,
                          ui::Accelerator::KeyState::PRESSED)}},
-       {SWITCH_TO_LAST_USED_IME,
+       {AcceleratorAction::kSwitchToLastUsedIme,
         {ui::Accelerator(ui::VKEY_SPACE, ui::EF_CONTROL_DOWN,
                          ui::Accelerator::KeyState::RELEASED)}}});
   return *hiddenAcceleratorMap;
@@ -484,6 +486,16 @@ void AcceleratorConfigurationProvider::AddAccelerator(
     return;
   }
 
+  // Only allow a maximum of five accelerators per action.
+  const size_t accelerator_count =
+      ash_accelerator_configuration_->GetAcceleratorsForAction(action_id)
+          .size();
+  if (accelerator_count >= kMaxAcceleratorsAllowed) {
+    result_data->result = AcceleratorConfigResult::kMaximumAcceleratorsReached;
+    std::move(callback).Run(std::move(result_data));
+    return;
+  }
+
   absl::optional<AcceleratorResultDataPtr> result_data_ptr =
       PreprocessAddAccelerator(source, action_id, accelerator);
   // Check if there was an error during processing the accelerator, if so return
@@ -708,8 +720,25 @@ AcceleratorConfigurationProvider::PreprocessAddAccelerator(
   // Check if the accelerator conflicts with an existing ash accelerator.
   const AcceleratorAction* found_ash_action =
       ash_accelerator_configuration_->FindAcceleratorAction(accelerator);
-  if (found_ash_action &&
-      !ash_accelerator_configuration_->IsDeprecated(accelerator)) {
+
+  // Accelerator does not exist, can add this accelerator.
+  if (!found_ash_action) {
+    return absl::nullopt;
+  }
+
+  // Check that the new accelerator is not already an existing accelerator of
+  // the same action. If so, return with `kConflict`.
+  if (*found_ash_action == action_id) {
+    pending_accelerator_.reset();
+    result_data->result = AcceleratorConfigResult::kConflict;
+    result_data->shortcut_name = l10n_util::GetStringUTF16(
+        accelerator_layout_lookup_[GetUuid(mojom::AcceleratorSource::kAsh,
+                                           *found_ash_action)]
+            .description_string_id);
+    return result_data;
+  }
+
+  if (!ash_accelerator_configuration_->IsDeprecated(accelerator)) {
     // Accelerator already exists, check if it belongs to a locked action.
     const auto& layout_iter = accelerator_layout_lookup_.find(
         GetUuid(mojom::AcceleratorSource::kAsh, *found_ash_action));

@@ -552,6 +552,11 @@ BASE_FEATURE(kHappinessTrackingSystemBluetoothRevamp,
 BASE_FEATURE(kHappinessTrackingSystemBatteryLife,
              "HappinessTrackingSystemBatteryLife",
              base::FEATURE_DISABLED_BY_DEFAULT);
+// Enables or disables the Happiness Tracking System for the Peripherals
+// survey.
+BASE_FEATURE(kHappinessTrackingSystemPeripherals,
+             "HappinessTrackingSystemPeripherals",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 // Enables or disables the Happiness Tracking System for the Ent survey.
 BASE_FEATURE(kHappinessTrackingSystemEnt,
              "HappinessTrackingSystemEnt",
@@ -643,6 +648,12 @@ BASE_FEATURE(kHttpsFirstModeForAdvancedProtectionUsers,
 BASE_FEATURE(kHttpsFirstModeV2,
              "HttpsFirstModeV2",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+// Enables HTTPS-First Mode for engaged sites. No-op if HttpsFirstModeV2 or
+// HTTPS-Upgrades is disabled.
+BASE_FEATURE(kHttpsFirstModeV2ForEngagedSites,
+             "HttpsFirstModeV2ForEngagedSites",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables automatically upgrading main frame navigations to HTTPS.
 BASE_FEATURE(kHttpsUpgrades,
@@ -768,7 +779,7 @@ BASE_FEATURE(kKAnonymityServiceOHTTPRequests,
 // public keys.
 BASE_FEATURE(kKAnonymityServiceStorage,
              "KAnonymityServiceStorage",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 #if BUILDFLAG(IS_LINUX) && !BUILDFLAG(IS_CHROMEOS)
 BASE_FEATURE(kLinuxLowMemoryMonitor,
@@ -995,6 +1006,9 @@ const base::FeatureParam<int>
     kSafetyCheckNotificationPermissionsLowEnagementLimit{
         &kSafetyCheckNotificationPermissions,
         "low-engagement-notification-count", 4};
+
+// Enables Safety Hub feature.
+BASE_FEATURE(kSafetyHub, "SafetyHub", base::FEATURE_DISABLED_BY_DEFAULT);
 #endif  // !BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
@@ -1530,14 +1544,14 @@ BASE_FEATURE(kUseWebAppDBInsteadOfExternalPrefs,
 
 BASE_FEATURE(kWebAuthFlowInBrowserTab,
              "WebAuthFlowInBrowserTab",
-             base::FeatureState::FEATURE_DISABLED_BY_DEFAULT);
+             base::FeatureState::FEATURE_ENABLED_BY_DEFAULT);
 const base::FeatureParam<WebAuthFlowInBrowserTabMode>::Option
     web_auth_flow_modes[] = {
         {WebAuthFlowInBrowserTabMode::kNewTab, "new_tab"},
         {WebAuthFlowInBrowserTabMode::kPopupWindow, "popup_window"}};
 const base::FeatureParam<WebAuthFlowInBrowserTabMode>
     kWebAuthFlowInBrowserTabMode{&kWebAuthFlowInBrowserTab, "browser_tab_mode",
-                                 WebAuthFlowInBrowserTabMode::kNewTab,
+                                 WebAuthFlowInBrowserTabMode::kPopupWindow,
                                  &web_auth_flow_modes};
 
 }  // namespace features

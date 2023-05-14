@@ -10,6 +10,12 @@
  * #include=cr-shared-style cros-color-overrides
  * #css_wrapper_metadata_end */
 
+:host {
+  /* Margin on hover for responsive layout adjusts based on padded-left minus
+     16px to align left. */
+  --active-status-hover-margin: calc(var(--padded-left) - 16px);
+}
+
 :host-context(body.jelly-enabled) .main-container {
   display: flex;
   flex-flow: column;
@@ -135,11 +141,18 @@
 
 #activeStatusContainer:hover {
   background-color: rgba(var(--google-blue-600-rgb), 0.06);
+  border-radius: 16px;
+  margin-inline-start: 16px;
+  padding-inline-start: 16px;
 }
 
 @media (min-width: 600px) and (max-width: 767px) {
+  :host {
+    --padded-left: 32px;
+  }
+
   :host-context(body.jelly-enabled) #headerContainer {
-    margin: 0 20px;
+    margin-inline: 20px;
   }
 
   :host-context(body.jelly-enabled) .data-container {
@@ -159,11 +172,11 @@
   }
 
   :host-context(body:not(.jelly-enabled)) .margin-border {
-    margin: 0px 40px 0px 40px;
+    margin-inline: 40px;
   }
 
   .padded-left {
-    margin-inline-start: 32px;
+    margin-inline-start: var(--padded-left);
   }
 
   .printer-name-column {
@@ -175,15 +188,17 @@
   }
 
   #activeStatusContainer:hover {
-    border-radius: 16px;
-    margin-inline-start: 16px;
-    padding-left: 16px;
+    margin-inline-start: var(--active-status-hover-margin);
   }
 }
 
 @media (min-width: 768px) and (max-width: 959px) {
+  :host {
+    --padded-left: 40px;
+  }
+
   :host-context(body.jelly-enabled) #headerContainer {
-    margin: 0 20px;
+    margin-inline: 20px;
   }
 
   :host-context(body.jelly-enabled) .data-container {
@@ -203,11 +218,11 @@
   }
 
   :host-context(body:not(.jelly-enabled)) .margin-border {
-    margin: 0px 40px 0px 40px;
+    margin-inline: 40px;
   }
 
   .padded-left {
-    margin-inline-start: 40px;
+    margin-inline-start: var(--padded-left);
   }
 
   .printer-name-column {
@@ -219,15 +234,17 @@
   }
 
   #activeStatusContainer:hover {
-    border-radius: 16px;
-    margin-inline-start: 16px;
-    padding-left: 16px;
+    margin-inline-start: var(--active-status-hover-margin);
   }
 }
 
 @media (min-width: 960px) and (max-width: 1279px) {
+  :host {
+    --padded-left: 48px;
+  }
+
   :host-context(body.jelly-enabled) #headerContainer {
-    margin: 0 32px;
+    margin-inline: 32px;
   }
 
   :host-context(body.jelly-enabled) .data-container {
@@ -247,11 +264,11 @@
   }
 
   .margin-border {
-    margin: 0px 64px 0px 64px;
+    margin-inline: 64px;
   }
 
   .padded-left {
-    margin-inline-start: 48px;
+    margin-inline-start: var(--padded-left);
   }
 
   .printer-name-column {
@@ -263,15 +280,17 @@
   }
 
   #activeStatusContainer:hover {
-    border-radius: 16px;
-    margin-inline-start: 16px;
-    padding-left: 16px;
+    margin-inline-start: var(--active-status-hover-margin);
   }
 }
 
 @media (min-width: 1280px) {
+  :host {
+    --padded-left: 56px;
+  }
+
   :host-context(body.jelly-enabled) #headerContainer {
-    margin: 0 72px;
+    margin-inline: 72px;
   }
 
   :host-context(body.jelly-enabled) .data-container {
@@ -291,11 +310,11 @@
   }
 
   :host-context(body:not(.jelly-enabled)) .margin-border {
-    margin: 0px 144px 0px 144px;
+    margin-inline: 144px;
   }
 
   .padded-left {
-    margin-inline-start: 56px;
+    margin-inline-start: var(--padded-left);
   }
 
   .printer-name-column {
@@ -307,8 +326,6 @@
   }
 
   #activeStatusContainer:hover {
-    border-radius: 16px;
-    margin-inline-start: 16px;
-    padding-left: 16px;
+    margin-inline-start: var(--active-status-hover-margin);
   }
 }

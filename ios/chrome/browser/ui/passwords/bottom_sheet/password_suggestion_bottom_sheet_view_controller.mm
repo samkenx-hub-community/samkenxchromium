@@ -84,6 +84,10 @@ CGFloat const kLandscapeTableViewWidthMultiplier = 0.65;
   // The property is defined by PasswordSuggestionBottomSheetConsumer protocol.
   NSArray<FormSuggestion*>* _suggestions;
 
+  // The current's page domain. This is used for the password bottom sheet
+  // description label.
+  NSString* _domain;
+
   // The password controller handler used to open the password manager.
   id<PasswordSuggestionBottomSheetHandler> _handler;
 }
@@ -159,8 +163,10 @@ CGFloat const kLandscapeTableViewWidthMultiplier = 0.65;
 
 #pragma mark - PasswordSuggestionBottomSheetConsumer
 
-- (void)setSuggestions:(NSArray<FormSuggestion*>*)suggestions {
+- (void)setSuggestions:(NSArray<FormSuggestion*>*)suggestions
+             andDomain:(NSString*)domain {
   _suggestions = suggestions;
+  _domain = domain;
 }
 
 - (void)dismiss {
@@ -239,7 +245,7 @@ CGFloat const kLandscapeTableViewWidthMultiplier = 0.65;
   // and URL.
   cell.titleLabel.text = [self suggestionAtRow:indexPath.row];
   cell.titleLabel.lineBreakMode = NSLineBreakByTruncatingMiddle;
-  cell.URLLabel.text = [self descriptionAtRow:indexPath.row];
+  cell.URLLabel.text = _domain;
   cell.URLLabel.lineBreakMode = NSLineBreakByTruncatingMiddle;
   cell.URLLabel.hidden = NO;
 
@@ -330,7 +336,9 @@ CGFloat const kLandscapeTableViewWidthMultiplier = 0.65;
 // Configures the title view of this ViewController.
 - (UIView*)setUpTitleView {
   NSString* title = l10n_util::GetNSString(IDS_IOS_PASSWORD_BOTTOM_SHEET_TITLE);
-  return password_manager::CreatePasswordManagerTitleView(title);
+  UIView* titleView = password_manager::CreatePasswordManagerTitleView(title);
+  titleView.backgroundColor = [UIColor colorNamed:kPrimaryBackgroundColor];
+  return titleView;
 }
 
 // Returns the string to display at a given row in the table view.
@@ -345,17 +353,6 @@ CGFloat const kLandscapeTableViewWidthMultiplier = 0.65;
                                   withString:@""];
   }
   return username;
-}
-
-// Returns the display description at a given row in the table view.
-- (NSString*)descriptionAtRow:(NSInteger)row {
-  FormSuggestion* formSuggestion = [_suggestions objectAtIndex:row];
-  GURL URL(base::SysNSStringToUTF8(formSuggestion.displayDescription));
-  if (!URL.is_empty()) {
-    return base::SysUTF8ToNSString(
-        password_manager::GetShownOrigin(url::Origin::Create(URL)));
-  }
-  return formSuggestion.displayDescription;
 }
 
 // Creates the password bottom sheet's table view, initially at minimized
@@ -400,8 +397,8 @@ CGFloat const kLandscapeTableViewWidthMultiplier = 0.65;
 
 // Change the tableview's width constraint based on the screen's orientation.
 - (void)adjustTableViewWidthConstraint {
-  CGSize screenSize = [[UIScreen mainScreen] bounds].size;
-  BOOL isLandscape = screenSize.width > screenSize.height;
+  BOOL isLandscape =
+      UIDeviceOrientationIsLandscape([UIDevice currentDevice].orientation);
   _landscapeTableWidthConstraint.active = isLandscape;
   _portraitTableWidthConstraint.active = !isLandscape;
 }

@@ -34,7 +34,7 @@ BASE_FEATURE(kAutofillGivePrecedenceToNumericQuantities,
 // TODO(crbug.com/1348294): Remove once launched.
 BASE_FEATURE(kAutofillAccountProfilesUnionView,
              "AutofillAccountProfilesUnionView",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 // Account profiles are not considered for regular updates on import, but if
 // this parameter is enabled, they are considered for silent updates.
 const base::FeatureParam<bool> kAutofillEnableSilentUpdatesForAccountProfiles{
@@ -184,6 +184,15 @@ BASE_FEATURE(kAutofillEnableSelectMenu,
              "AutofillEnableSelectMenu",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// When enabled, autofill will support the following field types:
+//   - ADDRESS_HOME_LANDMARK
+//   - ADDRESS_HOME_BETWEEN_STREETS
+//   - ADDRESS_HOME_ADMIN_LEVEL2
+// TODO(crbug.com/1441904) Remove once launched.
+BASE_FEATURE(kAutofillEnableNewStreetLevelFieldTypes,
+             "AutofillEnableNewStreetLevelFieldTypes",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Controls if the heuristic field parsing utilizes shared labels.
 // TODO(crbug.com/1165780): Remove once shared labels are launched.
 BASE_FEATURE(kAutofillEnableSupportForParsingWithSharedLabels,
@@ -234,12 +243,6 @@ BASE_FEATURE(kAutofillEnableParsingEmptyPhoneNumberLabels,
 BASE_FEATURE(kAutofillEnableLabelPrecedenceForTurkishAddresses,
              "AutofillEnableLabelPrecedenceForTurkishAddresses",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-// When enabled, the address profile deduplication logic runs after the browser
-// startup, once per chrome version.
-BASE_FEATURE(kAutofillEnableProfileDeduplication,
-             "AutofillEnableProfileDeduplication",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Controls if Autofill supports merging subset names.
 // TODO(crbug.com/1098943): Remove once launched.

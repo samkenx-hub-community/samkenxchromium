@@ -40,6 +40,7 @@ import org.chromium.chrome.browser.feature_engagement.TrackerFactory;
 import org.chromium.chrome.browser.feature_guide.notifications.FeatureNotificationUtils;
 import org.chromium.chrome.browser.feature_guide.notifications.FeatureType;
 import org.chromium.chrome.browser.feed.FeedActionDelegate;
+import org.chromium.chrome.browser.feed.FeedFeatures;
 import org.chromium.chrome.browser.feed.FeedReliabilityLogger;
 import org.chromium.chrome.browser.feed.FeedSurfaceCoordinator;
 import org.chromium.chrome.browser.feed.FeedSurfaceDelegate;
@@ -49,6 +50,7 @@ import org.chromium.chrome.browser.feed.FeedSwipeRefreshLayout;
 import org.chromium.chrome.browser.feed.NtpFeedSurfaceLifecycleManager;
 import org.chromium.chrome.browser.feed.componentinterfaces.SurfaceCoordinator;
 import org.chromium.chrome.browser.feedback.HelpAndFeedbackLauncherImpl;
+import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.lifecycle.ActivityLifecycleDispatcher;
 import org.chromium.chrome.browser.lifecycle.LifecycleObserver;
 import org.chromium.chrome.browser.lifecycle.PauseResumeWithNativeObserver;
@@ -85,6 +87,7 @@ import org.chromium.chrome.browser.ui.native_page.NativePage;
 import org.chromium.chrome.browser.ui.native_page.NativePageHost;
 import org.chromium.chrome.browser.util.BrowserUiUtils;
 import org.chromium.chrome.browser.xsurface.FeedLaunchReliabilityLogger.SurfaceType;
+import org.chromium.chrome.features.start_surface.StartSurfaceConfiguration;
 import org.chromium.chrome.features.tasks.SingleTabSwitcherCoordinator;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
 import org.chromium.components.browser_ui.settings.SettingsLauncher;
@@ -167,6 +170,7 @@ public class NewTabPage implements NativePage, InvalidationAwareThumbnailProvide
     private final Activity mActivity;
     @Nullable
     private final HomeSurfaceTracker mHomeSurfaceTracker;
+    private final boolean mIsNtpAsHomeSurfaceEnabled;
 
     @Nullable
     private SearchResumptionModuleCoordinator mSearchResumptionModuleCoordinator;
@@ -383,6 +387,7 @@ public class NewTabPage implements NativePage, InvalidationAwareThumbnailProvide
         mIsTablet = isTablet;
         mTemplateUrlService = TemplateUrlServiceFactory.getForProfile(profile);
         mTemplateUrlService.addObserver(this);
+        mIsNtpAsHomeSurfaceEnabled = StartSurfaceConfiguration.isNtpAsHomeSurfaceEnabled(mIsTablet);
 
         mTabObserver = new EmptyTabObserver() {
             @Override
@@ -482,7 +487,8 @@ public class NewTabPage implements NativePage, InvalidationAwareThumbnailProvide
                 mSearchProviderHasLogo, mTemplateUrlService.isDefaultSearchEngineGoogle(),
                 mFeedSurfaceProvider.getScrollDelegate(),
                 mFeedSurfaceProvider.getTouchEnabledDelegate(), mFeedSurfaceProvider.getUiConfig(),
-                lifecycleDispatcher, uma, mTab.isIncognito(), windowAndroid);
+                lifecycleDispatcher, uma, mTab.isIncognito(), windowAndroid,
+                mIsNtpAsHomeSurfaceEnabled, FeedFeatures.isMultiColumnFeedEnabled(mContext));
 
         // If new NewTabPage is created via back operations, re-show the single Tab card with the
         // previously tracked Tab.
@@ -1040,6 +1046,10 @@ public class NewTabPage implements NativePage, InvalidationAwareThumbnailProvide
     // cleaned up.
     private int getLogoMargin(boolean isTopMargin) {
         if (FeedPositionUtils.isFeedPullUpEnabled() && mSearchProviderHasLogo) return 0;
+        if (mIsNtpAsHomeSurfaceEnabled && mSearchProviderHasLogo) {
+            return mNewTabPageLayout.getResources().getDimensionPixelSize(
+                    R.dimen.ntp_logo_vertical_margin_tablet);
+        }
         return isTopMargin ? mNewTabPageLayout.getResources().getDimensionPixelSize(
                        R.dimen.ntp_logo_margin_top)
                            : mNewTabPageLayout.getResources().getDimensionPixelSize(
@@ -1081,8 +1091,9 @@ public class NewTabPage implements NativePage, InvalidationAwareThumbnailProvide
         mSingleTabCardContainer = (FrameLayout) ((ViewStub) mNewTabPageLayout.findViewById(
                                                          R.id.tab_switcher_module_container_stub))
                                           .inflate();
-        mSingleTabSwitcherCoordinator = new SingleTabSwitcherCoordinator(
-                mActivity, mSingleTabCardContainer, mTabModelSelector, true, mostRecentTab);
+        mSingleTabSwitcherCoordinator = new SingleTabSwitcherCoordinator(mActivity,
+                mSingleTabCardContainer, mActivityLifecycleDispatcher, mTabModelSelector, true,
+                isScrollableMvtEnabled(mContext), mostRecentTab);
         mSingleTabSwitcherCoordinator.initWithNative();
         setSingleTabCardVisibility(true);
     }
@@ -1094,6 +1105,12 @@ public class NewTabPage implements NativePage, InvalidationAwareThumbnailProvide
         if (mSingleTabSwitcherCoordinator != null) {
             mSingleTabSwitcherCoordinator.setVisibility(isVisible);
         }
+    }
+
+    static boolean isScrollableMvtEnabled(Context context) {
+        return ChromeFeatureList.isEnabled(ChromeFeatureList.SHOW_SCROLLABLE_MVT_ON_NTP_ANDROID)
+                && (ChromeFeatureList.sStartSurfaceOnTablet.isEnabled()
+                        || !DeviceFormFactor.isNonMultiDisplayContextOnTablet(context));
     }
 
     @VisibleForTesting

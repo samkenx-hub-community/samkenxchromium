@@ -800,6 +800,23 @@ void FederatedAuthRequestImpl::LogoutRps(
   DispatchOneLogout();
 }
 
+void FederatedAuthRequestImpl::ResolveTokenRequest(
+    const std::string& token,
+    ResolveTokenRequestCallback callback) {
+  if (!IsFedCmAuthzEnabled()) {
+    std::move(callback).Run(false);
+    return;
+  }
+
+  if (!identity_registry_) {
+    std::move(callback).Run(false);
+    return;
+  }
+
+  bool accepted = identity_registry_->NotifyResolve(origin(), token);
+  std::move(callback).Run(accepted);
+}
+
 void FederatedAuthRequestImpl::SetIdpSigninStatus(
     const url::Origin& idp_origin,
     blink::mojom::IdpSigninStatus status) {
@@ -1094,13 +1111,13 @@ void FederatedAuthRequestImpl::MaybeShowAccountsDialog() {
       IsFedCmAutoReauthnEnabled();
 
   bool auto_reauthn = auto_reauthn_enabled;
-  bool has_auto_reauthn_content_setting = false;
+  bool is_auto_reauthn_setting_enabled = false;
   bool is_auto_reauthn_embargoed = false;
   absl::optional<base::TimeDelta> time_from_embargo;
   if (auto_reauthn_enabled) {
-    has_auto_reauthn_content_setting =
-        auto_reauthn_permission_delegate_->HasAutoReauthnContentSetting();
-    auto_reauthn &= has_auto_reauthn_content_setting;
+    is_auto_reauthn_setting_enabled =
+        auto_reauthn_permission_delegate_->IsAutoReauthnSettingEnabled();
+    auto_reauthn &= is_auto_reauthn_setting_enabled;
     is_auto_reauthn_embargoed =
         auto_reauthn_permission_delegate_->IsAutoReauthnEmbargoed(
             GetEmbeddingOrigin());
@@ -1132,7 +1149,7 @@ void FederatedAuthRequestImpl::MaybeShowAccountsDialog() {
         mediation_requirement_ == MediationRequirement::kSilent) {
       fedcm_metrics_->RecordAutoReauthnMetrics(
           has_single_returning_account, auto_reauthn_account, auto_reauthn,
-          !has_auto_reauthn_content_setting, is_auto_reauthn_embargoed,
+          !is_auto_reauthn_setting_enabled, is_auto_reauthn_embargoed,
           time_from_embargo);
 
       // By this moment we know that the user has granted permission in the past
@@ -1194,12 +1211,13 @@ void FederatedAuthRequestImpl::MaybeShowAccountsDialog() {
                      weak_ptr_factory_.GetWeakPtr(), auto_reauthn),
       base::BindOnce(&FederatedAuthRequestImpl::OnDialogDismissed,
                      weak_ptr_factory_.GetWeakPtr()));
-  devtools_instrumentation::OnFedCmAccountsDialogShown(&render_frame_host());
+  devtools_instrumentation::OnFedCmAccountsDialogShown(&render_frame_host(),
+                                                       auto_reauthn);
 
   if (auto_reauthn_enabled) {
     fedcm_metrics_->RecordAutoReauthnMetrics(
         has_single_returning_account, auto_reauthn_account, auto_reauthn,
-        !has_auto_reauthn_content_setting, is_auto_reauthn_embargoed,
+        !is_auto_reauthn_setting_enabled, is_auto_reauthn_embargoed,
         time_from_embargo);
   }
 }
@@ -1277,19 +1295,14 @@ void FederatedAuthRequestImpl::HandleAccountsFetchFailure(
                      FederatedAuthRequestResult::kError,
                      TokenStatus::kNotSignedInWithIdp,
                      /*should_delay_callback=*/true),
-      base::BindOnce(&FederatedAuthRequestImpl::CreateIdentityRegistry,
-                     weak_ptr_factory_.GetWeakPtr(), idp_origin));
-}
-
-void FederatedAuthRequestImpl::CreateIdentityRegistry(
-    const url::Origin& idp_origin,
-    content::WebContents* web_contents) {
-  IdentityRegistry::CreateForWebContents(web_contents, this, idp_origin);
+      base::BindOnce(&FederatedAuthRequestImpl::ShowModalDialog,
+                     weak_ptr_factory_.GetWeakPtr(),
+                     idp_info->metadata.idp_signin_url));
 }
 
 void FederatedAuthRequestImpl::CloseModalDialogView() {
   if (identity_registry_) {
-    identity_registry_->Notify(origin());
+    identity_registry_->NotifyClose(origin());
   }
 }
 
@@ -1540,6 +1553,14 @@ void FederatedAuthRequestImpl::OnDialogDismissed(
                            /*should_delay_callback=*/false);
 }
 
+void FederatedAuthRequestImpl::ShowModalDialog(const GURL& url) {
+  WebContents* web_contents = request_dialog_controller_->ShowModalDialog(
+      url, base::BindOnce(&FederatedAuthRequestImpl::OnDialogDismissed,
+                          weak_ptr_factory_.GetWeakPtr()));
+  IdentityRegistry::CreateForWebContents(web_contents, this,
+                                         url::Origin::Create(url));
+}
+
 void FederatedAuthRequestImpl::OnContinueOnResponseReceived(
     IdentityProviderConfigPtr idp,
     IdpNetworkRequestManager::FetchStatus status,
@@ -1553,13 +1574,7 @@ void FederatedAuthRequestImpl::OnContinueOnResponseReceived(
   }
 
   // TODO(crbug.com/1429083): record the appropriate metrics.
-  request_dialog_controller_->ShowModalDialog(
-      std::move(continue_on),
-      base::BindOnce(&FederatedAuthRequestImpl::CompleteTokenRequest,
-                     weak_ptr_factory_.GetWeakPtr(), std::move(idp),
-                     std::move(status)),
-      base::BindOnce(&FederatedAuthRequestImpl::OnDialogDismissed,
-                     weak_ptr_factory_.GetWeakPtr()));
+  ShowModalDialog(idp->config_url);
 }
 
 void FederatedAuthRequestImpl::OnTokenResponseReceived(
@@ -1951,6 +1966,17 @@ void FederatedAuthRequestImpl::NotifyClose() {
   request_dialog_controller_->CloseModalDialog();
 }
 
+bool FederatedAuthRequestImpl::NotifyResolve(const std::string& token) {
+  // TODO(crbug.com/1429083): handle the multi-idp case when there are
+  // more than one config_urls hanging.
+  CompleteRequest(FederatedAuthRequestResult::kSuccess, TokenStatus::kSuccess,
+                  absl::nullopt, token,
+                  /*should_delay_callback=*/false);
+  // TODO(crbug.com/1429083): handle the corner cases where CompleteRequest
+  // can't actually fulfill the request.
+  return true;
+}
+
 void FederatedAuthRequestImpl::OnRejectRequest() {
   if (auth_request_token_callback_) {
     DCHECK(!logout_callback_);
@@ -2018,8 +2044,8 @@ bool FederatedAuthRequestImpl::ShouldFailBeforeFetchingAccounts(
     return false;
   }
 
-  bool has_auto_reauthn_content_setting =
-      auto_reauthn_permission_delegate_->HasAutoReauthnContentSetting();
+  bool is_auto_reauthn_setting_enabled =
+      auto_reauthn_permission_delegate_->IsAutoReauthnSettingEnabled();
 
   bool is_auto_reauthn_embargoed =
       auto_reauthn_permission_delegate_->IsAutoReauthnEmbargoed(
@@ -2030,8 +2056,8 @@ bool FederatedAuthRequestImpl::ShouldFailBeforeFetchingAccounts(
           origin(), GetEmbeddingOrigin(), url::Origin::Create(config_url),
           absl::nullopt);
 
-  return !has_auto_reauthn_content_setting || is_auto_reauthn_embargoed ||
-         !has_sharing_permission_for_any_account || RequiresUserMediation();
+  return RequiresUserMediation() || !is_auto_reauthn_setting_enabled ||
+         is_auto_reauthn_embargoed || !has_sharing_permission_for_any_account;
 }
 
 bool FederatedAuthRequestImpl::RequiresUserMediation() {

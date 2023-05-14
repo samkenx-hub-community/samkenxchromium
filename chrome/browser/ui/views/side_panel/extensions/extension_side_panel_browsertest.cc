@@ -240,7 +240,7 @@ class ExtensionSidePanelBrowserTest : public ExtensionBrowserTest {
 
     std::string script =
         base::StringPrintf(R"(document.sidePanelTemp = "%s";)", value.c_str());
-    ASSERT_TRUE(content::ExecuteScript(
+    ASSERT_TRUE(content::ExecJs(
         extension_coordinator->GetHostWebContentsForTesting(), script.c_str()));
   }
 
@@ -374,25 +374,9 @@ IN_PROC_BROWSER_TEST_F(ExtensionSidePanelBrowserTest, EntryShowsExtensionIcon) {
       test_data_dir_.AppendASCII("api_test/side_panel/simple_default"));
   ASSERT_TRUE(extension);
 
-  auto* extension_coordinator =
-      extensions::ExtensionSidePanelManager::GetOrCreateForBrowser(browser())
-          ->GetExtensionCoordinatorForTesting(extension->id());
-
   SidePanelEntry::Key extension_key = GetKey(extension->id());
   SidePanelEntry* extension_entry =
       global_registry()->GetEntryForKey(extension_key);
-
-  // At this point, we don't know if the extension's icon has finished loading
-  // or not, since the first icon load is initiated right when the extension
-  // loads. Attempting to wait on OnEntryIconUpdated will hang forever if the
-  // icon has been loaded after setting up the waiter. To ensure the icon is
-  // loaded and the OnEntryIconUpdated event is broadcast, initiate a reload for
-  // the extension's icon manually.
-  {
-    TestSidePanelEntryWaiter icon_updated_waiter(extension_entry);
-    extension_coordinator->LoadExtensionIconForTesting();
-    icon_updated_waiter.WaitForIconUpdated();
-  }
 
   // Check that the entry's icon bitmap is identical to the bitmap of the
   // extension's icon scaled down to `extension_misc::EXTENSION_ICON_BITTY`.
@@ -551,9 +535,9 @@ IN_PROC_BROWSER_TEST_F(ExtensionSidePanelBrowserTest, WindowCloseCalled) {
   {
     content::WebContentsDestroyedWatcher destroyed_watcher(
         extension_coordinator->GetHostWebContentsForTesting());
-    ASSERT_TRUE(content::ExecuteScript(
-        extension_coordinator->GetHostWebContentsForTesting(),
-        "window.close();"));
+    ASSERT_TRUE(
+        content::ExecJs(extension_coordinator->GetHostWebContentsForTesting(),
+                        "window.close();"));
     destroyed_watcher.Wait();
   }
 
@@ -574,9 +558,9 @@ IN_PROC_BROWSER_TEST_F(ExtensionSidePanelBrowserTest, WindowCloseCalled) {
   // view when the extension panel is not shown.
   content::WebContentsDestroyedWatcher destroyed_watcher(
       extension_coordinator->GetHostWebContentsForTesting());
-  ASSERT_TRUE(content::ExecuteScript(
-      extension_coordinator->GetHostWebContentsForTesting(),
-      "window.close();"));
+  ASSERT_TRUE(
+      content::ExecJs(extension_coordinator->GetHostWebContentsForTesting(),
+                      "window.close();"));
   destroyed_watcher.Wait();
 
   // The side panel should be open because the reading list entry is still
@@ -619,9 +603,9 @@ IN_PROC_BROWSER_TEST_F(ExtensionSidePanelBrowserTest,
           ->GetExtensionCoordinatorForTesting(extension->id());
   content::WebContentsDestroyedWatcher destroyed_watcher(
       extension_coordinator->GetHostWebContentsForTesting());
-  ASSERT_TRUE(content::ExecuteScript(
-      extension_coordinator->GetHostWebContentsForTesting(),
-      "window.close();"));
+  ASSERT_TRUE(
+      content::ExecJs(extension_coordinator->GetHostWebContentsForTesting(),
+                      "window.close();"));
   destroyed_watcher.Wait();
 }
 
@@ -657,9 +641,9 @@ IN_PROC_BROWSER_TEST_F(ExtensionSidePanelBrowserTest,
 
     content::WebContentsDestroyedWatcher destroyed_watcher(
         extension_coordinator->GetHostWebContentsForTesting());
-    ASSERT_TRUE(content::ExecuteScript(
-        extension_coordinator->GetHostWebContentsForTesting(),
-        "window.close();"));
+    ASSERT_TRUE(
+        content::ExecJs(extension_coordinator->GetHostWebContentsForTesting(),
+                        "window.close();"));
     destroyed_watcher.Wait();
   }
 

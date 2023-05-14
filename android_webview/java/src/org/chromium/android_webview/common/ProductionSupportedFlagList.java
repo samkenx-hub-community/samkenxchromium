@@ -112,6 +112,8 @@ public final class ProductionSupportedFlagList {
                     "Disables WebView from checking for app recovery mitigations."),
             Flag.commandLine(AwSwitches.WEBVIEW_ENABLE_APP_RECOVERY,
                     "Enables WebView to check for app recovery mitigations."),
+            Flag.commandLine(AwSwitches.WEBVIEW_ENABLE_USER_AGENT_CLIENT_HINTS,
+                    "Enables user-agent client hints in WebView."),
             Flag.baseFeature("DefaultPassthroughCommandDecoder",
                     "Use the passthrough GLES2 command decoder."),
             Flag.baseFeature(GpuFeatures.WEBVIEW_VULKAN,
@@ -354,6 +356,10 @@ public final class ProductionSupportedFlagList {
             Flag.baseFeature(MetricsFeatures.REPORTING_SERVICE_FLUSH_PREFS_ON_UPLOAD_IN_BACKGROUND,
                     "Controls whether we immediately flush Local State after "
                             + "uploading a UMA log while in background."),
+            Flag.baseFeature(MetricsFeatures.SUBPROCESS_METRICS_PROVIDER_LEAKY,
+                    "Whether SubprocessMetricsProvider should be leaky, so that it can listen "
+                            + "to subprocesses exiting even after the MetricsService has been "
+                            + "destroyed."),
             Flag.baseFeature(ContentFeatures.MAIN_THREAD_COMPOSITING_PRIORITY,
                     "When enabled runs the main thread at compositing priority."),
             Flag.baseFeature(AwFeatures.WEBVIEW_UMA_UPLOAD_QUALITY_OF_SERVICE_SET_TO_DEFAULT,
@@ -425,6 +431,9 @@ public final class ProductionSupportedFlagList {
                             + "the WebView use OS-level attribution."),
             Flag.baseFeature(BaseFeatures.THREAD_POOL_CAP,
                     "Reduces the thread pool cap to use less threads"),
+            Flag.baseFeature(BlinkFeatures.BEFOREUNLOAD_EVENT_CANCEL_BY_PREVENT_DEFAULT,
+                    "Enables showing the cancel dialog by calling preventDefault() "
+                            + "on beforeunload event."),
             // Add new commandline switches and features above. The final entry should have a
             // trailing comma for cleaner diffs.
     };

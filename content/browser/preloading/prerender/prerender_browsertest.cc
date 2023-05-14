@@ -1395,7 +1395,8 @@ IN_PROC_BROWSER_TEST_F(PrerenderBrowserTest,
   host_observer.WaitForDestroyed();
   EXPECT_EQ(GetHostForUrl(kPrerenderingUrl),
             RenderFrameHost::kNoFrameTreeNodeId);
-  ExpectFinalStatusForSpeculationRule(PrerenderFinalStatus::kTriggerDestroyed);
+  ExpectFinalStatusForSpeculationRule(
+      PrerenderFinalStatus::kSpeculationRuleRemoved);
 }
 
 IN_PROC_BROWSER_TEST_F(PrerenderBrowserTest,
@@ -4173,6 +4174,13 @@ IN_PROC_BROWSER_TEST_P(SSLPrerenderBrowserTest,
       GetParam() == SSLPrerenderTestErrorBlockType::kClientCertRequested
           ? PrerenderFinalStatus::kClientCertRequested
           : PrerenderFinalStatus::kNavigationRequestNetworkError);
+  if (GetParam() == SSLPrerenderTestErrorBlockType::kClientCertRequested) {
+    return;
+  }
+  histogram_tester().ExpectUniqueSample(
+      "Prerender.Experimental.PrerenderNavigationRequestNetworkErrorCode."
+      "SpeculationRule",
+      std::abs(net::Error::ERR_FAILED), 1);
 }
 
 // Tests that prerendering will be cancelled if the server asks for client
@@ -4898,7 +4906,8 @@ class PrerenderSequentialPrerenderingBrowserTest : public PrerenderBrowserTest {
   int MaxNumOfRunningPrerenders() const { return 4; }
 
  protected:
-  void TestSequentialPrerenderingInBackground(Visibility visibility);
+  void TestSequentialPrerenderingInBackground(Visibility initial_visibility,
+                                              Visibility background_visibility);
 
  private:
   base::test::ScopedFeatureList feature_list_;
@@ -5009,7 +5018,7 @@ IN_PROC_BROWSER_TEST_F(PrerenderSequentialPrerenderingBrowserTest,
       PrerenderFinalStatus::kActivated, 1);
   histogram_tester().ExpectBucketCount(
       "Prerender.Experimental.PrerenderHostFinalStatus.SpeculationRule",
-      PrerenderFinalStatus::kTriggerDestroyed, 2);
+      PrerenderFinalStatus::kOtherPrerenderedPageActivated, 2);
 }
 
 // Tests that a cancelled request in the pending queue is skipped and the next
@@ -5064,7 +5073,7 @@ IN_PROC_BROWSER_TEST_F(PrerenderSequentialPrerenderingBrowserTest,
   // The first prerender is destroyed by SpeculationHostImpl.
   histogram_tester().ExpectBucketCount(
       "Prerender.Experimental.PrerenderHostFinalStatus.SpeculationRule",
-      PrerenderFinalStatus::kTriggerDestroyed, 1);
+      PrerenderFinalStatus::kOtherPrerenderedPageActivated, 1);
 
   // The second prerender is destroyed directly.
   histogram_tester().ExpectBucketCount(
@@ -5160,7 +5169,7 @@ IN_PROC_BROWSER_TEST_F(PrerenderSequentialPrerenderingBrowserTest,
   // The first prerender was destroyed by SpeculationHostImpl.
   histogram_tester().ExpectBucketCount(
       "Prerender.Experimental.PrerenderHostFinalStatus.SpeculationRule",
-      PrerenderFinalStatus::kTriggerDestroyed, 1);
+      PrerenderFinalStatus::kTriggerPageNavigated, 1);
   // The second prerender is destroyed since activation navigation is requested
   // while it's still pending.
   histogram_tester().ExpectBucketCount(
@@ -5441,7 +5450,7 @@ IN_PROC_BROWSER_TEST_F(PrerenderSequentialPrerenderingBrowserTest,
   // The first prerender should be cancelled by the trigger.
   histogram_tester().ExpectBucketCount(
       "Prerender.Experimental.PrerenderHostFinalStatus.SpeculationRule",
-      PrerenderFinalStatus::kTriggerDestroyed, 1);
+      PrerenderFinalStatus::kSpeculationRuleRemoved, 1);
   // The second prerender should be successfully activated.
   histogram_tester().ExpectBucketCount(
       "Prerender.Experimental.PrerenderHostFinalStatus.SpeculationRule",
@@ -5811,11 +5820,15 @@ IN_PROC_BROWSER_TEST_F(PrerenderSequentialPrerenderingBrowserTest,
   EXPECT_EQ(web_contents()->GetLastCommittedURL(), initial_url);
 }
 
-// Test that when the current tab gets hidden then the prerender sequence is
-// terminated, and when the current tab gets visible then we start the next
-// prerender if we have some pending prerender hosts.
+// Test that the prerender request is handled and stored regardless of the
+// initial visibility of the current tab, and when the current tab goes
+// background (whether HIDDEN or OCCLUDED is specified by
+// `background_visibility`) then the prerender sequence is terminated, and when
+// the current tab gets visible then we start the next prerender if we have some
+// pending prerender hosts.
 void PrerenderSequentialPrerenderingBrowserTest::
-    TestSequentialPrerenderingInBackground(Visibility visibility) {
+    TestSequentialPrerenderingInBackground(Visibility initial_visibility,
+                                           Visibility background_visibility) {
   net::test_server::ControllableHttpResponse response1(
       embedded_test_server(), "/empty.html?prerender1");
   ASSERT_TRUE(embedded_test_server()->Start());
@@ -5827,6 +5840,19 @@ void PrerenderSequentialPrerenderingBrowserTest::
 
   ASSERT_TRUE(NavigateToURL(shell(), kInitialUrl));
 
+  // Set the initial visibility.
+  switch (initial_visibility) {
+    case Visibility::VISIBLE:
+      web_contents()->WasShown();
+      break;
+    case Visibility::HIDDEN:
+      web_contents()->WasHidden();
+      break;
+    case Visibility::OCCLUDED:
+      web_contents()->WasOccluded();
+      break;
+  }
+
   test::PrerenderHostRegistryObserver registry_observer(*web_contents_impl());
 
   // Insert 2 URLs into the speculation rules at the same time.
@@ -5836,11 +5862,15 @@ void PrerenderSequentialPrerenderingBrowserTest::
   test::PrerenderHostObserver prerender2_observer(*web_contents(),
                                                   GetHostForUrl(kPrerender2));
 
+  // Set the visibility status to VISIBLE, encouraging to start first
+  // prerendering when initial visibility was on the background.
+  web_contents()->WasShown();
+
   // Stop the first prerendering initial navigation.
   response1.WaitForRequest();
 
   // Change the visibility status to HIDDEN/OCCLUDED.
-  switch (visibility) {
+  switch (background_visibility) {
     case Visibility::HIDDEN:
       web_contents()->WasHidden();
       break;
@@ -5881,13 +5911,39 @@ void PrerenderSequentialPrerenderingBrowserTest::
 }
 
 IN_PROC_BROWSER_TEST_F(PrerenderSequentialPrerenderingBrowserTest,
-                       SequentialPrerenderingInBackground_Hidden) {
-  TestSequentialPrerenderingInBackground(Visibility::HIDDEN);
+                       PrerenderInBackground_InitialyVisible_Hidden) {
+  TestSequentialPrerenderingInBackground(Visibility::VISIBLE,
+                                         Visibility::HIDDEN);
 }
 
 IN_PROC_BROWSER_TEST_F(PrerenderSequentialPrerenderingBrowserTest,
-                       SequentialPrerenderingInBackground_Occluded) {
-  TestSequentialPrerenderingInBackground(Visibility::OCCLUDED);
+                       PrerenderInBackground_InitialyVisible_Occluded) {
+  TestSequentialPrerenderingInBackground(Visibility::VISIBLE,
+                                         Visibility::OCCLUDED);
+}
+
+IN_PROC_BROWSER_TEST_F(PrerenderSequentialPrerenderingBrowserTest,
+                       PrerenderInBackground_InitialyOccluded_Hidden) {
+  TestSequentialPrerenderingInBackground(Visibility::OCCLUDED,
+                                         Visibility::HIDDEN);
+}
+
+IN_PROC_BROWSER_TEST_F(PrerenderSequentialPrerenderingBrowserTest,
+                       PrerenderInBackground_InitialyOccluded_Occluded) {
+  TestSequentialPrerenderingInBackground(Visibility::OCCLUDED,
+                                         Visibility::OCCLUDED);
+}
+
+IN_PROC_BROWSER_TEST_F(PrerenderSequentialPrerenderingBrowserTest,
+                       PrerenderInBackground_InitialyHidden_Hidden) {
+  TestSequentialPrerenderingInBackground(Visibility::HIDDEN,
+                                         Visibility::HIDDEN);
+}
+
+IN_PROC_BROWSER_TEST_F(PrerenderSequentialPrerenderingBrowserTest,
+                       PrerenderInBackground_InitialyHidden_Occluded) {
+  TestSequentialPrerenderingInBackground(Visibility::HIDDEN,
+                                         Visibility::OCCLUDED);
 }
 
 IN_PROC_BROWSER_TEST_F(PrerenderBrowserTest,
@@ -7498,7 +7554,17 @@ IN_PROC_BROWSER_TEST_P(PrerenderWithBackForwardCacheBrowserTest,
   // initial page was in the back/forward cache.
   prerender_observer.WaitForDestroyed();
   EXPECT_FALSE(HasHostForUrl(kPrerenderingUrl));
-  ExpectFinalStatusForSpeculationRule(PrerenderFinalStatus::kTriggerDestroyed);
+
+  switch (GetParam()) {
+    case BackForwardCacheType::kDisabled:
+      ExpectFinalStatusForSpeculationRule(
+          PrerenderFinalStatus::kTriggerDestroyed);
+      break;
+    case BackForwardCacheType::kEnabled:
+      ExpectFinalStatusForSpeculationRule(
+          PrerenderFinalStatus::kTriggerPageNavigated);
+      break;
+  }
 }
 
 // Tests that a trigger page destroys a prerendered page when it navigates back
@@ -7545,7 +7611,17 @@ IN_PROC_BROWSER_TEST_P(PrerenderWithBackForwardCacheBrowserTest,
   // next page was in the back/forward cache.
   prerender_observer.WaitForDestroyed();
   EXPECT_FALSE(HasHostForUrl(kPrerenderingUrl));
-  ExpectFinalStatusForSpeculationRule(PrerenderFinalStatus::kTriggerDestroyed);
+
+  switch (GetParam()) {
+    case BackForwardCacheType::kDisabled:
+      ExpectFinalStatusForSpeculationRule(
+          PrerenderFinalStatus::kTriggerDestroyed);
+      break;
+    case BackForwardCacheType::kEnabled:
+      ExpectFinalStatusForSpeculationRule(
+          PrerenderFinalStatus::kTriggerPageNavigated);
+      break;
+  }
 }
 
 // Tests that PrerenderHostRegistry can hold up to two prerendering for the
@@ -7960,7 +8036,7 @@ IN_PROC_BROWSER_TEST_F(MultiplePrerendersWithLimitedMemoryBrowserTest,
       PrerenderFinalStatus::kMemoryLimitExceeded, 0);
 
   // Activate one of the prerendered pages. This should cancel the other
-  // prerendered as kTriggerDestroyed.
+  // prerendered pages.
   NavigatePrimaryPage(urls[0]);
   ASSERT_EQ(web_contents()->GetLastCommittedURL(), urls[0]);
   histogram_tester().ExpectBucketCount(
@@ -7968,7 +8044,7 @@ IN_PROC_BROWSER_TEST_F(MultiplePrerendersWithLimitedMemoryBrowserTest,
       PrerenderFinalStatus::kActivated, 1);
   histogram_tester().ExpectBucketCount(
       "Prerender.Experimental.PrerenderHostFinalStatus.SpeculationRule",
-      PrerenderFinalStatus::kTriggerDestroyed, 2);
+      PrerenderFinalStatus::kOtherPrerenderedPageActivated, 2);
 }
 
 // Tests that cross-site urls cannot be prerendered.
@@ -10004,22 +10080,23 @@ IN_PROC_BROWSER_TEST_F(PrerenderClientHintsBrowserTest, ViewPort_Width) {
   GURL url = GetUrl("/empty.html?acceptch-viewport-width");
   ASSERT_TRUE(NavigateToURL(shell(), url));
 
-  // Start prerendering. This should have the "(sec-ch-)viewport-width" headers.
+  // Start prerendering. This won't have the "(sec-ch-)viewport-width" headers
+  // as the width is 0 due to the lack of a cached/known viewport size.
   GURL prerender_url = GetUrl("/iframe.html?acceptch");
   int host_id = AddPrerender(prerender_url);
   WaitForPrerenderLoadCompleted(host_id);
-  EXPECT_TRUE(HasRequestHeader(prerender_url, "viewport-width"));
-  EXPECT_TRUE(HasRequestHeader(prerender_url, "sec-ch-viewport-width"));
+  EXPECT_FALSE(HasRequestHeader(prerender_url, "viewport-width"));
+  EXPECT_FALSE(HasRequestHeader(prerender_url, "sec-ch-viewport-width"));
 
   // Resize the window.
   web_contents_impl()->Resize(gfx::Rect(30, 40));
 
-  // Activation should also have the "(sec-ch-)viewport-width" headers but their
-  // value is different from prerender initial navigation. This shouldn't fail
-  // prerender activation parameter match.
+  // Activation should also not have the "(sec-ch-)viewport-width" headers.
   test::PrerenderHostObserver prerender_observer(*web_contents_impl(), host_id);
   NavigatePrimaryPage(prerender_url);
   prerender_observer.WaitForActivation();
+  EXPECT_FALSE(HasRequestHeader(prerender_url, "viewport-width"));
+  EXPECT_FALSE(HasRequestHeader(prerender_url, "sec-ch-viewport-width"));
 }
 
 // Test that changes on the viewport height of the initiator page between when
@@ -10039,21 +10116,21 @@ IN_PROC_BROWSER_TEST_F(PrerenderClientHintsBrowserTest, ViewPort_Height) {
   GURL url = GetUrl("/empty.html?acceptch-viewport-height");
   ASSERT_TRUE(NavigateToURL(shell(), url));
 
-  // Start prerendering. This should have the "sec-ch-viewport-height" header.
+  // Start prerendering. This won't have the "sec-ch-viewport-height" header
+  // as the height is 0 due to the lack of a cached/known viewport size.
   GURL prerender_url = GetUrl("/iframe.html?acceptch");
   int host_id = AddPrerender(prerender_url);
   WaitForPrerenderLoadCompleted(host_id);
-  EXPECT_TRUE(HasRequestHeader(prerender_url, "sec-ch-viewport-height"));
+  EXPECT_FALSE(HasRequestHeader(prerender_url, "sec-ch-viewport-height"));
 
   // Resize the window.
   web_contents_impl()->Resize(gfx::Rect(30, 40));
 
-  // Activation should also have the "sec-ch-viewport-height" header but its
-  // value is different from prerender initial navigation. This shouldn't fail
-  // prerender activation parameter match.
+  // Activation should also not have the "sec-ch-viewport-height" header.
   test::PrerenderHostObserver prerender_observer(*web_contents_impl(), host_id);
   NavigatePrimaryPage(prerender_url);
   prerender_observer.WaitForActivation();
+  EXPECT_FALSE(HasRequestHeader(prerender_url, "sec-ch-viewport-height"));
 }
 
 void CheckExpectedCrossOriginMetrics(

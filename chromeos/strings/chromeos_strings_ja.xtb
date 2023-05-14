@@ -5,6 +5,7 @@
 <translation id="1018219910092211213">DNS を解決できません</translation>
 <translation id="1018656279737460067">キャンセルされました</translation>
 <translation id="1022433422498218992">一般設定</translation>
+<translation id="1022628058306505708">地球の動き</translation>
 <translation id="1047458377670401304"><ph name="CPU_NAME" />（スレッド数 <ph name="THREAD_COUNT" />、<ph name="CPU_MAX_CLOCK_SPEED" /> GHz）</translation>
 <translation id="1047773237499189053">新しい機能があります。上矢印キーで詳細を確認できます。</translation>
 <translation id="1059913517121127803">スキャンを開始できませんでした</translation>
@@ -115,6 +116,7 @@
 <translation id="1801418420130173017">ダークモードを無効にする</translation>
 <translation id="1807246157184219062">明</translation>
 <translation id="1827738518074806965">アート ギャラリー</translation>
+<translation id="1838374766361614909">検索をクリア</translation>
 <translation id="1851218745569890714">ビデオ会議</translation>
 <translation id="1852934301711881861">ChromeOS Flex をインストール</translation>
 <translation id="1856388568474281774">下矢印</translation>
@@ -234,6 +236,7 @@
 <translation id="2902312830803030883">その他の操作</translation>
 <translation id="2926057806159140518">ユーザー名とパスワードを入力するか、QR コードをスキャンしてください</translation>
 <translation id="2940811910881150316">デバイスをテストできません。テストするにはディスプレイをもう一度開きます。</translation>
+<translation id="2981143481017883351">Chromebook 限定のアセットが利用可能に</translation>
 <translation id="3008341117444806826">更新</translation>
 <translation id="3009958530611748826">保存先のフォルダを選択</translation>
 <translation id="3017079585324758401">背景</translation>
@@ -270,6 +273,7 @@
 <translation id="3286515922899063534"><ph name="CURRENT" /> GHz</translation>
 <translation id="3291996639387199448">鍵の方向</translation>
 <translation id="3294437725009624529">ゲスト</translation>
+<translation id="3303855915957856445">一致する結果は見つかりませんでした</translation>
 <translation id="3310640316857623290">DNS の応答時間が許容値を大幅に超えています</translation>
 <translation id="3328783797891415197">テスト実行中</translation>
 <translation id="3340011300870565703">デバイスの右イヤフォンのバッテリー残量は <ph name="BATTERY_PERCENTAGE" />% です。</translation>
@@ -278,6 +282,7 @@
 <translation id="3360306038446926262">ウィンドウ</translation>
 <translation id="3368922792935385530">接続済み</translation>
 <translation id="3369013195428705271">印刷履歴をすべて削除してもよろしいですか？実行中の印刷ジョブは削除されません。</translation>
+<translation id="3386675685417744672">Chromebook 限定</translation>
 <translation id="3404249063913988450">スクリーン セーバーを有効にする</translation>
 <translation id="3413935475507503304">更新を進めるには、[次へ] をクリックしてください。</translation>
 <translation id="3434107140712555581"><ph name="BATTERY_PERCENTAGE" />%</translation>
@@ -356,6 +361,7 @@
 <translation id="404928562651467259">警告</translation>
 <translation id="4054683689023980771">画像のダウンロード中</translation>
 <translation id="4060260348856573701">新しい APN</translation>
+<translation id="4079743696465895866">Chromebook 限定のアートワークを選択する</translation>
 <translation id="4093865285251893588">プロフィール画像</translation>
 <translation id="409427325554347132">テストの詳細を保存</translation>
 <translation id="4095829376260267438">WPA2 / WPA3</translation>
@@ -473,7 +479,6 @@
 <translation id="4921665434385737356"><ph name="NUM_SECONDS" /> 秒で <ph name="RATE" /> 充電しました。</translation>
 <translation id="4930320165497208503">接続を設定または更新するには、[<ph name="BEGIN_LINK" />設定<ph name="END_LINK" />] に移動します。</translation>
 <translation id="4932733599132424254">日付</translation>
-<translation id="4937657825850660613">半分</translation>
 <translation id="4950314376641394653"><ph name="DEVICE_NAME" /> のファームウェアがバージョン <ph name="VERSION" /> に更新されました</translation>
 <translation id="4971925105143343452">一部</translation>
 <translation id="4972592110715526173">モード変更</translation>
@@ -622,6 +627,7 @@
 <translation id="6184793017104303157">B4</translation>
 <translation id="6189418609903030344">バッテリー容量は使用に伴って減少します</translation>
 <translation id="6191293864534840972">ネームサーバーの形式が正しくありません</translation>
+<translation id="6205145102504628069">雲の流れ</translation>
 <translation id="6213737986933151570">CDMA1XRTT</translation>
 <translation id="6223066887782788441">全画面表示を終了</translation>
 <translation id="6223752125779001553">利用可能なスキャナがありません</translation>
@@ -664,6 +670,7 @@
 <translation id="6494974875566443634">カスタマイズ</translation>
 <translation id="6500818810472529210">Google 検索で結果を見る</translation>
 <translation id="650266656685499220">アルバムを作成するには、Google フォトにアクセスします</translation>
+<translation id="6505750420152840539">夜明けから夜更けまで</translation>
 <translation id="6516990319416533844">バッテリーの充電速度をテストするには、短時間で電池を消耗してください</translation>
 <translation id="6517239166834772319">使い方・ヒント</translation>
 <translation id="6526200165918397681">壁紙に合わせる</translation>
@@ -778,6 +785,7 @@
 <translation id="7490813197707563893">MAC アドレス</translation>
 <translation id="7491478667760509108">フロート表示を終了</translation>
 <translation id="7497215489070763236">サーバーの CA 証明書</translation>
+<translation id="7501957181231305652">または</translation>
 <translation id="7502658306369382406">IPv6 アドレス</translation>
 <translation id="7515998400212163428">Android</translation>
 <translation id="7528507600602050979">ヘルプ コンテンツをご利用いただけません</translation>
@@ -794,6 +802,7 @@
 <translation id="7620771111601174153">詳しくはヘルプセンターをご覧ください</translation>
 <translation id="763165478673169849">前回のリセット時間</translation>
 <translation id="7648838807254605802">HTTPS レイテンシが高くなっています</translation>
+<translation id="765159867434478292">分割</translation>
 <translation id="7656388927906093505">デバイスの種類はマウスです。</translation>
 <translation id="7658239707568436148">キャンセル</translation>
 <translation id="7665800271478495366">アバターを変更</translation>

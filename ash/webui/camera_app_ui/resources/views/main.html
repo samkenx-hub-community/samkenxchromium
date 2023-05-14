@@ -92,7 +92,16 @@
           </div>
           <div class="barcode-scan-box centered-overlay"></div>
           <div class="snackbar" aria-live="polite"></div>
-          <div id="camera-mode" class="centered-overlay"></div>
+          <div id="camera-mode" class="centered-overlay">
+            <svg-wrapper name="camera_mode_photo.svg" class="photo">
+            </svg-wrapper>
+            <svg-wrapper name="camera_mode_scan.svg" class="scan">
+            </svg-wrapper>
+            <svg-wrapper name="camera_mode_video.svg" class="video">
+            </svg-wrapper>
+            <svg-wrapper name="camera_mode_portrait.svg" class="portrait">
+            </svg-wrapper>
+          </div>
         </div>
         <div id="barcode-chip-url-container"
              class="invisible barcode-chip-container">
@@ -134,7 +143,8 @@
       </div>
       <div class="top-stripe left-stripe buttons circle">
         <button id="back-to-review-document" tabindex="0"
-                i18n-label="back_button"></button>
+                i18n-label="back_button" data-svg="settings_button_back.svg">
+        </button>
       </div>
       <div class="top-stripe right-stripe circle buttons">
         <button id="toggle-mic" role="checkbox" tabindex="0"
@@ -232,7 +242,8 @@
                 i18n-label="take_photo_button"
                 data-svg="camera_shutter_photo_start.svg"></button>
         <button id="stop-takephoto" class="shutter inkdrop" tabindex="0"
-                i18n-label="take_photo_cancel_button"></button>
+                i18n-label="take_photo_cancel_button"
+                data-svg="camera_shutter_photo_stop.svg"></button>
       </div>
       <div id="pause-recordvideo-holder" class="buttons right-stripe circle">
         <button id="pause-recordvideo" tabindex="0"
@@ -295,7 +306,7 @@
         <div id="timer-tick-msg"></div>
       </div>
       <div id="nudge" tabindex="0" role="alert" hidden>
-        <div class="warning-icon"></div>
+        <div class="warning-icon" data-svg="circle_warning_icon.svg"></div>
         <div class="warning-msg"
              i18n-text="low_storage_nudge_warning_msg"></div>
      </div>
@@ -303,51 +314,56 @@
     <div id="view-settings" class="settings">
       <div class="menu">
         <div class="menu-header circle">
-          <button class="icon" tabindex="0" i18n-aria="back_button"></button>
+          <button class="icon" tabindex="0" i18n-aria="back_button"
+            data-svg="settings_button_back.svg"></button>
           <div id="settings-header" i18n-text="settings_button"></div>
         </div>
         <button id="settings-photo-resolution" class="menu-item inkdrop
                 expandable" tabindex="0">
-          <div class="icon"></div>
+          <div class="icon" data-svg="settings_resolution.svg"></div>
           <div>
             <div i18n-text="photo_resolution_button"></div>
             <div class="description">
               <span></span>
             </div>
           </div>
+          <div class="expand" data-svg="settings_button_expand.svg"></div>
         </button>
         <button id="settings-video-resolution" class="menu-item inkdrop
                 expandable" tabindex="0">
-          <div class="icon"></div>
+          <div class="icon" data-svg="settings_resolution.svg"></div>
           <div>
             <div i18n-text="video_resolution_button"></div>
             <div class="description">
               <span></span>
             </div>
           </div>
+          <div class="expand" data-svg="settings_button_expand.svg"></div>
         </button>
         <button id="settings-photo-aspect-ratio" class="menu-item inkdrop
                 expandable" tabindex="0">
-          <div class="icon"></div>
+          <div class="icon" data-svg="settings_aspect_ratio.svg"></div>
           <div>
             <div i18n-text="photo_aspect_ratio_button"></div>
             <div class="description">
               <span></span>
             </div>
           </div>
+          <div class="expand" data-svg="settings_button_expand.svg"></div>
         </button>
         <button id="settings-expert" class="menu-item inkdrop expandable"
                 tabindex="0">
-          <div class="icon"></div>
+          <div class="icon" data-svg="settings_expert.svg"></div>
           <div i18n-text="expert_mode_button">
           </div>
+          <div class="expand" data-svg="settings_button_expand.svg"></div>
         </button>
         <button id="settings-feedback" class="menu-item inkdrop" tabindex="0">
-          <div class="icon"></div>
+          <div class="icon" data-svg="settings_feedback.svg"></div>
           <div i18n-text="feedback_button"></div>
         </button>
         <button id="settings-help" class="menu-item inkdrop" tabindex="0">
-          <div class="icon"></div>
+          <div class="icon" data-svg="settings_help.svg"></div>
           <div i18n-text="help_button"></div>
         </button>
       </div>
@@ -355,7 +371,8 @@
     <div id="view-photo-resolution-settings" class="settings">
       <div class="menu">
         <div class="menu-header circle">
-          <button class="icon" tabindex="0" i18n-aria="back_button"></button>
+          <button class="icon" tabindex="0" i18n-aria="back_button"
+            data-svg="settings_button_back.svg"></button>
           <div i18n-text="photo_resolution_button"></div>
         </div>
       </div>
@@ -363,7 +380,8 @@
     <div id="view-photo-aspect-ratio-settings" class="settings">
       <div class="menu" data-name="aspectratios">
         <div class="menu-header circle">
-          <button class="icon" tabindex="0" i18n-aria="back_button"></button>
+          <button class="icon" tabindex="0" i18n-aria="back_button"
+            data-svg="settings_button_back.svg"></button>
           <div i18n-text="photo_aspect_ratio_button"></div>
         </div>
       </div>
@@ -371,7 +389,8 @@
     <div id="view-video-resolution-settings" class="settings">
       <div class="menu" data-name="videores">
         <div class="menu-header circle">
-          <button class="icon" tabindex="0" i18n-aria="back_button"></button>
+          <button class="icon" tabindex="0" i18n-aria="back_button"
+            data-svg="settings_button_back.svg"></button>
           <div i18n-text="video_resolution_button"></div>
         </div>
       </div>
@@ -379,7 +398,8 @@
     <div id="view-expert-settings" class="settings">
       <div class="menu">
         <div class="menu-header circle">
-          <button class="icon" tabindex="0" i18n-aria="back_button"></button>
+          <button class="icon" tabindex="0" i18n-aria="back_button"
+            data-svg="settings_button_back.svg"></button>
           <div i18n-text="expert_mode_button"></div>
         </div>
         <label class="menu-item inkdrop require-chromeos-vcd">
@@ -507,7 +527,8 @@
         <div class="low-storage-dialog-buttons">
           <button class="dialog-negative-button text-button pill
                   system-secondary dark" tabindex="0">
-            <div class="external-link-icon"></div>
+            <div class="external-link-icon" data-svg="external_link_icon.svg">
+            </div>
             <div i18n-text="low_storage_dialog_storage_button"></div>
           </button>
           <button class="dialog-positive-button text-button pill primary dark
@@ -524,7 +545,9 @@
     <div id="view-warning">
       <div id="error-msg" aria-live="polite"></div>
     </div>
-    <div id="view-splash"></div>
+    <div id="view-splash">
+      <div class="icon"></div>
+    </div>
     <div id="toast" class="centered-overlay" tabindex="-1"
          aria-live="polite"></div>
     <div id="tooltip" aria-hidden="true"></div>
@@ -556,14 +579,18 @@
       </label>
     </template>
     <template id="video-resolution-item-template">
-      <label class="menu-item circle resolution-option inkdrop">
+      <label class="menu-item resolution-option inkdrop">
         <input class="icon" type="radio" tabindex="0">
         <span></span>
         <div class="fps-buttons">
           <button class="fps-button fps-30" i18n-aria="label_30fps"
-                  tabindex="0"></button>
+                  tabindex="0">
+            <svg-wrapper name="camera_button_fps_30.svg"></svg-wrapper>
+          </button>
           <button class="fps-button fps-60" i18n-aria="label_60fps"
-                  tabindex="0"></button>
+                  tabindex="0">
+            <svg-wrapper name="camera_button_fps_60.svg"></svg-wrapper>
+          </button>
         </div>
       </label>
     </template>
@@ -593,14 +620,13 @@
     </template>
     <template id="new-feature-toast-template">
       <div id="new-feature-toast" class="custom-toast" tabindex="0">
+        <svg-wrapper name="new_feature_toast_icon.svg"></svg-wrapper>
         <span class="custom-toast-text" aria-hidden="true"></span>
       </div>
     </template>
     <template id="indicator-toast-template">
       <div id="indicator-toast" class="custom-toast" tabindex="0">
-        <div>
-          <img id="indicator-icon" alt="">
-        </div>
+        <svg-wrapper id="indicator-icon"></svg-wrapper>
         <span class="custom-toast-text" aria-hidden="true"></span>
       </div>
       <div id="indicator-dot"></div>
@@ -638,13 +664,21 @@
               i18n-text="cancel_review_button" tabindex="0"></button>
             <div class="separator"></div>
             <button class="icon-button dark inkdrop" id="doc-scan-menu-button"
-              tabindex="0" i18n-label="doc_scan_menu_button"></button>
+              tabindex="0" i18n-label="doc_scan_menu_button">
+              <svg-wrapper name="more_horizontal.svg"></svg-wrapper>
+            </button>
             <button class="icon-button dark inkdrop"
-              i18n-label="add_new_page_button" tabindex="0"></button>
+              i18n-label="add_new_page_button" tabindex="0">
+              <svg-wrapper name="document_review_add_page.svg"></svg-wrapper>
+            </button>
             <button class="icon-button dark inkdrop"
-              i18n-label="label_share" tabindex="0"></button>
+              i18n-label="label_share" tabindex="0">
+              <svg-wrapper name="review_share.svg"></svg-wrapper>
+            </button>
             <button class="icon-button dark inkdrop"
-              i18n-label="fix_page_button" tabindex="0"></button>
+              i18n-label="fix_page_button" tabindex="0">
+              <svg-wrapper name="document_review_fix_page.svg"></svg-wrapper>
+            </button>
           </div>
           <div class="button-group right">
             <button class="text-button pill dark inkdrop secondary"
@@ -670,9 +704,15 @@
         <div class="buttons-container">
           <div class="review-crop-rotation-button-group button-group">
             <button class="icon-button dark inkdrop"
-              i18n-label="rotate_clockwise_button" tabindex="0"></button>
+              i18n-label="rotate_clockwise_button" tabindex="0">
+              <svg-wrapper name="crop_document_clockwise_rotate.svg">
+              </svg-wrapper>
+            </button>
             <button class="icon-button dark inkdrop"
-              i18n-label="rotate_counterclockwise_button" tabindex="0"></button>
+              i18n-label="rotate_counterclockwise_button" tabindex="0">
+              <svg-wrapper name="crop_document_counterclockwise_rotate.svg">
+              </svg-wrapper>
+            </button>
           </div>
           <div class="button-group right">
             <button class="text-button pill dark inkdrop primary"
@@ -686,7 +726,9 @@
         i18n-aria="select_page_button">
         <div class="delete-container">
           <button class="delete icon-button dark inkdrop"
-                  i18n-label="delete_page_button" tabindex="0"></button>
+                  i18n-label="delete_page_button" tabindex="0">
+            <svg-wrapper name="document_review_delete_page.svg"></svg-wrapper>
+          </button>
         </div>
         <div class="thumbnail-container">
           <img class="thumbnail" alt="">
@@ -703,7 +745,7 @@
     </template>
     <template id="doc-scan-menu-item-content">
       <div class="menu-item-content">
-        <img alt="" class="menu-item-icon">
+        <svg-wrapper class="menu-item-icon"></svg-wrapper>
         <div class="menu-item-label"></div>
       </div>
     </template>

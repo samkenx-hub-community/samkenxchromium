@@ -795,6 +795,8 @@ if (enable_java_templates && is_android) {
       _cpu_family = "CPU_FAMILY_X86"
     } else if (current_cpu == "mipsel" || current_cpu == "mips64el") {
       _cpu_family = "CPU_FAMILY_MIPS"
+    } else if (current_cpu == "riscv64") {
+      _cpu_family = "CPU_FAMILY_RISCV"
     } else {
       assert(false, "Unsupported CPU family")
     }
@@ -1463,7 +1465,7 @@ if (enable_java_templates && is_android) {
       "//testing/android/junit:junit_test_support",
       "//third_party/android_deps:robolectric_all_java",
       "//third_party/junit",
-      "//third_party/mockito:mockito_java",
+      "//third_party/mockito:mockito_jvm_java",
     ]
     if (defined(invoker.deps)) {
       _invoker_deps += invoker.deps
@@ -4826,9 +4828,6 @@ if (enable_java_templates && is_android) {
   #    proguard_android_sdk_dep: Optional. android_system_java_prebuilt() target
   #      used as a library jar for synchronized proguarding.
   #
-  #    compress_shared_libraries: Optional. Whether to compress shared libraries
-  #      such that they are extracted upon install.
-  #
   #    system_image_locale_allowlist: List of locales that should be included
   #      on system APKs generated from this bundle.
   #
@@ -5329,10 +5328,6 @@ if (enable_java_templates && is_android) {
       ]
       if (_split_dimensions != []) {
         args += [ "--split-dimensions=$_split_dimensions" ]
-      }
-      if (defined(invoker.compress_shared_libraries) &&
-          invoker.compress_shared_libraries) {
-        args += [ "--compress-shared-libraries" ]
       }
 
       # Android P+ support loading from stored dex.

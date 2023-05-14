@@ -21,6 +21,7 @@
 #include "chrome/browser/browsing_data/browsing_data_lifetime_policy_handler.h"
 #include "chrome/browser/enterprise/connectors/device_trust/prefs.h"
 #include "chrome/browser/enterprise/idle/idle_timeout_policy_handler.h"
+#include "chrome/browser/enterprise/reporting/legacy_tech/legacy_tech_report_policy_handler.h"
 #include "chrome/browser/first_party_sets/first_party_sets_overrides_policy_handler.h"
 #include "chrome/browser/net/disk_cache_dir_policy_handler.h"
 #include "chrome/browser/net/explicitly_allowed_network_ports_policy_handler.h"
@@ -167,6 +168,7 @@
 #include "chrome/browser/ash/policy/handlers/configuration_policy_handler_ash.h"
 #include "chrome/browser/ash/policy/handlers/lacros_availability_policy_handler.h"
 #include "chrome/browser/ash/policy/handlers/lacros_selection_policy_handler.h"
+#include "chrome/browser/ash/policy/reporting/metrics_reporting/metric_reporting_prefs.h"
 #include "chrome/browser/nearby_sharing/common/nearby_share_prefs.h"
 #include "chrome/browser/policy/default_geolocation_policy_handler.h"
 #include "chrome/browser/policy/device_login_screen_geolocation_access_level_policy_handler.h"
@@ -1079,9 +1081,6 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
   { key::kEasyUnlockAllowed,
     ash::multidevice_setup::kSmartLockAllowedPrefName,
     base::Value::Type::BOOLEAN },
-  { key::kSmartLockSigninAllowed,
-    ash::multidevice_setup::kSmartLockSigninAllowedPrefName,
-    base::Value::Type::BOOLEAN },
   { key::kInstantTetheringAllowed,
     ash::multidevice_setup::kInstantTetheringAllowedPrefName,
     base::Value::Type::BOOLEAN },
@@ -1424,6 +1423,15 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
   { key::kShowDisplaySizeScreenEnabled,
     ash::prefs::kShowDisplaySizeScreenEnabled,
     base::Value::Type::BOOLEAN },
+  { key::kReportAppInventory,
+    ash::reporting::kReportAppInventory,
+    base::Value::Type::LIST },
+  { key::kReportAppUsage,
+    ash::reporting::kReportAppUsage,
+    base::Value::Type::LIST },
+  { key::kReportAppUsageCollectionRateMs,
+    ash::reporting::kReportAppUsageCollectionRateMs,
+    base::Value::Type::INTEGER },
 #endif // BUILDFLAG(IS_CHROMEOS_ASH)
 
 #if BUILDFLAG(IS_LINUX)
@@ -1871,12 +1879,6 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
     base::Value::Type::INTEGER },
 #endif  // BUILDFLAG(IS_WIN)
 #if BUILDFLAG(ENABLE_PPAPI)
-  { key::kUseMojoVideoDecoderForPepperAllowed,
-    policy::policy_prefs::kUseMojoVideoDecoderForPepperAllowed,
-    base::Value::Type::BOOLEAN },
-  { key::kPPAPISharedImagesSwapChainAllowed,
-    policy::policy_prefs::kPPAPISharedImagesSwapChainAllowed,
-    base::Value::Type::BOOLEAN },
   { key::kForceEnablePepperVideoDecoderDevAPI,
     policy::policy_prefs::kForceEnablePepperVideoDecoderDevAPI,
     base::Value::Type::BOOLEAN },
@@ -1951,6 +1953,8 @@ std::unique_ptr<ConfigurationPolicyHandlerList> BuildHandlerList(
   handlers->AddHandler(
       std::make_unique<
           enterprise_reporting::CloudReportingFrequencyPolicyHandler>());
+  handlers->AddHandler(
+      std::make_unique<enterprise_reporting::LegacyTechReportPolicyHandler>());
   handlers->AddHandler(std::make_unique<DefaultSearchPolicyHandler>());
   handlers->AddHandler(std::make_unique<IncognitoModePolicyHandler>());
   handlers->AddHandler(

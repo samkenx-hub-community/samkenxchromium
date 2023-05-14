@@ -4896,6 +4896,9 @@ class DesksAcceleratorsTest : public DesksTest,
   bool NotifyDeprecatedSixPackKeyRewrite(ui::KeyboardCode key_code) override {
     return false;
   }
+  void RecordEventRemappedToRightClick() override {}
+  void RecordSixPackEventRewrite(ui::KeyboardCode key_code,
+                                 bool alt_based) override {}
 
   void SendAccelerator(ui::KeyboardCode key_code, int flags) {
     ui::test::EventGenerator* generator = GetEventGenerator();
@@ -8607,9 +8610,6 @@ TEST_P(DesksCloseAllTest, InteractingWithShelfClosesToast) {
 
   // Enter overview and close the desk.
   EnterOverview();
-  // Wait for shelf animation, i.e. the desk button disappears and the
-  // scrollable shelf view expands to take more space.
-  WaitForShelfAnimation();
   ASSERT_TRUE(Shell::Get()->overview_controller()->InOverviewSession());
   ClickOnCloseAllButtonForDesk(0);
 

@@ -129,8 +129,8 @@ RequestsAccessSection::RequestsAccessSection() {
 
 ExtensionsMenuMainPageView::ExtensionsMenuMainPageView(
     Browser* browser,
-    ExtensionsMenuHandler* navigation_handler)
-    : browser_(browser), navigation_handler_(navigation_handler) {
+    ExtensionsMenuHandler* menu_handler)
+    : browser_(browser), menu_handler_(menu_handler) {
   // This is set so that the extensions menu doesn't fall outside the monitor in
   // a maximized window in 1024x768. See https://crbug.com/1096630.
   // TODO(crbug.com/1413883): Consider making the height dynamic.
@@ -221,7 +221,7 @@ ExtensionsMenuMainPageView::ExtensionsMenuMainPageView(
                       views::BubbleFrameView::CreateCloseButton(
                           base::BindRepeating(
                               &ExtensionsMenuHandler::CloseBubble,
-                              base::Unretained(navigation_handler_))))),
+                              base::Unretained(menu_handler_))))),
           // Contents.
           views::Builder<views::Separator>(),
           views::Builder<views::ScrollView>()
@@ -254,13 +254,14 @@ void ExtensionsMenuMainPageView::CreateAndInsertMenuItem(
     ExtensionMenuItemView::SitePermissionsButtonAccess
         site_permissions_button_access,
     int index) {
+  // base::Unretained() below is safe because `menu_handler_` lifetime is
+  // tied to this view lifetime by the extensions menu coordinator.
   auto item = std::make_unique<ExtensionMenuItemView>(
       browser_, std::move(action_controller),
-      // TODO(crbug.com/1390952): Create callback that grants/withhelds site
-      // access when toggling the site access toggle.
-      base::RepeatingClosure(base::NullCallback()),
+      base::BindRepeating(&ExtensionsMenuHandler::OnExtensionToggleSelected,
+                          base::Unretained(menu_handler_), extension_id),
       base::BindRepeating(&ExtensionsMenuHandler::OpenSitePermissionsPage,
-                          base::Unretained(navigation_handler_), extension_id));
+                          base::Unretained(menu_handler_), extension_id));
   item->Update(site_access_toggle_state, site_permissions_button_state,
                site_permissions_button_access);
   menu_items_->AddChildViewAt(std::move(item), index);

@@ -43,7 +43,12 @@ enum ParamType {
   UI_SURFACE = 'uiSurface',
 
   // Arguments for MethodType.kRecordUiSurfaceShown.
-  CHILD_ELEMENT_COUNT = 'childElementCount',
+  UI_SURFACE_POSITION = 'uiSurfacePosition',
+  CHILD_ELEMENT_AVAILABLE_COUNT = 'childElementAvailableCount',
+  CHILD_ELEMENT_SHOWN_COUNT = 'childElementShownCount',
+
+  // Arguments for MethodType.kRecordUiSurfaceClicked.
+  CLICK_POSITION = 'clickPosition',
 
   // Arguments for MethodType.kOnCqJamptagClicked.
   CQ_JUMPTAG_TEXT = 'cqJumptagText',
@@ -189,10 +194,18 @@ function onCompanionMessageEvent(event: MessageEvent) {
     openInNewTabUrl.url = data[ParamType.URL_FOR_OPEN_IN_NEW_TAB];
     companionProxy.handler.onOpenInNewTabButtonURLChanged(openInNewTabUrl);
   } else if (methodType === MethodType.kRecordUiSurfaceShown) {
+    const uiSurfacePosition = data[ParamType.UI_SURFACE_POSITION] || -1;
+    const childElementAvailableCount =
+        data[ParamType.CHILD_ELEMENT_AVAILABLE_COUNT] || -1;
+    const childElementShownCount =
+        data[ParamType.CHILD_ELEMENT_SHOWN_COUNT] || -1;
     companionProxy.handler.recordUiSurfaceShown(
-        data[ParamType.UI_SURFACE], data[ParamType.CHILD_ELEMENT_COUNT]);
+        data[ParamType.UI_SURFACE], uiSurfacePosition,
+        childElementAvailableCount, childElementShownCount);
   } else if (methodType === MethodType.kRecordUiSurfaceClicked) {
-    companionProxy.handler.recordUiSurfaceClicked(data[ParamType.UI_SURFACE]);
+    const clickPosition = data[ParamType.CLICK_POSITION] || -1;
+    companionProxy.handler.recordUiSurfaceClicked(
+        data[ParamType.UI_SURFACE], clickPosition);
   } else if (methodType === MethodType.kOnCqCandidatesAvailable) {
     companionProxy.handler.onCqCandidatesAvailable(
         data[ParamType.CQ_TEXT_DIRECTIVES]);

@@ -172,26 +172,11 @@ void OpenAndroidOneDriveUrls(
   }
 }
 
-bool FileIsOnDriveFS(Profile* profile, const base::FilePath& file_path) {
+bool PathIsOnDriveFS(Profile* profile, const base::FilePath& file_path) {
   drive::DriveIntegrationService* integration_service =
       drive::DriveIntegrationServiceFactory::FindForProfile(profile);
   base::FilePath relative_path;
   return integration_service->GetRelativeDrivePath(file_path, &relative_path);
-}
-
-bool FileIsOnODFS(Profile* profile, const FileSystemURL& url) {
-  ash::file_system_provider::util::FileSystemURLParser parser(url);
-  if (!parser.Parse()) {
-    return false;
-  }
-
-  file_system_provider::ProviderId provider_id =
-      file_system_provider::ProviderId::CreateFromExtensionId(
-          file_manager::file_tasks::GetODFSExtensionId(profile));
-  if (parser.file_system()->GetFileSystemInfo().provider_id() != provider_id) {
-    return false;
-  }
-  return true;
 }
 
 bool HasWordFile(const std::vector<storage::FileSystemURL>& file_urls) {
@@ -228,6 +213,19 @@ bool HasPowerPointFile(const std::vector<storage::FileSystemURL>& file_urls) {
     }
   }
   return false;
+}
+
+// This indicates we ran Office setup and set a preference, or the user had a
+// pre-existing preference for these file types.
+bool HaveExplicitFileHandlers(
+    Profile* profile,
+    const std::vector<storage::FileSystemURL>& file_urls) {
+  return std::all_of(
+      file_urls.begin(), file_urls.end(),
+      [profile](const storage::FileSystemURL& url) {
+        return file_manager::file_tasks::HasExplicitDefaultFileHandler(
+            profile, url.path().FinalExtension());
+      });
 }
 
 }  // namespace
@@ -267,8 +265,13 @@ bool CloudOpenTask::ExecuteInternal() {
     return false;
   }
 
-  // Run the setup flow if it's never been completed.
-  if (!file_manager::file_tasks::OfficeSetupComplete(profile_)) {
+  // Run the setup flow if we don't have explicit default file handlers set for
+  // these files in preferences. This indicates we haven't run setup, because
+  // setup sets default handlers at the end. If the user has a default set for
+  // another, non-office handler, then we won't get here except via the 'Open
+  // With' menu. In that case we might need to run fixup or just open/move the
+  // file, but without changing stored user file handler preferences.
+  if (!HaveExplicitFileHandlers(profile_, file_urls_)) {
     return InitAndShowDialog(mojom::DialogPage::kFileHandlerDialog);
   }
 
@@ -284,15 +287,15 @@ bool CloudOpenTask::ExecuteInternal() {
 // the files before opening.
 void CloudOpenTask::OpenOrMoveFiles() {
   if (cloud_provider_ == CloudProvider::kGoogleDrive &&
-      FileIsOnDriveFS(profile_, file_urls_.front().path())) {
+      PathIsOnDriveFS(profile_, file_urls_.front().path())) {
     // The files are on Drive already.
     OpenAlreadyHostedDriveUrls();
   } else if (cloud_provider_ == CloudProvider::kOneDrive &&
-             FileIsOnODFS(profile_, file_urls_.front())) {
+             UrlIsOnODFS(profile_, file_urls_.front())) {
     // The files are on OneDrive already, selected from ODFS.
     OpenODFSUrls();
   } else if (cloud_provider_ == CloudProvider::kOneDrive &&
-             FileIsOnAndroidOneDrive(profile_, file_urls_.front())) {
+             UrlIsOnAndroidOneDrive(profile_, file_urls_.front())) {
     // The files are on OneDrive already, selected from Android OneDrive.
     OpenAndroidOneDriveUrlsIfAccountMatchedODFS();
   } else {
@@ -322,22 +325,72 @@ void CloudOpenTask::OpenODFSUrls() {
   }
 }
 
-void CloudOpenTask::ConfirmMoveOrStartUpload() {
+// Returns True if the confirmation dialog should be shown before uploading a
+// file to a cloud location and opening it.
+bool CloudOpenTask::ShouldShowConfirmationDialog() {
+  bool force_show_confirmation_dialog = false;
+  SourceType source_type = GetSourceType(profile_, file_urls_[0]);
+
   if (cloud_provider_ == CloudProvider::kGoogleDrive) {
-    if (file_manager::file_tasks::GetAlwaysMoveOfficeFilesToDrive(profile_)) {
-      // No dialog required.
-      StartUpload();
-    } else {
-      InitAndShowDialog(mojom::DialogPage::kMoveConfirmationGoogleDrive);
+    switch (source_type) {
+      case SourceType::READ_ONLY:
+        force_show_confirmation_dialog =
+            !file_manager::file_tasks::
+                GetOfficeMoveConfirmationShownForLocalToDrive(profile_) &&
+            !file_manager::file_tasks::
+                GetOfficeMoveConfirmationShownForCloudToDrive(profile_);
+        break;
+      case SourceType::LOCAL:
+        force_show_confirmation_dialog =
+            !file_manager::file_tasks::
+                GetOfficeMoveConfirmationShownForLocalToDrive(profile_);
+        break;
+      case SourceType::CLOUD:
+        force_show_confirmation_dialog =
+            !file_manager::file_tasks::
+                GetOfficeMoveConfirmationShownForCloudToDrive(profile_);
+        break;
     }
+    return force_show_confirmation_dialog ||
+           !file_manager::file_tasks::GetAlwaysMoveOfficeFilesToDrive(profile_);
   } else if (cloud_provider_ == CloudProvider::kOneDrive) {
-    if (file_manager::file_tasks::GetAlwaysMoveOfficeFilesToOneDrive(
-            profile_)) {
-      // No dialog required.
-      StartUpload();
-    } else {
-      InitAndShowDialog(mojom::DialogPage::kMoveConfirmationOneDrive);
+    switch (source_type) {
+      case SourceType::READ_ONLY:
+        force_show_confirmation_dialog =
+            !file_manager::file_tasks::
+                GetOfficeMoveConfirmationShownForLocalToOneDrive(profile_) &&
+            !file_manager::file_tasks::
+                GetOfficeMoveConfirmationShownForCloudToOneDrive(profile_);
+        break;
+      case SourceType::LOCAL:
+        force_show_confirmation_dialog =
+            !file_manager::file_tasks::
+                GetOfficeMoveConfirmationShownForLocalToOneDrive(profile_);
+        break;
+      case SourceType::CLOUD:
+        force_show_confirmation_dialog =
+            !file_manager::file_tasks::
+                GetOfficeMoveConfirmationShownForCloudToOneDrive(profile_);
+        break;
     }
+    return force_show_confirmation_dialog ||
+           !file_manager::file_tasks::GetAlwaysMoveOfficeFilesToOneDrive(
+               profile_);
+  }
+  NOTREACHED();
+  return true;
+}
+
+void CloudOpenTask::ConfirmMoveOrStartUpload() {
+  bool show_confirmation_dialog = ShouldShowConfirmationDialog();
+  if (show_confirmation_dialog) {
+    mojom::DialogPage dialog_page =
+        cloud_provider_ == CloudProvider::kGoogleDrive
+            ? mojom::DialogPage::kMoveConfirmationGoogleDrive
+            : mojom::DialogPage::kMoveConfirmationOneDrive;
+    InitAndShowDialog(dialog_page);
+  } else {
+    StartUpload();
   }
 }
 
@@ -361,7 +414,22 @@ bool ShouldFixUpOffice(Profile* profile, const CloudProvider cloud_provider) {
            CloudUploadDialog::IsOfficeWebAppInstalled(profile));
 }
 
-bool FileIsOnAndroidOneDrive(Profile* profile, const FileSystemURL& url) {
+bool UrlIsOnODFS(Profile* profile, const FileSystemURL& url) {
+  ash::file_system_provider::util::FileSystemURLParser parser(url);
+  if (!parser.Parse()) {
+    return false;
+  }
+
+  file_system_provider::ProviderId provider_id =
+      file_system_provider::ProviderId::CreateFromExtensionId(
+          file_manager::file_tasks::GetODFSExtensionId(profile));
+  if (parser.file_system()->GetFileSystemInfo().provider_id() != provider_id) {
+    return false;
+  }
+  return true;
+}
+
+bool UrlIsOnAndroidOneDrive(Profile* profile, const FileSystemURL& url) {
   std::string authority;
   std::string root_document_id;
   base::FilePath path;
@@ -426,7 +494,7 @@ void CloudOpenTask::OpenAndroidOneDriveUrlsIfAccountMatchedODFS() {
 absl::optional<ODFSFileSystemAndPath> AndroidOneDriveUrlToODFS(
     Profile* profile,
     const FileSystemURL& android_onedrive_file_url) {
-  if (!FileIsOnAndroidOneDrive(profile, android_onedrive_file_url)) {
+  if (!UrlIsOnAndroidOneDrive(profile, android_onedrive_file_url)) {
     LOG(ERROR) << "File not on Android OneDrive";
     return absl::nullopt;
   }
@@ -581,8 +649,7 @@ mojom::DialogArgsPtr CloudOpenTask::CreateDialogArgs(
     args->file_names.push_back(file_url.path().BaseName().value());
   }
   args->dialog_page = dialog_page;
-  args->first_time_setup =
-      !file_manager::file_tasks::OfficeSetupComplete(profile_);
+  args->first_time_setup = !HaveExplicitFileHandlers(profile_, file_urls_);
   const file_manager::io_task::OperationType operation_type =
       GetOperationTypeForUpload(profile_, file_urls_[0]);
   switch (operation_type) {
@@ -697,6 +764,14 @@ void CloudOpenTask::OnBrowserAdded(Browser* browser) {
 // necessary to make sure that we delete CloudOpenTask when we're done.
 void CloudOpenTask::OnDialogComplete(const std::string& user_response) {
   using file_manager::file_tasks::SetExcelFileHandlerToFilesSWA;
+  using file_manager::file_tasks::SetOfficeMoveConfirmationShownForCloudToDrive;
+  using file_manager::file_tasks::
+      SetOfficeMoveConfirmationShownForCloudToOneDrive;
+  using file_manager::file_tasks::SetOfficeMoveConfirmationShownForDrive;
+  using file_manager::file_tasks::SetOfficeMoveConfirmationShownForLocalToDrive;
+  using file_manager::file_tasks::
+      SetOfficeMoveConfirmationShownForLocalToOneDrive;
+  using file_manager::file_tasks::SetOfficeMoveConfirmationShownForOneDrive;
   using file_manager::file_tasks::SetOfficeSetupComplete;
   using file_manager::file_tasks::SetPowerPointFileHandlerToFilesSWA;
   using file_manager::file_tasks::SetWordFileHandlerToFilesSWA;
@@ -726,13 +801,40 @@ void CloudOpenTask::OnDialogComplete(const std::string& user_response) {
     SetOfficeSetupComplete(profile_);
     OpenOrMoveFiles();
   } else if (user_response == kUserActionConfirmOrUploadToOneDrive) {
+    SetOfficeSetupComplete(profile_);
     // Default handlers have already been set by this point for
     // Office/OneDrive.
     OpenOrMoveFiles();
   } else if (user_response == kUserActionUploadToGoogleDrive) {
     cloud_provider_ = CloudProvider::kGoogleDrive;
+    SetOfficeMoveConfirmationShownForDrive(profile_, true);
+    SourceType source_type = GetSourceType(profile_, file_urls_[0]);
+    switch (source_type) {
+      case SourceType::LOCAL:
+        SetOfficeMoveConfirmationShownForLocalToDrive(profile_, true);
+        break;
+      case SourceType::CLOUD:
+        SetOfficeMoveConfirmationShownForCloudToDrive(profile_, true);
+        break;
+      case SourceType::READ_ONLY:
+        // TODO (jboulic): Clarify UX.
+        break;
+    }
     StartUpload();
   } else if (user_response == kUserActionUploadToOneDrive) {
+    SetOfficeMoveConfirmationShownForOneDrive(profile_, true);
+    SourceType source_type = GetSourceType(profile_, file_urls_[0]);
+    switch (source_type) {
+      case SourceType::LOCAL:
+        SetOfficeMoveConfirmationShownForLocalToOneDrive(profile_, true);
+        break;
+      case SourceType::CLOUD:
+        SetOfficeMoveConfirmationShownForCloudToOneDrive(profile_, true);
+        break;
+      case SourceType::READ_ONLY:
+        // TODO (jboulic): Clarify UX.
+        break;
+    }
     StartUpload();
   } else if (user_response == kUserActionSetUpOneDrive) {
     cloud_provider_ = CloudProvider::kOneDrive;

@@ -14,6 +14,7 @@
 #include "base/numerics/safe_conversions.h"
 #include "base/ranges/algorithm.h"
 #include "base/stl_util.h"
+#include "components/autofill/content/browser/content_autofill_driver.h"
 #include "components/autofill/content/browser/form_forest_util_inl.h"
 #include "components/autofill/core/common/autofill_features.h"
 #include "content/public/browser/render_process_host.h"
@@ -563,12 +564,10 @@ void FormForest::UpdateTreeOfRendererForm(FormData* form,
   // FormData::child_frames now include |frame|.
   content::RenderFrameHost* parent_rfh = rfh->GetParent();
   if (!frame->parent_form && parent_rfh && !IsFencedFrameRoot(rfh)) {
-    LocalFrameToken parent_frame_token(
-        LocalFrameToken(parent_rfh->GetFrameToken().value()));
-    FrameData* parent_frame = GetFrameData(parent_frame_token);
-    if (parent_frame && parent_frame->driver) {
-      AFCHECK(parent_frame->driver->render_frame_host() == parent_rfh);
-      parent_frame->driver->TriggerReparse();
+    ContentAutofillDriver* parent_driver =
+        ContentAutofillDriver::GetForRenderFrameHost(parent_rfh);
+    if (parent_driver) {
+      parent_driver->TriggerReparse();
     }
   }
 }

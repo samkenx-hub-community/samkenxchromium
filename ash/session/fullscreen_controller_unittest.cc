@@ -30,6 +30,14 @@ constexpr char kNonMatchingPattern[] = "google.com";
 constexpr char kMatchingPattern[] = "test.com";
 constexpr char kWildcardPattern[] = "*";
 
+bool IsOfficialBuildWithoutDcheck() {
+#if defined(OFFICIAL_BUILD) && !DCHECK_IS_ON()
+  return true;
+#else
+  return false;
+#endif
+}
+
 class FullscreenControllerTestBase : public AshTestBase {
  public:
   FullscreenControllerTestBase() = default;
@@ -243,6 +251,11 @@ TEST_F(FullscreenControllerNotLacrosRelatedTest,
 
 TEST_F(FullscreenControllerNotLacrosRelatedTest,
        NoExitPropertyNotAllowedIfOverviewPropertyIsNotSet) {
+  // CHECK macro discards error message for the official build with
+  // dcheck=false. See the definition in base/check.h for details.
+  std::string expected_error_message =
+      IsOfficialBuildWithoutDcheck() ? "" : "Property combination not allowed";
+
   EXPECT_DEATH(
       {
         window_->SetProperty(chromeos::kUseOverviewToExitFullscreen, false);
@@ -255,7 +268,7 @@ TEST_F(FullscreenControllerNotLacrosRelatedTest,
             run_loop.QuitClosure());
         GetSessionControllerClient()->LockScreen();
       },
-      "Property combination not allowed");
+      expected_error_message);
 }
 
 }  // namespace

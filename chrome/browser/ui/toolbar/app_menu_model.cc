@@ -223,11 +223,21 @@ class HelpMenuModel : public ui::SimpleMenuModel {
 #else
     int help_string_id = IDS_HELP_PAGE;
 #endif
-    AddItem(IDC_ABOUT, l10n_util::GetStringUTF16(IDS_ABOUT));
+    AddItemWithStringId(IDC_ABOUT, IDS_ABOUT);
+    if (features::IsChromeRefresh2023()) {
+      SetIcon(
+          GetIndexOfCommandId(IDC_ABOUT).value(),
+          ui::ImageModel::FromVectorIcon(vector_icons::kInfoRefreshIcon,
+                                         ui::kColorMenuIcon, kDefaultIconSize));
+    }
 #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
     if (base::FeatureList::IsEnabled(features::kChromeWhatsNewUI)) {
-      AddItem(IDC_CHROME_WHATS_NEW,
-              l10n_util::GetStringUTF16(IDS_CHROME_WHATS_NEW));
+      AddItemWithStringId(IDC_CHROME_WHATS_NEW, IDS_CHROME_WHATS_NEW);
+      if (features::IsChromeRefresh2023()) {
+        SetIcon(GetIndexOfCommandId(IDC_CHROME_WHATS_NEW).value(),
+                ui::ImageModel::FromVectorIcon(
+                    kReleaseAlertIcon, ui::kColorMenuIcon, kDefaultIconSize));
+      }
     }
 #endif  // BUILDFLAG(GOOGLE_CHROME_BRANDING)
     AddItemWithStringId(IDC_HELP_PAGE_VIA_MENU, help_string_id);
@@ -235,9 +245,20 @@ class HelpMenuModel : public ui::SimpleMenuModel {
       ui::ResourceBundle& rb = ui::ResourceBundle::GetSharedInstance();
       SetIcon(GetIndexOfCommandId(IDC_HELP_PAGE_VIA_MENU).value(),
               ui::ImageModel::FromImage(rb.GetNativeImageNamed(IDR_HELP_MENU)));
+    } else if (features::IsChromeRefresh2023()) {
+      SetIcon(GetIndexOfCommandId(IDC_HELP_PAGE_VIA_MENU).value(),
+              ui::ImageModel::FromVectorIcon(kHelpMenuIcon, ui::kColorMenuIcon,
+                                             kDefaultIconSize));
     }
-    if (browser->profile()->GetPrefs()->GetBoolean(prefs::kUserFeedbackAllowed))
+    if (browser->profile()->GetPrefs()->GetBoolean(
+            prefs::kUserFeedbackAllowed)) {
       AddItemWithStringId(IDC_FEEDBACK, IDS_FEEDBACK);
+      if (features::IsChromeRefresh2023()) {
+        SetIcon(GetIndexOfCommandId(IDC_FEEDBACK).value(),
+                ui::ImageModel::FromVectorIcon(kReportIcon, ui::kColorMenuIcon,
+                                               kDefaultIconSize));
+      }
+    }
   }
 };
 
@@ -333,9 +354,9 @@ void ExtensionsMenuModel::Build(Browser* browser) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// AutofillSubMenuModel
+// PasswordsAndAutofillSubMenuModel
 
-AutofillSubMenuModel::AutofillSubMenuModel(
+PasswordsAndAutofillSubMenuModel::PasswordsAndAutofillSubMenuModel(
     ui::SimpleMenuModel::Delegate* delegate)
     : SimpleMenuModel(delegate) {
   AddItemWithStringIdAndIcon(
@@ -352,7 +373,7 @@ AutofillSubMenuModel::AutofillSubMenuModel(
                                      ui::kColorMenuIcon, kDefaultIconSize));
 }
 
-AutofillSubMenuModel::~AutofillSubMenuModel() = default;
+PasswordsAndAutofillSubMenuModel::~PasswordsAndAutofillSubMenuModel() = default;
 
 ////////////////////////////////////////////////////////////////////////////////
 // FindAndEditSubMenuModel
@@ -1030,8 +1051,10 @@ void AppMenuModel::Build() {
       features::IsChromeRefresh2023() &&
       !base::FeatureList::IsEnabled(
           password_manager::features::kPasswordManagerRedesign)) {
-    sub_menus_.push_back(std::make_unique<AutofillSubMenuModel>(this));
-    AddSubMenuWithStringId(IDC_AUTOFILL_MENU, IDS_AUTOFILL_MENU,
+    sub_menus_.push_back(
+        std::make_unique<PasswordsAndAutofillSubMenuModel>(this));
+    AddSubMenuWithStringId(IDC_PASSWORDS_AND_AUTOFILL_MENU,
+                           IDS_PASSWORDS_AND_AUTOFILL_MENU,
                            sub_menus_.back().get());
   }
 
@@ -1269,7 +1292,7 @@ void AppMenuModel::Build() {
     set_icon(IDC_TRANSLATE_PAGE, kTranslateChromeRefreshIcon);
     set_icon(IDC_ROUTE_MEDIA, kCastMenuIcon);
     set_icon(IDC_FIND_AND_EDIT_MENU, kSearchMenuIcon);
-    set_icon(IDC_AUTOFILL_MENU, kKeyChromeRefreshIcon);
+    set_icon(IDC_PASSWORDS_AND_AUTOFILL_MENU, kKeyChromeRefreshIcon);
     set_icon(IDC_MORE_TOOLS_MENU, kMoreToolsMenuIcon);
     set_icon(IDC_OPTIONS, kSettingsMenuIcon);
 #if BUILDFLAG(GOOGLE_CHROME_BRANDING)

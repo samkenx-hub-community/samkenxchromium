@@ -672,7 +672,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.ExperienceKitCalendar.Present"
-    enum="ExperienceKitCalendarTypes" expires_after="2023-09-03">
+    enum="ExperienceKitCalendarTypes" expires_after="2023-11-05">
   <owner>djean@chromium.org</owner>
   <owner>erahmaoui@google.com</owner>
   <summary>
@@ -1129,6 +1129,18 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="IOS.IsEnabled.Password.BottomSheet" enum="Boolean"
+    expires_after="2024-05-08">
+  <owner>sugoi@chromium.org</owner>
+  <owner>veronguyen@google.com</owner>
+  <owner>tmartino@chromium.org</owner>
+  <summary>
+    At the moment of trying to enable the bottom sheet at page load time, track
+    whether the bottom sheet is enabled or whether it has been disabled due to
+    the number of dismisses.
+  </summary>
+</histogram>
+
 <histogram name="IOS.JavascriptContentBlockFailure"
     enum="IOSJavascriptContentBlockType" expires_after="2020-12-31">
   <owner>rkgibson@google.com</owner>
@@ -1483,7 +1495,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.NTP.Impression" enum="IOSNTPImpressionType"
-    expires_after="2023-09-03">
+    expires_after="2023-11-05">
   <owner>gambard@chromium.org</owner>
   <owner>bling-team@google.com</owner>
   <summary>
@@ -1963,6 +1975,17 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="IOS.ResetDismissCount.Password.BottomSheet" units="dismisses"
+    expires_after="2024-05-08">
+  <owner>sugoi@chromium.org</owner>
+  <owner>veronguyen@google.com</owner>
+  <owner>tmartino@chromium.org</owner>
+  <summary>
+    Tracks the number of times in a row the Password Bottom Sheet had been
+    dismissed at the moment the dismiss count was reset to 0 (between 1 and 3).
+  </summary>
+</histogram>
+
 <histogram name="IOS.RestoreNavigationItemCount" units="rank"
     expires_after="2023-09-12">
   <owner>gambard@chromium.org</owner>
@@ -2022,6 +2045,76 @@ chromium-metrics-reviews@google.com.
     this invariant violation, and is logged each time that a main-frame
     navigation response is received after a server redirect. True means that the
     request and response URLs have the same host.
+  </summary>
+</histogram>
+
+<histogram name="IOS.SandboxMetrics.AvailableCapacity" units="MB"
+    expires_after="2023-10-01">
+  <owner>michaeldo@chromium.org</owner>
+  <owner>rohitrao@chromium.org</owner>
+  <summary>
+    The total amount of available storage capacity on the device. Logged once
+    per application cold launch, on startup.
+  </summary>
+</histogram>
+
+<histogram name="IOS.SandboxMetrics.AvailableCapacityPercentage" units="%"
+    expires_after="2023-10-01">
+  <owner>michaeldo@chromium.org</owner>
+  <owner>rohitrao@chromium.org</owner>
+  <summary>
+    The percentage of the device storage which is available. Logged once per
+    application cold launch, on startup.
+  </summary>
+</histogram>
+
+<histogram name="IOS.SandboxMetrics.CapacityForImportantUsage" units="MB"
+    expires_after="2023-10-01">
+  <owner>michaeldo@chromium.org</owner>
+  <owner>rohitrao@chromium.org</owner>
+  <summary>
+    The amount of device storage which is available for important storage.
+    Logged once per application cold launch, on startup.
+  </summary>
+</histogram>
+
+<histogram name="IOS.SandboxMetrics.CapacityForImportantUsagePercentage"
+    units="%" expires_after="2023-10-01">
+  <owner>michaeldo@chromium.org</owner>
+  <owner>rohitrao@chromium.org</owner>
+  <summary>
+    The percentage of the device storage which is available for important
+    storage. Logged once per application cold launch, on startup.
+  </summary>
+</histogram>
+
+<histogram name="IOS.SandboxMetrics.CapacityForOpportunisticUsage" units="MB"
+    expires_after="2023-10-01">
+  <owner>michaeldo@chromium.org</owner>
+  <owner>rohitrao@chromium.org</owner>
+  <summary>
+    The amount of device storage which is available for opportunistic storage.
+    Logged once per application cold launch, on startup.
+  </summary>
+</histogram>
+
+<histogram name="IOS.SandboxMetrics.CapacityForOpportunisticUsagePercentage"
+    units="%" expires_after="2023-10-01">
+  <owner>michaeldo@chromium.org</owner>
+  <owner>rohitrao@chromium.org</owner>
+  <summary>
+    The percentage of the device storage which is available for opportunistic
+    storage. Logged once per application cold launch, on startup.
+  </summary>
+</histogram>
+
+<histogram name="IOS.SandboxMetrics.TotalCapacity" enum="IOSStorageCapacity"
+    expires_after="2023-10-01">
+  <owner>michaeldo@chromium.org</owner>
+  <owner>rohitrao@chromium.org</owner>
+  <summary>
+    The total amount of storage capacity on the device. Logged once per
+    application cold launch, on startup.
   </summary>
 </histogram>
 

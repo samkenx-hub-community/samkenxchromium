@@ -533,17 +533,6 @@ BASE_FEATURE(kNetworkQualityEstimatorWebHoldback,
              "NetworkQualityEstimatorWebHoldback",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Enables the getDisplayMediaSet API for capturing multiple screens at once.
-BASE_FEATURE(kGetDisplayMediaSet,
-             "GetDisplayMediaSet",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-// Enables auto selection of all screens in combination with the
-// getDisplayMediaSet API.
-BASE_FEATURE(kGetDisplayMediaSetAutoSelectAllScreens,
-             "GetDisplayMediaSetAutoSelectAllScreens",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 // Determines if an extra brand version pair containing possibly escaped double
 // quotes and escaped backslashed should be added to the Sec-CH-UA header
 // (activated by kUserAgentClientHint)
@@ -633,10 +622,6 @@ BASE_FEATURE(kJavaScriptExperimentalSharedMemory,
 
 BASE_FEATURE(kLazyFrameLoading,
              "LazyFrameLoading",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-BASE_FEATURE(kLazyImageVisibleLoadTimeMetrics,
-             "LazyImageVisibleLoadTimeMetrics",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enable lazy initialization of the media controls.
@@ -928,6 +913,14 @@ BASE_FEATURE(kPrivateNetworkAccessSendPreflights,
 // windows.
 BASE_FEATURE(kProactivelySwapBrowsingInstance,
              "ProactivelySwapBrowsingInstance",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Enables origin-keyed processes by default, unless origins opt out using
+// Origin-Agent-Cluster: ?0. This feature only takes effect if the Blink feature
+// OriginAgentClusterDefaultEnable is enabled, since origin-keyed processes
+// require origin-agent-clusters.
+BASE_FEATURE(kOriginKeyedProcessesByDefault,
+             "OriginKeyedProcessesByDefault",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Fires the `pushsubscriptionchange` event defined here:
@@ -1436,6 +1429,11 @@ BASE_FEATURE(kWebBluetooth, "WebBluetooth", base::FEATURE_DISABLED_BY_DEFAULT);
 // and WebBluetoothGetDevices blink features are also enabled.
 BASE_FEATURE(kWebBluetoothNewPermissionsBackend,
              "WebBluetoothNewPermissionsBackend",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Enables the Web Environment Integrity API.
+BASE_FEATURE(kWebEnvironmentIntegrity,
+             "WebEnvironmentIntegrity",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // If WebGL Image Chromium is allowed, this feature controls whether it is

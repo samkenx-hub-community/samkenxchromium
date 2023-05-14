@@ -4,13 +4,13 @@
 
 #include "ash/capture_mode/capture_mode_session.h"
 
+#include <memory>
 #include <tuple>
 #include <utility>
 
 #include "ash/accessibility/accessibility_controller_impl.h"
 #include "ash/accessibility/magnifier/magnifier_glass.h"
 #include "ash/capture_mode/capture_label_view.h"
-#include "ash/capture_mode/capture_mode_bar_view.h"
 #include "ash/capture_mode/capture_mode_behavior.h"
 #include "ash/capture_mode/capture_mode_camera_controller.h"
 #include "ash/capture_mode/capture_mode_camera_preview_view.h"
@@ -23,12 +23,12 @@
 #include "ash/capture_mode/capture_mode_util.h"
 #include "ash/capture_mode/capture_window_observer.h"
 #include "ash/capture_mode/folder_selection_dialog_controller.h"
+#include "ash/capture_mode/normal_capture_bar_view.h"
 #include "ash/capture_mode/recording_type_menu_view.h"
 #include "ash/capture_mode/user_nudge_controller.h"
 #include "ash/display/mouse_cursor_event_filter.h"
 #include "ash/display/window_tree_host_manager.h"
 #include "ash/keyboard/ui/keyboard_ui_controller.h"
-#include "ash/projector/projector_controller_impl.h"
 #include "ash/public/cpp/resources/grit/ash_public_unscaled_resources.h"
 #include "ash/public/cpp/shell_window_ids.h"
 #include "ash/root_window_controller.h"
@@ -435,17 +435,16 @@ class CaptureModeSession::ParentContainerObserver
 // CaptureModeSession:
 
 CaptureModeSession::CaptureModeSession(CaptureModeController* controller,
-                                       CaptureModeBehavior* active_behavior,
-                                       bool projector_mode)
+                                       CaptureModeBehavior* active_behavior)
     : controller_(controller),
       active_behavior_(active_behavior),
       current_root_(capture_mode_util::GetPreferredRootWindow()),
       magnifier_glass_(kMagnifierParams),
-      is_in_projector_mode_(projector_mode),
       cursor_setter_(std::make_unique<CursorSetter>()),
       focus_cycler_(std::make_unique<CaptureModeSessionFocusCycler>(this)),
       capture_toast_controller_(this) {
   CHECK(current_root_);
+  active_behavior->AttachToSession();
 }
 
 CaptureModeSession::~CaptureModeSession() = default;
@@ -498,10 +497,10 @@ void CaptureModeSession::Initialize() {
   ClampCaptureRegionToRootWindowSize();
 
   capture_mode_bar_widget_->Init(CreateWidgetParams(
-      parent, CaptureModeBarView::GetBounds(current_root_, active_behavior_),
+      parent, active_behavior_->GetCaptureBarBounds(current_root_),
       "CaptureModeBarWidget"));
   capture_mode_bar_view_ = capture_mode_bar_widget_->SetContentsView(
-      std::make_unique<CaptureModeBarView>(active_behavior_));
+      active_behavior_->CreateCaptureModeBarView());
   capture_mode_bar_widget_->GetNativeWindow()->SetTitle(
       l10n_util::GetStringUTF16(IDS_ASH_SCREEN_CAPTURE_A11Y_TITLE));
   capture_mode_bar_widget_->Show();
@@ -534,11 +533,10 @@ void CaptureModeSession::Initialize() {
   // `OnCaptureTypeChanged` may trigger `ShowCaptureToast` which depends on the
   // capture bar.
   // Also please note we should call `OnCaptureTypeChanged` in
-  // `CaptureModeTypeView` instead of `CaptureModeSession`, since this is during
+  // `CaptureModeBarView` instead of `CaptureModeSession`, since this is during
   // the initialization of the capture session, the type change is not triggered
   // by the user.
-  capture_mode_bar_view_->capture_type_view()->OnCaptureTypeChanged(
-      controller_->type());
+  capture_mode_bar_view_->OnCaptureTypeChanged(controller_->type());
   MaybeCreateUserNudge();
 
   if (active_behavior_->ShouldAutoSelectFirstCamera()) {
@@ -570,8 +568,15 @@ void CaptureModeSession::Shutdown() {
 
   // Close all widgets immediately to avoid having them show up in the captured
   // screenshots or video.
-  for (auto* widget : GetAvailableWidgets())
+  for (auto* widget : GetAvailableWidgets()) {
     widget->CloseNow();
+  }
+
+  // Clear all the contents view of all the widgets to avoid UAF.
+  capture_mode_bar_view_ = nullptr;
+  capture_mode_settings_view_ = nullptr;
+  capture_label_view_ = nullptr;
+  recording_type_menu_view_ = nullptr;
 
   if (a11y_alert_on_session_exit_) {
     capture_mode_util::TriggerAccessibilityAlert(
@@ -599,11 +604,11 @@ void CaptureModeSession::Shutdown() {
     // projector-initiated capture mode session.
     controller_->camera_controller()->MaybeRevertAutoCameraSelection();
 
-    // Restore the capture mode configurations that include the `type_`,
-    // `source_` and `enable_audio_recording_` when the projector-initiated
-    // session ends without starting a new recording, in case any of them were
-    // overwritten by projector.
-    controller_->MaybeRestoreCachedCaptureConfigurations();
+    // The session is about to end and recording won't start afterwards. The
+    // active behavior may have overwritten some of the configs, we need to
+    // restore them back to their original values so that future sessions are
+    // not affected.
+    active_behavior_->DetachFromSession();
   }
 
   Shell::Get()->RemoveShellObserver(this);
@@ -770,7 +775,7 @@ void CaptureModeSession::ReportSessionHistograms() {
 
   if (source == CaptureModeSource::kRegion) {
     RecordNumberOfCaptureRegionAdjustments(num_capture_region_adjusted_,
-                                           is_in_projector_mode_);
+                                           active_behavior_);
     const auto region_in_root = controller_->user_capture_region();
     if (is_stopping_to_start_video_recording_ &&
         recording_type == RecordingType::kGif && !region_in_root.IsEmpty()) {
@@ -786,7 +791,7 @@ void CaptureModeSession::ReportSessionHistograms() {
       controller_->type(), source, recording_type,
       /*audio_on=*/controller_->GetEffectiveAudioRecordingMode() !=
           AudioRecordingMode::kOff,
-      is_in_projector_mode_);
+      active_behavior_);
 }
 
 void CaptureModeSession::StartCountDown(
@@ -1067,10 +1072,22 @@ void CaptureModeSession::OnKeyEvent(ui::KeyEvent* event) {
     }
 
     case ui::VKEY_TAB: {
-      event->StopPropagation();
-      event->SetHandled();
-      focus_cycler_->AdvanceFocus(/*reverse=*/event->IsShiftDown());
-      *should_update_opacity_ptr = true;
+      // We only care about specific modifiers, e.g., the interaction between
+      // Tab and Caps Lock doesn't concern us.
+      constexpr ui::EventFlags kModifiers =
+          ui::EF_SHIFT_DOWN | ui::EF_CONTROL_DOWN | ui::EF_ALT_DOWN |
+          ui::EF_COMMAND_DOWN;
+      const auto shortcut_flags = kModifiers & event->flags();
+
+      // Only advance focus if explicitly Tab or Shift + Tab are pressed,
+      // otherwise keep propagating the event.
+      if (shortcut_flags == ui::EF_NONE ||
+          shortcut_flags == ui::EF_SHIFT_DOWN) {
+        event->StopPropagation();
+        event->SetHandled();
+        focus_cycler_->AdvanceFocus(/*reverse=*/event->IsShiftDown());
+        *should_update_opacity_ptr = true;
+      }
       return;
     }
 
@@ -1570,7 +1587,7 @@ void CaptureModeSession::RefreshBarWidgetBounds() {
   // The sequence matters here since settings bounds depend on capture bar
   // bounds.
   capture_mode_bar_widget_->SetBounds(
-      CaptureModeBarView::GetBounds(current_root_, active_behavior_));
+      active_behavior_->GetCaptureBarBounds(current_root_));
   MaybeUpdateSettingsBounds();
   if (user_nudge_controller_)
     user_nudge_controller_->Reposition();

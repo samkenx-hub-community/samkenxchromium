@@ -809,10 +809,6 @@ BASE_FEATURE(kResamplingInputEvents,
              "ResamplingInputEvents",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(kInputTargetClientHighPriority,
-             "InputTargetClientHighPriority",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 BASE_FEATURE(kResamplingScrollEvents,
              "ResamplingScrollEvents",
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -989,6 +985,12 @@ const base::FeatureParam<int> kInterestGroupStorageMaxOpsBeforeMaintenance{
 // See https://github.com/WICG/turtledove/blob/main/FLEDGE.md
 // Enables FLEDGE implementation. See https://crbug.com/1186444.
 BASE_FEATURE(kFledge, "Fledge", base::FEATURE_DISABLED_BY_DEFAULT);
+
+// See
+// https://github.com/WICG/turtledove/blob/main/FLEDGE_browser_bidding_and_auction_API.md
+BASE_FEATURE(kFledgeBiddingAndAuctionServer,
+             "FledgeBiddingAndAuctionServer",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // See in the header.
 BASE_FEATURE(kFledgeConsiderKAnonymity,
@@ -1715,14 +1717,17 @@ BASE_FEATURE(kSpeculationRulesPrefetchFuture,
              "SpeculationRulesPrefetchFuture",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+// TODO(https://crbug.com/1331187): Delete the flag.
 BASE_FEATURE(kAllowPageWithIDBConnectionInBFCache,
              "AllowPageWithIDBConnectionInBFCache",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
+// TODO(https://crbug.com/1331187): Delete the flag.
 BASE_FEATURE(kAllowPageWithIDBTransactionInBFCache,
              "AllowPageWithIDBTransactionInBFCache",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
+// TODO(https://crbug.com/1331187): Delete the function.
 bool IsAllowPageWithIDBConnectionAndTransactionInBFCacheEnabled() {
   return base::FeatureList::IsEnabled(kAllowPageWithIDBConnectionInBFCache) &&
          base::FeatureList::IsEnabled(kAllowPageWithIDBTransactionInBFCache);
@@ -1752,7 +1757,7 @@ const base::FeatureParam<int> kMaxFCPDelayMsForRenderBlockingFonts(
 
 BASE_FEATURE(kWebRtcStatsReportIdl,
              "WebRtcStatsReportIdl",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kQuoteEmptySecChUaStringHeadersConsistently,
              "QuoteEmptySecChUaStringHeadersConsistently",

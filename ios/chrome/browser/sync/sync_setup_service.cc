@@ -88,11 +88,6 @@ void SyncSetupService::SetSyncEverythingEnabled(bool sync_all) {
       sync_all, sync_service_->GetUserSettings()->GetSelectedTypes());
 }
 
-bool SyncSetupService::IsSyncRequested() const {
-  return !sync_service_->GetDisableReasons().Has(
-      syncer::SyncService::DISABLE_REASON_USER_CHOICE);
-}
-
 bool SyncSetupService::CanSyncFeatureStart() const {
   return sync_service_->CanSyncFeatureStart();
 }
@@ -116,8 +111,8 @@ void SyncSetupService::SetFirstSetupComplete(
   }
 }
 
-bool SyncSetupService::IsFirstSetupComplete() const {
-  return sync_service_->GetUserSettings()->IsFirstSetupComplete();
+bool SyncSetupService::IsInitialSyncFeatureSetupComplete() const {
+  return sync_service_->GetUserSettings()->IsInitialSyncFeatureSetupComplete();
 }
 
 void SyncSetupService::CommitSyncChanges() {

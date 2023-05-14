@@ -195,8 +195,6 @@ void FetchManifestAndInstallCommand::StartWithLock(
   }
 }
 
-void FetchManifestAndInstallCommand::OnSyncSourceRemoved() {}
-
 void FetchManifestAndInstallCommand::OnShutdown() {
   Abort(webapps::InstallResultCode::kCancelledOnWebAppProviderShuttingDown);
 }
@@ -517,8 +515,6 @@ void FetchManifestAndInstallCommand::OnInstallFinalizedMaybeReparentTab(
       Profile::FromBrowserContext(web_contents_->GetBrowserContext())
           ->GetPrefs(),
       app_id, install_surface_);
-
-  RecordAppBanner(web_contents_.get(), web_app_info_->start_url);
 
   bool error = os_hooks_errors[OsHookType::kShortcuts];
   DCHECK(app_lock_);

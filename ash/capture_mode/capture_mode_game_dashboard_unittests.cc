@@ -14,12 +14,14 @@
 
 namespace ash {
 
-class GameDashboardTest : public AshTestBase {
+class GameDashboardCaptureModeTest : public AshTestBase {
  public:
-  GameDashboardTest() : scoped_feature_list_(features::kGameDashboard) {}
-  GameDashboardTest(const GameDashboardTest&) = delete;
-  GameDashboardTest& operator=(const GameDashboardTest&) = delete;
-  ~GameDashboardTest() override = default;
+  GameDashboardCaptureModeTest()
+      : scoped_feature_list_(features::kGameDashboard) {}
+  GameDashboardCaptureModeTest(const GameDashboardCaptureModeTest&) = delete;
+  GameDashboardCaptureModeTest& operator=(const GameDashboardCaptureModeTest&) =
+      delete;
+  ~GameDashboardCaptureModeTest() override = default;
 
   // AshTestBase:
   void SetUp() override {
@@ -38,10 +40,10 @@ class GameDashboardTest : public AshTestBase {
     base::SysInfo::ResetChromeOSVersionInfoForTest();
   }
 
-  CaptureModeController* StartGameCaptureSession() {
+  CaptureModeController* StartGameCaptureModeSession() {
     auto* controller = CaptureModeController::Get();
     controller->Start(CaptureModeEntryType::kGameDashboard);
-    DCHECK(controller->IsActive());
+    CHECK(controller->IsActive());
     return controller;
   }
 
@@ -51,8 +53,8 @@ class GameDashboardTest : public AshTestBase {
   std::unique_ptr<aura::Window> window_;
 };
 
-TEST_F(GameDashboardTest, GameDashboardBehavior) {
-  CaptureModeController* controller = StartGameCaptureSession();
+TEST_F(GameDashboardCaptureModeTest, GameDashboardBehavior) {
+  CaptureModeController* controller = StartGameCaptureModeSession();
   CaptureModeSession* session = controller->capture_mode_session();
   CaptureModeBehavior* active_behavior = session->active_behavior();
   ASSERT_TRUE(active_behavior);
@@ -65,7 +67,9 @@ TEST_F(GameDashboardTest, GameDashboardBehavior) {
   EXPECT_TRUE(
       active_behavior->SupportsAudioRecordingMode(AudioRecordingMode::kOff));
   EXPECT_TRUE(active_behavior->SupportsAudioRecordingMode(
-      AudioRecordingMode::kMicrophone));
+      features::IsCaptureModeAudioMixingEnabled()
+          ? AudioRecordingMode::kSystemAndMicrophone
+          : AudioRecordingMode::kMicrophone));
   EXPECT_TRUE(active_behavior->ShouldCameraSelectionSettingsBeIncluded());
   EXPECT_FALSE(active_behavior->ShouldDemoToolsSettingsBeIncluded());
   EXPECT_TRUE(active_behavior->ShouldSaveToSettingsBeIncluded());
@@ -75,6 +79,23 @@ TEST_F(GameDashboardTest, GameDashboardBehavior) {
   EXPECT_FALSE(active_behavior->ShouldCreateRecordingOverlayController());
   EXPECT_FALSE(active_behavior->ShouldShowUserNudge());
   EXPECT_TRUE(active_behavior->ShouldAutoSelectFirstCamera());
+}
+
+TEST_F(GameDashboardCaptureModeTest, CaptureBar) {
+  StartGameCaptureModeSession();
+  views::Widget* bar_widget = GetCaptureModeBarWidget();
+  ASSERT_TRUE(bar_widget);
+
+  // Checks that the game capture bar only includes the start recording button,
+  // settings button and close button.
+  EXPECT_TRUE(GetStartRecordingButton());
+  EXPECT_FALSE(GetImageToggleButton());
+  EXPECT_FALSE(GetVideoToggleButton());
+  EXPECT_FALSE(GetFullscreenToggleButton());
+  EXPECT_FALSE(GetRegionToggleButton());
+  EXPECT_FALSE(GetWindowToggleButton());
+  EXPECT_TRUE(GetSettingsButton());
+  EXPECT_TRUE(GetCloseButton());
 }
 
 }  // namespace ash

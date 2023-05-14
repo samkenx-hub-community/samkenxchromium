@@ -7,6 +7,7 @@
 
 #include <vector>
 
+#include "base/gtest_prod_util.h"
 #include "base/memory/raw_ptr.h"
 #include "chrome/browser/ash/file_manager/file_tasks.h"
 #include "chrome/browser/ash/file_system_provider/mount_path_util.h"
@@ -127,6 +128,7 @@ class CloudOpenTask : public BrowserListObserver,
 
  private:
   friend class RefCounted<CloudOpenTask>;  // Allow destruction by RefCounted<>.
+  friend class CloudOpenTaskBrowserTest;
 
   CloudOpenTask(Profile* profile,
                 std::vector<storage::FileSystemURL> file_urls,
@@ -145,6 +147,7 @@ class CloudOpenTask : public BrowserListObserver,
                              const file_system_provider::Actions& actions,
                              base::File::Error result);
 
+  bool ShouldShowConfirmationDialog();
   void ConfirmMoveOrStartUpload();
   void StartUpload();
 
@@ -198,8 +201,11 @@ bool IsEligibleAndEnabledUploadOfficeToCloud(Profile* profile);
 // is not mounted or the Office PWA is not installed. Returns False otherwise.
 bool ShouldFixUpOffice(Profile* profile, const CloudProvider cloud_provider);
 
-// Returns True if the file is on the Android OneDrive DocumentsProvider.
-bool FileIsOnAndroidOneDrive(Profile* profile, const FileSystemURL& url);
+// Returns True if the url is on ODFS.
+bool UrlIsOnODFS(Profile* profile, const FileSystemURL& url);
+
+// Returns True if the url is on the Android OneDrive DocumentsProvider.
+bool UrlIsOnAndroidOneDrive(Profile* profile, const FileSystemURL& url);
 
 // Return the email from the Root Document Id of the Android OneDrive
 // DocumentsProvider.

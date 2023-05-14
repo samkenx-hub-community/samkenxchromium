@@ -217,7 +217,12 @@ template("cargo_crate") {
     rustenv = _rustenv
 
     if (!defined(build_native_rust_unit_tests)) {
-      build_native_rust_unit_tests = true
+      build_native_rust_unit_tests = _crate_type != "proc-macro"
+    }
+    if (build_native_rust_unit_tests) {
+      # Unit tests in a proc-macro crate type don't make sense, you can't
+      # compile executables against the `proc_macro` crate.
+      assert(_crate_type != "proc-macro")
     }
 
     # The unit tests for each target, if generated, should be unique as well.
@@ -370,7 +375,21 @@ template("cargo_crate") {
                                  "edition",
                                  "rustflags",
                                ])
-        configs -= [ "//build/config/compiler:chromium_code" ]
+        configs -= [
+          "//build/config/compiler:chromium_code",
+
+          # Avoid generating profiling data for build scripts.
+          #
+          # TODO(crbug.com/1426472): determine for sure whether to remove this
+          # config. I'm not sure of the overlap between PGO instrumentation and
+          # code coverage instrumentation, but we definitely don't want build
+          # script coverage for PGO, while we might for test coverage metrics.
+          #
+          # If we do include build script output in test metrics, it could be
+          # misleading: exercising some code from a build script doesn't give us
+          # the same signal as an actual test.
+          "//build/config/coverage:default_coverage",
+        ]
         configs += [ "//build/config/compiler:no_chromium_code" ]
       }
     } else {

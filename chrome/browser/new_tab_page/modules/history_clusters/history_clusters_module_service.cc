@@ -135,12 +135,17 @@ HistoryClustersModuleService::HistoryClustersModuleService(
           ntp_features::kNtpHistoryClustersModuleUseModelRanking) &&
       optimization_guide_keyed_service) {
     module_ranker_ = std::make_unique<HistoryClustersModuleRanker>(
-        optimization_guide_keyed_service, category_boostlist_);
+        optimization_guide_keyed_service, cart_service_, category_boostlist_);
   }
 }
 HistoryClustersModuleService::~HistoryClustersModuleService() = default;
 
 void HistoryClustersModuleService::GetClusters(GetClustersCallback callback) {
+  if (!history_clusters_service_->IsJourneysEnabled()) {
+    std::move(callback).Run({});
+    return;
+  }
+
   if (!template_url_service_) {
     std::move(callback).Run({});
     return;

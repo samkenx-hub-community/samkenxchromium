@@ -21,6 +21,10 @@
 namespace ash::user_education_util {
 namespace {
 
+// Key used for help bubble ID in
+// `user_education::HelpBubbleParams::ExtendedProperties`.
+constexpr char kHelpBubbleIdKey[] = "helpBubbleId";
+
 // Helpers ---------------------------------------------------------------------
 
 AccountId GetActiveAccountId(const SessionControllerImpl* session_controller) {
@@ -52,8 +56,23 @@ session_manager::SessionState GetSessionState(
 
 // Utilities -------------------------------------------------------------------
 
+user_education::HelpBubbleParams::ExtendedProperties CreateExtendedProperties(
+    HelpBubbleId help_bubble_id) {
+  user_education::HelpBubbleParams::ExtendedProperties extended_properties;
+  extended_properties.values().Set(kHelpBubbleIdKey,
+                                   static_cast<int>(help_bubble_id));
+  return extended_properties;
+}
+
 const AccountId& GetAccountId(const UserSession* user_session) {
   return user_session ? user_session->user_info.account_id : EmptyAccountId();
+}
+
+HelpBubbleId GetHelpBubbleId(
+    const user_education::HelpBubbleParams::ExtendedProperties&
+        extended_properties) {
+  return static_cast<HelpBubbleId>(
+      extended_properties.values().FindInt(kHelpBubbleIdKey).value());
 }
 
 views::View* GetMatchingViewInRootWindow(int64_t display_id,
@@ -97,6 +116,8 @@ std::string ToString(TutorialId tutorial_id) {
       return "AshHoldingSpaceTourPrototype1";
     case TutorialId::kHoldingSpaceTourPrototype2:
       return "AshHoldingSpaceTourPrototype2";
+    case TutorialId::kTest:
+      return "AshTest";
     case TutorialId::kWelcomeTourPrototype1:
       return "AshWelcomeTourPrototype1";
   }

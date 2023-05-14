@@ -83,8 +83,7 @@
 
 namespace media {
 
-// static
-const uint32_t V4L2SliceVideoDecodeAccelerator::supported_input_fourccs_[] = {
+static const std::vector<uint32_t> kSupportedInputFourCCs = {
     V4L2_PIX_FMT_H264_SLICE,
 #if BUILDFLAG(ENABLE_HEVC_PARSER_AND_HW_DECODER)
     V4L2_PIX_FMT_HEVC_SLICE,
@@ -307,7 +306,7 @@ bool V4L2SliceVideoDecodeAccelerator::Initialize(const Config& config,
   input_format_fourcc_ =
       V4L2Device::VideoCodecProfileToV4L2PixFmt(video_profile_, true);
 
-  if (!input_format_fourcc_ ||
+  if (input_format_fourcc_ == V4L2_PIX_FMT_INVALID ||
       !device_->Open(V4L2Device::Type::kDecoder, input_format_fourcc_)) {
     VLOGF(1) << "Failed to open device for profile: " << config.profile
              << " fourcc: " << FourccToString(input_format_fourcc_);
@@ -2216,8 +2215,7 @@ V4L2SliceVideoDecodeAccelerator::GetSupportedProfiles() {
   if (!device)
     return SupportedProfiles();
 
-  return device->GetSupportedDecodeProfiles(std::size(supported_input_fourccs_),
-                                            supported_input_fourccs_);
+  return device->GetSupportedDecodeProfiles(kSupportedInputFourCCs);
 }
 
 bool V4L2SliceVideoDecodeAccelerator::IsSupportedProfile(

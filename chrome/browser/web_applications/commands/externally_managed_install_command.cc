@@ -89,8 +89,6 @@ void ExternallyManagedInstallCommand::StartWithLock(
           weak_factory_.GetWeakPtr()));
 }
 
-void ExternallyManagedInstallCommand::OnSyncSourceRemoved() {}
-
 void ExternallyManagedInstallCommand::OnShutdown() {
   Abort(webapps::InstallResultCode::kCancelledOnWebAppProviderShuttingDown);
 }
@@ -308,10 +306,6 @@ void ExternallyManagedInstallCommand::OnInstallFinalized(
       Profile::FromBrowserContext(web_contents_->GetBrowserContext())
           ->GetPrefs(),
       app_id, install_surface_);
-
-  if (install_params_.locally_installed) {
-    RecordAppBanner(web_contents_.get(), web_app_info_->start_url);
-  }
 
   if (base::FeatureList::IsEnabled(features::kRecordWebAppDebugInfo)) {
     if (install_error_log_entry_.HasErrorDict()) {

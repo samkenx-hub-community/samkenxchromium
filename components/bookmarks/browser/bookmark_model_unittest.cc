@@ -30,7 +30,9 @@
 #include "base/uuid.h"
 #include "build/build_config.h"
 #include "components/bookmarks/browser/bookmark_model_observer.h"
+#include "components/bookmarks/browser/bookmark_node.h"
 #include "components/bookmarks/browser/bookmark_undo_delegate.h"
+#include "components/bookmarks/browser/bookmark_undo_provider.h"
 #include "components/bookmarks/browser/bookmark_utils.h"
 #include "components/bookmarks/browser/titled_url_match.h"
 #include "components/bookmarks/browser/url_and_title.h"
@@ -52,7 +54,9 @@
 
 using base::ASCIIToUTF16;
 using base::Time;
+using testing::Invoke;
 using testing::Mock;
+using testing::WithArg;
 
 namespace bookmarks {
 namespace {
@@ -134,14 +138,12 @@ class ScopedBookmarkUndoDelegate : public BookmarkUndoDelegate {
   }
 
   // BookmarkUndoDelegate overrides.
-  void SetUndoProvider(BookmarkUndoProvider* provider) override {
-    undo_provider_ = provider;
-  }
-
   void OnBookmarkNodeRemoved(BookmarkModel* model,
+                             BookmarkUndoProvider* undo_provider,
                              const BookmarkNode* parent,
                              size_t index,
                              std::unique_ptr<BookmarkNode> node) override {
+    undo_provider_ = undo_provider;
     parent_ = parent;
     index_ = index;
     last_removed_node_ = std::move(node);
@@ -366,8 +368,6 @@ class BookmarkModelTest : public testing::Test,
     ++before_remove_count_;
   }
 
-  void SetUndoProvider(BookmarkUndoProvider* provider) override {}
-
   void BookmarkNodeRemoved(BookmarkModel* model,
                            const BookmarkNode* parent,
                            size_t old_index,
@@ -433,6 +433,7 @@ class BookmarkModelTest : public testing::Test,
   }
 
   void OnBookmarkNodeRemoved(BookmarkModel* model,
+                             BookmarkUndoProvider* undo_provider,
                              const BookmarkNode* parent,
                              size_t index,
                              std::unique_ptr<BookmarkNode> node) override {
@@ -1997,9 +1998,21 @@ TEST_F(BookmarkDualModelTest, MoveToOtherModel) {
               BookmarkNodeRemoved(local_or_syncable_model_.get(), root, 0,
                                   folder, removed_urls))
       .InSequence(local_or_syncable_sequence);
-  // Not associated with the sequence and allowed to be invoked at any point.
+
+  testing::Sequence account_sequence;
   EXPECT_CALL(account_observer_,
-              BookmarkNodeAdded(account_model_.get(), dest_folder, 0, true));
+              BookmarkNodeAdded(account_model_.get(), dest_folder, 0, true))
+      .InSequence(account_sequence);
+  const BookmarkNode* captured_foo_parent = nullptr;
+  EXPECT_CALL(account_observer_,
+              BookmarkNodeAdded(account_model_.get(), testing::_, 0, true))
+      .InSequence(account_sequence)
+      .WillOnce(testing::SaveArg<1>(&captured_foo_parent));
+  const BookmarkNode* captured_bar_parent = nullptr;
+  EXPECT_CALL(account_observer_,
+              BookmarkNodeAdded(account_model_.get(), testing::_, 1, true))
+      .InSequence(account_sequence)
+      .WillOnce(testing::SaveArg<1>(&captured_bar_parent));
 
   local_or_syncable_model_->MoveToOtherModelWithNewNodeIdsAndUuids(
       folder, account_model_.get(), dest_folder);
@@ -2008,6 +2021,8 @@ TEST_F(BookmarkDualModelTest, MoveToOtherModel) {
   const BookmarkNode* moved_folder = dest_folder->children()[0].get();
   EXPECT_EQ(moved_folder->GetTitle(), u"folder");
   ASSERT_EQ(moved_folder->children().size(), 2u);
+  EXPECT_EQ(captured_foo_parent, moved_folder);
+  EXPECT_EQ(captured_bar_parent, moved_folder);
   const BookmarkNode* moved_foo = moved_folder->children()[0].get();
   EXPECT_EQ(moved_foo->GetTitle(), u"foo");
   EXPECT_EQ(moved_foo->GetTitledUrlNodeUrl(), GURL("http://foo.com"));
@@ -2017,8 +2032,5 @@ TEST_F(BookmarkDualModelTest, MoveToOtherModel) {
   // Moving bookmarks to another model should generate new UUIDs.
   EXPECT_NE(moved_folder->uuid(), folder_uuid_before_move);
 }
-
-// TODO(crbug.com/1424820): Add a test for undoing
-//                          `MoveToOtherModelWithNewNodeIdsAndUuids`.
 
 }  // namespace bookmarks

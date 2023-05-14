@@ -218,8 +218,6 @@ void DriveUploadHandler::OnIOTaskStatus(
       return;
     case file_manager::io_task::State::kPaused:
       return;
-    case file_manager::io_task::State::kWarning:
-      return;
     case file_manager::io_task::State::kSuccess:
       move_progress_ = 100;
       notification_manager_->SetDestinationPath(status.outputs[0].url.path());
@@ -240,6 +238,11 @@ void DriveUploadHandler::OnIOTaskStatus(
 
 void DriveUploadHandler::OnUnmounted() {}
 
+void DriveUploadHandler::ImmediatelyUploadDone(drive::FileError error) {
+  LOG_IF(ERROR, error != drive::FileError::FILE_ERROR_OK)
+      << "ImmediatelyUpload failed with status: " << error;
+}
+
 void DriveUploadHandler::OnSyncingStatusUpdate(
     const drivefs::mojom::SyncingStatus& syncing_status) {
   for (const auto& item : syncing_status.item_events) {
@@ -247,8 +250,16 @@ void DriveUploadHandler::OnSyncingStatusUpdate(
       continue;
     }
     switch (item->state) {
-      case drivefs::mojom::ItemEvent::State::kQueued:
+      case drivefs::mojom::ItemEvent::State::kQueued: {
+        // Tell Drive to upload the file now. If successful, we will receive a
+        // kInProgress or kCompleted event sooner. If this fails, we ignore it.
+        // The file will get uploaded eventually.
+        drive_integration_service_->ImmediatelyUpload(
+            observed_relative_drive_path_,
+            base::BindOnce(&DriveUploadHandler::ImmediatelyUploadDone,
+                           weak_ptr_factory_.GetWeakPtr()));
         return;
+      }
       case drivefs::mojom::ItemEvent::State::kInProgress:
         if (item->bytes_transferred > 0) {
           sync_progress_ =

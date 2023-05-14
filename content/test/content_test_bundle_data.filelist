@@ -3774,6 +3774,9 @@ data/accessibility/html/link-inside-heading-expected-mac.txt
 data/accessibility/html/link-inside-heading-expected-uia-win.txt
 data/accessibility/html/link-inside-heading-expected-win.txt
 data/accessibility/html/link-inside-heading.html
+data/accessibility/html/link-target-expected-auralinux.txt
+data/accessibility/html/link-target-expected-win.txt
+data/accessibility/html/link-target.html
 data/accessibility/html/link.html
 data/accessibility/html/list-expected-android-external.txt
 data/accessibility/html/list-expected-android.txt
@@ -5101,6 +5104,8 @@ data/attribution_reporting/aggregatable_report_goldens/version_/report_6.json
 data/attribution_reporting/aggregatable_report_goldens/version_/report_6_cleartext_payloads.json
 data/attribution_reporting/databases/version_51.sql
 data/attribution_reporting/databases/version_52.sql
+data/attribution_reporting/databases/version_53.sql
+data/attribution_reporting/inject_cross_app_web_third_party_ot.js
 data/attribution_reporting/interop/aggregatable_budget.json
 data/attribution_reporting/interop/aggregatable_contributions_creation.json
 data/attribution_reporting/interop/aggregatable_dedup_key.json
@@ -5120,6 +5125,7 @@ data/attribution_reporting/interop/event_report_window.json
 data/attribution_reporting/interop/event_source.json
 data/attribution_reporting/interop/event_source_trigger_priority.json
 data/attribution_reporting/interop/expired_source.json
+data/attribution_reporting/interop/max_aggregatable_reports_per_source.json
 data/attribution_reporting/interop/most_recent_source.json
 data/attribution_reporting/interop/multiple_destinations.json
 data/attribution_reporting/interop/rate_limit_max_attribution_reporting_endpoints.json
@@ -5138,6 +5144,7 @@ data/attribution_reporting/page_with_conversion_measurement_disabled.html
 data/attribution_reporting/page_with_conversion_measurement_disabled.html.mock-http-headers
 data/attribution_reporting/page_with_conversion_redirect.html
 data/attribution_reporting/page_with_cross_app_web_ot.html
+data/attribution_reporting/page_with_cross_app_web_third_party_ot.html
 data/attribution_reporting/page_with_disallowed_iframe.html
 data/attribution_reporting/page_with_impression_creator.html
 data/attribution_reporting/page_with_impression_creator.html.mock-http-headers
@@ -5281,6 +5288,8 @@ data/clipboard/small.jpg
 data/color-scheme-2.html
 data/color-scheme-dark.html
 data/color-scheme.html
+data/compute_pressure/no_token.html
+data/compute_pressure/valid_token.html
 data/content-disposition-attachment.html
 data/content-disposition-attachment.html.mock-http-headers
 data/content-disposition-empty.html
@@ -6073,6 +6082,7 @@ data/interest_group/decision_no_direct_from_seller_signals_validator.js
 data/interest_group/decision_no_direct_from_seller_signals_validator.js.mock-http-headers
 data/interest_group/decision_simple_direct_from_seller_signals_validator.js
 data/interest_group/decision_simple_direct_from_seller_signals_validator.js.mock-http-headers
+data/interest_group/empty.html
 data/interest_group/generate-test-wbns.sh
 data/interest_group/multiply.wasm
 data/interest_group/multiply.wasm.mock-http-headers
@@ -6080,6 +6090,8 @@ data/interest_group/multiply.wat
 data/interest_group/page-with-fledge-permissions-policy-disabled-in-iframe.html
 data/interest_group/page-with-fledge-permissions-policy-disabled.html
 data/interest_group/page-with-fledge-permissions-policy-disabled.html.mock-http-headers
+data/interest_group/page_with_ads_apis_ot.html
+data/interest_group/page_with_ba_server_ot.html
 data/interest_group/schemaV6.sql
 data/interest_group/trusted_bidding_signals.json
 data/interest_group/trusted_bidding_signals.json.mock-http-headers
@@ -6389,6 +6401,7 @@ data/portals/scroll.html
 data/portals/touch-input-transfer-across-reactivation.html
 data/post_message.html
 data/post_message2.html
+data/preloading/preloading_decider.html
 data/prerender/cross_origin_prerender.html
 data/prerender/doc-with-display-none-iframe.html
 data/prerender/duplicate_prerenders.html

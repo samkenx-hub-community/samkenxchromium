@@ -5,6 +5,7 @@
 <translation id="1018219910092211213">DNS manzil olinmadi</translation>
 <translation id="1018656279737460067">Bekor qilindi</translation>
 <translation id="1022433422498218992">Umumiy boshqaruv tugmalari</translation>
+<translation id="1022628058306505708">Yer</translation>
 <translation id="1047458377670401304"><ph name="CPU_NAME" /> (<ph name="THREAD_COUNT" /> ta oqim, <ph name="CPU_MAX_CLOCK_SPEED" /> GGs)</translation>
 <translation id="1047773237499189053">Yangi funksiya chiqdi, batafsil axborot uchun tepaga strelkani bosing</translation>
 <translation id="1059913517121127803">Skanerlash ishga tushmadi</translation>
@@ -115,6 +116,7 @@
 <translation id="1801418420130173017">Tungi mavzuni faolsizlantirish</translation>
 <translation id="1807246157184219062">Yorqin</translation>
 <translation id="1827738518074806965">Fotogalereya</translation>
+<translation id="1838374766361614909">Qidiruv shartlarini tozalash</translation>
 <translation id="1851218745569890714">Videokonferensiya</translation>
 <translation id="1852934301711881861">ChromeOS Flex tizimini oʻrnatish</translation>
 <translation id="1856388568474281774">Pastga strelka</translation>
@@ -234,6 +236,7 @@
 <translation id="2902312830803030883">Boshqa amallar</translation>
 <translation id="2926057806159140518">Login va parolingizni kiriting yoki QR kodni skanerlang</translation>
 <translation id="2940811910881150316">Qurilmani sinash imkonsiz. Sinash uchun qurlimani yopib, keyin qayta oching</translation>
+<translation id="2981143481017883351">Chromebook ekskluziv obyektlari chiqdi</translation>
 <translation id="3008341117444806826">YANGILASH</translation>
 <translation id="3009958530611748826">Saqlash uchun jild tanlang</translation>
 <translation id="3017079585324758401">Orqa fon</translation>
@@ -270,6 +273,7 @@
 <translation id="3286515922899063534"><ph name="CURRENT" /> GHz</translation>
 <translation id="3291996639387199448">Kalit yoʻnalishi</translation>
 <translation id="3294437725009624529">Mehmon</translation>
+<translation id="3303855915957856445">Qidiruv hech qanday natija bermadi</translation>
 <translation id="3310640316857623290">DNS kutish vaqti ruxsat etilgan chegaradan juda baland</translation>
 <translation id="3328783797891415197">Tekshirilmoqda</translation>
 <translation id="3340011300870565703">Qurilmaning oʻng quloqlik batareyasi quvvati: <ph name="BATTERY_PERCENTAGE" />%</translation>
@@ -278,6 +282,7 @@
 <translation id="3360306038446926262">Oynalar</translation>
 <translation id="3368922792935385530">Ulangan</translation>
 <translation id="3369013195428705271">Chop etish tarixi tozalansinmi? Joriy chop etish vazifalari oʻchirib tashlanmaydi.</translation>
+<translation id="3386675685417744672">Faqat Chromebookda</translation>
 <translation id="3404249063913988450">Ekran lavhasini faollashtirish</translation>
 <translation id="3413935475507503304">Yangilashda davom etish uchun Keyingisi tugmasini bosing</translation>
 <translation id="3434107140712555581"><ph name="BATTERY_PERCENTAGE" />%</translation>
@@ -356,6 +361,7 @@
 <translation id="404928562651467259">Diqqat!</translation>
 <translation id="4054683689023980771">Rasm yuklab olinmoqda</translation>
 <translation id="4060260348856573701">Yangi APN</translation>
+<translation id="4079743696465895866">Chromebook ekskluziv afishasini tanlang</translation>
 <translation id="4093865285251893588">Profil rasmi</translation>
 <translation id="409427325554347132">Test tafsilotlarini saqlash</translation>
 <translation id="4095829376260267438">WPA2WPA3</translation>
@@ -473,7 +479,6 @@
 <translation id="4921665434385737356"><ph name="NUM_SECONDS" /> soniyada <ph name="RATE" /> quvvat oldi.</translation>
 <translation id="4930320165497208503">Aloqani sozlash yoki yangilash uchun <ph name="BEGIN_LINK" />Sozlamalar<ph name="END_LINK" /> sahifasini oching.</translation>
 <translation id="4932733599132424254">Sana</translation>
-<translation id="4937657825850660613">Yarim</translation>
 <translation id="4950314376641394653"><ph name="DEVICE_NAME" /> mikrodasturi <ph name="VERSION" />-versiyaga yangilandi</translation>
 <translation id="4971925105143343452">Qisman</translation>
 <translation id="4972592110715526173">usulni oʻzgartirish</translation>
@@ -622,6 +627,7 @@
 <translation id="6184793017104303157">B4</translation>
 <translation id="6189418609903030344">Batareya sigʻimi ishlatilishi davomida kamayadi</translation>
 <translation id="6191293864534840972">Nom serverlarida xato</translation>
+<translation id="6205145102504628069">Bulutlar</translation>
 <translation id="6213737986933151570">CDMA1XRTT</translation>
 <translation id="6223066887782788441">Butun ekran rejimidan chiqish</translation>
 <translation id="6223752125779001553">Hech qanday skaner mavjud emas</translation>
@@ -664,6 +670,7 @@
 <translation id="6494974875566443634">Moslashtirish</translation>
 <translation id="6500818810472529210">Google Qidiruv natijalarini oching</translation>
 <translation id="650266656685499220">Albomlar yaratish uchun Google Photos sahifasini oching</translation>
+<translation id="6505750420152840539">Tongdan tungacha</translation>
 <translation id="6516990319416533844">Batareyaning quvvatlanish tezligini bilish uchun uni biroz muddat sarflang</translation>
 <translation id="6517239166834772319">Tanishuv</translation>
 <translation id="6526200165918397681">Mos fon rasmi</translation>
@@ -733,6 +740,7 @@
 <translation id="7130438335435247835">Ulanish nuqtasi nomi (APN)</translation>
 <translation id="7131634559772719176">Andozani tasdiqlang</translation>
 <translation id="7134436342991564651">{0,plural, =1{Nom serveri}other{Nom serverlari}}</translation>
+<translation id="7135814714616751706">Tezkor tugmalar qidiruvi</translation>
 <translation id="7143207342074048698">Ulanmoqda</translation>
 <translation id="7144878232160441200">Qayta urinish</translation>
 <translation id="714876143603641390">LAN aloqasi</translation>
@@ -763,6 +771,7 @@
 <translation id="7319430975418800333">A3</translation>
 <translation id="7343581795491695942"><ph name="QUERY_TEXT" />; <ph name="RESULT_TEXT" />; Natijalarni Google Qidiruvida chiqarish uchun Qidiruv + Boʻshliq tugmalarini bosing.</translation>
 <translation id="7343649194310845056">Tarmoq qurilmalari</translation>
+<translation id="7353413232959255829"><ph name="LIST_POSITION" />/<ph name="LIST_SIZE" /> ta natija: <ph name="SEARCH_RESULT_TEXT" />. Tezkor tugmani ochish uchun Enter tugmasini bosing.</translation>
 <translation id="7359657277149375382">Fayl turi</translation>
 <translation id="73631062356239394">Diagnostika axborotini ulashish</translation>
 <translation id="7375053625150546623">EAP</translation>
@@ -778,6 +787,7 @@
 <translation id="7490813197707563893">MAC manzil</translation>
 <translation id="7491478667760509108">Suzuvchi rejimdan chiqish</translation>
 <translation id="7497215489070763236">Server CA sertifikati</translation>
+<translation id="7501957181231305652">yoki</translation>
 <translation id="7502658306369382406">IPv6 manzil</translation>
 <translation id="7515998400212163428">Android</translation>
 <translation id="7528507600602050979">Yordam kontenti mavjud emas</translation>
@@ -794,6 +804,7 @@
 <translation id="7620771111601174153">Yordam markazi orqali batafsil</translation>
 <translation id="763165478673169849">Oxirgi tiklangan vaqti</translation>
 <translation id="7648838807254605802">HTTPS kechikishi yuqori</translation>
+<translation id="765159867434478292">Ajratish</translation>
 <translation id="7656388927906093505">Qurilma — sichqoncha.</translation>
 <translation id="7658239707568436148">Bekor qilish</translation>
 <translation id="7665800271478495366">Avatarni almashtirish</translation>

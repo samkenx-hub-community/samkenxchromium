@@ -237,11 +237,17 @@ bool IsABookmarkNodeSectionForIdentifier(
     [self generateTableViewDataForModel:_profileBookmarkModel.get()
                               inSection:
                                   BookmarksHomeSectionIdentifierRootProfile];
+  } else {
+    [self.consumer.tableViewModel
+        removeSectionWithIdentifier:BookmarksHomeSectionIdentifierRootProfile];
   }
   if (showAccountSection) {
     [self generateTableViewDataForModel:_accountBookmarkModel.get()
                               inSection:
                                   BookmarksHomeSectionIdentifierRootAccount];
+  } else {
+    [self.consumer.tableViewModel
+        removeSectionWithIdentifier:BookmarksHomeSectionIdentifierRootAccount];
   }
   if (showProfileSection && showAccountSection) {
     // Headers are only shown if both sections are visible.
@@ -726,7 +732,7 @@ bool IsABookmarkNodeSectionForIdentifier(
 // Returns YES if the user cannot turn on sync for enterprise policy reasons.
 - (BOOL)isSyncDisabledByAdministrator {
   DCHECK(self.syncService);
-  bool syncDisabledPolicy = self.syncService->GetDisableReasons().Has(
+  bool syncDisabledPolicy = self.syncService->HasDisableReason(
       syncer::SyncService::DISABLE_REASON_ENTERPRISE_POLICY);
   bool syncTypesDisabledPolicy = IsManagedSyncDataType(
       self.syncService, syncer::UserSelectableType::kBookmarks);

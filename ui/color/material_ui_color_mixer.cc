@@ -41,10 +41,12 @@ void AddMaterialUiColorMixer(ColorProvider* provider,
   mixer[kColorButtonForeground] = {kColorSysPrimary};
   mixer[kColorButtonForegroundDisabled] = {kColorSysStateDisabled};
   mixer[kColorButtonForegroundProminent] = {kColorSysOnPrimary};
-  mixer[kColorCheckboxBackgroundDisabled] = {kColorSysStateDisabledContainer};
-  mixer[kColorCheckboxForegroundChecked] = {kColorSysPrimary};
-  mixer[kColorCheckboxForegroundDisabled] = {kColorSysStateDisabled};
-  mixer[kColorCheckboxForegroundUnchecked] = {kColorSysOutline};
+  mixer[kColorCheckboxCheck] = {kColorSysOnPrimary};
+  mixer[kColorCheckboxCheckDisabled] = {kColorSysStateDisabled};
+  mixer[kColorCheckboxContainer] = {kColorSysPrimary};
+  mixer[kColorCheckboxContainerDisabled] = {kColorSysStateDisabledContainer};
+  mixer[kColorCheckboxOutline] = {kColorSysOutline};
+  mixer[kColorCheckboxOutlineDisabled] = {kColorSysStateDisabledContainer};
   mixer[kColorComboboxBackground] = {kColorSysSurface};
   mixer[kColorComboboxBackgroundDisabled] = {GetResultingPaintColor(
       {kColorSysStateDisabledContainer}, {kColorComboboxBackground})};
@@ -63,11 +65,11 @@ void AddMaterialUiColorMixer(ColorProvider* provider,
   mixer[kColorMenuIcon] = {kColorSysOnSurfaceSubtle};
   mixer[kColorMenuItemForegroundSecondary] = {kColorSysOnSurfaceSubtle};
   mixer[kColorMenuItemForeground] = {kColorSysOnSurface};
-  mixer[kColorMenuSeparator] = {kColorSysDivider};
   mixer[kColorRadioButtonForegroundChecked] = {kColorSysPrimary};
   mixer[kColorRadioButtonForegroundDisabled] = {
       kColorSysStateDisabledContainer};
   mixer[kColorRadioButtonForegroundUnchecked] = {kColorSysOutline};
+  mixer[kColorSeparator] = {kColorSysDivider};
   mixer[kColorSliderThumb] = {kColorSysPrimary};
   mixer[kColorSliderThumbMinimal] = {kColorSysSecondary};
   mixer[kColorSliderTrack] = {kColorSysOnPrimary};
@@ -100,7 +102,8 @@ void AddMaterialUiColorMixer(ColorProvider* provider,
   mixer[kColorToggleButtonTrackOn] = {kColorSysPrimary};
   mixer[kColorToggleButtonTrackOnDisabled] = {kColorSysStateDisabledContainer};
   mixer[kColorToolbarSearchFieldBackground] = {kColorSysBaseContainerElevated};
-  mixer[kColorToolbarSearchFieldBackgroundHover] = {kColorSysStateHoverCutout};
+  mixer[kColorToolbarSearchFieldBackgroundHover] = {
+      kColorSysStateHoverDimBlendProtection};
   mixer[kColorToolbarSearchFieldBackgroundPressed] = {
       kColorSysStateRippleNeutralOnSubtle};
   mixer[kColorToolbarSearchFieldForeground] = {kColorSysOnSurface};

@@ -16,6 +16,7 @@
 #include "base/memory/raw_ptr.h"
 #include "base/timer/timer.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
+#include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/compositor/layer_animation_observer.h"
 #include "ui/views/context_menu_controller.h"
 #include "ui/views/controls/button/button.h"
@@ -289,7 +290,10 @@ class ASH_EXPORT AppListItemView : public views::Button,
   void reset_has_pending_row_change() { has_pending_row_change_ = false; }
 
   const ui::Layer* icon_background_layer_for_test() const {
-    return icon_background_layer_.layer();
+    if (!icon_background_layer_) {
+      return nullptr;
+    }
+    return icon_background_layer_->layer();
   }
   bool is_icon_extended_for_test() const { return is_icon_extended_; }
   absl::optional<size_t> item_counter_count_for_test() const;
@@ -447,7 +451,7 @@ class ASH_EXPORT AppListItemView : public views::Button,
 
   // The background layer added under the `icon_` layer to paint the background
   // of the icon.
-  ui::LayerOwner icon_background_layer_;
+  std::unique_ptr<ui::LayerOwner> icon_background_layer_;
 
   // Draws a dot next to the title for newly installed apps.
   raw_ptr<views::View, ExperimentalAsh> new_install_dot_ = nullptr;

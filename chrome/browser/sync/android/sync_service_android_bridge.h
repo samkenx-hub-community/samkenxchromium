@@ -47,10 +47,11 @@ class SyncServiceAndroidBridge : public syncer::SyncServiceObserver {
   jboolean IsEngineInitialized(JNIEnv* env);
   jboolean IsTransportStateActive(JNIEnv* env);
   void SetSetupInProgress(JNIEnv* env, jboolean in_progress);
-  jboolean IsFirstSetupComplete(JNIEnv* env);
+  jboolean IsInitialSyncFeatureSetupComplete(JNIEnv* env);
   void SetFirstSetupComplete(JNIEnv* env, jint source);
   base::android::ScopedJavaLocalRef<jintArray> GetActiveDataTypes(JNIEnv* env);
   base::android::ScopedJavaLocalRef<jintArray> GetSelectedTypes(JNIEnv* env);
+  jboolean IsTypeManagedByPolicy(JNIEnv* env, jint type);
   void SetSelectedTypes(JNIEnv* env,
                         jboolean sync_everything,
                         const base::android::JavaParamRef<jintArray>&

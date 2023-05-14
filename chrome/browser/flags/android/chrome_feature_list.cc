@@ -8,6 +8,7 @@
 
 #include <string>
 
+#include "base/android/feature_map.h"
 #include "base/android/jni_array.h"
 #include "base/android/jni_string.h"
 #include "base/containers/flat_map.h"
@@ -26,7 +27,6 @@
 #include "chrome/browser/signin/signin_features.h"
 #include "chrome/browser/thumbnail/cc/features.h"
 #include "chrome/browser/ui/ui_features.h"
-#include "chrome/browser/video_tutorials/switches.h"
 #include "chrome/common/chrome_features.h"
 #include "components/autofill/core/common/autofill_features.h"
 #include "components/autofill/core/common/autofill_payments_features.h"
@@ -115,7 +115,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &features::kPWAsDefaultOfflinePage,
     &features::kEarlyLibraryLoad,
     &features::kGenericSensorExtraClasses,
-    &features::kAsyncSensorCalls,
     &features::kBackForwardCache,
     &features::kBackForwardTransitions,
     &features::kBlockMidiByDefault,
@@ -134,7 +133,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &features::kWebNfc,
     &features::kIncognitoDownloadsWarning,
     &features::kIncognitoNtpRevamp,
-    &features::kKeepAndroidTintedResources,
     &feature_engagement::kIPHNewTabPageHomeButtonFeature,
     &feature_engagement::kIPHTabSwitcherButtonFeature,
     &feature_engagement::kUseClientConfigIPH,
@@ -162,6 +160,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &feed::kXsurfaceMetricsReporting,
     &history::kOrganicRepeatableQueries,
     &history_clusters::internal::kJourneys,
+    &history_clusters::internal::kOmniboxAction,
     &history_clusters::internal::kOmniboxHistoryClusterProvider,
     &kAdaptiveButtonInTopToolbar,
     &kAdaptiveButtonInTopToolbarTranslate,
@@ -171,7 +170,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kAddToHomescreenIPH,
     &kAllowNewIncognitoTabIntents,
     &kAndroidAppIntegration,
-    &kAndroidScrollOptimizations,
     &kAndroidSearchEngineChoiceNotification,
     &kAndroidWidgetFullscreenToast,
     &kAndroidImprovedBookmarks,
@@ -312,6 +310,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kTabGroupsForTablets,
     &kDiscoverFeedMultiColumn,
     &kTabStripRedesign,
+    &kTabStripStartupRefactoring,
     &kTabGridLayoutAndroid,
     &kTabStateV1Optimizations,
     &kTabToGTSAnimation,
@@ -376,7 +375,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &password_manager::features::kUnifiedCredentialManagerDryRun,
     &password_manager::features::kUnifiedPasswordManagerAndroid,
     &password_manager::features::kUnifiedPasswordManagerAndroidBranding,
-    &password_manager::features::kUnifiedPasswordManagerErrorMessages,
     &password_manager::features::kPasswordEditDialogWithDetails,
     &privacy_sandbox::kPrivacySandboxFirstPartySetsUI,
     &privacy_sandbox::kPrivacySandboxSettings3,
@@ -404,7 +402,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &syncer::kSyncAndroidLimitNTPPromoImpressions,
     &subresource_filter::kSafeBrowsingSubresourceFilter,
     &thumbnail::kThumbnailCacheRefactor,
-    &video_tutorials::features::kVideoTutorials,
     &webapps::features::kInstallableAmbientBadgeInfoBar,
     &webapps::features::kInstallableAmbientBadgeMessage,
     &webapps::features::kWebApkInstallFailureNotification,
@@ -413,23 +410,11 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &network::features::kPrivateStateTokens,
 };
 
-const base::Feature* FindFeatureExposedToJava(const std::string& feature_name) {
-  static auto kFeaturesExposedToJavaMap = base::NoDestructor(
-      base::MakeFlatMap<base::StringPiece, const base::Feature*>(
-          kFeaturesExposedToJava, {},
-          [](const base::Feature* a)
-              -> std::pair<base::StringPiece, const base::Feature*> {
-            return std::make_pair(a->name, a);
-          }));
-
-  auto it = kFeaturesExposedToJavaMap->find(base::StringPiece(feature_name));
-  if (it != kFeaturesExposedToJavaMap->end()) {
-    return it->second;
-  }
-
-  NOTREACHED() << "Queried feature cannot be found in ChromeFeatureList: "
-               << feature_name;
-  return nullptr;
+// static
+base::android::FeatureMap* GetFeatureMap() {
+  static base::NoDestructor<base::android::FeatureMap> kFeatureMap(std::vector(
+      std::begin(kFeaturesExposedToJava), std::end(kFeaturesExposedToJava)));
+  return kFeatureMap.get();
 }
 
 }  // namespace
@@ -471,10 +456,6 @@ BASE_FEATURE(kFocusOmniboxInIncognitoTabIntents,
 BASE_FEATURE(kAndroidAppIntegration,
              "AndroidAppIntegration",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-BASE_FEATURE(kAndroidScrollOptimizations,
-             "AndroidScrollOptimizations",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kAndroidSearchEngineChoiceNotification,
              "AndroidSearchEngineChoiceNotification",
@@ -632,7 +613,7 @@ BASE_FEATURE(kCCTRetainingStateInMemory,
 
 BASE_FEATURE(kCCTTextFragmentLookupApiEnabled,
              "CCTTextFragmentLookupApiEnabled",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kCCTToolbarCustomizations,
              "CCTToolbarCustomizations",
@@ -1037,6 +1018,10 @@ BASE_FEATURE(kTabStripRedesign,
              "TabStripRedesign",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+BASE_FEATURE(kTabStripStartupRefactoring,
+             "TabStripStartupRefactoring",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Enabled, but often disabled in tests to reduce animation flakes and test
 // low-end device behavior where this animation is disabled.
 BASE_FEATURE(kTabToGTSAnimation,
@@ -1161,8 +1146,8 @@ BASE_FEATURE(kWebApkTrampolineOnInitialIntent,
 static jboolean JNI_ChromeFeatureList_IsEnabled(
     JNIEnv* env,
     const JavaParamRef<jstring>& jfeature_name) {
-  const base::Feature* feature =
-      FindFeatureExposedToJava(ConvertJavaStringToUTF8(env, jfeature_name));
+  const base::Feature* feature = GetFeatureMap()->FindFeatureExposedToJava(
+      base::StringPiece(ConvertJavaStringToUTF8(env, jfeature_name)));
   return base::FeatureList::IsEnabled(*feature);
 }
 
@@ -1171,8 +1156,8 @@ JNI_ChromeFeatureList_GetFieldTrialParamByFeature(
     JNIEnv* env,
     const JavaParamRef<jstring>& jfeature_name,
     const JavaParamRef<jstring>& jparam_name) {
-  const base::Feature* feature =
-      FindFeatureExposedToJava(ConvertJavaStringToUTF8(env, jfeature_name));
+  const base::Feature* feature = GetFeatureMap()->FindFeatureExposedToJava(
+      base::StringPiece(ConvertJavaStringToUTF8(env, jfeature_name)));
   const std::string& param_name = ConvertJavaStringToUTF8(env, jparam_name);
   const std::string& param_value =
       base::GetFieldTrialParamValueByFeature(*feature, param_name);
@@ -1184,8 +1169,8 @@ static jint JNI_ChromeFeatureList_GetFieldTrialParamByFeatureAsInt(
     const JavaParamRef<jstring>& jfeature_name,
     const JavaParamRef<jstring>& jparam_name,
     const jint jdefault_value) {
-  const base::Feature* feature =
-      FindFeatureExposedToJava(ConvertJavaStringToUTF8(env, jfeature_name));
+  const base::Feature* feature = GetFeatureMap()->FindFeatureExposedToJava(
+      base::StringPiece(ConvertJavaStringToUTF8(env, jfeature_name)));
   const std::string& param_name = ConvertJavaStringToUTF8(env, jparam_name);
   return base::GetFieldTrialParamByFeatureAsInt(*feature, param_name,
                                                 jdefault_value);
@@ -1196,8 +1181,8 @@ static jdouble JNI_ChromeFeatureList_GetFieldTrialParamByFeatureAsDouble(
     const JavaParamRef<jstring>& jfeature_name,
     const JavaParamRef<jstring>& jparam_name,
     const jdouble jdefault_value) {
-  const base::Feature* feature =
-      FindFeatureExposedToJava(ConvertJavaStringToUTF8(env, jfeature_name));
+  const base::Feature* feature = GetFeatureMap()->FindFeatureExposedToJava(
+      base::StringPiece(ConvertJavaStringToUTF8(env, jfeature_name)));
   const std::string& param_name = ConvertJavaStringToUTF8(env, jparam_name);
   return base::GetFieldTrialParamByFeatureAsDouble(*feature, param_name,
                                                    jdefault_value);
@@ -1208,8 +1193,8 @@ static jboolean JNI_ChromeFeatureList_GetFieldTrialParamByFeatureAsBoolean(
     const JavaParamRef<jstring>& jfeature_name,
     const JavaParamRef<jstring>& jparam_name,
     const jboolean jdefault_value) {
-  const base::Feature* feature =
-      FindFeatureExposedToJava(ConvertJavaStringToUTF8(env, jfeature_name));
+  const base::Feature* feature = GetFeatureMap()->FindFeatureExposedToJava(
+      base::StringPiece(ConvertJavaStringToUTF8(env, jfeature_name)));
   const std::string& param_name = ConvertJavaStringToUTF8(env, jparam_name);
   return base::GetFieldTrialParamByFeatureAsBool(*feature, param_name,
                                                  jdefault_value);
@@ -1218,11 +1203,11 @@ static jboolean JNI_ChromeFeatureList_GetFieldTrialParamByFeatureAsBoolean(
 static ScopedJavaLocalRef<jobjectArray>
 JNI_ChromeFeatureList_GetFlattedFieldTrialParamsForFeature(
     JNIEnv* env,
-    const JavaParamRef<jstring>& feature_name) {
+    const JavaParamRef<jstring>& jfeature_name) {
   base::FieldTrialParams params;
   std::vector<std::string> keys_and_values;
-  const base::Feature* feature =
-      FindFeatureExposedToJava(ConvertJavaStringToUTF8(env, feature_name));
+  const base::Feature* feature = GetFeatureMap()->FindFeatureExposedToJava(
+      base::StringPiece(ConvertJavaStringToUTF8(env, jfeature_name)));
   if (feature && base::GetFieldTrialParamsByFeature(*feature, &params)) {
     for (const auto& param_pair : params) {
       keys_and_values.push_back(param_pair.first);

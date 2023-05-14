@@ -283,7 +283,6 @@
          'args': [
           '--enable-pixel-output-in-tests',
         ],
-        'experiment_percentage': 100,
         'mixins': [
           'skia_gold_test',
         ],
@@ -461,16 +460,15 @@
     'chrome_finch_smoke_tests': {
       'variations_desktop_smoke_tests': {
         'isolate_name': 'variations_desktop_smoke_tests',
-        'mixins': [
-          'skia_gold_test',
+        'lacros_args': [
+          '--target-platform=lacros',
         ],
-        'resultdb': {
-          'enable': True,
-          'result_format': 'single'
-        },
-      },
-      'variations_smoke_tests': {
-        'isolate_name': 'variations_smoke_tests',
+        'android_args': [
+          '--target-platform=android',
+        ],
+        'chromeos_args': [
+          '--target-platform=cros',
+        ],
         'mixins': [
           'skia_gold_test',
         ],
@@ -1549,7 +1547,6 @@
           'blink_tests_write_run_histories',
           # TODO(crbug.com/1327314): Enable for blink web tests.
           'disable_check_flakiness_web_tests',
-          'skia_gold_test',
         ],
         'resultdb': {
           'enable': True,
@@ -1582,7 +1579,6 @@
           'blink_tests_write_run_histories',
           # TODO(crbug.com/1327314): Enable for blink web tests.
           'disable_check_flakiness_web_tests',
-          'skia_gold_test',
         ],
         'resultdb': {
           'enable': True,
@@ -1613,7 +1609,6 @@
           'blink_tests_write_run_histories',
           # TODO(crbug.com/1327314): Enable for blink web tests.
           'disable_check_flakiness_web_tests',
-          'skia_gold_test',
         ],
         'resultdb': {
           'enable': True,
@@ -1641,7 +1636,6 @@
           'blink_tests_write_run_histories',
           # TODO(crbug.com/1327314): Enable for blink web tests.
           'disable_check_flakiness_web_tests',
-          'skia_gold_test',
         ],
         'resultdb': {
           'enable': True,
@@ -1876,7 +1870,6 @@
           'blink_tests_write_run_histories',
           # TODO(crbug.com/1327314): Enable for blink web tests.
           'disable_check_flakiness_web_tests',
-          'skia_gold_test',
         ],
         'resultdb': {
           'enable': True,
@@ -1904,7 +1897,6 @@
           'blink_tests_write_run_histories',
           # TODO(crbug.com/1327314): Enable for blink web tests.
           'disable_check_flakiness_web_tests',
-          'skia_gold_test',
         ],
         'resultdb': {
           'enable': True,
@@ -1999,7 +1991,6 @@
           'blink_tests_write_run_histories',
           # TODO(crbug.com/1327314): Enable for blink web tests.
           'disable_check_flakiness_web_tests',
-          'skia_gold_test',
         ],
         'resultdb': {
           'enable': True,
@@ -2029,7 +2020,6 @@
           'blink_tests_write_run_histories',
           # TODO(crbug.com/1327314): Enable for blink web tests.
           'disable_check_flakiness_web_tests',
-          'skia_gold_test',
         ],
         'resultdb': {
           'enable': True,
@@ -2057,7 +2047,6 @@
           'blink_tests_write_run_histories',
           # TODO(crbug.com/1327314): Enable for blink web tests.
           'disable_check_flakiness_web_tests',
-          'skia_gold_test',
         ],
         'resultdb': {
           'enable': True,
@@ -2113,7 +2102,6 @@
           'blink_tests_write_run_histories',
           # TODO(crbug.com/1327314): Enable for blink web tests.
           'disable_check_flakiness_web_tests',
-          'skia_gold_test',
         ],
         'resultdb': {
           'enable': True,
@@ -2141,7 +2129,6 @@
           'blink_tests_write_run_histories',
           # TODO(crbug.com/1327314): Enable for blink web tests.
           'disable_check_flakiness_web_tests',
-          'skia_gold_test',
         ],
         'resultdb': {
           'enable': True,
@@ -2594,6 +2581,9 @@
         'linux_args': [
           '--no-xvfb',
         ],
+        'mixins': [
+          'skia_gold_test',
+        ],
       },
     },
     'gpu_common_gtests_validating': {
@@ -2622,6 +2612,9 @@
         'linux_args': [
           '--no-xvfb',
         ],
+        'mixins': [
+          'skia_gold_test',
+        ],
       },
     },
 
@@ -2639,6 +2632,15 @@
 
     # GPU gtests that test only Dawn
     'gpu_dawn_gtests': {
+      'dawn_end2end_implicit_device_sync_tests': {
+        'mixins': ['dawn_end2end_gpu_test'],
+        'args': [
+          '--enable-implicit-device-sync',
+        ],
+        'linux_args': [ '--no-xvfb' ],
+        'test': 'dawn_end2end_tests',
+        'ci_only': True, # https://crbug.com/dawn/1749
+      },
       'dawn_end2end_skip_validation_tests': {
         'mixins': ['dawn_end2end_gpu_test'],
         'args': [
@@ -2734,7 +2736,6 @@
           # TODO(crbug.com/1327314): Enable for blink web tests.
           'disable_check_flakiness_web_tests',
           'webgpu_cts',
-          'skia_gold_test',
         ],
       },
       'webgpu_blink_web_tests_with_backend_validation': {
@@ -2747,7 +2748,6 @@
         ],
         'mixins': [
           'webgpu_cts',
-          'skia_gold_test',
         ],
       },
     },
@@ -2761,7 +2761,6 @@
         ],
         'mixins': [
           'webgpu_cts',
-          'skia_gold_test',
         ],
       },
       'webgpu_swiftshader_blink_web_tests_with_backend_validation': {
@@ -2774,7 +2773,6 @@
         ],
         'mixins': [
           'webgpu_cts',
-          'skia_gold_test',
         ],
       },
     },
@@ -4024,10 +4022,6 @@
       'ui_base_unittests': {},
     },
 
-    'ios_swift_interop_xcuitests': {
-      'ios_swift_interop_xcuitests_module': {},
-    },
-
     # END tests which run on the GPU bots
 
     'js_code_coverage_browser_tests' : {
@@ -4399,7 +4393,6 @@
           'blink_tests_write_run_histories',
           # TODO(crbug.com/1327314): Enable for blink web tests.
           'disable_check_flakiness_web_tests',
-          'skia_gold_test',
         ],
         'resultdb': {
           'enable': True,
@@ -4433,7 +4426,6 @@
           'blink_tests_write_run_histories',
           # TODO(crbug.com/1327314): Enable for blink web tests.
           'disable_check_flakiness_web_tests',
-          'skia_gold_test',
         ],
         'resultdb': {
           'enable': True,
@@ -5290,7 +5282,6 @@
           'blink_tests_write_run_histories',
           # TODO(crbug.com/1327314): Enable for blink web tests.
           'disable_check_flakiness_web_tests',
-          'skia_gold_test',
         ],
         'resultdb': {
           'enable': True,
@@ -5427,7 +5418,6 @@
           'blink_tests_write_run_histories',
           # TODO(crbug.com/1327314): Enable for blink web tests.
           'disable_check_flakiness_web_tests',
-          'skia_gold_test',
         ],
         'resultdb': {
           'enable': True,
@@ -5658,7 +5648,7 @@
         },
         'results_handler': 'layout tests',
         'swarming': {
-          'shards': 36,
+          'shards': 15,
           'expiration': 18000,
           'hard_timeout': 14400,
         },
@@ -7008,13 +6998,6 @@
           'SIM_IPHONE_X_16_4',
         ]
       },
-      'ios_swift_interop_xcuitests': {
-        'mixins': ['xcode_parallelization'],
-        'variants': [
-          'SIM_IPHONE_X_16_4',
-          'SIM_IPAD_PRO_3RD_GEN_16_4',
-        ],
-      },
     },
 
     'ios16_sdk_simulator_tests': {
@@ -7030,7 +7013,7 @@
         ]
       },
       'ios_eg2_tests': {
-        'mixins': ['xcode_parallelization'],
+        'mixins': ['xcode_parallelization', 'record_failed_tests'],
         'variants': [
           'SIM_IPHONE_X_16_4',
           'SIM_IPAD_AIR_3RD_GEN_16_4',
@@ -7038,7 +7021,7 @@
         ]
       },
       'ios_eg2_cq_tests': {
-        'mixins': ['xcode_parallelization'],
+        'mixins': ['xcode_parallelization', 'record_failed_tests'],
         'variants': [
           'SIM_IPHONE_X_16_4',
           'SIM_IPAD_AIR_3RD_GEN_16_4',
@@ -7051,13 +7034,6 @@
           'SIM_IPHONE_SE_3RD_GEN_16_4',
           'SIM_IPAD_AIR_3RD_GEN_16_4',
           'SIM_IPAD_PRO_3RD_GEN_16_4',
-        ],
-      },
-      'ios_swift_interop_xcuitests': {
-        'mixins': ['xcode_parallelization'],
-        'variants': [
-          'SIM_IPHONE_X_16_4',
-          'SIM_IPAD_AIR_3RD_GEN_16_4',
         ],
       },
     },

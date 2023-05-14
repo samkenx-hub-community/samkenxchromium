@@ -1133,8 +1133,6 @@ std::unique_ptr<NavigationRequest> NavigationRequest::CreateBrowserInitiated(
     blink::mojom::CommonNavigationParamsPtr common_params,
     blink::mojom::CommitNavigationParamsPtr commit_params,
     bool was_opener_suppressed,
-    const blink::LocalFrameToken* initiator_frame_token,
-    int initiator_process_id,
     const std::string& extra_headers,
     FrameNavigationEntry* frame_entry,
     NavigationEntryImpl* entry,
@@ -1146,9 +1144,11 @@ std::unique_ptr<NavigationRequest> NavigationRequest::CreateBrowserInitiated(
     absl::optional<std::u16string> embedder_shared_storage_context) {
   return Create(
       frame_tree_node, std::move(common_params), std::move(commit_params),
-      /*browser_initiated=*/true, was_opener_suppressed, initiator_frame_token,
-      initiator_process_id, extra_headers, frame_entry, entry,
-      is_form_submission, std::move(navigation_ui_data), impression,
+      /*browser_initiated=*/true, was_opener_suppressed,
+      absl::nullopt /* initiator_frame_token */,
+      ChildProcessHost::kInvalidUniqueID /* initiator_process_id */,
+      extra_headers, frame_entry, entry, is_form_submission,
+      std::move(navigation_ui_data), impression,
       blink::mojom::NavigationInitiatorActivationAndAdStatus::
           kDidNotStartWithTransientActivation,
       is_pdf, is_embedder_initiated_fenced_frame_navigation,
@@ -1162,7 +1162,7 @@ std::unique_ptr<NavigationRequest> NavigationRequest::Create(
     blink::mojom::CommitNavigationParamsPtr commit_params,
     bool browser_initiated,
     bool was_opener_suppressed,
-    const blink::LocalFrameToken* initiator_frame_token,
+    const absl::optional<blink::LocalFrameToken>& initiator_frame_token,
     int initiator_process_id,
     const std::string& extra_headers,
     FrameNavigationEntry* frame_entry,
@@ -1193,8 +1193,8 @@ std::unique_ptr<NavigationRequest> NavigationRequest::Create(
   }
 
   auto navigation_params = blink::mojom::BeginNavigationParams::New(
-      base::OptionalFromPtr(initiator_frame_token), extra_headers,
-      net::LOAD_NORMAL, false /* skip_service_worker */,
+      initiator_frame_token, extra_headers, net::LOAD_NORMAL,
+      false /* skip_service_worker */,
       blink::mojom::RequestContextType::LOCATION,
       blink::mojom::MixedContentContextType::kBlockable, is_form_submission,
       false /* was_initiated_by_link_click */,
@@ -3409,15 +3409,20 @@ void NavigationRequest::CheckForIsolationOptIn(const GURL& url) {
   }
 }
 
-void NavigationRequest::AddSameProcessOriginAgentClusterStateIfNecessary(
-    const IsolationContext& isolation_context,
-    const GURL& url) {
-  // In this function we only handle opt-in requests for the cases where OAC
-  // process isolation is not enabled. Otherwise it will be handled when the
-  // origin's SiteInstance is created.
-  bool is_opt_in_requested =
-      IsOriginAgentClusterOptInRequested() &&
-      !SiteIsolationPolicy::IsProcessIsolationForOriginAgentClusterEnabled();
+void NavigationRequest::AddOriginAgentClusterStateIfNecessary(
+    const IsolationContext& isolation_context) {
+  // Normally for explicit opt-ins the origin is tracked when we create the
+  // SiteInstance, but there are two cases where that fails. (1) If process-
+  // isolation for OAC is not enabled we need to track opt-in here (used for
+  // origin-agent-cluster-by-default), and (2) if origin-keyed processes by
+  // default is enabled, then it's possible we got here due to using a
+  // speculative RenderFrameHost. In this latter case, the opt-in header had not
+  // arrived when the SiteInstance was created, so the origin was not tracked
+  // earlier.
+  bool is_opt_in_requested = IsOriginAgentClusterOptInRequested();
+  bool explicitly_requests_origin_keyed_process =
+      is_opt_in_requested &&
+      SiteIsolationPolicy::IsProcessIsolationForOriginAgentClusterEnabled();
 
   // Since opt-outs are asking not to have OAC or requires_origin_keyed_process,
   // they don't get their own SiteInstance, and so we must register their
@@ -3437,17 +3442,21 @@ void NavigationRequest::AddSameProcessOriginAgentClusterStateIfNecessary(
   // opt-out, which would trigger a normal global walk and record that the
   // origin has already been implicitly isolated in some BrowsingInstances.
 
-  // Since either site isolation is disabled, or we are requesting an opt-out,
-  // we can't rely on a newly created SiteInstance to add the origin as
-  // OAC/not-OAC, so we do it manually here.
-  url::Origin origin = url::Origin::Create(url);
+  // TODO(crbug.com/1442972): investigate using one of NavigationRequest's
+  // Get*Origin*() functions to compute this, instead of assuming we can just
+  // convert directly from GetURL().
+  url::Origin origin = url::Origin::Create(GetURL());
+  // Since this origin is using a site-keyed process (either because
+  // origin-keyed processes are disabled, not used for this origin, or the
+  // origin has opted out), we can't rely on a newly created SiteInstance to add
+  // the origin as OAC/not-OAC, so we do it manually here.
   auto* policy = ChildProcessSecurityPolicyImpl::GetInstance();
   // If there is already a state registered for `origin` in `isolation_context`,
   // then the following call does nothing.
   policy->AddOriginIsolationStateForBrowsingInstance(
       isolation_context, origin,
       should_isolate_origin /* is_origin_agent_cluster */,
-      false /* requires_origin_keyed_process */);
+      explicitly_requests_origin_keyed_process);
 }
 
 bool NavigationRequest::IsOriginAgentClusterOptInRequested() {
@@ -3510,8 +3519,11 @@ void NavigationRequest::DetermineOriginAgentClusterEndResult() {
 
   bool is_requested = IsOriginAgentClusterOptInRequested();
   bool expects_origin_agent_cluster = is_requested || IsIsolationImplied();
+  bool is_origin_keyed_process_implied =
+      IsIsolationImplied() &&
+      base::FeatureList::IsEnabled(features::kOriginKeyedProcessesByDefault);
   bool requires_origin_keyed_process =
-      is_requested &&
+      (is_requested || is_origin_keyed_process_implied) &&
       SiteIsolationPolicy::IsProcessIsolationForOriginAgentClusterEnabled();
 
   OriginAgentClusterIsolationState requested_isolation_state =
@@ -3793,11 +3805,12 @@ UrlInfo NavigationRequest::GetUrlInfo() {
     isolation_flags = UrlInfo::OriginIsolationRequest::kNone;
   } else if (IsOriginAgentClusterOptInRequested()) {
     // An origin-keyed agent cluster is used if explicitly requested by header.
-    isolation_flags = UrlInfo::OriginIsolationRequest::kOriginAgentCluster;
+    isolation_flags =
+        UrlInfo::OriginIsolationRequest::kOriginAgentClusterByHeader;
     if (SiteIsolationPolicy::IsProcessIsolationForOriginAgentClusterEnabled()) {
       // An origin-keyed process is used if requested by header.
       isolation_flags |=
-          UrlInfo::OriginIsolationRequest::kRequiresOriginKeyedProcess;
+          UrlInfo::OriginIsolationRequest::kRequiresOriginKeyedProcessByHeader;
     }
   }
 
@@ -4421,8 +4434,7 @@ void NavigationRequest::SelectFrameHostForOnResponseStarted(
     // will be handled by the existing pathway in
     // SiteInstanceImpl::SetSiteInfoInternal().
     const IsolationContext& isolation_context = instance->GetIsolationContext();
-    AddSameProcessOriginAgentClusterStateIfNecessary(isolation_context,
-                                                     GetURL());
+    AddOriginAgentClusterStateIfNecessary(isolation_context);
 
     // TODO(wjmaclean): Once this is all working, consider combining the
     // following code into the function above.
@@ -4671,12 +4683,12 @@ void NavigationRequest::OnRequestFailedInternal(
       policy_container_builder_->FinalPolicies().cross_origin_opener_policy,
       url::Origin(), net::NetworkAnonymizationKey::CreateTransient());
 
-  SelectFrameHostForOnRequestFailedInternal(status, skip_throttles,
-                                            error_page_content);
+  SelectFrameHostForOnRequestFailedInternal(status.exists_in_cache,
+                                            skip_throttles, error_page_content);
 }
 
 void NavigationRequest::SelectFrameHostForOnRequestFailedInternal(
-    const network::URLLoaderCompletionStatus& status,
+    bool exists_in_cache,
     bool skip_throttles,
     const absl::optional<std::string>& error_page_content) {
   switch (ComputeErrorPageProcess()) {
@@ -4725,9 +4737,11 @@ void NavigationRequest::SelectFrameHostForOnRequestFailedInternal(
         // removed in the future.
         break;
       case GetFrameHostForNavigationFailed::kBlockedByPendingCommit:
-        // TODO(https://crbug.com/1220337): Split OnRequestFailedInternal()
-        // so the process selection logic is at the top of its own method.
-        break;
+        resume_commit_closure_ = base::BindOnce(
+            &NavigationRequest::SelectFrameHostForOnRequestFailedInternal,
+            weak_factory_.GetWeakPtr(), exists_in_cache, skip_throttles,
+            error_page_content);
+        return;
     }
   }
 
@@ -4763,7 +4777,7 @@ void NavigationRequest::SelectFrameHostForOnRequestFailedInternal(
     }
   }
 
-  has_stale_copy_in_cache_ = status.exists_in_cache;
+  has_stale_copy_in_cache_ = exists_in_cache;
 
   if (skip_throttles) {
     // The NavigationHandle shouldn't be notified about renderer-debug URLs.
@@ -5571,7 +5585,13 @@ void NavigationRequest::CommitErrorPage(
     topics_eligible_ = false;
   }
 
+  base::WeakPtr<NavigationRequest> weak_self(weak_factory_.GetWeakPtr());
   ReadyToCommitNavigation(true /* is_error */);
+  // The caller above might result in the deletion of `this`. Return immediately
+  // if so.
+  if (!weak_self) {
+    return;
+  }
 
   PopulateDocumentTokenForCrossDocumentNavigation();
   // Use a separate cache shard, and no cookies, for error pages.

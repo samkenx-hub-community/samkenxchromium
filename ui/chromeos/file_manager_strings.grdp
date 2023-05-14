@@ -1105,13 +1105,13 @@
     1 folder selected
   </message>
   <message name="IDS_FILE_BROWSER_MANY_FILES_SELECTED" desc="Many files selected.">
-    <ph name="SELCTED_FILE_COUNT">$1<ex>13</ex></ph> files selected
+    <ph name="SELECTED_FILE_COUNT">$1<ex>13</ex></ph> files selected
   </message>
   <message name="IDS_FILE_BROWSER_MANY_DIRECTORIES_SELECTED" desc="Many directories selected.">
-    <ph name="SELCTED_FOLDERS_COUNT">$1<ex>2</ex></ph> folders selected
+    <ph name="SELECTED_FOLDERS_COUNT">$1<ex>2</ex></ph> folders selected
   </message>
   <message name="IDS_FILE_BROWSER_MANY_ENTRIES_SELECTED" desc="Many items (both files and directories) selected.">
-    <ph name="SELCTED_FILES_COUNT">$1<ex>21</ex></ph> items selected
+    <ph name="SELECTED_FILES_COUNT">$1<ex>21</ex></ph> items selected
   </message>
   <message name="IDS_FILE_BROWSER_METADATA_BOX_ALBUM_TITLE" desc="Label for audio album title.">
     Album
@@ -1133,6 +1133,9 @@
   </message>
   <message name="IDS_FILE_BROWSER_METADATA_BOX_DURATION" desc="Label for audio/video duration.">
     Duration
+  </message>
+  <message name="IDS_FILE_BROWSER_METADATA_BOX_ENCRYPTED" desc="Type hint for a file, encrypted with CSE (https://support.google.com/a/answer/10741897).">
+    Encrypted <ph name='ORIGINAL_MIME_TYPE'>$1<ex>text/plain</ex></ph>
   </message>
   <message name="IDS_FILE_BROWSER_METADATA_BOX_EXIF_DEVICE_MODEL" desc="Label for the device model which created the image.">
     Device model
@@ -1769,13 +1772,10 @@
     Keep your files available when you’re offline
   </message>
   <message name="IDS_FILE_BROWSER_BULK_PINNING_EXPLANATION" translateable="false" desc="The main text of the dialog offering the Google Drive bulk pinning feature">
-    Everything in your My Drive will be synced automatically so you can access your files without an internet connection.
+    Your files in My Drive will sync to your Chromebook automatically so you can access them without an internet connection.
   </message>
   <message name="IDS_FILE_BROWSER_BULK_PINNING_POINT_1" translateable="false" desc="First bullet point of the dialog offering the Google Drive bulk pinning feature">
-    My Drive files are stored in the cloud <ph name="BEGIN_BOLD">&lt;b&gt;</ph>and<ph name="END_BOLD">&lt;/b&gt;</ph> on this device.
-  </message>
-  <message name="IDS_FILE_BROWSER_BULK_PINNING_POINT_2" translateable="false" desc="Second bullet point of the dialog offering the Google Drive bulk pinning feature">
-    Files will be automatically available offline.
+    Files will be stored in the cloud and on this Chromebook.
   </message>
   <message name="IDS_FILE_BROWSER_BULK_PINNING_SPACE" translateable="false" desc="Text in the dialog offering the Google Drive bulk pinning feature">
     This will use about <ph name="REQUIRED_SPACE">$1<ex>12.2 GB</ex></ph> leaving <ph name="FREE_SPACE">$2<ex>96.8 GB</ex></ph> available.

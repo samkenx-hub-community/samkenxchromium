@@ -528,6 +528,7 @@ test("components_unittests") {
       "//components/variations/android:variations_java",
       "//components/webapps/browser/android:java",
       "//components/webapps/browser/android:unit_tests",
+      "//components/webauthn/android:unit_tests",
       "//content/public/android:content_java",
       "//content/public/browser",
       "//gin:v8_snapshot_assets",
@@ -664,7 +665,10 @@ test("components_unittests") {
       "//components/safe_browsing/core/common:unit_tests",
     ]
   } else if (safe_browsing_mode == 2) {
-    deps += [ "//components/safe_browsing/android:unit_tests_mobile" ]
+    deps += [
+      "//components/safe_browsing/android:native_java_unittests_java",
+      "//components/safe_browsing/android:unit_tests_mobile",
+    ]
   }
 
   if (safe_browsing_mode == 1) {
@@ -819,7 +823,6 @@ if (use_blink) {
       "dom_distiller/content/browser/test/dom_distiller_js_browsertest.cc",
       "dom_distiller/content/browser/test/test_util.cc",
       "dom_distiller/content/browser/test/test_util.h",
-      "metrics/content/subprocess_metrics_provider_browsertest.cc",
       "optimization_guide/content/renderer/page_text_agent_browsertest.cc",
       "paint_preview/renderer/paint_preview_recorder_browsertest.cc",
       "ukm/content/source_url_recorder_browsertest.cc",

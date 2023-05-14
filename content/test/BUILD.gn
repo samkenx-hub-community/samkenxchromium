@@ -974,11 +974,11 @@ static_library("browsertest_support") {
     "../public/test/content_browser_test_utils.h",
     "../public/test/content_cert_verifier_browser_test.cc",
     "../public/test/content_cert_verifier_browser_test.h",
+    "../public/test/resource_load_observer.cc",
+    "../public/test/resource_load_observer.h",
     "content_browser_test_utils_internal.cc",
     "content_browser_test_utils_internal.h",
     "content_test_launcher.cc",
-    "resource_load_observer.cc",
-    "resource_load_observer.h",
   ]
 
   public_deps = [
@@ -1296,6 +1296,7 @@ test("content_browsertests") {
     "../browser/browsing_topics/browsing_topics_browsertest.cc",
     "../browser/child_process_launcher_browsertest.cc",
     "../browser/child_process_security_policy_browsertest.cc",
+    "../browser/compute_pressure/compute_pressure_origin_trial_browsertest.cc",
     "../browser/content_index/content_index_browsertest.cc",
     "../browser/content_security_policy_browsertest.cc",
     "../browser/cross_origin_opener_policy_browsertest.cc",
@@ -1410,6 +1411,7 @@ test("content_browsertests") {
     "../browser/portal/portal_navigation_throttle_browsertest.cc",
     "../browser/power_monitor_browsertest.cc",
     "../browser/preloading/anchor_element_interaction_browsertest.cc",
+    "../browser/preloading/preloading_decider_browsertest.cc",
     "../browser/preloading/prerender/prerender_browsertest.cc",
     "../browser/process_internals/process_internals_browsertest.cc",
     "../browser/quota/quota_browsertest.cc",
@@ -1523,6 +1525,8 @@ test("content_browsertests") {
     "../browser/web_contents/web_contents_view_aura_browsertest.cc",
     "../browser/web_package/signed_exchange_request_handler_browsertest.cc",
     "../browser/web_package/signed_exchange_subresource_prefetch_browsertest.cc",
+    "../browser/webid/test/mock_identity_request_dialog_controller.cc",
+    "../browser/webid/test/mock_identity_request_dialog_controller.h",
     "../browser/webid/test/mock_mdoc_provider.cc",
     "../browser/webid/test/mock_mdoc_provider.h",
     "../browser/webid/test/mock_modal_dialog_view_delegate.cc",
@@ -1870,6 +1874,8 @@ test("content_browsertests") {
       "//third_party/iaccessible2",
       "//third_party/isimpledom",
     ]
+
+    data_deps += [ "//services/test/echo:echo_preload_library" ]
 
     libs = [ "uiautomationcore.lib" ]
 
@@ -2522,6 +2528,7 @@ test("content_unittests") {
     "../browser/renderer_host/media/video_capture_controller_unittest.cc",
     "../browser/renderer_host/media/video_capture_manager_unittest.cc",
     "../browser/renderer_host/media/video_capture_unittest.cc",
+    "../browser/renderer_host/mixed_content_checker_unittest.cc",
     "../browser/renderer_host/mixed_content_navigation_throttle_unittest.cc",
     "../browser/renderer_host/navigation_controller_impl_unittest.cc",
     "../browser/renderer_host/navigation_entry_impl_unittest.cc",
@@ -3318,6 +3325,7 @@ group("gpu_pytype") {
 
   data = [
     "//content/test/gpu/run_pytype.py",
+    "//content/test/gpu/unexpected_pass_finder.py",
     "//content/test/gpu/validate_tag_consistency.py",
 
     "//content/test/gpu/gold_inexact_matching/",

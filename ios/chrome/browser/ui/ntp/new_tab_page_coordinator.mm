@@ -415,9 +415,17 @@
       return;
     }
   }
-
   // No active NTPs were found.
   [self stop];
+}
+
+- (BOOL)isNTPActiveForCurrentWebState {
+  if (!self.webState) {
+    return NO;
+  }
+  NewTabPageTabHelper* NTPHelper =
+      NewTabPageTabHelper::FromWebState(self.webState);
+  return NTPHelper && NTPHelper->IsActive();
 }
 
 - (void)stopScrolling {
@@ -451,7 +459,6 @@
   [self.NTPViewController resetStateUponReload];
   self.discoverFeedService->RefreshFeed(
       FeedRefreshTrigger::kForegroundUserTriggered);
-  [self reloadContentSuggestions];
 }
 
 - (void)locationBarDidBecomeFirstResponder {
@@ -1109,13 +1116,6 @@
 }
 
 #pragma mark - NewTabPageContentDelegate
-
-- (void)reloadContentSuggestions {
-  // No need to reload ContentSuggestions since the mediator receives all
-  // model state changes and immediately updates the consumer with the new
-  // state.
-  return;
-}
 
 - (BOOL)isContentHeaderSticky {
   return [self isFollowingFeedAvailable] && [self isFeedHeaderVisible] &&

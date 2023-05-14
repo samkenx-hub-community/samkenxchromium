@@ -76,6 +76,8 @@ class CONTENT_EXPORT FederatedAuthRequestImpl
   void RequestUserInfo(blink::mojom::IdentityProviderConfigPtr provider,
                        RequestUserInfoCallback) override;
   void CancelTokenRequest() override;
+  void ResolveTokenRequest(const std::string& token,
+                           ResolveTokenRequestCallback callback) override;
   void LogoutRps(std::vector<blink::mojom::LogoutRpsRequestPtr> logout_requests,
                  LogoutRpsCallback) override;
   void SetIdpSigninStatus(const url::Origin& origin,
@@ -98,6 +100,7 @@ class CONTENT_EXPORT FederatedAuthRequestImpl
 
   // content::FederatedIdentityModalDialogViewDelegate:
   void NotifyClose() override;
+  bool NotifyResolve(const std::string& token) override;
 
   // Rejects the pending request if it has not been resolved naturally yet.
   void OnRejectRequest();
@@ -200,6 +203,7 @@ class CONTENT_EXPORT FederatedAuthRequestImpl
       bool should_delay_callback);
 
   void MaybeShowAccountsDialog();
+  void ShowModalDialog(const GURL& url);
 
   // Updates the IdpSigninStatus in case of accounts fetch failure and shows a
   // failure UI if applicable.
@@ -309,9 +313,6 @@ class CONTENT_EXPORT FederatedAuthRequestImpl
   // `preventSilentAccess` call.
   bool RequiresUserMediation();
   void SetRequiresUserMediation(bool requires_user_mediation);
-
-  void CreateIdentityRegistry(const url::Origin& idp_origin,
-                              content::WebContents* web_contents);
 
   std::unique_ptr<IdpNetworkRequestManager> network_manager_;
   std::unique_ptr<IdentityRequestDialogController> request_dialog_controller_;

@@ -217,8 +217,8 @@ extern const char kEnableBookmarksAccountStorageName[];
 extern const char kEnableBookmarksAccountStorageDescription[];
 
 // Title and description for the flag to enable browser lockdown mode.
-extern const char kEnableBrowserLockdownModeName[];
-extern const char kEnableBrowserLockdownModeDescription[];
+extern const char kBrowserLockdownModeAvailableName[];
+extern const char kBrowserLockdownModeAvailableDescription[];
 
 // Title and description for the flag to enable checking feed visibility on
 // attention log start.
@@ -905,11 +905,6 @@ extern const char kTabInactivityThresholdDescription[];
 // CRWWKNavigationHandler.
 extern const char kUseLoadSimulatedRequestForOfflinePageName[];
 extern const char kUseLoadSimulatedRequestForOfflinePageDescription[];
-
-// Title and description for the flag to enable the replacement of images
-// by SFSymbols in omnibox.
-extern const char kUseSFSymbolsInOmniboxName[];
-extern const char kUseSFSymbolsInOmniboxDescription[];
 
 // Title and description for the flag to control the maximum wait time (in
 // seconds) for a response from the Account Capabilities API.

@@ -142,12 +142,13 @@ public class ImprovedBookmarkRowRenderTest {
             mModel = new PropertyModel.Builder(ImprovedBookmarkRowProperties.ALL_KEYS)
                              .with(ImprovedBookmarkRowProperties.TITLE, "test title")
                              .with(ImprovedBookmarkRowProperties.DESCRIPTION, "test description")
-                             .with(ImprovedBookmarkRowProperties.ICON,
+                             .with(ImprovedBookmarkRowProperties.BOOKMARK_DRAWABLE,
                                      new BitmapDrawable(
                                              mActivityTestRule.getActivity().getResources(),
                                              mBitmap))
                              .with(ImprovedBookmarkRowProperties.SELECTED, false)
-                             .with(ImprovedBookmarkRowProperties.LIST_MENU, buildListMenu())
+                             .with(ImprovedBookmarkRowProperties.LIST_MENU_BUTTON_DELEGATE,
+                                     () -> buildListMenu())
                              .build();
 
             PropertyModelChangeProcessor.create(

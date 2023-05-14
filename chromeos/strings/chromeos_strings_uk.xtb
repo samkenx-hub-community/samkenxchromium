@@ -5,6 +5,7 @@
 <translation id="1018219910092211213">Не вдається перетворити DNS</translation>
 <translation id="1018656279737460067">Скасовано</translation>
 <translation id="1022433422498218992">Загальні налаштування</translation>
+<translation id="1022628058306505708">Опливина</translation>
 <translation id="1047458377670401304"><ph name="CPU_NAME" /> (потоків: <ph name="THREAD_COUNT" />, <ph name="CPU_MAX_CLOCK_SPEED" /> ГГц)</translation>
 <translation id="1047773237499189053">Доступна нова функція. Щоб дізнатися більше, натисніть клавішу зі стрілкою вгору.</translation>
 <translation id="1059913517121127803">Не вдається почати сканування</translation>
@@ -115,6 +116,7 @@
 <translation id="1801418420130173017">Вимкнути темну тему</translation>
 <translation id="1807246157184219062">Світла</translation>
 <translation id="1827738518074806965">Мистецька галерея</translation>
+<translation id="1838374766361614909">Очистити поле пошуку</translation>
 <translation id="1851218745569890714">Відеоконференції</translation>
 <translation id="1852934301711881861">Установити ОС Chrome Flex</translation>
 <translation id="1856388568474281774">Стрілка вниз</translation>
@@ -234,6 +236,7 @@
 <translation id="2902312830803030883">Додаткові дії</translation>
 <translation id="2926057806159140518">Введіть ім’я користувача та пароль або зіскануйте QR-код</translation>
 <translation id="2940811910881150316">Не вдалося перевірити клавіатуру. Відкрийте кришку й повторіть спробу.</translation>
+<translation id="2981143481017883351">Доступні ексклюзивні анімації для пристроїв Chromebook</translation>
 <translation id="3008341117444806826">ОНОВИТИ</translation>
 <translation id="3009958530611748826">Виберіть, у якій папці зберегти</translation>
 <translation id="3017079585324758401">Фон</translation>
@@ -270,6 +273,7 @@
 <translation id="3286515922899063534"><ph name="CURRENT" /> ГГц</translation>
 <translation id="3291996639387199448">Напрямок ключа</translation>
 <translation id="3294437725009624529">Гість</translation>
+<translation id="3303855915957856445">Немає результатів</translation>
 <translation id="3310640316857623290">Затримка DNS значно довша, ніж дозволено</translation>
 <translation id="3328783797891415197">Триває перевірка</translation>
 <translation id="3340011300870565703">Рівень заряду акумулятора правого навушника – <ph name="BATTERY_PERCENTAGE" />%.</translation>
@@ -278,6 +282,7 @@
 <translation id="3360306038446926262">ОС Windows</translation>
 <translation id="3368922792935385530">Підключено</translation>
 <translation id="3369013195428705271">Видалити всю історію друку? Поточні завдання друку збережуться.</translation>
+<translation id="3386675685417744672">Тільки на пристроях Chromebook</translation>
 <translation id="3404249063913988450">Активувати заставку</translation>
 <translation id="3413935475507503304">Щоб оновити, натисніть "Далі".</translation>
 <translation id="3434107140712555581"><ph name="BATTERY_PERCENTAGE" />%</translation>
@@ -356,6 +361,7 @@
 <translation id="404928562651467259">ЗАСТЕРЕЖЕННЯ</translation>
 <translation id="4054683689023980771">Завантаження зображення</translation>
 <translation id="4060260348856573701">Нове ім’я точки доступу (APN)</translation>
+<translation id="4079743696465895866">Вибрати ексклюзивні анімації для пристрою Chromebook</translation>
 <translation id="4093865285251893588">Зображення профілю</translation>
 <translation id="409427325554347132">Зберегти дані перевірки</translation>
 <translation id="4095829376260267438">WPA2/WPA3</translation>
@@ -473,7 +479,6 @@
 <translation id="4921665434385737356">Акумулятор зарядився на <ph name="RATE" /> за <ph name="NUM_SECONDS" /> с.</translation>
 <translation id="4930320165497208503">Щоб налаштувати або оновити з’єднання, перейдіть у <ph name="BEGIN_LINK" />Налаштування<ph name="END_LINK" />.</translation>
 <translation id="4932733599132424254">Дата</translation>
-<translation id="4937657825850660613">Половина</translation>
 <translation id="4950314376641394653"><ph name="DEVICE_NAME" />: мікропрограму пристрою оновлено до версії <ph name="VERSION" /></translation>
 <translation id="4971925105143343452">Частково</translation>
 <translation id="4972592110715526173">змінити режим</translation>
@@ -622,6 +627,7 @@
 <translation id="6184793017104303157">B4</translation>
 <translation id="6189418609903030344">Ємність акумулятора зменшується внаслідок використання</translation>
 <translation id="6191293864534840972">Неправильні сервери імен</translation>
+<translation id="6205145102504628069">Плин хмар</translation>
 <translation id="6213737986933151570">CDMA1XRTT</translation>
 <translation id="6223066887782788441">Вийти з повноекранного режиму</translation>
 <translation id="6223752125779001553">Немає доступних сканерів</translation>
@@ -664,6 +670,7 @@
 <translation id="6494974875566443634">Налаштування</translation>
 <translation id="6500818810472529210">Переглянути результати в Пошуку Google</translation>
 <translation id="650266656685499220">Щоб створити альбоми, відкрийте Google Фото</translation>
+<translation id="6505750420152840539">Від світанку до заходу сонця</translation>
 <translation id="6516990319416533844">Щоб перевірити швидкість заряджання акумулятора, максимально використайте його заряд протягом короткого періоду часу</translation>
 <translation id="6517239166834772319">Можливості</translation>
 <translation id="6526200165918397681">Вибрати колір, що гармоніює з фоновим малюнком</translation>
@@ -778,6 +785,7 @@
 <translation id="7490813197707563893">MAC-адреса</translation>
 <translation id="7491478667760509108">Закрити плаваюче вікно</translation>
 <translation id="7497215489070763236">Сертифікат ЦС для сервера</translation>
+<translation id="7501957181231305652">або</translation>
 <translation id="7502658306369382406">Адреса IPv6</translation>
 <translation id="7515998400212163428">Android</translation>
 <translation id="7528507600602050979">Довідковий контент недоступний</translation>
@@ -794,6 +802,7 @@
 <translation id="7620771111601174153">Дізнатися більше в Довідковому центрі</translation>
 <translation id="763165478673169849">Час останнього скидання</translation>
 <translation id="7648838807254605802">велика затримка HTTPS</translation>
+<translation id="765159867434478292">Розділити</translation>
 <translation id="7656388927906093505">Це миша.</translation>
 <translation id="7658239707568436148">Скасувати</translation>
 <translation id="7665800271478495366">Змінити аватар</translation>

@@ -310,24 +310,19 @@
   <message name="IDS_OS_SETTINGS_SYNC_APPS_CHECKBOX_LABEL" desc="Label for the checkbox which enables syncing of apps across devices.">
     Apps
   </message>
-  <message name="IDS_OS_SETTINGS_SYNC_APPS_CHECKBOX_SUBLABEL" translateable="false" desc="Disclaimer shown under label for the checkbox which enables syncing of apps across devices.">
-    <!-- TODO(crbug.com/1330894): Remove "translateable=false" once definitive string is available. -->
+  <message name="IDS_OS_SETTINGS_SYNC_APPS_CHECKBOX_SUBLABEL" desc="Disclaimer shown under label for the checkbox which enables syncing of apps across devices.">
     Apps installed from the Play Store and web apps from Chrome browser
   </message>
-  <message name="IDS_OS_SETTINGS_SYNC_SETTINGS_CHECKBOX_SUBLABEL" translateable="false" desc="Disclaimer shown under label for the checkbox which enables syncing of settings across devices.">
-    <!-- TODO(crbug.com/1330894): Remove "translateable=false" once definitive string is available. -->
+  <message name="IDS_OS_SETTINGS_SYNC_SETTINGS_CHECKBOX_SUBLABEL" desc="Disclaimer shown under label for the checkbox which enables syncing of settings across devices.">
     Keyboard and mouse behavior, language preferences, and more
   </message>
-  <message name="IDS_OS_SETTINGS_SYNC_WIFI_CHECKBOX_SUBLABEL" translateable="false" desc="Disclaimer shown under label for the checkbox which enables syncing of Wi-Fi networks  across devices.">
-    <!-- TODO(crbug.com/1330894): Remove "translateable=false" once definitive string is available. -->
+  <message name="IDS_OS_SETTINGS_SYNC_WIFI_CHECKBOX_SUBLABEL" desc="Disclaimer shown under label for the checkbox which enables syncing of Wi-Fi networks  across devices.">
     Saved networks and passwords so you can connect instantly
   </message>
-  <message name="IDS_OS_SETTINGS_SYNC_WALLPAPER_CHECKBOX_SUBLABEL" translateable="false" desc="Disclaimer shown under label for the checkbox which enables syncing of wallpaper across devices.">
-    <!-- TODO(crbug.com/1330894): Remove "translateable=false" once definitive string is available. -->
+  <message name="IDS_OS_SETTINGS_SYNC_WALLPAPER_CHECKBOX_SUBLABEL" desc="Disclaimer shown under label for the checkbox which enables syncing of wallpaper across devices.">
     Desktop backgrounds match across devices
   </message>
-  <message name="IDS_OS_SETTINGS_SYNC_APPS_TOOLTIP" translateable="false" desc="Tooltip shown next to the apps toggle in OS sync settings.">
-    <!-- TODO(crbug.com/1330894): Remove "translateable=false" once definitive string is available. -->
+  <message name="IDS_OS_SETTINGS_SYNC_APPS_TOOLTIP" desc="Tooltip shown next to the apps toggle in OS sync settings.">
     Once turned on, your apps will be available on any ChromeOS devices after you sign in with your Google Account. Web apps will be synced through Chrome even if other browser sync features are turned off.
   </message>
   <message name="IDS_OS_SETTINGS_SYNC_PRINTERS_CHECKBOX_LABEL" desc="Label for the checkbox which enables syncing of printers across devices.">
@@ -3643,7 +3638,7 @@ Press an assigned switch or key to remove assignment.
     Forget this subscription?
   </message>
   <message name="IDS_SETTINGS_INTERNET_NETWORK_SECTION_PASSPOINT_REMOVAL_DESCRIPTION" desc="Settings > Internet > Network details: Description of the Passpoint network removal dialog.">
-    By forgetting this network you will also remove the Passpoint subscription and its associated networks. <ph name="LINK_BEGIN">&lt;a&gt;</ph>Learn more<ph name="LINK_END">&lt;/a&gt;</ph>
+    By forgetting this network you will also remove the Passpoint subscription and its associated networks.
   </message>
   <message name="IDS_SETTINGS_INTERNET_NETWORK_SECTION_PROXY" desc="Settings > Internet > Network details: Proxy section label.">
     Proxy
@@ -3803,6 +3798,45 @@ Press an assigned switch or key to remove assignment.
   </message>
   <message name="IDS_SETTINGS_INTERNET_PASSPOINT_PROVIDER_LABEL" desc="Label of the link to the Passpoint provider details page.">
     Passpoint provider
+  </message>
+  <message name="IDS_SETTINGS_INTERNET_PASSPOINT_REMOVE_SUBSCRIPTION" desc="Label of the button used to remove a subscription from the Passpoint detail page.">
+    Remove
+  </message>
+  <message name="IDS_SETTINGS_INTERNET_PASSPOINT_HEADLINE" desc="Headline text describing how Passpoint subscription is synced with the user account.">
+    Subscription is installed on this device only and not synced with other devices under your account. <ph name="LINK_BEGIN">&lt;a&gt;</ph>Learn more<ph name="LINK_END">&lt;/a&gt;</ph>
+  </message>
+  <message name="IDS_SETTINGS_INTERNET_PASSPOINT_SUBSCRIPTION_EXPIRATION" desc="Label of the subscription expiration date.">
+    Expiry date
+  </message>
+  <message name="IDS_SETTINGS_INTERNET_PASSPOINT_SOURCE" desc="Label of the source that installed the Passpoint subscription.">
+    Passpoint provider
+  </message>
+  <message name="IDS_SETTINGS_INTERNET_PASSPOINT_TRUSTED_CA" desc="Label of the subscription trusted certificate authority used to authenticate the server.">
+    Trusted CA
+  </message>
+  <message name="IDS_SETTINGS_INTERNET_PASSPOINT_SYSTEM_CA" desc="Text displayed when the subscription relies on system CA certificates for server authentication.">
+    System CAs
+  </message>
+  <message name="IDS_SETTINGS_INTERNET_PASSPOINT_DOMAINS" desc="Label for the list of domains included in the Passpoint subscription.">
+    Domains
+  </message>
+  <message name="IDS_SETTINGS_INTERNET_PASSPOINT_DOMAINS_A11Y_LABEL" desc="Label for the button that toggles showing the Passpoint domains. Only visible by screen reader software.">
+    Show domains
+  </message>
+  <message name="IDS_SETTINGS_INTERNET_PASSPOINT_REMOVAL_TITLE" desc="Title of the dialog displayed when the remove button is clicked on Passpoint details page.">
+    Remove subscription from device
+  </message>
+  <message name="IDS_SETTINGS_INTERNET_PASSPOINT_REMOVAL_DESCRIPTION" desc="Text of the dialog displayed when the remove button is clicked on Passpoint details page.">
+    <ph name="SUBSCRIPTION_NAME">$1<ex>My Passpoint Provider</ex></ph> will be removed from this device only. To make changes to your subscription, contact the subscription provider. <ph name="LINK_BEGIN">&lt;a&gt;</ph>Learn more<ph name="LINK_END">&lt;/a&gt;</ph>
+  </message>
+  <message name="IDS_SETTINGS_INTERNET_PASSPOINT_LEARN_MORE_A11Y" desc="A11y label that describes the Learn more link leading to the Passpoint user guide.">
+    Learn more about Passpoint subscriptions
+  </message>
+  <message name="IDS_SETTINGS_INTERNET_PASSPOINT_REMOVE_CANCEL_A11Y" desc="A11y label for the Cancel button of the dialog displayed when a Passpoint network is removed.">
+    Cancel forgetting subscription
+  </message>
+  <message name="IDS_SETTINGS_INTERNET_PASSPOINT_REMOVE_CONFIRM_A11Y" desc="A11y label for the Confirm button of the dialog displayed when a Passpoint network is removed.">
+    Confirm subscription removal
   </message>
 
   <!-- Users Page (OS Settings) -->
@@ -4312,7 +4346,10 @@ Press an assigned switch or key to remove assignment.
     Failed to parse configuration
   </message>
   <message name="IDS_SETTINGS_KERBEROS_CONFIG_ERROR_TOO_MANY_NESTED_GROUPS" desc="Error message displayed in the Kerberos configuration dialog when the user tries to save a configuration that contains too many nested groups. See https://web.mit.edu/kerberos/krb5-1.12/doc/admin/conf_files/krb5_conf.html.">
-    Too many nested groups: <ph name="ERROR_LINE">$1<ex>[appdefaults]</ex></ph>
+    Too many nested groups: <ph name="ERROR_LINE">$1<ex>A{ (after many opening curly braces that haven't been closed yet)</ex></ph>
+  </message>
+  <message name="IDS_SETTINGS_KERBEROS_CONFIG_ERROR_LINE_TOO_LONG" desc="Error message displayed in the Kerberos configuration dialog when the user tries to save a configuration that contains a line that is too long. See https://web.mit.edu/kerberos/krb5-1.12/doc/admin/conf_files/krb5_conf.html.">
+    Line is too long: <ph name="ERROR_LINE">$1<ex># A very long comment line...</ex></ph>
   </message>
   <message name="IDS_SETTINGS_ADD_KERBEROS_ACCOUNT_REFRESH_BUTTON_LABEL" desc="Label of the action button on the 'Refresh a Kerberos tickets' dialog.">
     Refresh
@@ -4878,8 +4915,8 @@ Press an assigned switch or key to remove assignment.
   <message name="IDS_SETTINGS_PER_DEVICE_KEYBOARD_KEY_COMMAND" desc="In keyboard remap keys subpage, the dropdown list item for the external Command key on Apple keyboards when there's no internal keyboard on the device.">
     command
   </message>
-  <message name="IDS_SETTINGS_PER_DEVICE_KEYBOARD_KEY_EXTERNAL_META" desc="In keyboard remap keys subpage, the dropdown list item for the external Meta key (Search key on ChromeOS keyboards, and Windows key on Windows keyboards).">
-    external meta
+  <message name="IDS_SETTINGS_PER_DEVICE_KEYBOARD_KEY_META" desc="In keyboard remap keys subpage, the dropdown list item for the Meta key (Search key on ChromeOS keyboards, and Windows key on Windows keyboards).">
+    meta
   </message>
   <message name="IDS_SETTINGS_PER_DEVICE_KEYBOARD_KEY_SEARCH" desc="In keyboard remap keys subpage, the label and dropdown list item for the Search key.">
     search

@@ -758,8 +758,9 @@ void OverviewGrid::AddItem(aura::Window* window,
   if (reposition)
     PositionWindows(should_animate, ignored_items);
 
-  if (IsShowingSavedDeskLibrary() || WillShowSavedDeskLibrary())
+  if (IsShowingSavedDeskLibrary()) {
     item->HideForSavedDeskLibrary(/*animate=*/false);
+  }
 }
 
 void OverviewGrid::AppendItem(aura::Window* window,
@@ -1893,12 +1894,9 @@ void OverviewGrid::HideSavedDeskLibrary(bool exit_overview) {
 }
 
 bool OverviewGrid::IsShowingSavedDeskLibrary() const {
-  return saved_desk_library_widget_ && saved_desk_library_widget_->IsVisible();
-}
-
-bool OverviewGrid::WillShowSavedDeskLibrary() const {
-  return saved_desk_library_widget_ && saved_desk_library_widget_->GetLayer() &&
-         saved_desk_library_widget_->GetLayer()->GetTargetVisibility() != 0.f;
+  return saved_desk_library_widget_ &&
+         saved_desk_library_widget_->IsVisible() &&
+         saved_desk_library_widget_->GetLayer()->GetTargetOpacity() == 1.0f;
 }
 
 bool OverviewGrid::IsSavedDeskNameBeingModified() const {
@@ -2390,7 +2388,9 @@ std::vector<gfx::RectF> OverviewGrid::GetWindowRectsForTabletModeLayout(
   // |window_list_|. However, if a window turns out to be an ignored item,
   // |window_position| remains where the item was as to then reposition the
   // other window's bounds in place of that item.
-  const int height = total_bounds.height() / kTabletLayoutRow;
+  const int height = (total_bounds.height() -
+                      ((kTabletLayoutRow - 1) * kSpaceBetweenItemsDp)) /
+                     kTabletLayoutRow;
   int window_position = 0;
   std::vector<gfx::RectF> rects;
   for (const auto& window : window_list_) {
@@ -2403,7 +2403,8 @@ std::vector<gfx::RectF> OverviewGrid::GetWindowRectsForTabletModeLayout(
     // Calculate the width and y position of the item.
     const int width = CalculateWidthAndMaybeSetUnclippedBounds(item, height);
     const int y =
-        height * (window_position % kTabletLayoutRow) + total_bounds.y();
+        (height + kSpaceBetweenItemsDp) * (window_position % kTabletLayoutRow) +
+        total_bounds.y();
 
     // Use the right bounds of the item next to in the row as the x position, if
     // that item exists.

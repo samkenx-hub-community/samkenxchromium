@@ -162,7 +162,8 @@ class SyncService : public KeyedService {
     INITIALIZING,
     // The Sync engine is initialized, but the process of configuring the data
     // types hasn't been started yet. This usually occurs if the user hasn't
-    // completed the initial Sync setup yet (i.e. IsFirstSetupComplete() is
+    // completed the initial Sync setup yet (i.e.
+    // IsInitialSyncFeatureSetupComplete() is
     // false), but it can also occur if a (non-initial) Sync setup happens to be
     // ongoing while the Sync service is starting up.
     PENDING_DESIRED_CONFIGURATION,
@@ -223,8 +224,10 @@ class SyncService : public KeyedService {
   // Indicates the the user wants Sync-the-Feature to run. It should get invoked
   // early in the Sync setup flow, after the user has pressed "turn on Sync" but
   // before they have actually confirmed the settings.
-  // TODO(crbug.com/1291953): Remove this API, as SyncService can internally
-  // determine whether or not it is the case.
+  // TODO(crbug.com/1219990): Remove this API once the internal sync-requested
+  // bit is fully removed and rollback/killswitch safe. Note that it also
+  // requires finding an alternative solution to resolving
+  // IsSyncFeatureDisabledViaDashboard(), tracked in crbug.com/1443446.
   virtual void SetSyncFeatureRequested() = 0;
 
   // Returns the SyncUserSettings, which encapsulate all the user-configurable
@@ -295,6 +298,14 @@ class SyncService : public KeyedService {
   // instead.
   virtual bool RequiresClientUpgrade() const = 0;
 
+  // Returns true only on ChromeOS (Ash), if sync-the-feature is disabled
+  // because the user cleared data from the Sync dashboard. It can be re-enabled
+  // by invoking SetSyncFeatureRequested().
+  // TODO(crbug.com/1443446): Consider removing this API, for example by
+  // reporting IsInitialSyncFeatureSetupComplete()==false which is otherwise
+  // unreachable on ChromeOS Ash.
+  virtual bool IsSyncFeatureDisabledViaDashboard() const = 0;
+
   //////////////////////////////////////////////////////////////////////////////
   // DERIVED STATE ACCESS
   //////////////////////////////////////////////////////////////////////////////
@@ -321,6 +332,8 @@ class SyncService : public KeyedService {
   // after the engine has started.
   // Note: This refers to Sync-the-feature. Sync-the-transport may be running
   // even if this is false.
+  // TODO(crbug.com/1444344): Remove this API, in favor of
+  // IsSyncFeatureEnabled().
   bool CanSyncFeatureStart() const;
 
   // Returns whether Sync-the-feature is active, which means

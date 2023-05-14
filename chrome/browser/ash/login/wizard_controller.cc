@@ -51,7 +51,6 @@
 #include "chrome/browser/ash/login/login_wizard.h"
 #include "chrome/browser/ash/login/oobe_screen.h"
 #include "chrome/browser/ash/login/quick_unlock/quick_unlock_utils.h"
-#include "chrome/browser/ash/login/screens/active_directory_login_screen.h"
 #include "chrome/browser/ash/login/screens/active_directory_password_change_screen.h"
 #include "chrome/browser/ash/login/screens/app_downloading_screen.h"
 #include "chrome/browser/ash/login/screens/arc_vm_data_migration_screen.h"
@@ -73,6 +72,7 @@
 #include "chrome/browser/ash/login/screens/error_screen.h"
 #include "chrome/browser/ash/login/screens/family_link_notice_screen.h"
 #include "chrome/browser/ash/login/screens/fingerprint_setup_screen.h"
+#include "chrome/browser/ash/login/screens/gaia_info_screen.h"
 #include "chrome/browser/ash/login/screens/gaia_password_changed_screen.h"
 #include "chrome/browser/ash/login/screens/gaia_password_changed_screen_legacy.h"
 #include "chrome/browser/ash/login/screens/gaia_screen.h"
@@ -131,7 +131,6 @@
 #include "chrome/browser/policy/profile_policy_connector.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_manager.h"
-#include "chrome/browser/ui/webui/ash/login/active_directory_login_screen_handler.h"
 #include "chrome/browser/ui/webui/ash/login/active_directory_password_change_screen_handler.h"
 #include "chrome/browser/ui/webui/ash/login/app_downloading_screen_handler.h"
 #include "chrome/browser/ui/webui/ash/login/app_launch_splash_screen_handler.h"
@@ -154,6 +153,7 @@
 #include "chrome/browser/ui/webui/ash/login/error_screen_handler.h"
 #include "chrome/browser/ui/webui/ash/login/family_link_notice_screen_handler.h"
 #include "chrome/browser/ui/webui/ash/login/fingerprint_setup_screen_handler.h"
+#include "chrome/browser/ui/webui/ash/login/gaia_info_screen_handler.h"
 #include "chrome/browser/ui/webui/ash/login/gaia_password_changed_screen_handler.h"
 #include "chrome/browser/ui/webui/ash/login/gaia_screen_handler.h"
 #include "chrome/browser/ui/webui/ash/login/gesture_navigation_screen_handler.h"
@@ -603,12 +603,10 @@ WizardController::CreateScreens() {
         base::BindRepeating(&WizardController::OnDemoPreferencesScreenExit,
                             weak_factory_.GetWeakPtr())));
 
-    if (ash::features::IsOobeQuickStartEnabled()) {
-      append(std::make_unique<QuickStartScreen>(
-          oobe_ui->GetView<QuickStartScreenHandler>()->AsWeakPtr(),
-          base::BindRepeating(&WizardController::OnQuickStartScreenExit,
-                              weak_factory_.GetWeakPtr())));
-    }
+    append(std::make_unique<QuickStartScreen>(
+        oobe_ui->GetView<QuickStartScreenHandler>()->AsWeakPtr(),
+        base::BindRepeating(&WizardController::OnQuickStartScreenExit,
+                            weak_factory_.GetWeakPtr())));
   }
 
   append(std::make_unique<NetworkScreen>(
@@ -749,6 +747,14 @@ WizardController::CreateScreens() {
       oobe_ui->GetView<PackagedLicenseScreenHandler>()->AsWeakPtr(),
       base::BindRepeating(&WizardController::OnPackagedLicenseScreenExit,
                           weak_factory_.GetWeakPtr())));
+
+  if (features::IsOobeGaiaInfoScreenEnabled()) {
+    append(std::make_unique<GaiaInfoScreen>(
+        oobe_ui->GetView<GaiaInfoScreenHandler>()->AsWeakPtr(),
+        base::BindRepeating(&WizardController::OnGaiaInfoScreenExit,
+                            weak_factory_.GetWeakPtr())));
+  }
+
   append(std::make_unique<GaiaScreen>(
       oobe_ui->GetView<GaiaScreenHandler>()->AsWeakPtr(),
       base::BindRepeating(&WizardController::OnGaiaScreenExit,
@@ -799,12 +805,6 @@ WizardController::CreateScreens() {
       oobe_ui->GetView<UserCreationScreenHandler>()->AsWeakPtr(),
       oobe_ui->GetErrorScreen(),
       base::BindRepeating(&WizardController::OnUserCreationScreenExit,
-                          weak_factory_.GetWeakPtr())));
-
-  append(std::make_unique<ActiveDirectoryLoginScreen>(
-      oobe_ui->GetView<ActiveDirectoryLoginScreenHandler>()->AsWeakPtr(),
-      oobe_ui->GetErrorScreen(),
-      base::BindRepeating(&WizardController::OnActiveDirectoryLoginScreenExit,
                           weak_factory_.GetWeakPtr())));
 
   append(std::make_unique<EduCoexistenceLoginScreen>(
@@ -901,7 +901,7 @@ void WizardController::ShowWelcomeScreen() {
 }
 
 void WizardController::ShowQuickStartScreen() {
-  CHECK(ash::features::IsOobeQuickStartEnabled());
+  CHECK(wizard_context_->quick_start_enabled);
   SetCurrentScreen(GetScreen(QuickStartView::kScreenId));
 }
 
@@ -973,6 +973,10 @@ void WizardController::ShowGaiaPasswordChangedScreen(
   DCHECK(features::IsCryptohomeRecoveryEnabled());
   wizard_context_->user_context = std::move(user_context);
   SetCurrentScreen(GetScreen<GaiaPasswordChangedScreen>());
+}
+
+void WizardController::ShowGaiaInfoScreen() {
+  SetCurrentScreen(GetScreen(GaiaInfoScreenView::kScreenId));
 }
 
 void WizardController::ShowEnrollmentScreen() {
@@ -1208,7 +1212,11 @@ void WizardController::OnUserCreationScreenExit(
   switch (result) {
     case UserCreationScreen::Result::SIGNIN:
     case UserCreationScreen::Result::SKIPPED:
-      AdvanceToSigninScreen();
+      if (features::IsOobeGaiaInfoScreenEnabled()) {
+        ShowGaiaInfoScreen();
+      } else {
+        AdvanceToSigninScreen();
+      }
       break;
     case UserCreationScreen::Result::CHILD_SIGNIN:
       GetScreen<GaiaScreen>()->LoadOnlineForChildSignin();
@@ -1236,16 +1244,42 @@ void WizardController::OnGaiaScreenExit(GaiaScreen::Result result) {
   OnScreenExit(GaiaView::kScreenId, GaiaScreen::GetResultString(result));
   switch (result) {
     case GaiaScreen::Result::BACK:
+    case GaiaScreen::Result::BACK_CHILD:
     case GaiaScreen::Result::CANCEL: {
-      if (result == GaiaScreen::Result::BACK &&
-          wizard_context_->is_user_creation_enabled) {
-        // `Result::BACK` is only triggered when pressing back button. It goes
-        // back to UserCreationScreen if screen is enabled; otherwise, it
-        // behaves the same as `Result::CANCEL` which is triggered by pressing
-        // ESC key.
-        AdvanceToScreen(UserCreationView::kScreenId);
-        break;
+      if (features::IsOobeGaiaInfoScreenEnabled()) {
+        if (wizard_context_->is_user_creation_enabled) {
+          // `Result::BACK` and `Result::BACK_CHILD` are only triggered when
+          // pressing back button. It goes back to GaiaInfoScreenView if user
+          // creation is enabled; otherwise, it behaves the same as
+          // `Result::CANCEL` which is triggered by pressing ESC key.
+          // In the child flow the GaiaInfo screen is not shown, so in case of
+          // `Result::BACK_CHILD` we should go back to user creation screen
+          if (result == GaiaScreen::Result::BACK) {
+            if (wizard_context_->is_add_person_flow) {
+              AdvanceToScreen(UserCreationView::kScreenId);
+            } else {
+              AdvanceToScreen(GaiaInfoScreenView::kScreenId);
+            }
+            break;
+          }
+          if (result == GaiaScreen::Result::BACK_CHILD) {
+            AdvanceToScreen(UserCreationView::kScreenId);
+            break;
+          }
+        }
+      } else {
+        // TODO: delete this part after removing the feature flag
+        if (result == GaiaScreen::Result::BACK &&
+            wizard_context_->is_user_creation_enabled) {
+          // `Result::BACK` is only triggered when pressing back button. It goes
+          // back to UserCreationScreen if screen is enabled; otherwise, it
+          // behaves the same as `Result::CANCEL` which is triggered by pressing
+          // ESC key.
+          AdvanceToScreen(UserCreationView::kScreenId);
+          break;
+        }
       }
+
       // If a default redirection to third party IdP is set we can hide the
       // dialog.
       const bool gaia_page_defaults_to_saml = IsGaiaPageDefaultsToSAML();
@@ -1266,6 +1300,20 @@ void WizardController::OnGaiaScreenExit(GaiaScreen::Result result) {
       break;
     case GaiaScreen::Result::START_CONSUMER_KIOSK:
       LoginDisplayHost::default_host()->AttemptShowEnableConsumerKioskScreen();
+      break;
+  }
+}
+
+void WizardController::OnGaiaInfoScreenExit(GaiaInfoScreen::Result result) {
+  OnScreenExit(GaiaInfoScreenView::kScreenId,
+               GaiaInfoScreen::GetResultString(result));
+  switch (result) {
+    case GaiaInfoScreen::Result::kBack:
+      AdvanceToScreen(UserCreationView::kScreenId);
+      break;
+    case GaiaInfoScreen::Result::kNext:
+    case GaiaInfoScreen::Result::kNotApplicable:
+      AdvanceToSigninScreen();
       break;
   }
 }
@@ -1325,11 +1373,6 @@ void WizardController::OnPasswordChangeScreenExit(
       NOTREACHED();
       LoginDisplayHost::default_host()->CancelPasswordChangedFlow();
   }
-}
-
-void WizardController::OnActiveDirectoryLoginScreenExit() {
-  OnScreenExit(ActiveDirectoryLoginView::kScreenId, kDefaultExitReason);
-  LoginDisplayHost::default_host()->HideOobeDialog();
 }
 
 void WizardController::OnEduCoexistenceLoginScreenExit(
@@ -1591,15 +1634,9 @@ void WizardController::OnScreenExit(OobeScreenId screen,
 }
 
 void WizardController::AdvanceToSigninScreen() {
-  if (g_browser_process->platform_part()
-          ->browser_policy_connector_ash()
-          ->GetDeviceMode() == policy::DEVICE_MODE_ENTERPRISE_AD) {
-    AdvanceToScreen(ActiveDirectoryLoginView::kScreenId);
-  } else {
-    // Reset Gaia.
-    GetScreen<GaiaScreen>()->LoadOnline(EmptyAccountId());
-    AdvanceToScreen(GaiaView::kScreenId);
-  }
+  // Reset Gaia.
+  GetScreen<GaiaScreen>()->LoadOnline(EmptyAccountId());
+  AdvanceToScreen(GaiaView::kScreenId);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -2439,13 +2476,14 @@ void WizardController::AdvanceToScreen(OobeScreenId screen_id) {
     ShowArcVmDataMigrationScreen();
   } else if (screen_id == TouchpadScrollScreenView::kScreenId) {
     ShowTouchpadScrollScreen();
+  } else if (screen_id == GaiaInfoScreenView::kScreenId) {
+    ShowGaiaInfoScreen();
   } else if (screen_id == TpmErrorView::kScreenId ||
              screen_id == GaiaPasswordChangedView::kScreenId ||
              screen_id == ActiveDirectoryPasswordChangeView::kScreenId ||
              screen_id == FamilyLinkNoticeView::kScreenId ||
              screen_id == GaiaView::kScreenId ||
              screen_id == UserCreationView::kScreenId ||
-             screen_id == ActiveDirectoryLoginView::kScreenId ||
              screen_id == SignInFatalErrorView::kScreenId ||
              screen_id == LocaleSwitchView::kScreenId ||
              screen_id == RecoveryEligibilityView::kScreenId ||

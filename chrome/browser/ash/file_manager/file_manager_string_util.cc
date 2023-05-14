@@ -18,6 +18,7 @@
 #include "chrome/browser/ash/bruschetta/bruschetta_util.h"
 #include "chrome/browser/ash/crostini/crostini_features.h"
 #include "chrome/browser/ash/crostini/crostini_util.h"
+#include "chrome/browser/ash/drive/file_system_util.h"
 #include "chrome/browser/ash/guest_os/guest_os_share_path.h"
 #include "chrome/browser/ash/login/demo_mode/demo_session.h"
 #include "chrome/browser/ash/plugin_vm/plugin_vm_features.h"
@@ -357,7 +358,6 @@ void AddStringsGeneric(base::Value::Dict* dict) {
              IDS_FILE_BROWSER_BULK_PINNING_NOT_ENOUGH_SPACE);
   SET_STRING("BULK_PINNING_OFFLINE", IDS_FILE_BROWSER_BULK_PINNING_OFFLINE);
   SET_STRING("BULK_PINNING_POINT_1", IDS_FILE_BROWSER_BULK_PINNING_POINT_1);
-  SET_STRING("BULK_PINNING_POINT_2", IDS_FILE_BROWSER_BULK_PINNING_POINT_2);
   SET_STRING("BULK_PINNING_SPACE", IDS_FILE_BROWSER_BULK_PINNING_SPACE);
   SET_STRING("BULK_PINNING_TITLE", IDS_FILE_BROWSER_BULK_PINNING_TITLE);
   SET_STRING("BULK_PINNING_VIEW_STORAGE",
@@ -648,6 +648,7 @@ void AddStringsGeneric(base::Value::Dict* dict) {
              IDS_FILE_BROWSER_METADATA_BOX_CREATION_TIME);
   SET_STRING("METADATA_BOX_DIMENSION", IDS_FILE_BROWSER_METADATA_BOX_DIMENSION);
   SET_STRING("METADATA_BOX_DURATION", IDS_FILE_BROWSER_METADATA_BOX_DURATION);
+  SET_STRING("METADATA_BOX_ENCRYPTED", IDS_FILE_BROWSER_METADATA_BOX_ENCRYPTED);
   SET_STRING("METADATA_BOX_EXIF_DEVICE_MODEL",
              IDS_FILE_BROWSER_METADATA_BOX_EXIF_DEVICE_MODEL);
   SET_STRING("METADATA_BOX_EXIF_DEVICE_SETTINGS",
@@ -1246,7 +1247,7 @@ void AddFileManagerFeatureStrings(const std::string& locale,
             base::FeatureList::IsEnabled(ash::features::kFilesDriveShortcuts));
 
   dict->Set("DRIVE_FS_BULK_PINNING",
-            base::FeatureList::IsEnabled(ash::features::kDriveFsBulkPinning));
+            drive::util::IsDriveFsBulkPinningEnabled());
 
   if (base::FeatureList::IsEnabled(features::kDataLeakPreventionPolicy) &&
       base::FeatureList::IsEnabled(

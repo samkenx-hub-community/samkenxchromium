@@ -1312,13 +1312,6 @@
       },
     },
   },
-  'cc_unittests eve': {
-    'modifications': {
-      'lacros-amd64-generic-rel': {
-        'ci_only': True,
-      },
-    },
-  },
   'check_static_initializers': {
     'modifications': {
       'Mac Builder': {
@@ -1452,6 +1445,8 @@
             {
               # use 8-core to shorten runtime
               'cores': '8',
+              # TODO(crbug.com/1412588): Move to jammy.
+              'os': 'Ubuntu-18.04',
             },
           ],
         },
@@ -1489,6 +1484,8 @@
             {
               # use 8-core to shorten runtime
               'cores': '8',
+              # TODO(crbug.com/1412588): Move to jammy.
+              'os': 'Ubuntu-18.04',
             },
           ],
         },
@@ -1736,12 +1733,6 @@
       },
       'Linux TSan Tests': {
         'swarming': {
-          'dimension_sets': [
-            {
-              # TODO(crbug.com/1412588): Move the rest of the tests to Jammy.
-              'os': 'Ubuntu-22.04',
-            },
-          ],
           'shards': 30,
         },
       },
@@ -2572,17 +2563,25 @@
       },
       'Mac FYI Experimental Release (Apple M1)': {
         'args': {
-          # The GPU information is not yet exposed in swarming, so we can't
-          # explicitly request it and have the JSON generation handle this
-          # automatically.
+          # Apple silicon does not show up normally as a PCI-e device, but
+          # Chrome is able to find a vendor ID that matches other (non-GPU)
+          # Apple PCI-e devices.
           '--expected-vendor-id': '106b',
         },
       },
       'Mac FYI Release (Apple M1)': {
         'args': {
-          # The GPU information is not yet exposed in swarming, so we can't
-          # explicitly request it and have the JSON generation handle this
-          # automatically.
+          # Apple silicon does not show up normally as a PCI-e device, but
+          # Chrome is able to find a vendor ID that matches other (non-GPU)
+          # Apple PCI-e devices.
+          '--expected-vendor-id': '106b',
+        },
+      },
+      'Mac FYI Retina Release (Apple M2)': {
+        'args': {
+          # Apple silicon does not show up normally as a PCI-e device, but
+          # Chrome is able to find a vendor ID that matches other (non-GPU)
+          # Apple PCI-e devices.
           '--expected-vendor-id': '106b',
         },
       },
@@ -2756,13 +2755,6 @@
         'swarming': {
           'shards': 2,
         },
-      },
-    },
-  },
-  'lacros_all_tast_tests eve': {
-    'modifications': {
-      'lacros-amd64-generic-rel': {
-        'ci_only': True,
       },
     },
   },
@@ -3147,13 +3139,6 @@
       },
     },
   },
-  'ozone_unittests eve': {
-    'modifications': {
-      'lacros-amd64-generic-rel': {
-        'ci_only': True,
-      },
-    },
-  },
   'ozone_x11_unittests': {
     # Wayland bot uses chromium_linux_gtests that includes some x11 only
     # test targets. To avoid maintaining a list of tests, remove them here.
@@ -3464,6 +3449,11 @@
         ],
       },
     }
+  },
+  'services_webnn_unittests': {
+    'remove_from': [
+      'Win10 FYI x64 Release (AMD RX 5500 XT)', # crbug.com/1445060
+    ],
   },
   'snapshot_unittests': {
     'modifications': {
@@ -4314,8 +4304,13 @@
       # Remove from bots where capacity is constrained.
       'Dawn Win10 x64 DEPS Release (Intel)',
       'Dawn Win10 x64 Release (Intel)',
+      # Disable testing with validation on x86 where they frequently OOM.
+      # See crbug.com/1444815.
       'Dawn Win10 x86 DEPS Release (Intel)',
       'Dawn Win10 x86 Release (Intel)',
+      'Dawn Win10 x86 DEPS Release (NVIDIA)',
+      'Dawn Win10 x86 Release (NVIDIA)',
+      # Don't need validation layers on code coverage bots
       'linux-code-coverage',
       'mac-code-coverage',
       'win10-code-coverage',
@@ -4504,12 +4499,6 @@
           '--use-persistent-shell',
         ],
         'swarming': {
-          'dimension_sets': [
-            {
-              # TODO(crbug.com/1412588): Move the remainder to Jammy.
-              'os': 'Ubuntu-22.04',
-            },
-          ],
           'shards': 27,
         },
       },
@@ -4536,12 +4525,6 @@
           '--use-persistent-shell',
         ],
         'swarming': {
-          'dimension_sets': [
-            {
-              # TODO(crbug.com/1412588): Move the remainder to Jammy.
-              'os': 'Ubuntu-22.04',
-            },
-          ],
           'shards': 27,
         },
       },

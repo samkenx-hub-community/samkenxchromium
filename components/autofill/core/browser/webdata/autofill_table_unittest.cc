@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include "components/autofill/core/browser/webdata/autofill_table.h"
+#include "components/autofill/core/browser/field_types.h"
 
 #include <map>
 #include <memory>
@@ -169,6 +170,15 @@ class AutofillTableProfileTest
     : public AutofillTableTest,
       public testing::WithParamInterface<AutofillProfile::Source> {
  public:
+  void SetUp() override {
+    AutofillTableTest::SetUp();
+    if (profile_source() == AutofillProfile::Source::kAccount) {
+      // Only enable support for new setting visible features for kAccount
+      // source.
+      features_.InitAndEnableFeature(
+          features::kAutofillEnableNewStreetLevelFieldTypes);
+    }
+  }
   AutofillProfile::Source profile_source() const { return GetParam(); }
 
   // Creates an `AutofillProfile` with `profile_source()` as its source.
@@ -207,6 +217,9 @@ class AutofillTableProfileTest
     s.BindString(1, guid);
     return s.Run();
   }
+
+ private:
+  base::test::ScopedFeatureList features_;
 };
 
 INSTANTIATE_TEST_SUITE_P(
@@ -872,7 +885,6 @@ TEST_F(AutofillTableTest, RemoveExpiredFormElements_NotOldEnough) {
 // birthdate information.
 TEST_P(AutofillTableProfileTest, AutofillProfile) {
   AutofillProfile home_profile = CreateAutofillProfile();
-  home_profile.set_origin(std::string());
 
   // TODO(crbug.com/1113617): Honorifics are temporally disabled.
   // home_profile.SetRawInfoWithVerificationStatus(
@@ -952,6 +964,11 @@ TEST_P(AutofillTableProfileTest, AutofillProfile) {
   home_profile.SetRawInfoWithVerificationStatus(
       ADDRESS_HOME_PREMISE_NAME, u"Premise", VerificationStatus::kUserVerified);
   ASSERT_EQ(home_profile.GetRawInfo(ADDRESS_HOME_STREET_NAME), u"Street Name");
+  if (base::FeatureList::IsEnabled(
+          features::kAutofillEnableNewStreetLevelFieldTypes)) {
+    home_profile.SetRawInfoWithVerificationStatus(
+        ADDRESS_HOME_LANDMARK, u"Red tree", VerificationStatus::kObserved);
+  }
 
   home_profile.SetRawInfo(PHONE_HOME_WHOLE_NUMBER, u"18181234567");
   home_profile.SetRawInfoAsInt(BIRTHDATE_DAY, 14);
@@ -1065,7 +1082,6 @@ TEST_F(AutofillTableTest, IBAN) {
   EXPECT_FALSE(s_target.Step());
 
   // Update the another_iban.
-  another_iban.set_origin("Interactive Autofill dialog");
   another_iban.SetRawInfo(IBAN_VALUE, u"GB98 MIDL 0700 9312 3456 78");
   another_iban.set_nickname(u"My teacher's IBAN");
   EXPECT_TRUE(table_->UpdateIBAN(another_iban));
@@ -1201,6 +1217,10 @@ TEST_P(AutofillTableProfileTest, UpdateAutofillProfile) {
   profile.SetRawInfo(ADDRESS_HOME_STATE, u"CA");
   profile.SetRawInfo(ADDRESS_HOME_ZIP, u"90025");
   profile.SetRawInfo(ADDRESS_HOME_COUNTRY, u"US");
+  if (base::FeatureList::IsEnabled(
+          features::kAutofillEnableNewStreetLevelFieldTypes)) {
+    profile.SetRawInfo(ADDRESS_HOME_LANDMARK, u"Red tree");
+  }
   profile.SetRawInfo(PHONE_HOME_WHOLE_NUMBER, u"18181234567");
   profile.SetRawInfoAsInt(BIRTHDATE_DAY, 14);
   profile.SetRawInfoAsInt(BIRTHDATE_MONTH, 3);

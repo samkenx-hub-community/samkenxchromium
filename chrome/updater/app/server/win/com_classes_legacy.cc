@@ -103,9 +103,7 @@ namespace updater {
 class AppVersionWebImpl : public IDispatchImpl<IAppVersionWeb> {
  public:
   AppVersionWebImpl()
-      : IDispatchImpl<IAppVersionWeb>(
-            {{__uuidof(IAppVersionWebUser), __uuidof(IAppVersionWeb)}},
-            {{__uuidof(IAppVersionWebSystem), __uuidof(IAppVersionWeb)}}) {}
+      : IDispatchImpl<IAppVersionWeb>(IID_MAPS_USERSYSTEM(IAppVersionWeb)) {}
   AppVersionWebImpl(const AppVersionWebImpl&) = delete;
   AppVersionWebImpl& operator=(const AppVersionWebImpl&) = delete;
 
@@ -144,9 +142,7 @@ class AppVersionWebImpl : public IDispatchImpl<IAppVersionWeb> {
 class CurrentStateImpl : public IDispatchImpl<ICurrentState> {
  public:
   CurrentStateImpl()
-      : IDispatchImpl<ICurrentState>(
-            {{__uuidof(ICurrentStateUser), __uuidof(ICurrentState)}},
-            {{__uuidof(ICurrentStateSystem), __uuidof(ICurrentState)}}) {}
+      : IDispatchImpl<ICurrentState>(IID_MAPS_USERSYSTEM(ICurrentState)) {}
   CurrentStateImpl(const CurrentStateImpl&) = delete;
   CurrentStateImpl& operator=(const CurrentStateImpl&) = delete;
 
@@ -343,8 +339,7 @@ class CurrentStateImpl : public IDispatchImpl<ICurrentState> {
 class AppWebImpl : public IDispatchImpl<IAppWeb> {
  public:
   AppWebImpl()
-      : IDispatchImpl<IAppWeb>({{__uuidof(IAppWebUser), __uuidof(IAppWeb)}},
-                               {{__uuidof(IAppWebSystem), __uuidof(IAppWeb)}}),
+      : IDispatchImpl<IAppWeb>(IID_MAPS_USERSYSTEM(IAppWeb)),
         task_runner_(base::ThreadPool::CreateSequencedTaskRunner(
             {base::MayBlock(), base::WithBaseSyncPrimitives()})) {}
   AppWebImpl(const AppWebImpl&) = delete;
@@ -474,7 +469,7 @@ class AppWebImpl : public IDispatchImpl<IAppWeb> {
       return E_FAIL;
     }
 
-    return Microsoft::WRL::MakeAndInitialize<AppVersionWebImpl>(
+    return MakeAndInitializeComObject<AppVersionWebImpl>(
         current, base::ASCIIToWide(result->current_version->GetString()));
   }
 
@@ -485,12 +480,12 @@ class AppWebImpl : public IDispatchImpl<IAppWeb> {
       return E_FAIL;
     }
 
-    return Microsoft::WRL::MakeAndInitialize<AppVersionWebImpl>(
+    return MakeAndInitializeComObject<AppVersionWebImpl>(
         next, base::ASCIIToWide(state_update_->next_version.GetString()));
   }
 
   IFACEMETHODIMP get_command(BSTR command_id, IDispatch** command) override {
-    return Microsoft::WRL::MakeAndInitialize<LegacyAppCommandWebImpl>(
+    return MakeAndInitializeComObject<LegacyAppCommandWebImpl>(
         command, GetUpdaterScope(), base::UTF8ToWide(app_id_), command_id);
   }
 
@@ -583,7 +578,7 @@ class AppWebImpl : public IDispatchImpl<IAppWeb> {
           (result_.value() == UpdateService::Result::kSuccess) ? 0 : -1;
     }
 
-    return Microsoft::WRL::MakeAndInitialize<CurrentStateImpl>(
+    return MakeAndInitializeComObject<CurrentStateImpl>(
         current_state, state_value, available_version, bytes_downloaded,
         total_bytes_to_download,
         /*download_time_remaining_ms=*/-1,
@@ -649,9 +644,7 @@ class AppWebImpl : public IDispatchImpl<IAppWeb> {
 class AppBundleWebImpl : public IDispatchImpl<IAppBundleWeb> {
  public:
   AppBundleWebImpl()
-      : IDispatchImpl<IAppBundleWeb>(
-            {{__uuidof(IAppBundleWebUser), __uuidof(IAppBundleWeb)}},
-            {{__uuidof(IAppBundleWebSystem), __uuidof(IAppBundleWeb)}}) {}
+      : IDispatchImpl<IAppBundleWeb>(IID_MAPS_USERSYSTEM(IAppBundleWeb)) {}
   AppBundleWebImpl(const AppBundleWebImpl&) = delete;
   AppBundleWebImpl& operator=(const AppBundleWebImpl&) = delete;
 
@@ -669,8 +662,8 @@ class AppBundleWebImpl : public IDispatchImpl<IAppBundleWeb> {
     }
 
     is_install_ = true;
-    return Microsoft::WRL::MakeAndInitialize<AppWebImpl>(
-        &app_web_, app_id, UpdateService::PolicySameVersionUpdate::kAllowed);
+    return MakeAndInitializeComObject<AppWebImpl>(
+        app_web_, app_id, UpdateService::PolicySameVersionUpdate::kAllowed);
   }
 
   IFACEMETHODIMP createInstalledApp(BSTR app_id) override {
@@ -681,8 +674,8 @@ class AppBundleWebImpl : public IDispatchImpl<IAppBundleWeb> {
     }
 
     is_install_ = false;
-    return Microsoft::WRL::MakeAndInitialize<AppWebImpl>(
-        &app_web_, app_id, UpdateService::PolicySameVersionUpdate::kNotAllowed);
+    return MakeAndInitializeComObject<AppWebImpl>(
+        app_web_, app_id, UpdateService::PolicySameVersionUpdate::kNotAllowed);
   }
 
   IFACEMETHODIMP createAllInstalledApps() override {
@@ -783,17 +776,15 @@ class AppBundleWebImpl : public IDispatchImpl<IAppBundleWeb> {
 };
 
 LegacyOnDemandImpl::LegacyOnDemandImpl()
-    : IDispatchImpl<IGoogleUpdate3Web>(
-          {{__uuidof(IGoogleUpdate3WebUser), __uuidof(IGoogleUpdate3Web)}},
-          {{__uuidof(IGoogleUpdate3WebSystem), __uuidof(IGoogleUpdate3Web)}}) {}
+    : IDispatchImpl<IGoogleUpdate3Web>(IID_MAPS_USERSYSTEM(IGoogleUpdate3Web)) {
+}
 
 LegacyOnDemandImpl::~LegacyOnDemandImpl() = default;
 
 STDMETHODIMP LegacyOnDemandImpl::createAppBundleWeb(
     IDispatch** app_bundle_web) {
   CHECK(app_bundle_web);
-
-  return Microsoft::WRL::MakeAndInitialize<AppBundleWebImpl>(app_bundle_web);
+  return MakeAndInitializeComObject<AppBundleWebImpl>(app_bundle_web);
 }
 
 LegacyProcessLauncherImpl::LegacyProcessLauncherImpl() = default;
@@ -858,9 +849,7 @@ STDMETHODIMP LegacyProcessLauncherImpl::LaunchCmdLineEx(
 }
 
 LegacyAppCommandWebImpl::LegacyAppCommandWebImpl()
-    : IDispatchImpl<IAppCommandWeb>(
-          {{__uuidof(IAppCommandWebUser), __uuidof(IAppCommandWeb)}},
-          {{__uuidof(IAppCommandWebSystem), __uuidof(IAppCommandWeb)}}) {}
+    : IDispatchImpl<IAppCommandWeb>(IID_MAPS_USERSYSTEM(IAppCommandWeb)) {}
 LegacyAppCommandWebImpl::~LegacyAppCommandWebImpl() = default;
 
 HRESULT LegacyAppCommandWebImpl::RuntimeClassInitialize(
@@ -936,12 +925,12 @@ STDMETHODIMP LegacyAppCommandWebImpl::execute(VARIANT substitution1,
 
 PolicyStatusImpl::PolicyStatusImpl()
     : IDispatchImpl<IPolicyStatus3, IPolicyStatus2, IPolicyStatus>(
-          {{__uuidof(IPolicyStatus3User), __uuidof(IPolicyStatus3)},
-           {__uuidof(IPolicyStatus2User), __uuidof(IPolicyStatus2)},
-           {__uuidof(IPolicyStatusUser), __uuidof(IPolicyStatus)}},
-          {{__uuidof(IPolicyStatus3System), __uuidof(IPolicyStatus3)},
-           {__uuidof(IPolicyStatus2System), __uuidof(IPolicyStatus2)},
-           {__uuidof(IPolicyStatusSystem), __uuidof(IPolicyStatus)}}),
+          {IID_MAP_ENTRY_USER(IPolicyStatus3),
+           IID_MAP_ENTRY_USER(IPolicyStatus2),
+           IID_MAP_ENTRY_USER(IPolicyStatus)},
+          {IID_MAP_ENTRY_SYSTEM(IPolicyStatus3),
+           IID_MAP_ENTRY_SYSTEM(IPolicyStatus2),
+           IID_MAP_ENTRY_SYSTEM(IPolicyStatus)}),
       policy_service_(
           AppServerSingletonInstance()->config()->GetPolicyService()) {}
 PolicyStatusImpl::~PolicyStatusImpl() = default;
@@ -1386,10 +1375,10 @@ PolicyStatusValueImpl::PolicyStatusValueImpl()
 PolicyStatusValueImpl::~PolicyStatusValueImpl() = default;
 
 template <typename T>
-HRESULT PolicyStatusValueImpl::Create(
+[[nodiscard]] HRESULT PolicyStatusValueImpl::Create(
     const T& value,
     IPolicyStatusValue** policy_status_value) {
-  return Microsoft::WRL::MakeAndInitialize<PolicyStatusValueImpl>(
+  return MakeAndInitializeComObject<PolicyStatusValueImpl>(
       policy_status_value,
       value.effective_policy() ? value.effective_policy()->source : "",
       value.effective_policy()

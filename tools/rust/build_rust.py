@@ -74,6 +74,9 @@ EXCLUDED_TESTS = [
     os.path.join('tests', 'codegen', 'sanitizer-cfi-emit-type-checks.rs'),
     os.path.join('tests', 'codegen',
                  'sanitizer-cfi-emit-type-metadata-itanium-cxx-abi.rs'),
+    # https://github.com/rust-lang/rust/issues/96464 used to be Windows only but
+    # now fails everywhere.
+    os.path.join('tests', 'codegen', 'vec-shrink-panik.rs'),
     # https://github.com/rust-lang/rust/issues/109671 the test is being
     # optimized in newer LLVM which breaks its expectations.
     os.path.join('tests', 'ui', 'abi', 'stack-protector.rs'),
@@ -85,8 +88,6 @@ EXCLUDED_TESTS = [
     os.path.join('tests', 'ui', 'numeric', 'numeric-cast.rs'),
 ]
 EXCLUDED_TESTS_WINDOWS = [
-    # https://github.com/rust-lang/rust/issues/96464
-    os.path.join('tests', 'codegen', 'vec-shrink-panik.rs'),
     # TODO(crbug.com/1442943): Re-enable when fixed.
     os.path.join('tests', 'ui', 'native-library-link-flags',
                  'msvc-non-utf8-output.rs'),
@@ -536,11 +537,12 @@ def MakeVersionStamp(git_hash):
 
 def GetLatestRustCommit():
     """Get the latest commit hash in the LLVM monorepo."""
+    url = (
+        'https://chromium.googlesource.com/external/' +
+        'github.com/rust-lang/rust/+/refs/heads/master?format=JSON'  # nocheck
+    )
     main = json.loads(
-        urllib.request.urlopen('https://chromium.googlesource.com/external/' +
-                               'github.com/rust-lang/rust/' +
-                               '+/refs/heads/main?format=JSON').read().decode(
-                                   "utf-8").replace(")]}'", ""))
+        urllib.request.urlopen(url).read().decode("utf-8").replace(")]}'", ""))
     return main['commit']
 
 

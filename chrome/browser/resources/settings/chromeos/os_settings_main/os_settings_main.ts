@@ -98,14 +98,6 @@ export class OsSettingsMainElement extends OsSettingsMainElementBase {
 
       showArcvmManageUsb: Boolean,
 
-      showCrostini: Boolean,
-
-      showReset: Boolean,
-
-      showStartup: Boolean,
-
-      showKerberosSection: Boolean,
-
       havePlayStoreApp: Boolean,
     };
   }
@@ -116,10 +108,6 @@ export class OsSettingsMainElement extends OsSettingsMainElementBase {
   pageAvailability: OsPageAvailability;
   showAndroidApps: boolean;
   showArcvmManageUsb: boolean;
-  showCrostini: boolean;
-  showReset: boolean;
-  showStartup: boolean;
-  showKerberosSection: boolean;
   havePlayStoreApp: boolean;
   private overscroll_: number;
   private showPages_: MainPageVisibility;

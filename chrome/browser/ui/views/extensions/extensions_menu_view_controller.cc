@@ -7,12 +7,14 @@
 #include "base/functional/bind.h"
 #include "base/i18n/case_conversion.h"
 #include "base/notreached.h"
+#include "chrome/browser/extensions/extension_action_runner.h"
 #include "chrome/browser/extensions/site_permissions_helper.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/extensions/extension_action_view_controller.h"
 #include "chrome/browser/ui/extensions/extensions_container.h"
 #include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
+#include "chrome/browser/ui/toolbar/toolbar_action_view_controller.h"
 #include "chrome/browser/ui/views/chrome_layout_provider.h"
 #include "chrome/browser/ui/views/extensions/extensions_dialogs_utils.h"
 #include "chrome/browser/ui/views/extensions/extensions_menu_item_view.h"
@@ -302,6 +304,50 @@ void ExtensionsMenuViewController::OnSiteAccessSelected(
                                GetActiveWebContents(), site_access);
 }
 
+void ExtensionsMenuViewController::OnExtensionToggleSelected(
+    extensions::ExtensionId extension_id,
+    bool is_on) {
+  const extensions::Extension* extension = GetExtension(browser_, extension_id);
+  content::WebContents* web_contents = GetActiveWebContents();
+  CHECK(CanUserCustomizeExtensionSiteAccess(*extension, *browser_->profile(),
+                                            *toolbar_model_, *web_contents));
+
+  // Toggling the button off removes site access.
+  SitePermissionsHelper permissions_helper(browser_->profile());
+  if (!is_on) {
+    // TODO(crbug.com/1433399): Clear tab permissions for extension.
+    permissions_helper.UpdateSiteAccess(
+        *extension, web_contents, PermissionsManager::UserSiteAccess::kOnClick);
+    return;
+  }
+
+  // Toggling the button on grants site access. Note that extension should
+  // currently have "on click" access.
+  auto* permissions_manager = PermissionsManager::Get(browser_->profile());
+  DCHECK_EQ(permissions_manager->GetUserSiteAccess(
+                *GetExtension(browser_, extension_id),
+                GetActiveWebContents()->GetLastCommittedURL()),
+            PermissionsManager::UserSiteAccess::kOnClick);
+
+  // If user can select "on site" access (that means the extension requested
+  // access to that site), then we update site access to "on site".
+  if (permissions_manager->CanUserSelectSiteAccess(
+          *extension, web_contents->GetLastCommittedURL(),
+          PermissionsManager::UserSiteAccess::kOnSite)) {
+    permissions_helper.UpdateSiteAccess(
+        *extension, web_contents, PermissionsManager::UserSiteAccess::kOnSite);
+    return;
+  }
+
+  // Otherwise just grant one-time tab permissions.
+  extensions::ExtensionActionRunner* action_runner =
+      extensions::ExtensionActionRunner::GetForWebContents(web_contents);
+  if (!action_runner) {
+    return;
+  }
+  action_runner->GrantTabPermissions({extension});
+}
+
 void ExtensionsMenuViewController::TabChangedAt(content::WebContents* contents,
                                                 int index,
                                                 TabChangeType change_type) {
@@ -352,7 +398,6 @@ void ExtensionsMenuViewController::UpdateMainPage(
     ExtensionsMenuMainPageView* main_page,
     content::WebContents* web_contents) {
   CHECK(web_contents);
-
   std::u16string current_site = GetCurrentHost(web_contents);
   bool is_site_settings_toggle_visible =
       IsSiteSettingsToggleVisible(*toolbar_model_, web_contents);
@@ -389,9 +434,8 @@ void ExtensionsMenuViewController::UpdateSitePermissionsPage(
   extensions::ExtensionId extension_id = site_permissions_page->extension_id();
   const int icon_size = ChromeLayoutProvider::Get()->GetDistanceMetric(
       DISTANCE_EXTENSIONS_MENU_EXTENSION_ICON_SIZE);
-  std::unique_ptr<ExtensionActionViewController> action_controller =
-      ExtensionActionViewController::Create(extension_id, browser_,
-                                            extensions_container_);
+  ToolbarActionViewController* action_controller =
+      extensions_container_->GetActionForId(extension_id);
 
   std::u16string extension_name = action_controller->GetActionName();
   ui::ImageModel extension_icon = action_controller->GetIcon(

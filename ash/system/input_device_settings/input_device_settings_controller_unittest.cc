@@ -81,6 +81,16 @@ const ui::TouchpadDevice kSampleTouchpadInternal(1,
                                                  0x1111,
                                                  0x4444,
                                                  0);
+const ui::TouchpadDevice kSampleHapticTouchpadInternal(
+    25,
+    ui::INPUT_DEVICE_INTERNAL,
+    "kSampleHapticTouchpadInternal",
+    "",
+    base::FilePath(),
+    0x1111,
+    0x4444,
+    0,
+    true);
 const ui::InputDevice kSamplePointingStickInternal(
     2,
     ui::INPUT_DEVICE_INTERNAL,
@@ -444,7 +454,7 @@ TEST_F(InputDeviceSettingsControllerTest, KeyboardSettingsAreValid) {
 }
 
 TEST_F(InputDeviceSettingsControllerTest,
-       RecordSetKeyboardSetttingsValidMetric) {
+       RecordSetKeyboardSettingsValidMetric) {
   base::HistogramTester histogram_tester;
   ui::DeviceDataManagerTestApi().SetKeyboardDevices({kSampleKeyboardInternal});
   controller_->SetKeyboardSettings((DeviceId)kSampleKeyboardInternal.id,
@@ -464,24 +474,45 @@ TEST_F(InputDeviceSettingsControllerTest,
 }
 
 TEST_F(InputDeviceSettingsControllerTest,
-       RecordSetTouchpadSetttingsValidMetric) {
+       RecordSetTouchpadSettingsValidMetric) {
   base::HistogramTester histogram_tester;
   ui::DeviceDataManagerTestApi().SetTouchpadDevices({kSampleTouchpadInternal});
+
+  // Set non-haptic touchpad with valid settings.
+  auto settings = mojom::TouchpadSettings::New();
+  settings->haptic_enabled = kDefaultHapticFeedbackEnabled;
+  settings->haptic_sensitivity = kDefaultHapticSensitivity;
   controller_->SetTouchpadSettings((DeviceId)kSampleTouchpadInternal.id,
-                                   mojom::TouchpadSettings::New());
+                                   settings->Clone());
   histogram_tester.ExpectBucketCount(
       "ChromeOS.Settings.Device.Touchpad.SetSettingsSucceeded", true,
       /*expected_count=*/1u);
 
-  // Set touchpad with invalid id.
+  // Set non-haptic touchpad with invalid id.
   controller_->SetTouchpadSettings(/*id=*/4, mojom::TouchpadSettings::New());
   histogram_tester.ExpectBucketCount(
       "ChromeOS.Settings.Device.Touchpad.SetSettingsSucceeded", false,
       /*expected_count=*/1u);
+
+  // Set non-haptic touchpad with invalid settings.
+  controller_->SetTouchpadSettings((DeviceId)kSampleTouchpadInternal.id,
+                                   mojom::TouchpadSettings::New());
+  histogram_tester.ExpectBucketCount(
+      "ChromeOS.Settings.Device.Touchpad.SetSettingsSucceeded", false,
+      /*expected_count=*/2u);
+
+  // Set haptic touchpad with valid settings.
+  ui::DeviceDataManagerTestApi().SetTouchpadDevices(
+      {kSampleHapticTouchpadInternal});
+  controller_->SetTouchpadSettings((DeviceId)kSampleHapticTouchpadInternal.id,
+                                   mojom::TouchpadSettings::New());
+  histogram_tester.ExpectBucketCount(
+      "ChromeOS.Settings.Device.Touchpad.SetSettingsSucceeded", true,
+      /*expected_count=*/2u);
 }
 
 TEST_F(InputDeviceSettingsControllerTest,
-       RecordSetPointingStickSetttingsValidMetric) {
+       RecordSetPointingStickSettingsValidMetric) {
   base::HistogramTester histogram_tester;
   ui::DeviceDataManagerTestApi().SetPointingStickDevices(
       {kSamplePointingStickInternal});
@@ -500,7 +531,7 @@ TEST_F(InputDeviceSettingsControllerTest,
       /*expected_count=*/1u);
 }
 
-TEST_F(InputDeviceSettingsControllerTest, RecordSetMouseSetttingsValidMetric) {
+TEST_F(InputDeviceSettingsControllerTest, RecordSetMouseSettingsValidMetric) {
   base::HistogramTester histogram_tester;
   ui::DeviceDataManagerTestApi().SetMouseDevices({kSampleMouseUsb});
   controller_->SetMouseSettings((DeviceId)kSampleMouseUsb.id,
@@ -578,8 +609,11 @@ TEST_F(InputDeviceSettingsControllerTest, RecordsMetricsSettings) {
 
   // Test Metrics Updates when setTouchpadSettings is called.
   controller_->OnTouchpadListUpdated({kSampleTouchpadInternal}, {});
+  auto settings = mojom::TouchpadSettings::New();
+  settings->haptic_enabled = kDefaultHapticFeedbackEnabled;
+  settings->haptic_sensitivity = kDefaultHapticSensitivity;
   controller_->SetTouchpadSettings(kSampleTouchpadInternal.id,
-                                   mojom::TouchpadSettings::New());
+                                   settings.Clone());
   histogram_tester.ExpectTotalCount(
       "ChromeOS.Settings.Device.Touchpad.Internal.AccelerationEnabled.Changed",
       /*expected_count=*/1u);

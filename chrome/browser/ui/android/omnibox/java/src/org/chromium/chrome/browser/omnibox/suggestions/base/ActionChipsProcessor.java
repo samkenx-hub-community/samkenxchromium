@@ -12,13 +12,13 @@ import androidx.annotation.NonNull;
 import androidx.collection.ArraySet;
 
 import org.chromium.chrome.browser.omnibox.R;
-import org.chromium.chrome.browser.omnibox.suggestions.ActionChipsDelegate;
 import org.chromium.chrome.browser.omnibox.suggestions.SuggestionHost;
-import org.chromium.chrome.browser.omnibox.suggestions.SuggestionsMetrics;
 import org.chromium.components.browser_ui.widget.chips.ChipProperties;
 import org.chromium.components.omnibox.AutocompleteMatch;
 import org.chromium.components.omnibox.EntityInfoProto;
+import org.chromium.components.omnibox.OmniboxMetrics;
 import org.chromium.components.omnibox.action.OmniboxAction;
+import org.chromium.components.omnibox.action.OmniboxActionDelegate;
 import org.chromium.components.omnibox.action.OmniboxActionInSuggest;
 import org.chromium.components.omnibox.action.OmniboxActionType;
 import org.chromium.components.omnibox.action.OmniboxPedal;
@@ -33,7 +33,7 @@ import java.util.Set;
  */
 public class ActionChipsProcessor {
     private final @NonNull Context mContext;
-    private final @NonNull ActionChipsDelegate mActionChipsDelegate;
+    private final @NonNull OmniboxActionDelegate mOmniboxActionDelegate;
     private final @NonNull SuggestionHost mSuggestionHost;
     private final @NonNull Set<Integer> mLastVisiblePedals = new ArraySet<>();
     private final @NonNull SparseBooleanArray mActionInSuggestShownOrUsed =
@@ -44,13 +44,13 @@ public class ActionChipsProcessor {
     /**
      * @param context An Android context.
      * @param suggestionHost Component receiving suggestion events.
-     * @param actionChipsDelegate A delegate that will responsible for pedals.
+     * @param omniboxActionDelegate A delegate that will responsible for pedals.
      */
     public ActionChipsProcessor(@NonNull Context context, @NonNull SuggestionHost suggestionHost,
-            @NonNull ActionChipsDelegate actionChipsDelegate) {
+            @NonNull OmniboxActionDelegate omniboxActionDelegate) {
         mContext = context;
         mSuggestionHost = suggestionHost;
-        mActionChipsDelegate = actionChipsDelegate;
+        mOmniboxActionDelegate = omniboxActionDelegate;
 
         // TODO(crbug/1418077): Migrate this to OmniboxActionInSuggest along with execute logic.
         var pm = mContext.getPackageManager();
@@ -163,7 +163,7 @@ public class ActionChipsProcessor {
     private void executeAction(@NonNull OmniboxAction action, int position) {
         switch (action.actionId) {
             case OmniboxActionType.HISTORY_CLUSTERS:
-                SuggestionsMetrics.recordResumeJourneyClick(position);
+                OmniboxMetrics.recordResumeJourneyClick(position);
                 break;
 
             case OmniboxActionType.ACTION_IN_SUGGEST:
@@ -173,7 +173,7 @@ public class ActionChipsProcessor {
                 break;
         }
         mSuggestionHost.finishInteraction();
-        mActionChipsDelegate.execute(action);
+        mOmniboxActionDelegate.execute(action);
     }
 
     /**
@@ -183,19 +183,19 @@ public class ActionChipsProcessor {
      */
     private void recordActionsShown() {
         for (Integer pedal : mLastVisiblePedals) {
-            SuggestionsMetrics.recordPedalShown(pedal);
+            OmniboxMetrics.recordPedalShown(pedal);
         }
 
         for (var actionIndex = 0; actionIndex < mActionInSuggestShownOrUsed.size(); actionIndex++) {
             int actionType = mActionInSuggestShownOrUsed.keyAt(actionIndex);
             boolean wasUsed = mActionInSuggestShownOrUsed.valueAt(actionIndex);
-            SuggestionsMetrics.recordActionInSuggestShown(actionType);
+            OmniboxMetrics.recordActionInSuggestShown(actionType);
             if (wasUsed) {
-                SuggestionsMetrics.recordActionInSuggestUsed(actionType);
+                OmniboxMetrics.recordActionInSuggestUsed(actionType);
             }
         }
 
-        SuggestionsMetrics.recordResumeJourneyShown(mJourneysActionShownPosition);
+        OmniboxMetrics.recordResumeJourneyShown(mJourneysActionShownPosition);
 
         mJourneysActionShownPosition = -1;
         mLastVisiblePedals.clear();

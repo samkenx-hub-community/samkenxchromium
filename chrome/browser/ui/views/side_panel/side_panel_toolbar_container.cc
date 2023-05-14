@@ -10,8 +10,10 @@
 #include "base/memory/raw_ptr.h"
 #include "base/metrics/user_metrics.h"
 #include "chrome/app/vector_icons/vector_icons.h"
+#include "chrome/browser/feature_engagement/tracker_factory.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/browser_element_identifiers.h"
 #include "chrome/browser/ui/side_panel/companion/companion_utils.h"
 #include "chrome/browser/ui/ui_features.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
@@ -23,6 +25,7 @@
 #include "chrome/browser/ui/views/toolbar/side_panel_toolbar_button.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/grit/generated_resources.h"
+#include "components/feature_engagement/public/feature_constants.h"
 #include "components/prefs/pref_service.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/models/dialog_model_menu_model_adapter.h"
@@ -68,6 +71,11 @@ void SidePanelToolbarContainer::PinnedSidePanelToolbarButton::ButtonPressed() {
     coordinator->Show(
         id_, SidePanelUtil::SidePanelOpenTrigger::kPinnedEntryToolbarButton);
   }
+  // Close IPH for companion if shown and record usage for side panel promo.
+  browser_view_->NotifyFeatureEngagementEvent(
+      "companion_side_panel_accessed_via_toolbar_button");
+  browser_view_->CloseFeaturePromo(
+      feature_engagement::kIPHCompanionSidePanelFeature);
 }
 
 void SidePanelToolbarContainer::PinnedSidePanelToolbarButton::
@@ -181,9 +189,10 @@ void SidePanelToolbarContainer::CreatePinnedEntryButtons() {
   auto* search_companion_coordinator =
       SearchCompanionSidePanelCoordinator::GetOrCreateForBrowser(
           browser_view_->browser());
-  AddPinnedEntryButtonFor(SidePanelEntry::Id::kSearchCompanion,
-                          search_companion_coordinator->name(),
-                          search_companion_coordinator->icon());
+  AddPinnedEntryButtonFor(
+      SidePanelEntry::Id::kSearchCompanion,
+      search_companion_coordinator->GetTooltipForToolbarButton(),
+      search_companion_coordinator->icon());
 }
 
 void SidePanelToolbarContainer::AddPinnedEntryButtonFor(
@@ -195,6 +204,8 @@ void SidePanelToolbarContainer::AddPinnedEntryButtonFor(
   }
   auto button = std::make_unique<PinnedSidePanelToolbarButton>(browser_view_,
                                                                id, name, icon);
+  button->SetProperty(views::kElementIdentifierKey,
+                      kSidePanelCompanionToolbarButtonElementId);
   button->SetVisible(false);
   ObserveButton(button.get());
   pinned_button_visibility_change_subscription_ =
@@ -246,12 +257,7 @@ void SidePanelToolbarContainer::UpdateSidePanelContainerButtonsState() {
       pinned_button->SetHighlighted(false);
     }
   }
-  // TODO(corising): Update tooltip for case when pinned button is highlighted
-  // once provided by UX.
   GetSidePanelButton()->SetHighlighted(side_panel_button_highlighted);
-  GetSidePanelButton()->SetTooltipText(l10n_util::GetStringUTF16(
-      side_panel_visible ? IDS_TOOLTIP_SIDE_PANEL_HIDE
-                         : IDS_TOOLTIP_SIDE_PANEL_SHOW));
 }
 
 bool SidePanelToolbarContainer::HasPinnedEntryButtonFor(SidePanelEntry::Id id) {

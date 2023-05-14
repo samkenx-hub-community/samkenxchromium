@@ -5,28 +5,35 @@
 import {CrButtonElement} from 'chrome://resources/cr_elements/cr_button/cr_button.js';
 import {CrDialogElement} from 'chrome://resources/cr_elements/cr_dialog/cr_dialog.js';
 
+import {calculateBulkPinRequiredSpace} from '../common/js/api.js';
 import {str, strf, util} from '../common/js/util.js';
-import {} from '../foreground/elements/files_spinner.js';
+import {State as AppState} from '../externs/ts/state.js';
+import {getStore} from '../state/store.js';
 
 import {css, customElement, html, query, XfBase} from './xf_base.js';
 
 // Different flavors of the XfBulkPinningDialog.
-const enum State {
+const enum DialogState {
+  // The dialog is not displayed.
+  CLOSED,
+
   // Currently offline. Cannot compute space requirement for the time being.
-  OFFLINE = 'OFFLINE',
+  OFFLINE,
 
   // Listing files and computing space requirements.
-  LISTING = 'LISTING',
+  LISTING,
 
   // An error occurred while computing the space requirements.
-  ERROR = 'ERROR',
+  ERROR,
 
   // There isn't enough space to activate the bulk-pinning feature.
-  NOT_ENOUGH_SPACE = 'NOT_ENOUGH_SPACE',
+  NOT_ENOUGH_SPACE,
 
   // Computed space requirements and ready to activate the bulk-pinning feature.
-  READY = 'READY',
+  READY,
 }
+
+const BulkPinStage = chrome.fileManagerPrivate.BulkPinStage;
 
 /**
  * Dialog that shows the benefits of enabling bulk pinning along with storage
@@ -35,7 +42,6 @@ const enum State {
 @customElement('xf-bulk-pinning-dialog')
 export class XfBulkPinningDialog extends XfBase {
   @query('cr-dialog') private $dialog_!: CrDialogElement;
-  @query('#point1') private $point1_!: HTMLElement;
   @query('#continue-button') private $button_!: CrButtonElement;
   @query('#offline-footer') private $offlineFooter_!: HTMLElement;
   @query('#listing-footer') private $listingFooter_!: HTMLElement;
@@ -44,27 +50,102 @@ export class XfBulkPinningDialog extends XfBase {
   private $notEnoughSpaceFooter_!: HTMLElement;
   @query('#ready-footer') private $readyFooter_!: HTMLElement;
 
-  requiredBytes = 0;
-  freeBytes = 0;
+  private store_ = getStore();
+  private stage_ = '';
+  private requiredBytes_ = 0;
+  private freeBytes_ = 0;
 
-  set state(s: State) {
-    // Show the footer matching the given state.
-    this.$offlineFooter_.style.display = s === State.OFFLINE ? 'flex' : 'none';
-    this.$listingFooter_.style.display = s === State.LISTING ? 'flex' : 'none';
-    this.$errorFooter_.style.display = s === State.ERROR ? 'flex' : 'none';
-    this.$notEnoughSpaceFooter_.style.display =
-        s === State.NOT_ENOUGH_SPACE ? 'flex' : 'none';
-    this.$readyFooter_.style.display = s === State.READY ? 'flex' : 'none';
-    // Enable or disable the 'Continue' button according to the given state.
-    this.$button_.disabled = s !== State.READY;
+  // Called when the app has changed state.
+  onStateChanged(state: AppState) {
+    // If bulk-pinning gets enabled while this dialog is open, just cancel this
+    // dialog.
+    if (state.preferences?.driveFsBulkPinningEnabled) {
+      this.onCancel();
+      return;
+    }
+
+    // We're only interested in the bulk-pinning part of the app state.
+    const bpp = state.bulkPinning;
+    if (!bpp) {
+      return;
+    }
+
+    if (this.freeBytes_ !== bpp.freeSpaceBytes ||
+        this.requiredBytes_ !== bpp.requiredSpaceBytes) {
+      this.freeBytes_ = bpp.freeSpaceBytes;
+      this.requiredBytes_ = bpp.requiredSpaceBytes;
+      this.$readyFooter_.innerText = strf(
+          'BULK_PINNING_SPACE', util.bytesToString(this.requiredBytes_),
+          util.bytesToString(this.freeBytes_ - this.requiredBytes_));
+    }
+
+    if (bpp.stage === this.stage_) {
+      return;
+    }
+
+    this.stage_ = bpp.stage;
+    switch (bpp.stage) {
+      case BulkPinStage.PAUSED:
+        this.state = DialogState.OFFLINE;
+        break;
+
+      case BulkPinStage.GETTING_FREE_SPACE:
+      case BulkPinStage.LISTING_FILES:
+        this.state = DialogState.LISTING;
+        break;
+
+      case BulkPinStage.SUCCESS:
+        this.state = DialogState.READY;
+        break;
+
+      case BulkPinStage.SYNCING:
+        this.$dialog_.close();
+        break;
+
+      case BulkPinStage.NOT_ENOUGH_SPACE:
+        this.state = DialogState.NOT_ENOUGH_SPACE;
+        break;
+
+      default:
+        console.warn(
+            `Cannot calculate bulk-pinning space requirements: ${this.stage_}`);
+        this.state = DialogState.ERROR;
+        break;
+    }
   }
 
-  show() {
-    this.$point1_.innerHTML = str('BULK_PINNING_POINT_1');
-    this.$readyFooter_.innerText = strf(
-        'BULK_PINNING_SPACE', util.bytesToString(this.requiredBytes),
-        util.bytesToString(this.freeBytes - this.requiredBytes));
+  // Shows the footer matching the given state.
+  // Enables or disables the 'Continue' button according to the given state.
+  set state(s: DialogState) {
+    this.$offlineFooter_.style.display =
+        s === DialogState.OFFLINE ? 'initial' : 'none';
+    this.$listingFooter_.style.display =
+        s === DialogState.LISTING ? 'flex' : 'none';
+    this.$errorFooter_.style.display =
+        s === DialogState.ERROR ? 'initial' : 'none';
+    this.$notEnoughSpaceFooter_.style.display =
+        s === DialogState.NOT_ENOUGH_SPACE ? 'initial' : 'none';
+    this.$readyFooter_.style.display =
+        s === DialogState.READY ? 'initial' : 'none';
+
+    this.$button_.disabled = s !== DialogState.READY;
+  }
+
+  async show() {
+    this.state = DialogState.LISTING;
     this.$dialog_.showModal();
+    this.store_.subscribe(this);
+    try {
+      await calculateBulkPinRequiredSpace();
+    } catch (e) {
+      console.error('Cannot calculate bulk-pinning required space', e);
+      this.state = DialogState.ERROR;
+    }
+  }
+
+  private onClose(_: Event) {
+    this.state = DialogState.CLOSED;
+    this.store_.unsubscribe(this);
   }
 
   private onContinue() {
@@ -78,9 +159,13 @@ export class XfBulkPinningDialog extends XfBase {
     this.$dialog_.cancel();
   }
 
-  /**
-   * Called when the "View storage" link is clicked.
-   */
+  // Called when the "Learn more" link is clicked.
+  private onLearnMore(e: UIEvent) {
+    e.preventDefault();
+    util.visitURL(str('GOOGLE_DRIVE_HELP_URL'));
+  }
+
+  // Called when the "View storage" link is clicked.
   private onViewStorage(e: UIEvent) {
     e.preventDefault();
     chrome.fileManagerPrivate.openSettingsSubpage('storage');
@@ -88,9 +173,9 @@ export class XfBulkPinningDialog extends XfBase {
 
   override render() {
     return html`
-      <cr-dialog>
+      <cr-dialog @close="${this.onClose}">
         <div slot="title">
-          <xf-icon type="drive_logo" size="large"></xf-icon>
+          <xf-icon type="drive_bulk_pinning" size="medium"></xf-icon>
           <div class="title">
             ${str('BULK_PINNING_TITLE')}
           </div>
@@ -98,15 +183,14 @@ export class XfBulkPinningDialog extends XfBase {
         <div slot="body">
           <div class="description">
             ${str('BULK_PINNING_EXPLANATION')}
+            <a href="_blank" @click="${this.onLearnMore}">
+              ${str('LEARN_MORE_LABEL')}
+            </a>
           </div>
           <ul>
             <li>
               <xf-icon type="my_files"></xf-icon>
-              <span id="point1"></span>
-            </li>
-            <li>
-              <xf-icon type="offline"></xf-icon>
-              ${str('BULK_PINNING_POINT_2')}
+              ${str('BULK_PINNING_POINT_1')}
             </li>
           </ul>
           <div id="offline-footer" class="offline-footer">
@@ -121,7 +205,6 @@ export class XfBulkPinningDialog extends XfBase {
           </div>
           <div id="not-enough-space-footer" class="error-footer">
             ${str('BULK_PINNING_NOT_ENOUGH_SPACE')}
-            &ensp;
             <a href="_blank" @click="${this.onViewStorage}">
               ${str('BULK_PINNING_VIEW_STORAGE')}
             </a>
@@ -143,16 +226,44 @@ export class XfBulkPinningDialog extends XfBase {
 
   static override get styles() {
     return css`
+      cr-dialog {
+        --cr-dialog-background-color: var(--cros-sys-dialog_container);
+        --cr-dialog-body-padding-horizontal: 0;
+        --cr-dialog-button-container-padding-bottom: 0;
+        --cr-dialog-button-container-padding-horizontal: 0;
+        --cr-dialog-title-slot-padding-bottom: 16px;
+        --cr-dialog-title-slot-padding-end: 0;
+        --cr-dialog-title-slot-padding-start: 0;
+        --cr-dialog-title-slot-padding-top: 0;
+        --cr-primary-text-color: var(--cros-sys-on_surface);
+        --cr-secondary-text-color: var(--cros-sys-on_surface_variant);
+      }
+
+      cr-dialog::part(dialog) {
+        border-radius: 20px;
+      }
+
+      cr-dialog::part(dialog)::backdrop {
+        background-color: var(--cros-sys-scrim);
+      }
+
+      cr-dialog::part(wrapper) {
+        padding: 32px;
+        padding-bottom: 28px;
+      }
+
       cr-dialog [slot="body"] {
-        color: var(--cros-sys-on_surface_variant);
         display: flex;
         flex-direction: column;
         font: var(--cros-body-1-font);
       }
 
+      cr-dialog [slot="button-container"] {
+        padding-top: 32px;
+      }
+
       cr-dialog [slot="title"] {
         align-items: center;
-        color: var(--cros-sys-on_surface);
         display: flex;
         font: var(--cros-display-7-font);
       }
@@ -181,7 +292,6 @@ export class XfBulkPinningDialog extends XfBase {
         border-radius: 0 0 12px 12px;
         border-top-style: none;
         color: var(--cros-sys-on_surface);
-        display: flex;
         padding: 16px;
       }
 
@@ -191,7 +301,6 @@ export class XfBulkPinningDialog extends XfBase {
         border-radius: 0 0 12px 12px;
         border-top-style: none;
         color: var(--cros-sys-on_error_container);
-        display: flex;
         padding: 16px;
       }
 
@@ -201,12 +310,11 @@ export class XfBulkPinningDialog extends XfBase {
         border-radius: 0 0 12px 12px;
         border-top-style: none;
         color: var(--cros-sys-on_surface_variant);
-        display: flex;
         padding: 16px;
       }
 
       a {
-        color: var(--cros-sys-on_error_container);
+        color: var(--cros-sys-primary);
       }
 
       files-spinner {

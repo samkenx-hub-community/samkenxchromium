@@ -133,7 +133,8 @@ class UserSigninMediatorTest : public PlatformTest {
               toBrowserState:browser_state_.get()])
         .andDo(^(NSInvocation* invocation) {
           NSLog(@" signInIdentity ");
-          authentication_service()->SignIn(identity_);
+          authentication_service()->SignIn(
+              identity_, signin_metrics::AccessPoint::ACCESS_POINT_UNKNOWN);
         });
     if (postSignInAction == PostSignInAction::kCommitSync) {
       OCMExpect(
@@ -509,7 +510,6 @@ TEST_F(UserSigninMediatorTest, CancelSyncAndStaySignin) {
   EXPECT_TRUE(completion_called);
   EXPECT_TRUE(authentication_service()->HasPrimaryIdentity(
       signin::ConsentLevel::kSignin));
-  EXPECT_FALSE(sync_setup_service_mock_->IsSyncRequested());
 }
 
 // Tests the following scenario:
@@ -521,7 +521,8 @@ TEST_F(UserSigninMediatorTest, OpenSettingsLinkWithDifferentIdentityAndCancel) {
   // Signs in with identity 2.
   id<SystemIdentity> identity2 = [FakeSystemIdentity fakeIdentity2];
   fake_system_identity_manager()->AddIdentity(identity2);
-  authentication_service()->SignIn(identity2);
+  authentication_service()->SignIn(
+      identity2, signin_metrics::AccessPoint::ACCESS_POINT_UNKNOWN);
 
   // Opens the settings link with identity 1.
   CreateAuthenticationFlow(PostSignInAction::kNone);
@@ -573,7 +574,8 @@ TEST_F(UserSigninMediatorTest,
                                      gaiaID:@"foo2ID"
                                        name:@"Fake Foo 2"];
   fake_system_identity_manager()->AddIdentity(identity2);
-  authentication_service()->SignIn(identity2);
+  authentication_service()->SignIn(
+      identity2, signin_metrics::AccessPoint::ACCESS_POINT_UNKNOWN);
 
   // Opens the settings link with identity 1.
   CreateAuthenticationFlow(PostSignInAction::kNone);

@@ -1107,6 +1107,9 @@ Style notes:
       <message name="IDS_ASH_AUTOCLICK_SCROLL_CLOSE" desc="The tooltip text for the automatic clicks menu option that results in the scrolling menu being closed.">
         Close
       </message>
+      <message name="IDS_ASH_AUTOCLICK_SCROLL_BUBBLE" desc="The name of a window showing autoclick scroll controls." is_accessibility_with_no_ui="true">
+        Scroll controls
+      </message>
       <message name="IDS_ASH_AUTOCLICK_DISABLE_CONFIRMATION_TEXT" desc="The text for the modal dialog shown when the user disables automatic clicks, to confirm they meant to disable the feature.">
         Are you sure you want to turn off automatic clicks?
       </message>
@@ -1489,6 +1492,14 @@ Style notes:
         Scanning
       </message>
 
+      <!--  Video Conference Speaking On Mute Nudge  -->
+      <message name="IDS_VIDEO_CONFERENCE_SPEAKING_ON_MUTE_OPT_IN_TITLE" desc="The title of the nudge shown to a user asking them to opt-in to the speaking on mute feature.">
+        Turn on mute nudge?
+      </message>
+      <message name="IDS_VIDEO_CONFERENCE_SPEAKING_ON_MUTE_OPT_IN_BODY" desc="The body of the nudge shown to a user asking them to opt-in to the speaking on mute feature.">
+        You’ll get notified if you talk while muted. Audio never leaves your device.
+      </message>
+
        <!-- Video Conference tray  -->
       <message name="IDS_ASH_VIDEO_CONFERENCE_TOGGLE_BUBBLE_BUTTON_TOOLTIP" desc="The tooltip for the toggle bubble button in the video conference tray.">
         Camera and audio controls
@@ -1528,7 +1539,7 @@ Style notes:
         Hide apps
       </message>
       <message name="IDS_ASH_VIDEO_CONFERENCE_BUBBLE_BACKGROUND_BLUR_NAME" desc="Text for name of the background blur effect in the VC bubble.">
-        Background Blur
+        Background blur
       </message>
       <message name="IDS_ASH_VIDEO_CONFERENCE_BUBBLE_BACKGROUND_BLUR_OFF" desc="Text for background blur 'off' setting, in the VC bubble.">
         Off
@@ -1536,7 +1547,7 @@ Style notes:
       <message name="IDS_ASH_VIDEO_CONFERENCE_BUBBLE_BACKGROUND_BLUR_LOWEST" desc="Text for background blur 'lowest' setting, in the VC bubble.">
         Lowest
       </message>
-      <message name="IDS_ASH_VIDEO_CONFERENCE_BUBBLE_BACKGROUND_BLUR_LIGHT" desc="Text for background blur 'light' setting, in the VC bubble.">
+      <message name="IDS_ASH_VIDEO_CONFERENCE_BUBBLE_BACKGROUND_BLUR_LIGHT" meaning="This describes the strength of background blur for a video conferencing background. In this case, `light` refers to the level of intensity, so this is a slight blur." desc="Text for background blur 'light' setting, in the VC bubble.">
         Light
       </message>
       <message name="IDS_ASH_VIDEO_CONFERENCE_BUBBLE_BACKGROUND_BLUR_MEDIUM" desc="Text for background blur 'medium' setting, in the VC bubble.">
@@ -1548,14 +1559,14 @@ Style notes:
       <message name="IDS_ASH_VIDEO_CONFERENCE_BUBBLE_BACKGROUND_BLUR_MAXIMUM" desc="Text for background blur 'maximum' setting, in the VC bubble.">
         Maximum
       </message>
-      <message name="IDS_ASH_VIDEO_CONFERENCE_BUBBLE_BACKGROUND_BLUR_FULL" desc="Text 'full' is a synonym of the background blur 'maximum' setting, in the VC bubble.">
+      <message name="IDS_ASH_VIDEO_CONFERENCE_BUBBLE_BACKGROUND_BLUR_FULL" meaning="This describes the strength of background blur for a video conferencing background. In this case, `full` refers to the level of intensity, so this is a full-strength, strongly blurred background." desc="Text 'full' is a synonym of the background blur 'maximum' setting, in the VC bubble.">
         Full
       </message>
       <message name="IDS_ASH_VIDEO_CONFERENCE_BUBBLE_PORTRAIT_RELIGHT_NAME" desc="Text for name of the portrait relight effect in the VC bubble, which is a toggle and effectively adjusts the users lighting.">
-        Adjust Lighting
+        Improve lighting
       </message>
       <message name="IDS_ASH_VIDEO_CONFERENCE_TOAST_SPEAK_ON_MUTE_DETECTED" desc="A toast message that we show when user tries to speak while muted on system-level.">
-        Are you speaking? You are on mute. Learn more
+        Are you talking? Your mic is off. Select the mic to turn it on.
       </message>
       <message name="IDS_ASH_VIDEO_CONFERENCE_TOAST_USE_WHILE_SOFTWARE_DISABLED" desc="A toast message that we show when an app tries to access camera or microphone while it is disabled by software.">
         <ph name="APP_NAME">$1<ex>Meet</ex></ph> wants to use your <ph name="DEVICE_NAME">$2<ex>camera</ex></ph>
@@ -2052,6 +2063,18 @@ Style notes:
       </message>
       <message name="IDS_ASH_SEARCH_RESULT_CATEGORY_LABEL_IMAGES" desc="Category title for the list of image results shown in launcher search relevant to the query in the search box.">
         Images
+      </message>
+      <message name="IDS_ASH_SEARCH_RESULT_IMAGE_FILE_SIZE" desc="The title for the file size of the image file search result, where the information is listed beside the launcher image result.">
+        Size
+      </message>
+      <message name="IDS_ASH_SEARCH_RESULT_IMAGE_DATE_MODIFIED" desc="The title for the last modified date of the image file search result, where the information is listed beside the launcher image result.">
+        Date modified
+      </message>
+      <message name="IDS_ASH_SEARCH_RESULT_IMAGE_FILE_TYPE" desc="The title for the file type of the image file search result, where the information is listed beside the launcher image result.">
+        Type
+      </message>
+      <message name="IDS_ASH_SEARCH_RESULT_IMAGE_FILE_LOCATION" desc="The title for the file location of the image file search result, where the information is listed beside the launcher image result.">
+        Location
       </message>
       <message name="IDS_ASH_SEARCH_RESULT_SEPARATOR" desc="Separator between the title and details text in ash search result view.">
         ''' - '''
@@ -2612,6 +2635,54 @@ Connect your device to power.
       <message name="IDS_ASH_STATUS_TRAY_ADD_CELLULAR_LABEL" desc="The label for button in network quick settings that allows user to add new cellular networks.">
         Add new cellular network
       </message>
+      <message name="IDS_ASH_STATUS_TRAY_HOTSPOT" desc="The title for hotspot feature pod in quick settings.">
+        Hotspot
+      </message>
+      <message name="IDS_ASH_STATUS_TRAY_HOTSPOT_STATUS_ON" desc="The sublabel for hotspot feature pod in quick settings to show hotspot is on.">
+        On
+      </message>
+      <message name="IDS_ASH_STATUS_TRAY_HOTSPOT_STATUS_OFF" desc="The sublabel for hotspot feature pod in quick settings to show hotspot is off.">
+        Off
+      </message>
+      <message name="IDS_ASH_STATUS_TRAY_HOTSPOT_STATUS_ENABLING" desc="The sublabel for hotspot feature pod in quick settings to show hotspot is enabling.">
+        Enabling...
+      </message>
+      <message name="IDS_ASH_STATUS_TRAY_HOTSPOT_STATUS_DISABLING" desc="The sublabel for hotspot feature pod in quick settings to show hotspot is disabling.">
+        Disabling...
+      </message>
+      <message name="IDS_ASH_STATUS_TRAY_HOTSPOT_FEATURE_TILE_DRILL_IN_TOOLTIP_STATUS_ON" desc="The tooltip for the drill in button in hotspot feature tile of quick settings when hotspot is on.">
+        Show hotspot details. Hotspot is on.
+      </message>
+      <message name="IDS_ASH_STATUS_TRAY_HOTSPOT_FEATURE_TILE_TOOLTIP_STATUS_ENABLING" desc="The tooltip for the hotspot feature tile of quick settings when hotspot is enabling.">
+        Show hotspot details. Hotspot is enabling.
+      </message>
+      <message name="IDS_ASH_STATUS_TRAY_HOTSPOT_FEATURE_TILE_TOOLTIP_STATUS_DISABLING" desc="The tooltip for the hotspot feature tile of quick settings when hotspot is disabling.">
+        Show hotspot details. Hotspot is disabling.
+      </message>
+      <message name="IDS_ASH_STATUS_TRAY_HOTSPOT_FEATURE_TILE_DRILL_IN_TOOLTIP_STATUS_OFF" desc="The tooltip for the drill in button in hotspot feature tile of quick settings when hotspot is off and is not allowed to turn on.">
+        Show hotspot details. Hotspot is off.
+      </message>
+      <message name="IDS_ASH_STATUS_TRAY_HOTSPOT_FEATURE_TILE_TOOLTIP_STATUS_OFF" desc="The tooltip for the hotspot feature tile of quick settings when hotspot is off and is allowed to turn on.">
+        Toggle Hotspot. Hotspot is off.
+      </message>
+      <message name="IDS_ASH_STATUS_TRAY_HOTSPOT_FEATURE_TILE_TOOLTIP_STATUS_ON_NO_DEVICE_CONNECTED" desc="The tooltip for the hotspot feature tile of quick settings when hotspot is on and no device connected.">
+        Toggle Hotspot. Hotspot is on, no device connected.
+      </message>
+      <message name="IDS_ASH_STATUS_TRAY_HOTSPOT_FEATURE_TILE_TOOLTIP_STATUS_ON_ONE_DEVICE_CONNECTED" desc="The tooltip for the hotspot feature tile of quick settings when hotspot is on and one device connected.">
+        Toggle Hotspot. Hotspot is on, 1 device connected.
+      </message>
+      <message name="IDS_ASH_STATUS_TRAY_HOTSPOT_FEATURE_TILE_TOOLTIP_STATUS_ON_MULTIPLE_DEVICES_CONNECTED" desc="The tooltip for the hotspot feature tile of quick settings when hotspot is on and multiple devices connected.">
+        Toggle Hotspot. Hotspot is on, <ph name="DEVICECOUNT">$1</ph> devices connected.
+      </message>
+      <message name="IDS_ASH_STATUS_TRAY_HOTSPOT_FEATURE_TILE_TOOLTIP_NO_MOBILE_DATA" desc="The tooltip for the hotspot feature tile of quick settings when hotspot is off and not allowed to turn on due to no mobile data connection.">
+        Show hotspot details. Connect to mobile network to use hotspot.
+      </message>
+      <message name="IDS_ASH_STATUS_TRAY_HOTSPOT_FEATURE_TILE_TOOLTIP_MOBILE_DATA_NOT_SUPPORTED" desc="The tooltip for the hotspot feature tile of quick settings when hotspot is off and not allowed to turn on due to the connected mobile data doesn't support hotspot.">
+        Show hotspot details. Your mobile network doesn't support hotspot.
+      </message>
+      <message name="IDS_ASH_STATUS_TRAY_HOTSPOT_FEATURE_TILE_TOOLTIP_PROHIBITED_BY_POLICY" desc="The tooltip for the hotspot feature tile of quick settings when hotspot is off and is not allowed to turn on due to prohibited by policy.">
+        Show hotspot details. Hotspot is blocked by your administrator.
+      </message>
       <message name="IDS_ASH_STATUS_TRAY_BLUETOOTH_DISCOVERABLE" desc="Toast shown when a Bluetooth adapter is discoverable.">
         "<ph name="NAME">$1<ex>Chromebook</ex></ph>" visible to Bluetooth devices.
       </message>
@@ -3089,25 +3160,28 @@ Connect your device to power.
         Cellular: <ph name="ADDRESS">$1<ex>01:23:45:67:89:AB</ex></ph>
       </message>
       <message name="IDS_ASH_STATUS_TRAY_INHIBITED_CELLULAR_INSTALLING_PROFILE" desc="Tooltip message for disabled add cellular button, indicating cellular network profile is being installed.">
-        Adding profile. Wait a few minutes.
+        Adding profile. This may take a few minutes.
       </message>
       <message name="IDS_ASH_STATUS_TRAY_INHIBITED_CELLULAR_REMOVING_PROFILE" desc="Tooltip message for disabled add cellular button, indicating cellular network profile is being removed.">
-       Removing profile. Wait a few minutes.
+       Removing profile. This may take a few minutes.
       </message>
       <message name="IDS_ASH_STATUS_TRAY_INHIBITED_CELLULAR_RENAMING_PROFILE" desc="Tooltip message for disabled add cellular button, indicating cellular network profile is being renamed.">
-        Renaming profile. Wait a few minutes.
+        Renaming profile. This may take a few minutes.
       </message>
       <message name="IDS_ASH_STATUS_TRAY_INHIBITED_CELLULAR_CONNECTING_TO_PROFILE" desc="Tooltip message for disabled add cellular button, indicating cellular network profile is being connected to.">
-        Connecting to profile. Wait a few minutes.
+        Connecting to profile. This may take a few minutes.
       </message>
       <message name="IDS_ASH_STATUS_TRAY_INHIBITED_CELLULAR_REFRESHING_PROFILE_LIST" desc="Tooltip message for disabled add cellular button, indicating cellular network profile list is being refreshed.">
-        Refreshing profile list. Wait a few minutes.
+        Refreshing profile list. This may take a few minutes.
       </message>
       <message name="IDS_ASH_STATUS_TRAY_INHIBITED_CELLULAR_RESETTING_ESIM" desc="Tooltip message for disabled add cellular button, indicating cellular eSIM is being reset.">
-        Your administrator is resetting your eSIM. Wait a few minutes.
+        Your administrator is resetting your eSIM. This may take a few minutes.
       </message>
       <message name="IDS_ASH_STATUS_TRAY_INHIBITED_CELLULAR_DISABLING_PROFILE" desc="Tooltip message for disabled add cellular button, indicating cellular network profile is being disabled.">
-       Disabling profile. Wait a few minutes.
+       Disabling profile. This may take a few minutes.
+      </message>
+      <message name="IDS_ASH_STATUS_TRAY_INHIBITED_CELLULAR_REQUESTING_AVAILABLE_PROFILES" desc="Tooltip message for disabled add cellular button, indicating cellular device is looking for profiles available to install.">
+        Looking for available profiles. This may take a few minutes.
       </message>
       <message name="IDS_ASH_STATUS_TRAY_INITIALIZING_CELLULAR" desc="Message for the status area when initializing the cellular device.">
         Initializing...
@@ -5190,12 +5264,6 @@ Here are some things you can try to get started.
       </message>
 
       <!-- Strings for camera privacy hub switch notifications -->
-      <message name="IDS_PRIVACY_HUB_WANT_TO_TURN_OFF_CAMERA_NOTIFICATION_TITLE" desc="Title for a notification shown to the users when they disable camera via the hardware switch.">
-        Turn off camera access?
-      </message>
-      <message name="IDS_PRIVACY_HUB_WANT_TO_TURN_OFF_CAMERA_NOTIFICATION_MESSAGE" desc="Message for a notification shown to the users when they disable camera via the hardware switch.">
-        You used the physical switch to turn off 1 camera. You can also turn off access for all cameras.
-      </message>
       <message name="IDS_PRIVACY_HUB_CAMERA_OFF_NOTIFICATION_TITLE" desc="Title for a notification shown to the users when an app tries to use the camera while the camera is disabled.">
         Turn on camera access?
       </message>
@@ -5207,9 +5275,6 @@ Here are some things you can try to get started.
       </message>
       <message name="IDS_PRIVACY_HUB_CAMERA_OFF_NOTIFICATION_MESSAGE_WITH_TWO_APP_NAMES" desc="Message for a notification shown to the users when an app tries to use the camera while the camera is off.">
         This allows camera access for <ph name="APP1_NAME">$1<ex>Zoom</ex></ph>, <ph name="APP2_NAME">$2<ex>Snapchat</ex></ph>, and all apps and websites with the camera permission
-      </message>
-      <message name="IDS_PRIVACY_HUB_TURN_OFF_CAMERA_ACTION_BUTTON" desc="Label for an action button that disables the camera.">
-        Turn off camera access
       </message>
       <message name="IDS_PRIVACY_HUB_TURN_ON_CAMERA_ACTION_BUTTON" desc="Label for an action button that enables the camera.">
         Turn on camera access
@@ -5709,6 +5774,9 @@ Here are some things you can try to get started.
       </message>
       <message name="IDS_ASH_SCREEN_CAPTURE_SAVE_TO_LINUX_FILES" desc="The label of the menu item button for selecting the root of the Linux Files path to store the captured images and videos.">
         Linux files
+      </message>
+      <message name="IDS_ASH_GAME_CAPTURE_START_RECORDING_BUTTON" desc="The label of the start recording button inside the game capture bar.">
+        Start recording
       </message>
 
       <!-- Snap Group -->

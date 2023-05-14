@@ -121,6 +121,8 @@
       'android-cronet-arm64-rel': 'android_cronet_release_bot_minimal_symbols_arm64_reclient',
       'android-cronet-asan-arm-rel': 'android_cronet_release_bot_minimal_symbols_arm_no_neon_clang_asan_reclient',
       'android-cronet-marshmallow-arm64-perf-rel': 'android_cronet_release_bot_minimal_symbols_arm64_reclient',
+      'android-cronet-riscv64-dbg': 'android_cronet_debug_static_bot_riscv64_reclient',
+      'android-cronet-riscv64-rel': 'android_cronet_release_bot_minimal_symbols_riscv64_reclient',
       'android-cronet-x86-dbg': 'android_cronet_debug_static_bot_x86_reclient',
       'android-cronet-x86-rel': 'android_cronet_release_bot_minimal_symbols_x86_reclient',
       'android-nougat-x86-rel': 'android_release_bot_minimal_symbols_x86_fastbuild_webview_monochrome_reclient',
@@ -501,71 +503,42 @@
 
     'chromium.goma': {
       'Chromium Android ARM 32-bit Goma RBE Staging': 'android_release_bot_minimal_symbols',
-      'Chromium Android ARM 32-bit Goma RBE ToT': 'android_release_bot_minimal_symbols',
       # TODO(b/167942918): re-enable java goma?
-      'Chromium Android ARM 32-bit Goma RBE ToT (ATS)': 'android_release_bot_minimal_symbols',
 
       'Chromium Linux Goma RBE Staging': 'release_bot',
-      'Chromium Linux Goma RBE Staging (clobber)': 'release_bot',
       'Chromium Linux Goma RBE Staging (dbg)': 'debug_bot',
-      'Chromium Linux Goma RBE Staging (dbg) (clobber)': 'debug_bot',
-      'Chromium Linux Goma RBE ToT': 'release_bot',
-      'Chromium Linux Goma RBE ToT (ATS)': 'release_bot',
 
       'Chromium Mac Goma RBE Staging': 'release_bot',
-      'Chromium Mac Goma RBE Staging (clobber)': 'release_bot',
       'Chromium Mac Goma RBE Staging (dbg)': 'debug_bot',
-      'Chromium Mac Goma RBE ToT': 'release_bot',
 
       'Chromium Win Goma RBE ATS Staging': 'release_bot_x86_minimal_symbols',
-      'Chromium Win Goma RBE ATS Staging (clobber)': 'release_bot_x86_minimal_symbols',
-      'Chromium Win Goma RBE ATS ToT': 'release_bot_x86_minimal_symbols',
       'Chromium Win Goma RBE Staging': 'release_bot_x86_minimal_symbols',
-      'Chromium Win Goma RBE Staging (clobber)': 'release_bot_x86_minimal_symbols',
-      'Chromium Win Goma RBE ToT': 'release_bot_x86_minimal_symbols',
-
-      'Chromium iOS Goma RBE ToT': 'ios_device_release_compile_only',
 
       'chromeos-amd64-generic-rel-goma-rbe-staging': 'chromeos_amd64-generic_use_fake_dbus_clients_vm_optimized_goma',
-      'chromeos-amd64-generic-rel-goma-rbe-tot': 'chromeos_amd64-generic_use_fake_dbus_clients_vm_optimized_goma',
     },
 
     'chromium.goma.fyi': {
       'Linux Builder Goma RBE Canary': 'gpu_tests_release_bot',
-      'Linux Builder Goma RBE Latest Client': 'gpu_tests_release_bot',
 
       'Mac Builder (dbg) Goma RBE Canary (clobber)': 'gpu_tests_debug_bot',
-      'Mac Builder (dbg) Goma RBE Latest Client (clobber)': 'gpu_tests_debug_bot',
       'Mac M1 Builder (dbg) Goma RBE Canary (clobber)': 'gpu_tests_debug_bot_arm64',
 
       'Win Builder (dbg) Goma RBE ATS Canary': 'gpu_tests_debug_bot_x86_no_symbols',
-      'Win Builder (dbg) Goma RBE ATS Latest Client': 'gpu_tests_debug_bot_x86_no_symbols',
       'Win Builder (dbg) Goma RBE Canary': 'gpu_tests_debug_bot_x86_no_symbols',
-      'Win Builder (dbg) Goma RBE Latest Client': 'gpu_tests_debug_bot_x86_no_symbols',
       'Win Builder Goma RBE ATS Canary': 'gpu_tests_release_bot_x86_minimal_symbols',
-      'Win Builder Goma RBE ATS Latest Client': 'gpu_tests_release_bot_x86_minimal_symbols',
       'Win Builder Goma RBE Canary': 'gpu_tests_release_bot_x86_minimal_symbols',
-      'Win Builder Goma RBE Canary (clobber)': 'gpu_tests_release_bot_x86_minimal_symbols',
-      'Win Builder Goma RBE Latest Client': 'gpu_tests_release_bot_x86_minimal_symbols',
 
       'android-archive-dbg-goma-rbe-ats-canary': 'android_without_codecs_debug_bot',
-      'android-archive-dbg-goma-rbe-ats-latest': 'android_without_codecs_debug_bot',
       'android-archive-dbg-goma-rbe-canary': 'android_without_codecs_debug_bot',
-      'android-archive-dbg-goma-rbe-latest': 'android_without_codecs_debug_bot',
 
       'chromeos-amd64-generic-rel-goma-rbe-canary': 'chromeos_amd64-generic_use_fake_dbus_clients_vm_optimized_goma',
-      'chromeos-amd64-generic-rel-goma-rbe-latest': 'chromeos_amd64-generic_use_fake_dbus_clients_vm_optimized_goma',
 
       'ios-device-goma-rbe-canary-clobber': 'ios_device_release_compile_only',
-      'ios-device-goma-rbe-latest-clobber': 'ios_device_release_compile_only',
 
       'linux-archive-rel-goma-rbe-ats-canary': 'release_bot',
-      'linux-archive-rel-goma-rbe-ats-latest': 'release_bot',
       'linux-archive-rel-goma-rbe-canary': 'release_bot',
-      'linux-archive-rel-goma-rbe-latest': 'release_bot',
 
       'mac-archive-rel-goma-rbe-canary': 'release_bot_mac_strip_minimal_symbols',
-      'mac-archive-rel-goma-rbe-latest': 'release_bot_mac_strip_minimal_symbols',
     },
 
     'chromium.gpu': {
@@ -897,7 +870,7 @@
 
     'internal.chrome.fyi': {
       'android-buildspeed-dbg': 'android_debug_bot_reclient_fastbuild',
-      'android-nougat-x86-finch-smoke-chrome': 'android_release_bot_minimal_symbols_x86_fastbuild_webview_official_monochrome_reclient',
+      'android-nougat-x86-finch-smoke-chrome': 'android_release_bot_minimal_symbols_x86_fastbuild_webview_official_no_resource_allowlisting_monochrome_reclient',
       'chromeos-arm-generic-cfi-thin-lto-chrome-reclient': 'chromeos_arm-generic_cfi_thin_lto_official_reclient',
       'lacros-arm-generic-chrome-fyi-reclient': 'chromeos_arm-generic_lacros_official_skylab_reclient',
       'linux-finch-smoke-chrome': 'official_reclient',
@@ -923,7 +896,7 @@
 
     # Internal codesearch builders.
     'luci.infra-internal.codesearch': {
-      'codesearch-gen-chrome-internal-linux': 'codesearch_gen_chromium_bot',
+      'codesearch-gen-chrome-internal-linux': 'codesearch_gen_chromium_bot_reclient',
     },
 
     'official.chrome': {
@@ -1041,6 +1014,8 @@
       'android-cronet-asan-arm-rel': 'android_cronet_release_bot_minimal_symbols_arm_no_neon_clang_asan_reclient',
       'android-cronet-lollipop-arm-rel': 'android_cronet_release_bot_minimal_symbols_arm_no_neon',
       'android-cronet-marshmallow-arm64-rel': 'android_cronet_release_trybot_arm64',
+      'android-cronet-riscv64-dbg': 'android_cronet_debug_static_bot_riscv64_reclient',
+      'android-cronet-riscv64-rel': 'android_cronet_release_bot_minimal_symbols_riscv64_reclient',
       'android-cronet-x86-dbg': 'android_cronet_debug_static_bot_x86_reclient',
       'android-cronet-x86-dbg-10-tests': 'android_cronet_debug_static_bot_x86_reclient',
       'android-cronet-x86-dbg-11-tests': 'android_cronet_debug_static_bot_x86_reclient',
@@ -1283,6 +1258,7 @@
       'gpu-fyi-try-mac-amd-retina-rel': 'gpu_fyi_tests_release_trybot_reclient',
       'gpu-fyi-try-mac-arm64-apple-m1-exp': 'gpu_fyi_tests_release_trybot_arm64_reclient',
       'gpu-fyi-try-mac-arm64-apple-m1-rel': 'gpu_fyi_tests_release_trybot_arm64_reclient',
+      'gpu-fyi-try-mac-arm64-apple-m2-retina-rel': 'gpu_fyi_tests_release_trybot_arm64_reclient',
       'gpu-fyi-try-mac-intel-asan': 'gpu_fyi_tests_release_trybot_asan_reclient',
       'gpu-fyi-try-mac-intel-dbg': 'gpu_fyi_tests_debug_trybot_reclient',
       'gpu-fyi-try-mac-intel-exp': 'gpu_fyi_tests_release_trybot_reclient',
@@ -1387,17 +1363,14 @@
       'win-swangle-try-x86': 'angle_deqp_release_trybot_x86_reclient',
     },
 
-    # crbug.com/1417003: `-Werror` is removed for these to work around the
-    # existence of C++20-only code in Chromium, while we're forcing -std=c++17.
-    # Tons of build failures slow down these builders significantly.
     'tryserver.chromium.tricium': {
-      'android-clang-tidy-rel': 'android_release_trybot_reclient_cxx17_no_werror',
-      'fuchsia-clang-tidy-rel': 'release_trybot_fuchsia_reclient_cxx17_no_werror',
-      'linux-chromeos-clang-tidy-rel': 'chromeos_with_codecs_release_trybot_reclient_cxx17_no_werror',
-      'linux-clang-tidy-rel': 'release_trybot_reclient_cxx17_no_werror',
-      'linux-lacros-clang-tidy-rel': 'lacros_on_linux_release_trybot_reclient_cxx17_no_werror',
-      'mac-clang-tidy-rel': 'release_trybot_reclient_cxx17_no_werror',
-      'win10-clang-tidy-rel': 'release_trybot_reclient_cxx17_no_werror',
+      'android-clang-tidy-rel': 'android_release_trybot_reclient',
+      'fuchsia-clang-tidy-rel': 'release_trybot_fuchsia_reclient',
+      'linux-chromeos-clang-tidy-rel': 'chromeos_with_codecs_release_trybot_reclient',
+      'linux-clang-tidy-rel': 'release_trybot_reclient',
+      'linux-lacros-clang-tidy-rel': 'lacros_on_linux_release_trybot_reclient',
+      'mac-clang-tidy-rel': 'release_trybot_reclient',
+      'win10-clang-tidy-rel': 'release_trybot_reclient',
     },
 
     'tryserver.chromium.updater': {
@@ -1553,6 +1526,10 @@
       'android', 'cronet_android', 'debug_static_bot_reclient', 'arm_no_neon', 'release_java',
     ],
 
+    'android_cronet_debug_static_bot_riscv64_reclient': [
+      'android', 'cronet_android', 'debug_static_bot_reclient', 'riscv64',
+    ],
+
     'android_cronet_debug_static_bot_x86_reclient': [
       'android', 'cronet_android', 'debug_static_bot_reclient', 'x86',
     ],
@@ -1574,6 +1551,11 @@
 
     'android_cronet_release_bot_minimal_symbols_arm_no_neon_reclient': [
       'android', 'cronet_android', 'official_optimize', 'release_bot_reclient', 'minimal_symbols', 'arm_no_neon',
+      'strip_debug_info',
+    ],
+
+    'android_cronet_release_bot_minimal_symbols_riscv64_reclient': [
+      'android', 'cronet_android', 'official_optimize', 'release_bot_reclient', 'minimal_symbols', 'riscv64',
       'strip_debug_info',
     ],
 
@@ -1734,10 +1716,10 @@
       'webview_shell', 'use_java_coverage'
     ],
 
-    'android_release_bot_minimal_symbols_x86_fastbuild_webview_official_monochrome_reclient': [
+    'android_release_bot_minimal_symbols_x86_fastbuild_webview_official_no_resource_allowlisting_monochrome_reclient': [
       'android', 'release_bot_reclient', 'minimal_symbols', 'x86',
       'strip_debug_info', 'android_fastbuild', 'webview_monochrome',
-      'webview_shell', 'official', 'chrome_branded'
+      'webview_shell', 'official', 'chrome_branded', 'no_resource_allowlisting'
     ],
 
     'android_release_bot_minimal_symbols_x86_fastbuild_webview_trichrome_reclient': [
@@ -1755,6 +1737,7 @@
       'android', 'release_trybot_reclient', 'arm64', 'strip_debug_info',
       'android_fastbuild', 'webview_monochrome', 'fail_on_android_expectations',
       'no_secondary_abi', 'use_clang_coverage', 'partial_code_coverage_instrumentation',
+      'enable_dangling_raw_ptr_checks',
     ],
 
     'android_release_trybot_arm64_webview_monochrome_expectations_fastbuild_native_coverage_siso': [
@@ -1777,10 +1760,6 @@
 
     'android_release_trybot_reclient': [
       'android', 'release_trybot_reclient', 'strip_debug_info',
-    ],
-
-    'android_release_trybot_reclient_cxx17_no_werror': [
-      'android', 'release_trybot_reclient', 'strip_debug_info', 'force_cxx17', 'no_werror',
     ],
 
     'android_release_trybot_x64_coverage_fastbuild_webview_trichrome_reclient': [
@@ -2271,7 +2250,7 @@
     ],
 
     'chromeos_js_coverage_reclient': [
-      'chromeos_with_codecs', 'release_bot_reclient', 'also_build_lacros_chrome', 'use_javascript_coverage', 'enable_webui_inline_sourcemaps_on', 'optimize_webui_off',
+      'chromeos_with_codecs', 'release_bot_reclient', 'use_javascript_coverage', 'optimize_webui_off',
     ],
 
     'chromeos_kevin_include_unwind_tables_official_dchecks': [
@@ -2359,8 +2338,8 @@
       'chromeos_with_codecs', 'release_trybot_reclient', 'no_symbols', 'invert_fieldtrials',
     ],
 
-    'chromeos_with_codecs_release_trybot_reclient_cxx17_no_werror': [
-      'chromeos_with_codecs', 'release_trybot_reclient', 'no_symbols', 'force_cxx17', 'no_werror',
+    'chromeos_with_codecs_release_trybot_reclient': [
+      'chromeos_with_codecs', 'release_trybot_reclient', 'no_symbols',
     ],
 
     'chromeos_with_codecs_with_lacros_release_bot_reclient': [
@@ -2460,10 +2439,6 @@
     'codesearch_gen_chromium_android_bot_reclient': [
       # Set is_component_build=false to enable cronet targets.
       'codesearch_reclient', 'android_without_codecs', 'static',
-    ],
-
-    'codesearch_gen_chromium_bot': [
-      'codesearch',
     ],
 
     'codesearch_gen_chromium_bot_reclient': [
@@ -2997,7 +2972,7 @@
     ],
 
     'js_coverage_reclient': [
-      'release_bot_reclient', 'clang',  'no_symbols', 'use_javascript_coverage', 'enable_webui_inline_sourcemaps_on', 'optimize_webui_off',
+      'release_bot_reclient', 'clang',  'no_symbols', 'use_javascript_coverage', 'optimize_webui_off',
     ],
 
     'lacros_on_linux_clang_code_coverage_reclient': [
@@ -3026,10 +3001,6 @@
 
     'lacros_on_linux_release_trybot_reclient': [
       'lacros_on_linux_release_trybot_reclient',
-    ],
-
-    'lacros_on_linux_release_trybot_reclient_cxx17_no_werror': [
-      'lacros_on_linux_release_trybot_reclient', 'force_cxx17', 'no_werror', 'no_werror',
     ],
 
     'lacros_on_linux_tot_debug': [
@@ -3609,10 +3580,6 @@
       'release_trybot_reclient', 'fuchsia',
     ],
 
-    'release_trybot_fuchsia_reclient_cxx17_no_werror': [
-      'release_trybot_reclient', 'fuchsia', 'force_cxx17', 'no_werror',
-    ],
-
     'release_trybot_minimal_symbols_reclient': [
       'release_trybot_minimal_symbols_reclient',
     ],
@@ -3627,10 +3594,6 @@
 
     'release_trybot_reclient': [
       'release_trybot_reclient',
-    ],
-
-    'release_trybot_reclient_cxx17_no_werror': [
-      'release_trybot_reclient', 'force_cxx17', 'no_werror',
     ],
 
     'release_trybot_reclient_x64': [
@@ -4015,13 +3978,6 @@
       'mixins': ['clang'],
     },
 
-    # Settings used by the codesearch builders to generate cross-references.
-    'codesearch': {
-      'gn_args': 'clang_use_chrome_plugins=false enable_kythe_annotations=true',
-      'mixins': ['goma', 'clang', 'shared', 'debug', 'minimal_symbols',
-                 'blink_enable_generated_code_formatting'],
-    },
-
     # Same as regular codesearch except ios does not allow component builds
     'codesearch_ios_reclient': {
       'gn_args': 'clang_use_chrome_plugins=false enable_kythe_annotations=true',
@@ -4201,10 +4157,6 @@
       'gn_args': 'enable_vulkan=true',
     },
 
-    'enable_webui_inline_sourcemaps_on': {
-      'gn_args': 'enable_webui_inline_sourcemaps=true',
-    },
-
     # This mixin is used to force configs that use it to fail. It
     # is used in two cases: when we have bots that we haven't looked
     # at yet and don't know whether they need MB or not, and for bots
@@ -4235,10 +4187,6 @@
 
     'ffmpeg_branding_chromeos': {
       'gn_args': 'ffmpeg_branding="ChromeOS"',
-    },
-
-    'force_cxx17': {
-      'gn_args': 'use_cxx17=true',
     },
 
     'fuchsia': {
@@ -4472,10 +4420,6 @@
       'gn_args': 'symbol_level=0',
     },
 
-    'no_werror': {
-      'gn_args': 'treat_warnings_as_errors=false',
-    },
-
     'no_widevine_cdm_host_verification': {
       'gn_args': 'ignore_missing_widevine_signing_cert=true',
     },
@@ -4647,6 +4591,10 @@
       'args_file': '//build/args/chromeos/reven-vmtest.gni',
     },
 
+    'riscv64': {
+      'gn_args': 'target_cpu="riscv64"',
+    },
+
     'shared': {
       'gn_args': 'is_component_build=true',
     },
@@ -4674,7 +4622,7 @@
     # Ensures we don't have mulitple versions of Trichrome Library installed on
     # devices so as to not run out of disk space.
     'stable_version_code': {
-      'gn_args': 'android_override_version_code="1234567890"',
+      'gn_args': 'android_override_version_code="1234567980"',
     },
 
     'static': {

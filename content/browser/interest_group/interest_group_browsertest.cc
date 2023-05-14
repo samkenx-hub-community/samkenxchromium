@@ -19,6 +19,7 @@
 #include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
 #include "base/strings/escape.h"
+#include "base/strings/strcat.h"
 #include "base/strings/stringprintf.h"
 #include "base/synchronization/lock.h"
 #include "base/test/bind.h"
@@ -29,7 +30,6 @@
 #include "base/time/time.h"
 #include "base/values.h"
 #include "build/build_config.h"
-#include "build/chromeos_buildflags.h"
 #include "components/network_session_configurator/common/network_switches.h"
 #include "components/web_package/web_bundle_builder.h"
 #include "content/browser/fenced_frame/fenced_frame.h"
@@ -145,6 +145,9 @@ base::Value::List MakeAdsValue(
     }
     if (ad.metadata)
       entry.Set("metadata", JsonToValue(*ad.metadata));
+    if (ad.ad_render_id) {
+      entry.Set("adRenderId", std::move(ad.ad_render_id.value()));
+    }
     list.Append(std::move(entry));
   }
   return list;
@@ -2803,11 +2806,13 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
                   {{{GURL("https://example.com/render"),
                      /*metadata=*/absl::nullopt, /*size_group=*/absl::nullopt,
                      /*buyer_reporting_id=*/"brid1",
-                     /*buyer_and_seller_reporting_id=*/"sh1"},
+                     /*buyer_and_seller_reporting_id=*/"sh1",
+                     /*ad_render_id=*/absl::nullopt},
                     {GURL("https://example.com/render2"),
                      /*metadata=*/absl::nullopt, /*size_group=*/absl::nullopt,
                      /*buyer_reporting_id=*/absl::nullopt,
-                     /*buyer_and_seller_reporting_id=*/"sh2"}}})
+                     /*buyer_and_seller_reporting_id=*/"sh2",
+                     /*ad_render_id=*/absl::nullopt}}})
               .Build()));
 
   std::vector<StorageInterestGroup> groups = GetInterestGroupsForOwner(origin);
@@ -2824,6 +2829,47 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
             GURL("https://example.com/render2"));
   EXPECT_FALSE(group.ads.value()[1].buyer_reporting_id.has_value());
   EXPECT_EQ(group.ads.value()[1].buyer_and_seller_reporting_id, "sh2");
+}
+
+IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
+                       JoinInterestGroupValidAdRenderId) {
+  GURL url = https_server_->GetURL("a.test", "/echo");
+  auto origin = url::Origin::Create(url);
+  std::string origin_string = origin.Serialize();
+  ASSERT_TRUE(NavigateToURL(shell(), url));
+
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/origin,
+                    /*name=*/"cars")
+                    .SetAds({{{GURL("https://example.com/render"),
+                               /*metadata=*/absl::nullopt,
+                               /*size_group=*/absl::nullopt,
+                               /*buyer_reporting_id=*/absl::nullopt,
+                               /*buyer_and_seller_reporting_id=*/absl::nullopt,
+                               /*ad_render_id=*/"123abc"}}})
+                    .SetAdComponents(
+                        {{{GURL("https://example.com/component"),
+                           /*metadata=*/absl::nullopt,
+                           /*size_group=*/absl::nullopt,
+                           /*buyer_reporting_id=*/absl::nullopt,
+                           /*buyer_and_seller_reporting_id=*/absl::nullopt,
+                           /*ad_render_id=*/"456def"}}})
+                    .Build()));
+
+  std::vector<StorageInterestGroup> groups = GetInterestGroupsForOwner(origin);
+  ASSERT_EQ(groups.size(), 1u);
+  const blink::InterestGroup& group = groups[0].interest_group;
+  ASSERT_TRUE(group.ads.has_value());
+  ASSERT_EQ(group.ads->size(), 1u);
+  EXPECT_EQ(group.ads.value()[0].render_url,
+            GURL("https://example.com/render"));
+  EXPECT_EQ(group.ads.value()[0].ad_render_id, "123abc");
+  ASSERT_EQ(group.ad_components->size(), 1u);
+  EXPECT_EQ(group.ad_components.value()[0].render_url,
+            GURL("https://example.com/component"));
+  EXPECT_EQ(group.ad_components.value()[0].ad_render_id, "456def");
 }
 
 IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
@@ -5850,23 +5896,23 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
   url::Origin test_origin = url::Origin::Create(test_url);
   GURL ad_url = https_server_->GetURL("c.test", "/echo?render_cars");
 
-  EXPECT_EQ(
-      kSuccess,
-      JoinInterestGroupAndVerify(
-          blink::TestInterestGroupBuilder(
-              /*owner=*/test_origin,
-              /*name=*/"cars")
-              .SetBiddingUrl(https_server_->GetURL(
-                  "a.test", "/interest_group/bidding_logic_with_size.js"))
-              .SetAds(
-                  /*ads=*/{{{ad_url, /*metadata=*/absl::nullopt, "group_1"}}})
-              .SetAdSizes(
-                  {{{"size_1",
-                     blink::AdSize(100, blink::AdSize::LengthUnit::kScreenWidth,
-                                   50,
-                                   blink::AdSize::LengthUnit::kScreenHeight)}}})
-              .SetSizeGroups({{{"group_1", {"size_1"}}}})
-              .Build()));
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/test_origin,
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        "a.test", "/interest_group/bidding_logic_with_size.js"))
+                    .SetAds(
+                        /*ads=*/{{{ad_url, /*metadata=*/absl::nullopt,
+                                   /*size_group=*/"group_1"}}})
+                    .SetAdSizes(
+                        {{{"size_1",
+                           blink::AdSize(
+                               100, blink::AdSize::LengthUnit::kScreenWidth, 50,
+                               blink::AdSize::LengthUnit::kScreenHeight)}}})
+                    .SetSizeGroups({{{"group_1", {"size_1"}}}})
+                    .Build()));
 
   std::string auction_config = JsReplace(
       R"({
@@ -5876,6 +5922,88 @@ IN_PROC_BROWSER_TEST_F(InterestGroupBrowserTest,
         })",
       test_origin,
       https_server_->GetURL("a.test", "/interest_group/decision_logic.js"));
+  RunAuctionAndWaitForURLAndNavigateIframe(auction_config, ad_url);
+}
+
+// Runs an auction just like InterestGroupBrowserTest.RunAdAuctionWithWinner,
+// but where the render size is specified only in the interest group, not the
+// bid. When size is only specified in one place, the ads are considered
+// matching (as long as their urls are the same), but the auction proceeds as if
+// no size information was specified.
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    RunAdAuctionWithSizeForInterestGroupWithWinnerNoMacroSubstitution) {
+  GURL test_url = https_server_->GetURL("a.test", "/page_with_iframe.html");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL ad_url = https_server_->GetURL(
+      "c.test", "/echo?render_cars&size={%AD_WIDTH%}x{%AD_HEIGHT%}");
+
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/test_origin,
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        "a.test", "/interest_group/bidding_logic.js"))
+                    .SetAds(
+                        /*ads=*/{{{ad_url, /*metadata=*/absl::nullopt,
+                                   /*size_group=*/"group_1"}}})
+                    .SetAdSizes(
+                        {{{"size_1",
+                           blink::AdSize(
+                               100, blink::AdSize::LengthUnit::kScreenWidth, 50,
+                               blink::AdSize::LengthUnit::kScreenHeight)}}})
+                    .SetSizeGroups({{{"group_1", {"size_1"}}}})
+                    .Build()));
+
+  std::string auction_config = JsReplace(
+      R"({
+          seller: $1,
+          decisionLogicUrl: $2,
+          interestGroupBuyers: [$1]
+        })",
+      test_origin,
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js"));
+  // Size is only specified in the interest group, ad size macro substitution
+  // should not happen.
+  RunAuctionAndWaitForURLAndNavigateIframe(auction_config, ad_url);
+}
+
+// Runs an auction just like InterestGroupBrowserTest.RunAdAuctionWithWinner,
+// but where the render size is specified only in the bid, not the interest
+// group. When size is only specified in one place, the ads are considered
+// matching (as long as their urls are the same), but the auction proceeds as if
+// no size information was specified.
+IN_PROC_BROWSER_TEST_F(
+    InterestGroupBrowserTest,
+    RunAdAuctionWithSizeForBidWithWinnerNoMacroSubstitution) {
+  GURL test_url = https_server_->GetURL("a.test", "/page_with_iframe.html");
+  ASSERT_TRUE(NavigateToURL(shell(), test_url));
+  url::Origin test_origin = url::Origin::Create(test_url);
+  GURL ad_url = https_server_->GetURL(
+      "c.test", "/echo?render_cars&size={%AD_WIDTH%}x{%AD_HEIGHT%}");
+
+  EXPECT_EQ(kSuccess,
+            JoinInterestGroupAndVerify(
+                blink::TestInterestGroupBuilder(
+                    /*owner=*/test_origin,
+                    /*name=*/"cars")
+                    .SetBiddingUrl(https_server_->GetURL(
+                        "a.test", "/interest_group/bidding_logic_with_size.js"))
+                    .SetAds(/*ads=*/{{{ad_url, /*metadata=*/absl::nullopt}}})
+                    .Build()));
+
+  std::string auction_config = JsReplace(
+      R"({
+          seller: $1,
+          decisionLogicUrl: $2,
+          interestGroupBuyers: [$1]
+        })",
+      test_origin,
+      https_server_->GetURL("a.test", "/interest_group/decision_logic.js"));
+  // Size is only specified in the bid, ad size macro substitution should not
+  // happen.
   RunAuctionAndWaitForURLAndNavigateIframe(auction_config, ad_url);
 }
 
@@ -6612,27 +6740,18 @@ IN_PROC_BROWSER_TEST_F(InterestGroupFencedFrameBrowserTest,
                                                  .height());
   RenderFrameHost* ad_frame = GetFencedFrameRenderFrameHost(shell());
   EXPECT_TRUE(WaitForLoadStop(web_contents()));
-  // Wait for 2 requestAnimationFrame calls to make things deterministic.
-  // Without this, the fenced frame may end up with its default size 300px *
-  // 150px. (Width * Height)
-  ASSERT_TRUE(WaitForFencedFrameSizeFreeze(ad_frame));
   // Force layout.
   EXPECT_TRUE(
       ExecJs(ad_frame, "getComputedStyle(document.documentElement).width;"));
-  EXPECT_EQ(EvalJs(ad_frame, "innerWidth").ExtractInt(), screen_width);
-  EXPECT_EQ(EvalJs(ad_frame, "innerHeight").ExtractInt(), screen_height);
+
+  EXPECT_TRUE(
+      PollUntilEvalToTrue(JsReplace("innerWidth == $1 && innerHeight == $2",
+                                    screen_width, screen_height),
+                          ad_frame));
 }
 
-// TODO(crbug.com/1439980): Fix flaky test.
-#if BUILDFLAG(IS_CHROMEOS_LACROS)
-#define MAYBE_RunAdAuctionWithAdComponentWithSize \
-  DISABLED_RunAdAuctionWithAdComponentWithSize
-#else
-#define MAYBE_RunAdAuctionWithAdComponentWithSize \
-  RunAdAuctionWithAdComponentWithSize
-#endif
 IN_PROC_BROWSER_TEST_F(InterestGroupFencedFrameBrowserTest,
-                       MAYBE_RunAdAuctionWithAdComponentWithSize) {
+                       RunAdAuctionWithAdComponentWithSize) {
   GURL test_url = https_server_->GetURL("a.test", "/fenced_frames/basic.html");
   ASSERT_TRUE(NavigateToURL(shell(), test_url));
   GURL ad_component_url = https_server_->GetURL(
@@ -6686,15 +6805,13 @@ IN_PROC_BROWSER_TEST_F(InterestGroupFencedFrameBrowserTest,
                                                  .GetSizeInPixel()
                                                  .height());
   EXPECT_TRUE(WaitForLoadStop(web_contents()));
-  // Wait for 2 requestAnimationFrame calls to make things deterministic.
-  // Without this, the fenced frame may end up with its default size 300px *
-  // 150px. (Width * Height)
-  ASSERT_TRUE(WaitForFencedFrameSizeFreeze(ad_frame));
   // Force layout.
   EXPECT_TRUE(
       ExecJs(ad_frame, "getComputedStyle(document.documentElement).width;"));
-  EXPECT_EQ(EvalJs(ad_frame, "innerWidth").ExtractInt(), screen_width);
-  EXPECT_EQ(EvalJs(ad_frame, "innerHeight").ExtractInt(), screen_height);
+  EXPECT_TRUE(
+      PollUntilEvalToTrue(JsReplace("innerWidth == $1 && innerHeight == $2",
+                                    screen_width, screen_height),
+                          ad_frame));
 
   // Get the first component config from the fenced frame. Load it in the
   // nested fenced frame. The load should succeed.
@@ -6711,15 +6828,12 @@ IN_PROC_BROWSER_TEST_F(InterestGroupFencedFrameBrowserTest,
   // bid.
   RenderFrameHost* ad_component_frame = GetFencedFrameRenderFrameHost(ad_frame);
   EXPECT_TRUE(WaitForLoadStop(web_contents()));
-  // Wait for 2 requestAnimationFrame calls to make things deterministic.
-  // Without this, the fenced frame may end up with its default size 300px *
-  // 150px. (Width * Height)
-  ASSERT_TRUE(WaitForFencedFrameSizeFreeze(ad_component_frame));
   // Force layout.
   EXPECT_TRUE(ExecJs(ad_component_frame,
                      "getComputedStyle(document.documentElement).width;"));
-  EXPECT_EQ(EvalJs(ad_component_frame, "innerWidth").ExtractInt(), 50);
-  EXPECT_EQ(EvalJs(ad_component_frame, "innerHeight").ExtractInt(), 25);
+  EXPECT_TRUE(PollUntilEvalToTrue(
+      JsReplace("innerWidth == $1 && innerHeight == $2", 50, 25),
+      ad_component_frame));
 }
 
 IN_PROC_BROWSER_TEST_F(InterestGroupFencedFrameBrowserTest,
@@ -12749,6 +12863,166 @@ IN_PROC_BROWSER_TEST_F(
   // Expect automatic beacon being sent successfully with empty event data.
   EXPECT_TRUE(network_responder_->GetRequest()->content.empty());
   EXPECT_TRUE(network_responder_->HasReceivedRequest());
+}
+
+class BiddingAndAuctionServerBrowserTestBase : public ContentBrowserTest {
+ public:
+  BiddingAndAuctionServerBrowserTestBase() = default;
+
+  void SetUpOnMainThread() override {
+    ContentBrowserTest::SetUpOnMainThread();
+
+    constexpr char kBaseDataDir[] = "content/test/data/interest_group/";
+
+    // We use a URLLoaderInterceptor, rather than the EmbeddedTestServer, since
+    // the origin trial token in the response is associated with a fixed
+    // origin, whereas EmbeddedTestServer serves content on a random port.
+    url_loader_interceptor_ =
+        std::make_unique<URLLoaderInterceptor>(base::BindLambdaForTesting(
+            [&](URLLoaderInterceptor::RequestParams* params) -> bool {
+              last_request_is_ad_auction_header_request_ =
+                  params->url_request.ad_auction_headers;
+
+              URLLoaderInterceptor::WriteResponse(
+                  base::StrCat(
+                      {kBaseDataDir, params->url_request.url.path_piece()}),
+                  params->client.get());
+
+              return true;
+            }));
+  }
+
+  void TearDownOnMainThread() override { url_loader_interceptor_.reset(); }
+
+  WebContents* web_contents() { return shell()->web_contents(); }
+
+  FrameTreeNode* root() {
+    return static_cast<WebContentsImpl*>(web_contents())
+        ->GetPrimaryFrameTree()
+        .root();
+  }
+
+  bool last_request_is_ad_auction_header_request() const {
+    return last_request_is_ad_auction_header_request_;
+  }
+
+ private:
+  bool last_request_is_ad_auction_header_request_ = false;
+
+  std::unique_ptr<URLLoaderInterceptor> url_loader_interceptor_;
+};
+
+class BiddingAndAuctionServerAllFeaturesEnabledBrowserTest
+    : public BiddingAndAuctionServerBrowserTestBase {
+ public:
+  BiddingAndAuctionServerAllFeaturesEnabledBrowserTest() {
+    feature_list_.InitWithFeatures(
+        {blink::features::kPrivacySandboxAdsAPIs,
+         blink::features::kInterestGroupStorage,
+         blink::features::kFledgeBiddingAndAuctionServer},
+        /*disabled_features=*/{});
+  }
+
+ private:
+  base::test::ScopedFeatureList feature_list_;
+};
+
+IN_PROC_BROWSER_TEST_F(BiddingAndAuctionServerAllFeaturesEnabledBrowserTest,
+                       AdsAPIsOriginTrial_AdAuctionHeadersNotAllowedForFetch) {
+  EXPECT_TRUE(NavigateToURL(
+      shell(), GURL("https://example.test/page_with_ads_apis_ot.html")));
+
+  EXPECT_TRUE(
+      ExecJs(shell()->web_contents(),
+             content::JsReplace("fetch($1, {adAuctionHeaders: true})",
+                                GURL("https://example.test/empty.html"))));
+
+  EXPECT_FALSE(last_request_is_ad_auction_header_request());
+}
+
+IN_PROC_BROWSER_TEST_F(
+    BiddingAndAuctionServerAllFeaturesEnabledBrowserTest,
+    BiddingAndAuctionServerOriginTrial_AdAuctionHeadersAllowedForFetch) {
+  EXPECT_TRUE(NavigateToURL(
+      shell(), GURL("https://example.test/page_with_ba_server_ot.html")));
+
+  EXPECT_TRUE(
+      ExecJs(shell()->web_contents(),
+             content::JsReplace("fetch($1, {adAuctionHeaders: true})",
+                                GURL("https://example.test/empty.html"))));
+
+  EXPECT_TRUE(last_request_is_ad_auction_header_request());
+}
+
+IN_PROC_BROWSER_TEST_F(
+    BiddingAndAuctionServerAllFeaturesEnabledBrowserTest,
+    BiddingAndAuctionServerOriginTrial_NoFetchParam_AdAuctionHeadersNotAllowedForFetch) {
+  EXPECT_TRUE(NavigateToURL(
+      shell(), GURL("https://example.test/page_with_ba_server_ot.html")));
+
+  EXPECT_TRUE(
+      ExecJs(shell()->web_contents(),
+             content::JsReplace("fetch($1)",
+                                GURL("https://example.test/empty.html"))));
+
+  EXPECT_FALSE(last_request_is_ad_auction_header_request());
+}
+
+class BiddingAndAuctionServerDisabledBrowserTest
+    : public BiddingAndAuctionServerBrowserTestBase {
+ public:
+  BiddingAndAuctionServerDisabledBrowserTest() {
+    feature_list_.InitWithFeatures(
+        {blink::features::kPrivacySandboxAdsAPIs,
+         blink::features::kInterestGroupStorage},
+        /*disabled_features=*/{
+            blink::features::kFledgeBiddingAndAuctionServer});
+  }
+
+ private:
+  base::test::ScopedFeatureList feature_list_;
+};
+
+IN_PROC_BROWSER_TEST_F(
+    BiddingAndAuctionServerDisabledBrowserTest,
+    BiddingAndAuctionServerOriginTrial_AdAuctionHeadersNotAllowedForFetch) {
+  EXPECT_TRUE(NavigateToURL(
+      shell(), GURL("https://example.test/page_with_ba_server_ot.html")));
+
+  EXPECT_TRUE(
+      ExecJs(shell()->web_contents(),
+             content::JsReplace("fetch($1, {adAuctionHeaders: true})",
+                                GURL("https://example.test/empty.html"))));
+
+  EXPECT_FALSE(last_request_is_ad_auction_header_request());
+}
+
+class BiddingAndAuctionServerMainFledgeFeatureDisabledBrowserTest
+    : public BiddingAndAuctionServerBrowserTestBase {
+ public:
+  BiddingAndAuctionServerMainFledgeFeatureDisabledBrowserTest() {
+    feature_list_.InitWithFeatures(
+        {blink::features::kPrivacySandboxAdsAPIs,
+         blink::features::kFledgeBiddingAndAuctionServer},
+        /*disabled_features=*/{blink::features::kInterestGroupStorage});
+  }
+
+ private:
+  base::test::ScopedFeatureList feature_list_;
+};
+
+IN_PROC_BROWSER_TEST_F(
+    BiddingAndAuctionServerMainFledgeFeatureDisabledBrowserTest,
+    BiddingAndAuctionServerOriginTrial_AdAuctionHeadersNotAllowedForFetch) {
+  EXPECT_TRUE(NavigateToURL(
+      shell(), GURL("https://example.test/page_with_ba_server_ot.html")));
+
+  EXPECT_TRUE(
+      ExecJs(shell()->web_contents(),
+             content::JsReplace("fetch($1, {adAuctionHeaders: true})",
+                                GURL("https://example.test/empty.html"))));
+
+  EXPECT_FALSE(last_request_is_ad_auction_header_request());
 }
 
 }  // namespace

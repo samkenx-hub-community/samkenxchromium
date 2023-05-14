@@ -22,6 +22,27 @@
 
 namespace media {
 
+namespace {
+// Equation 24. kDiagScanOrderMxM[i][0] is the horizontal component, and
+// kDiagScanOrderMxM[i][1] is the vertical component.
+constexpr uint8_t kDiagScanOrder8x8[64][2] = {
+    {0, 0}, {0, 1}, {1, 0}, {0, 2}, {1, 1}, {2, 0}, {0, 3}, {1, 2},
+    {2, 1}, {3, 0}, {0, 4}, {1, 3}, {2, 2}, {3, 1}, {4, 0}, {0, 5},
+    {1, 4}, {2, 3}, {3, 2}, {4, 1}, {5, 0}, {0, 6}, {1, 5}, {2, 4},
+    {3, 3}, {4, 2}, {5, 1}, {6, 0}, {0, 7}, {1, 6}, {2, 5}, {3, 4},
+    {4, 3}, {5, 2}, {6, 1}, {7, 0}, {1, 7}, {2, 6}, {3, 5}, {4, 4},
+    {5, 3}, {6, 2}, {7, 1}, {2, 7}, {3, 6}, {4, 5}, {5, 4}, {6, 3},
+    {7, 2}, {3, 7}, {4, 6}, {5, 5}, {6, 4}, {7, 3}, {4, 7}, {5, 6},
+    {6, 5}, {7, 4}, {5, 7}, {6, 6}, {7, 5}, {6, 7}, {7, 6}, {7, 7}};
+
+constexpr uint8_t kDiagScanOrder4x4[16][2] = {
+    {0, 0}, {0, 1}, {1, 0}, {0, 2}, {1, 1}, {2, 0}, {0, 3}, {1, 2},
+    {2, 1}, {3, 0}, {1, 3}, {2, 2}, {3, 1}, {2, 3}, {3, 2}, {3, 3}};
+
+constexpr uint8_t kDiagScanOrder2x2[4][2] = {{0, 0}, {0, 1}, {1, 0}, {1, 1}};
+
+}  // namespace
+
 H266ProfileTierLevel::H266ProfileTierLevel() {
   memset(reinterpret_cast<void*>(this), 0, sizeof(*this));
 }
@@ -51,6 +72,39 @@ H266SublayerHrdParameters::H266SublayerHrdParameters() {
 }
 
 H266OlsTimingHrdParameters::H266OlsTimingHrdParameters() {
+  memset(reinterpret_cast<void*>(this), 0, sizeof(*this));
+}
+
+H266PPS::H266PPS() {
+  memset(reinterpret_cast<void*>(this), 0, sizeof(*this));
+}
+
+H266APS::H266APS(int aps_type) : aps_params_type(aps_type) {
+  memset(reinterpret_cast<void*>(this), 0, sizeof(*this));
+  switch (aps_type) {
+    case 0:
+      data.emplace<H266AlfData>();
+      break;
+    case 1:
+      data.emplace<H266LmcsData>();
+      break;
+    case 2:
+      data.emplace<H266ScalingListData>();
+      break;
+  }
+}
+
+H266APS::~H266APS() = default;
+
+H266ScalingListData::H266ScalingListData() {
+  memset(reinterpret_cast<void*>(this), 0, sizeof(*this));
+}
+
+H266AlfData::H266AlfData() {
+  memset(reinterpret_cast<void*>(this), 0, sizeof(*this));
+}
+
+H266LmcsData::H266LmcsData() {
   memset(reinterpret_cast<void*>(this), 0, sizeof(*this));
 }
 
@@ -1825,6 +1879,1014 @@ H266Parser::Result H266Parser::ParseSPS(const H266NALU& nalu, int* sps_id) {
   return res;
 }
 
+// Picture parameter set contains information that's not changed frequently
+// across pictures, thus typically shared by many pictures. Since VVC
+// supports adaptive resolution change, the width and height information may be
+// in PPS instead of SPS. Also PPS includes information of reference picture
+// resamping scaling window, layout of tiles and rectangular slices, default
+// numbers of current active RPL entries, deblocking params/QP initials at
+// picture level, as well as many other flags.
+H266Parser::Result H266Parser::ParsePPS(const H266NALU& nalu, int* pps_id) {
+  // 7.3.2.5
+  DVLOG(4) << "Parsing PPS";
+  DCHECK(pps_id);
+  *pps_id = -1;
+
+  std::unique_ptr<H266PPS> pps = std::make_unique<H266PPS>();
+
+  READ_BITS_OR_RETURN(6, &pps->pps_pic_parameter_set_id);
+  READ_BITS_OR_RETURN(4, &pps->pps_seq_parameter_set_id);
+  IN_RANGE_OR_RETURN(pps->pps_seq_parameter_set_id, 0, 15);
+  const H266SPS* sps = GetSPS(pps->pps_seq_parameter_set_id);
+  if (!sps) {
+    return kMissingParameterSet;
+  }
+
+  READ_BOOL_OR_RETURN(&pps->pps_mixed_nalu_types_in_pic_flag);
+  READ_UE_OR_RETURN(&pps->pps_pic_width_in_luma_samples);
+  IN_RANGE_OR_RETURN(pps->pps_pic_width_in_luma_samples, 1,
+                     sps->sps_pic_width_max_in_luma_samples);
+
+  READ_UE_OR_RETURN(&pps->pps_pic_height_in_luma_samples);
+  IN_RANGE_OR_RETURN(pps->pps_pic_height_in_luma_samples, 1,
+                     sps->sps_pic_height_max_in_luma_samples);
+
+  int multipler = std::max(8, sps->min_cb_size_y);
+  if ((pps->pps_pic_width_in_luma_samples % multipler != 0) ||
+      (pps->pps_pic_height_in_luma_samples % multipler != 0)) {
+    DVLOG(1) << "Invalid pps pic width/height";
+    return kInvalidStream;
+  }
+
+  if (!sps->sps_res_change_in_clvs_allowed_flag &&
+      (pps->pps_pic_width_in_luma_samples !=
+           sps->sps_pic_width_max_in_luma_samples ||
+       (pps->pps_pic_height_in_luma_samples !=
+        sps->sps_pic_height_max_in_luma_samples))) {
+    DVLOG(1) << "pps pic width/height is different from sps pic width/height "
+                "when sps_res_change_in_clvs_allowed_flag is false.";
+    return kInvalidStream;
+  }
+  if (sps->sps_ref_wraparound_enabled_flag) {
+    LE_OR_RETURN(sps->ctb_size_y / sps->min_cb_size_y + 1,
+                 pps->pps_pic_width_in_luma_samples / sps->min_cb_size_y - 1);
+  }
+
+  pps->pic_width_in_ctbs_y =
+      (pps->pps_pic_width_in_luma_samples + sps->ctb_size_y - 1) /
+      sps->ctb_size_y;
+  pps->pic_height_in_ctbs_y =
+      (pps->pps_pic_height_in_luma_samples + sps->ctb_size_y - 1) /
+      sps->ctb_size_y;
+  pps->pic_size_in_ctbs_y =
+      pps->pic_width_in_ctbs_y * pps->pic_height_in_ctbs_y;
+  pps->pic_width_in_min_cbs_y =
+      pps->pps_pic_width_in_luma_samples / sps->min_cb_size_y;
+  pps->pic_height_in_min_cbs_y =
+      pps->pps_pic_height_in_luma_samples / sps->min_cb_size_y;
+  pps->pic_size_in_min_cbs_y =
+      pps->pic_width_in_min_cbs_y * pps->pic_height_in_min_cbs_y;
+  pps->pic_size_in_samples_y =
+      pps->pps_pic_width_in_luma_samples * pps->pps_pic_height_in_luma_samples;
+  pps->pic_width_in_samples_c =
+      pps->pps_pic_width_in_luma_samples / sps->sub_width_c;
+  pps->pic_height_in_samples_c =
+      pps->pps_pic_height_in_luma_samples / sps->sub_width_c;
+
+  READ_BOOL_OR_RETURN(&pps->pps_conformance_window_flag);
+  if (pps->pps_pic_width_in_luma_samples ==
+          sps->sps_pic_width_max_in_luma_samples &&
+      pps->pps_pic_height_in_luma_samples ==
+          sps->sps_pic_height_max_in_luma_samples) {
+    if (pps->pps_conformance_window_flag) {
+      DVLOG(1) << "Invalid pps_conformance_window_flag.";
+      return kInvalidStream;
+    }
+  }
+  if (pps->pps_conformance_window_flag) {
+    READ_UE_OR_RETURN(&pps->pps_conf_win_left_offset);
+    READ_UE_OR_RETURN(&pps->pps_conf_win_right_offset);
+    READ_UE_OR_RETURN(&pps->pps_conf_win_top_offset);
+    READ_UE_OR_RETURN(&pps->pps_conf_win_bottom_offset);
+    // Verify cropping window.
+    if ((sps->sub_width_c *
+             (pps->pps_conf_win_left_offset + pps->pps_conf_win_right_offset) >=
+         pps->pps_pic_width_in_luma_samples) ||
+        (sps->sub_height_c *
+             (pps->pps_conf_win_top_offset + pps->pps_conf_win_bottom_offset) >=
+         pps->pps_pic_height_in_luma_samples)) {
+      DVLOG(1) << "Invalid cropping window in PPS.";
+      return kInvalidStream;
+    }
+  } else {
+    if (pps->pps_pic_width_in_luma_samples ==
+            sps->sps_pic_width_max_in_luma_samples &&
+        pps->pps_pic_height_in_luma_samples ==
+            sps->sps_pic_height_max_in_luma_samples) {
+      pps->pps_conf_win_left_offset = sps->sps_conf_win_left_offset;
+      pps->pps_conf_win_right_offset = sps->sps_conf_win_right_offset;
+      pps->pps_conf_win_top_offset = sps->sps_conf_win_top_offset;
+      pps->pps_conf_win_bottom_offset = sps->sps_conf_win_bottom_offset;
+    }
+  }
+
+  READ_BOOL_OR_RETURN(&pps->pps_scaling_window_explicit_signaling_flag);
+  if (!sps->sps_ref_pic_resampling_enabled_flag &&
+      pps->pps_scaling_window_explicit_signaling_flag) {
+    DVLOG(1) << "Scaling window cannot be explicitly signaled in PPS if ref "
+                "picture resampling is disabled.";
+    return kInvalidStream;
+  }
+  if (pps->pps_scaling_window_explicit_signaling_flag) {
+    READ_SE_OR_RETURN(&pps->pps_scaling_win_left_offset);
+    READ_SE_OR_RETURN(&pps->pps_scaling_win_right_offset);
+    READ_SE_OR_RETURN(&pps->pps_scaling_win_top_offset);
+    READ_SE_OR_RETURN(&pps->pps_scaling_win_bottom_offset);
+    // Verify scaling window.
+    IN_RANGE_OR_RETURN(sps->sub_width_c * pps->pps_scaling_win_left_offset,
+                       -15 * pps->pps_pic_width_in_luma_samples,
+                       pps->pps_pic_width_in_luma_samples - 1);
+    IN_RANGE_OR_RETURN(sps->sub_width_c * pps->pps_scaling_win_right_offset,
+                       -15 * pps->pps_pic_width_in_luma_samples,
+                       pps->pps_pic_width_in_luma_samples - 1);
+    IN_RANGE_OR_RETURN(sps->sub_height_c * pps->pps_scaling_win_top_offset,
+                       -15 * pps->pps_pic_height_in_luma_samples,
+                       pps->pps_pic_height_in_luma_samples - 1);
+    IN_RANGE_OR_RETURN(sps->sub_height_c * pps->pps_scaling_win_bottom_offset,
+                       -15 * pps->pps_pic_height_in_luma_samples,
+                       pps->pps_pic_height_in_luma_samples - 1);
+    IN_RANGE_OR_RETURN(sps->sub_width_c * (pps->pps_scaling_win_left_offset +
+                                           pps->pps_scaling_win_right_offset),
+                       -15 * pps->pps_pic_width_in_luma_samples,
+                       pps->pps_pic_width_in_luma_samples - 1);
+    IN_RANGE_OR_RETURN(sps->sub_height_c * (pps->pps_scaling_win_top_offset +
+                                            pps->pps_scaling_win_bottom_offset),
+                       -15 * pps->pps_pic_height_in_luma_samples,
+                       pps->pps_pic_height_in_luma_samples - 1);
+  } else {
+    pps->pps_scaling_win_left_offset = pps->pps_conf_win_left_offset;
+    pps->pps_scaling_win_right_offset = pps->pps_conf_win_right_offset;
+    pps->pps_scaling_win_top_offset = pps->pps_conf_win_top_offset;
+    pps->pps_scaling_win_bottom_offset = pps->pps_conf_win_bottom_offset;
+  }
+
+  READ_BOOL_OR_RETURN(&pps->pps_output_flag_present_flag);
+  READ_BOOL_OR_RETURN(&pps->pps_no_pic_partition_flag);
+  if (sps->sps_num_subpics_minus1 > 0 ||
+      pps->pps_mixed_nalu_types_in_pic_flag == 1) {
+    TRUE_OR_RETURN(!pps->pps_no_pic_partition_flag);
+  }
+
+  READ_BOOL_OR_RETURN(&pps->pps_subpic_id_mapping_present_flag);
+  if (!sps->sps_subpic_id_mapping_explicitly_signaled_flag ||
+      sps->sps_subpic_id_mapping_present_flag) {
+    TRUE_OR_RETURN(!pps->pps_subpic_id_mapping_present_flag);
+  } else {
+    TRUE_OR_RETURN(pps->pps_subpic_id_mapping_present_flag);
+  }
+
+  if (pps->pps_subpic_id_mapping_present_flag) {
+    if (!pps->pps_no_pic_partition_flag) {
+      READ_UE_OR_RETURN(&pps->pps_num_subpics_minus1);
+      TRUE_OR_RETURN(pps->pps_num_subpics_minus1 ==
+                     sps->sps_num_subpics_minus1);
+    }
+
+    READ_UE_OR_RETURN(&pps->pps_subpic_id_len_minus1);
+    TRUE_OR_RETURN(pps->pps_subpic_id_len_minus1 ==
+                   sps->sps_subpic_id_len_minus1);
+    for (int i = 0; i <= pps->pps_num_subpics_minus1; i++) {
+      READ_BITS_OR_RETURN(pps->pps_subpic_id_len_minus1 + 1,
+                          &pps->pps_subpic_id[i]);
+    }
+  }
+
+  // Handle tile/slice layout information.
+  if (!pps->pps_no_pic_partition_flag) {
+    READ_BITS_OR_RETURN(2, &pps->pps_log2_ctu_size_minus5);
+    // CTU size info in PPS must be exactly the same as SPS.
+    TRUE_OR_RETURN(pps->pps_log2_ctu_size_minus5 ==
+                   sps->sps_log2_ctu_size_minus5);
+    READ_UE_OR_RETURN(&pps->pps_num_exp_tile_columns_minus1);
+    IN_RANGE_OR_RETURN(pps->pps_num_exp_tile_columns_minus1, 0,
+                       pps->pic_width_in_ctbs_y - 1);
+    READ_UE_OR_RETURN(&pps->pps_num_exp_tile_rows_minus1);
+    IN_RANGE_OR_RETURN(pps->pps_num_exp_tile_rows_minus1, 0,
+                       pps->pic_height_in_ctbs_y - 1);
+
+    // Clause 6.5.1, equation 14 & equation 15: calculate number
+    // of tile columns and rows.
+    // For those tile column/row sizes not explicitly signalled,
+    // use the last explicitly signalled size as the implicit
+    // tile size, unless it is the last tile column/row.
+    int remaining_width_in_ctbs_y = pps->pic_width_in_ctbs_y;
+    int explicit_tile_width = 0;
+    for (int i = 0; i <= pps->pps_num_exp_tile_columns_minus1; i++) {
+      READ_UE_OR_RETURN(&pps->pps_tile_column_width_minus1[i]);
+      IN_RANGE_OR_RETURN(pps->pps_tile_column_width_minus1[i], 0,
+                         pps->pic_width_in_ctbs_y - 1);
+      explicit_tile_width += pps->pps_tile_column_width_minus1[i] + 1;
+    }
+    remaining_width_in_ctbs_y -= explicit_tile_width;
+    int uniform_tile_col_width = pps->pps_tile_column_width_minus1
+                                     [pps->pps_num_exp_tile_columns_minus1] +
+                                 1;
+    int next_tile_column_idx = pps->pps_num_exp_tile_columns_minus1 + 1;
+    while (remaining_width_in_ctbs_y >= uniform_tile_col_width) {
+      pps->pps_tile_column_width_minus1[next_tile_column_idx++] =
+          uniform_tile_col_width - 1;
+      remaining_width_in_ctbs_y -= uniform_tile_col_width;
+    }
+    if (remaining_width_in_ctbs_y > 0) {
+      pps->pps_tile_column_width_minus1[next_tile_column_idx++] =
+          remaining_width_in_ctbs_y;
+    }
+    pps->num_tile_columns = next_tile_column_idx;
+
+    int remaining_height_in_ctbs_y = pps->pic_height_in_ctbs_y;
+    int explicit_tile_height = 0;
+    for (int i = 0; i <= pps->pps_num_exp_tile_rows_minus1; i++) {
+      READ_UE_OR_RETURN(&pps->pps_tile_row_height_minus1[i]);
+      IN_RANGE_OR_RETURN(pps->pps_tile_row_height_minus1[i], 0,
+                         pps->pic_height_in_ctbs_y - 1);
+      explicit_tile_height += pps->pps_tile_row_height_minus1[i] + 1;
+    }
+    remaining_height_in_ctbs_y -= explicit_tile_height;
+    int uniform_tile_row_height =
+        pps->pps_tile_row_height_minus1[pps->pps_num_exp_tile_rows_minus1] + 1;
+    int next_tile_row_idx = pps->pps_num_exp_tile_rows_minus1 + 1;
+    while (remaining_height_in_ctbs_y >= uniform_tile_row_height) {
+      pps->pps_tile_row_height_minus1[next_tile_row_idx++] =
+          uniform_tile_row_height - 1;
+      remaining_height_in_ctbs_y -= uniform_tile_row_height;
+    }
+    if (remaining_height_in_ctbs_y > 0) {
+      pps->pps_tile_row_height_minus1[next_tile_row_idx++] =
+          remaining_height_in_ctbs_y;
+    }
+    pps->num_tile_rows = next_tile_row_idx;
+    pps->num_tiles_in_pic = pps->num_tile_columns * pps->num_tile_rows;
+
+    if (pps->num_tiles_in_pic > 1) {
+      READ_BOOL_OR_RETURN(&pps->pps_loop_filter_across_tiles_enabled_flag);
+      READ_BOOL_OR_RETURN(&pps->pps_rect_slice_flag);
+    } else {
+      pps->pps_rect_slice_flag = 1;
+    }
+    if (pps->pps_rect_slice_flag) {
+      READ_BOOL_OR_RETURN(&pps->pps_single_slice_per_subpic_flag);
+    }
+
+    // When pps_rect_slice_flag is 0, PPS will not contain the slice
+    // width/height measured in units of tiles. In that case, VVC depends on
+    // sh_slice_address and sh_num_tiles_in_slice_minus1 syntax for the slice
+    // layout in the picture.
+    if (pps->pps_rect_slice_flag && !pps->pps_single_slice_per_subpic_flag) {
+      READ_UE_OR_RETURN(&pps->pps_num_slices_in_pic_minus1);
+      IN_RANGE_OR_RETURN(pps->pps_num_slices_in_pic_minus1, 0,
+                         sps->profile_tier_level.MaxSlicesPerAu() - 1);
+
+      if (pps->pps_num_slices_in_pic_minus1 > 1) {
+        // When this flag is 0, all pictures referring to current PPS are
+        // partitioned into rectangular slice columns and rows in slice raster
+        // order. Otherwise all rectangular slices in picture are specified in
+        // the order by the values of pps_tile_idx_delta_val[i] in increasing
+        // values of i.
+        READ_BOOL_OR_RETURN(&pps->pps_tile_idx_delta_present_flag);
+      }
+
+      int tile_idx = 0, tile_x = 0, tile_y = 0, ctu_x = 0, ctu_y = 0;
+      int slice_top_left_ctu_x[kMaxSlices];
+      int slice_top_left_ctu_y[kMaxSlices];
+      int i;
+
+      for (i = 0; i < pps->pps_num_slices_in_pic_minus1; i++) {
+        // Equation 21. tile_x is the 0-based index horizontally; tile_y is the
+        // 0-based tile row.
+        tile_x = tile_idx % pps->num_tile_columns;
+        tile_y = tile_idx / pps->num_tile_columns;
+        if (tile_x != pps->num_tile_columns - 1) {
+          READ_UE_OR_RETURN(&pps->pps_slice_width_in_tiles_minus1[i]);
+          IN_RANGE_OR_RETURN(pps->pps_slice_width_in_tiles_minus1[i], 0,
+                             pps->num_tile_columns - 1);
+        }
+
+        if ((tile_y != pps->num_tile_rows - 1) &&
+            (pps->pps_tile_idx_delta_present_flag || tile_x == 0)) {
+          READ_UE_OR_RETURN(&pps->pps_slice_height_in_tiles_minus1[i]);
+          IN_RANGE_OR_RETURN(pps->pps_slice_height_in_tiles_minus1[i], 0,
+                             pps->num_tile_rows - 1);
+        } else {
+          if (tile_y == pps->num_tile_rows - 1) {
+            pps->pps_slice_height_in_tiles_minus1[i] = 0;
+          } else {
+            pps->pps_slice_height_in_tiles_minus1[i] =
+                pps->pps_slice_height_in_tiles_minus1[i - 1];
+          }
+        }
+        for (int j = 0; j < tile_x; j++) {
+          ctu_x += pps->pps_tile_column_width_minus1[j] + 1;
+        }
+        for (int j = 0; j < tile_y; j++) {
+          ctu_y += pps->pps_tile_row_height_minus1[j] + 1;
+        }
+
+        int num_slices_in_tile = 0, uniform_slice_height = 0;
+        remaining_height_in_ctbs_y = 0;
+        if (pps->pps_slice_width_in_tiles_minus1[i] == 0 &&
+            pps->pps_slice_height_in_tiles_minus1[i] == 0 &&
+            pps->pps_tile_row_height_minus1[tile_y] > 0) {
+          remaining_height_in_ctbs_y =
+              pps->pps_tile_row_height_minus1[tile_y] + 1;
+          READ_UE_OR_RETURN(&pps->pps_num_exp_slices_in_tile[i]);
+          IN_RANGE_OR_RETURN(pps->pps_num_exp_slices_in_tile[i], 0,
+                             pps->pps_tile_row_height_minus1[tile_y]);
+
+          if (!pps->pps_num_exp_slices_in_tile[i]) {
+            slice_top_left_ctu_x[i] = ctu_x;
+            slice_top_left_ctu_y[i] = ctu_y;
+            pps->slice_height_in_ctus[i] =
+                pps->pps_tile_row_height_minus1[tile_y] + 1;
+            num_slices_in_tile = 1;
+          } else {
+            int slice_height_in_ctus = 0, j;
+            for (j = 0; j < pps->pps_num_exp_slices_in_tile[i]; j++) {
+              READ_UE_OR_RETURN(
+                  &pps->pps_exp_slice_height_in_ctus_minus1[i][j]);
+              IN_RANGE_OR_RETURN(pps->pps_exp_slice_height_in_ctus_minus1[i][j],
+                                 0, pps->pps_tile_row_height_minus1[tile_y]);
+              slice_height_in_ctus =
+                  pps->pps_exp_slice_height_in_ctus_minus1[i][j] + 1;
+              pps->slice_height_in_ctus[i + j] = slice_height_in_ctus;
+              slice_top_left_ctu_x[i + j] = ctu_x;
+              slice_top_left_ctu_y[i + j] = ctu_y;
+              ctu_y += slice_height_in_ctus;
+              remaining_height_in_ctbs_y -= slice_height_in_ctus;
+            }
+            uniform_slice_height =
+                1 + pps->pps_exp_slice_height_in_ctus_minus1[i][j - 1];
+            while (remaining_height_in_ctbs_y > uniform_slice_height) {
+              pps->slice_height_in_ctus[i + j] = uniform_slice_height;
+              slice_top_left_ctu_x[i + j] = ctu_x;
+              slice_top_left_ctu_y[i + j] = ctu_y;
+              ctu_y += uniform_slice_height;
+              j++;
+            }
+            if (remaining_height_in_ctbs_y > 0) {
+              pps->slice_height_in_ctus[i + j] = remaining_height_in_ctbs_y;
+              slice_top_left_ctu_x[i + j] = ctu_x;
+              slice_top_left_ctu_y[i + j] = ctu_y;
+              j++;
+            }
+            num_slices_in_tile = j;
+          }
+          i += num_slices_in_tile - 1;
+        } else {
+          int height = 0;
+          pps->pps_num_exp_slices_in_tile[i] = 0;
+          for (int j = 0; j <= pps->pps_slice_height_in_tiles_minus1[i]; j++) {
+            height += pps->pps_tile_row_height_minus1[tile_y + j] + 1;
+          }
+          pps->slice_height_in_ctus[i] = height;
+          slice_top_left_ctu_x[i] = ctu_x;
+          slice_top_left_ctu_y[i] = ctu_y;
+        }
+
+        // Fetch next slice's tile idx, which is used for calculating next
+        // tile_x & tile_y.
+        if (i < pps->pps_num_slices_in_pic_minus1) {
+          if (pps->pps_tile_idx_delta_present_flag) {
+            READ_SE_OR_RETURN(&pps->pps_tile_idx_delta_val[i]);
+            IN_RANGE_OR_RETURN(pps->pps_tile_idx_delta_val[i], 1 - tile_idx,
+                               pps->num_tiles_in_pic - 1 - tile_idx);
+            TRUE_OR_RETURN(pps->pps_tile_idx_delta_val[i] != 0);
+            tile_idx += pps->pps_tile_idx_delta_val[i];
+          } else {
+            pps->pps_tile_idx_delta_val[i] = 0;
+            tile_idx += pps->pps_slice_width_in_tiles_minus1[i] + 1;
+            if (tile_idx % pps->num_tile_columns == 0) {
+              tile_idx += pps->pps_slice_height_in_tiles_minus1[i] *
+                          pps->num_tile_columns;
+            }
+          }
+        }
+      }
+
+      // Handle the last slice.
+      if (i == pps->pps_num_slices_in_pic_minus1) {
+        int height = 0;
+        tile_x = tile_idx % pps->num_tile_columns;
+        tile_y = tile_idx / pps->num_tile_columns;
+
+        ctu_x = ctu_y = 0;
+        for (int j = 0; j < tile_x; j++) {
+          ctu_x += pps->pps_tile_column_width_minus1[j] + 1;
+        }
+        for (int j = 0; j < tile_y; j++) {
+          ctu_y += pps->pps_tile_row_height_minus1[j] + 1;
+        }
+        slice_top_left_ctu_x[i] = ctu_x;
+        slice_top_left_ctu_y[i] = ctu_y;
+        pps->pps_slice_width_in_tiles_minus1[i] =
+            pps->num_tile_columns - tile_x - 1;
+        pps->pps_slice_height_in_tiles_minus1[i] =
+            pps->num_tile_rows - tile_y - 1;
+
+        for (int j = 0; j <= pps->pps_slice_height_in_tiles_minus1[i]; j++) {
+          height += pps->pps_tile_row_height_minus1[tile_y + j] + 1;
+        }
+        pps->slice_height_in_ctus[i] = height;
+        pps->pps_num_exp_slices_in_tile[i] = 0;
+      }
+
+      for (int p = 0; p <= sps->sps_num_subpics_minus1; p++) {
+        pps->num_slices_in_subpic[p] = 0;
+        for (int k = 0; k <= pps->pps_num_slices_in_pic_minus1; k++) {
+          int pos_x = 0, pos_y = 0;
+          pos_x = slice_top_left_ctu_x[k];
+          pos_y = slice_top_left_ctu_y[k];
+          if ((pos_x >= sps->sps_subpic_ctu_top_left_x[p]) &&
+              (pos_x < sps->sps_subpic_ctu_top_left_x[p] +
+                           sps->sps_subpic_width_minus1[p] + 1) &&
+              (pos_y >= sps->sps_subpic_ctu_top_left_y[p]) &&
+              (pos_y < sps->sps_subpic_ctu_top_left_y[p] +
+                           sps->sps_subpic_height_minus1[p] + 1)) {
+            pps->num_slices_in_subpic[p]++;
+          }
+        }
+      }
+      // pps_rect_slice_flag && !pps_single_slice_per_subpic_flag
+    }
+
+    if (!pps->pps_rect_slice_flag || pps->pps_single_slice_per_subpic_flag ||
+        pps->pps_num_slices_in_pic_minus1 > 0) {
+      READ_BOOL_OR_RETURN(&pps->pps_loop_filter_across_slices_enabled_flag);
+    } else {
+      pps->pps_loop_filter_across_slices_enabled_flag = 0;
+    }
+
+  } else {
+    // pps_no_pic_partition_flag = 1, so that tiling and slicing layout
+    // need to be inferred.
+    pps->pps_num_exp_tile_columns_minus1 = 0;
+    pps->pps_num_exp_tile_rows_minus1 = 0;
+    pps->pps_tile_column_width_minus1[0] = pps->pic_width_in_ctbs_y - 1;
+    pps->pps_tile_row_height_minus1[0] = pps->pic_height_in_ctbs_y - 1;
+    pps->pps_loop_filter_across_tiles_enabled_flag = 0;
+    pps->pps_rect_slice_flag = 1;
+    pps->pps_single_slice_per_subpic_flag = 1;
+    // Spec requires when pps_no_pic_partition_flag is 1,
+    // pps_num_slices_in_pic_minus1 should be 0; But at the same time, if
+    // pps_single_slcie_per_subpic_flag is 1, it should be inferred to
+    // sps_num_subpics_minus1.
+    pps->pps_num_slices_in_pic_minus1 = 0;
+    pps->pps_tile_idx_delta_present_flag = 0;
+  }
+
+  READ_BOOL_OR_RETURN(&pps->pps_cabac_init_present_flag);
+  for (int i = 0; i < 2; i++) {
+    READ_UE_OR_RETURN(&pps->pps_num_ref_idx_default_active_minus1[i]);
+    IN_RANGE_OR_RETURN(pps->pps_num_ref_idx_default_active_minus1[i], 0, 14);
+  }
+  READ_BOOL_OR_RETURN(&pps->pps_rpl1_idx_present_flag);
+  READ_BOOL_OR_RETURN(&pps->pps_weighted_pred_flag);
+  READ_BOOL_OR_RETURN(&pps->pps_weighted_bipred_flag);
+  if (pps->pps_weighted_pred_flag) {
+    TRUE_OR_RETURN(pps->pps_weighted_bipred_flag == 0);
+  }
+  READ_BOOL_OR_RETURN(&pps->pps_ref_wraparound_enabled_flag);
+  if (sps->sps_ref_pic_resampling_enabled_flag == 0 ||
+      sps->ctb_size_y / sps->min_cb_size_y + 1 >
+          pps->pps_pic_width_in_luma_samples / sps->min_cb_size_y - 1) {
+    TRUE_OR_RETURN(pps->pps_ref_wraparound_enabled_flag == 0);
+  }
+
+  if (pps->pps_ref_wraparound_enabled_flag) {
+    READ_UE_OR_RETURN(&pps->pps_pic_width_minus_wraparound_offset);
+    IN_RANGE_OR_RETURN(
+        pps->pps_pic_width_minus_wraparound_offset, 0,
+        (pps->pps_pic_width_in_luma_samples / sps->min_cb_size_y) -
+            (sps->ctb_size_y / sps->min_cb_size_y) - 2);
+  }
+
+  // QP
+  READ_SE_OR_RETURN(&pps->pps_init_qp_minus26);
+  IN_RANGE_OR_RETURN(pps->pps_init_qp_minus26, -(26 + sps->qp_bd_offset), 37);
+  READ_BOOL_OR_RETURN(&pps->pps_cu_qp_delta_enabled_flag);
+  READ_BOOL_OR_RETURN(&pps->pps_chroma_tool_offsets_present_flag);
+  if (sps->sps_chroma_format_idc == 0) {
+    TRUE_OR_RETURN(pps->pps_chroma_tool_offsets_present_flag == 0);
+  }
+
+  if (pps->pps_chroma_tool_offsets_present_flag) {
+    READ_SE_OR_RETURN(&pps->pps_cb_qp_offset);
+    READ_SE_OR_RETURN(&pps->pps_cr_qp_offset);
+    IN_RANGE_OR_RETURN(pps->pps_cb_qp_offset, -12, 12);
+    IN_RANGE_OR_RETURN(pps->pps_cr_qp_offset, -12, 12);
+    READ_BOOL_OR_RETURN(&pps->pps_joint_cbcr_qp_offset_present_flag);
+    if (sps->sps_chroma_format_idc == 0 ||
+        sps->sps_joint_cbcr_enabled_flag == 0) {
+      TRUE_OR_RETURN(pps->pps_joint_cbcr_qp_offset_present_flag == 0);
+    }
+
+    if (pps->pps_joint_cbcr_qp_offset_present_flag) {
+      READ_SE_OR_RETURN(&pps->pps_joint_cbcr_qp_offset_value);
+      IN_RANGE_OR_RETURN(pps->pps_joint_cbcr_qp_offset_value, -12, 12);
+    }
+
+    READ_BOOL_OR_RETURN(&pps->pps_slice_chroma_qp_offsets_present_flag);
+    READ_BOOL_OR_RETURN(&pps->pps_cu_chroma_qp_offset_list_enabled_flag);
+    if (pps->pps_cu_chroma_qp_offset_list_enabled_flag) {
+      READ_UE_OR_RETURN(&pps->pps_chroma_qp_offset_list_len_minus1);
+      IN_RANGE_OR_RETURN(pps->pps_chroma_qp_offset_list_len_minus1, 0, 5);
+
+      for (int i = 0; i <= pps->pps_chroma_qp_offset_list_len_minus1; i++) {
+        READ_SE_OR_RETURN(&pps->pps_cb_qp_offset_list[i]);
+        READ_SE_OR_RETURN(&pps->pps_cr_qp_offset_list[i]);
+        IN_RANGE_OR_RETURN(pps->pps_cb_qp_offset_list[i], -12, 12);
+        IN_RANGE_OR_RETURN(pps->pps_cr_qp_offset_list[i], -12, 12);
+
+        if (pps->pps_joint_cbcr_qp_offset_present_flag) {
+          READ_SE_OR_RETURN(&pps->pps_joint_cbcr_qp_offset_list[i]);
+          IN_RANGE_OR_RETURN(pps->pps_joint_cbcr_qp_offset_list[i], -12, 12);
+        } else {
+          pps->pps_joint_cbcr_qp_offset_list[i] = 0;
+        }
+      }
+    }
+  }
+
+  // Deblocking filter
+  READ_BOOL_OR_RETURN(&pps->pps_deblocking_filter_control_present_flag);
+  if (pps->pps_deblocking_filter_control_present_flag) {
+    READ_BOOL_OR_RETURN(&pps->pps_deblocking_filter_override_enabled_flag);
+    READ_BOOL_OR_RETURN(&pps->pps_deblocking_filter_disabled_flag);
+    if (!pps->pps_no_pic_partition_flag &&
+        pps->pps_deblocking_filter_override_enabled_flag) {
+      READ_BOOL_OR_RETURN(&pps->pps_dbf_info_in_ph_flag);
+    } else {
+      pps->pps_dbf_info_in_ph_flag = 0;
+    }
+    if (!pps->pps_deblocking_filter_disabled_flag) {
+      READ_SE_OR_RETURN(&pps->pps_luma_beta_offset_div2);
+      READ_SE_OR_RETURN(&pps->pps_luma_tc_offset_div2);
+      IN_RANGE_OR_RETURN(pps->pps_luma_beta_offset_div2, -12, 12);
+      IN_RANGE_OR_RETURN(pps->pps_luma_tc_offset_div2, -12, 12);
+      if (pps->pps_chroma_tool_offsets_present_flag) {
+        READ_SE_OR_RETURN(&pps->pps_cb_beta_offset_div2);
+        READ_SE_OR_RETURN(&pps->pps_cb_tc_offset_div2);
+        READ_SE_OR_RETURN(&pps->pps_cr_beta_offset_div2);
+        READ_SE_OR_RETURN(&pps->pps_cr_tc_offset_div2);
+        IN_RANGE_OR_RETURN(pps->pps_cb_beta_offset_div2, -12, 12);
+        IN_RANGE_OR_RETURN(pps->pps_cb_tc_offset_div2, -12, 12);
+        IN_RANGE_OR_RETURN(pps->pps_cr_beta_offset_div2, -12, 12);
+        IN_RANGE_OR_RETURN(pps->pps_cr_tc_offset_div2, -12, 12);
+      } else {
+        pps->pps_cb_beta_offset_div2 = pps->pps_luma_beta_offset_div2;
+        pps->pps_cb_tc_offset_div2 = pps->pps_luma_tc_offset_div2;
+        pps->pps_cr_beta_offset_div2 = pps->pps_luma_beta_offset_div2;
+        pps->pps_cr_tc_offset_div2 = pps->pps_luma_tc_offset_div2;
+      }
+    } else {
+      pps->pps_luma_beta_offset_div2 = pps->pps_luma_tc_offset_div2 = 0;
+    }
+  } else {
+    pps->pps_deblocking_filter_override_enabled_flag = 0;
+    pps->pps_deblocking_filter_disabled_flag = 0;
+    pps->pps_dbf_info_in_ph_flag = 0;
+    pps->pps_luma_beta_offset_div2 = pps->pps_luma_tc_offset_div2 = 0;
+    pps->pps_cb_beta_offset_div2 = pps->pps_luma_beta_offset_div2;
+    pps->pps_cb_tc_offset_div2 = pps->pps_luma_tc_offset_div2;
+    pps->pps_cr_beta_offset_div2 = pps->pps_luma_beta_offset_div2;
+    pps->pps_cr_tc_offset_div2 = pps->pps_luma_tc_offset_div2;
+  }
+
+  if (!pps->pps_no_pic_partition_flag) {
+    READ_BOOL_OR_RETURN(&pps->pps_rpl_info_in_ph_flag);
+    READ_BOOL_OR_RETURN(&pps->pps_sao_info_in_ph_flag);
+    READ_BOOL_OR_RETURN(&pps->pps_alf_info_in_ph_flag);
+
+    if ((pps->pps_weighted_pred_flag || pps->pps_weighted_bipred_flag) &&
+        pps->pps_rpl_info_in_ph_flag) {
+      READ_BOOL_OR_RETURN(&pps->pps_wp_info_in_ph_flag);
+    } else {
+      pps->pps_wp_info_in_ph_flag = 0;
+    }
+    READ_BOOL_OR_RETURN(&pps->pps_qp_delta_info_in_ph_flag);
+  } else {
+    pps->pps_rpl_info_in_ph_flag = 0;
+    pps->pps_sao_info_in_ph_flag = 0;
+    pps->pps_alf_info_in_ph_flag = 0;
+    pps->pps_wp_info_in_ph_flag = 0;
+    pps->pps_qp_delta_info_in_ph_flag = 0;
+  }
+
+  READ_BOOL_OR_RETURN(&pps->pps_picture_header_extension_present_flag);
+  READ_BOOL_OR_RETURN(&pps->pps_slice_header_extension_present_flag);
+  READ_BOOL_OR_RETURN(&pps->pps_extension_flag);
+  // We stop here.
+
+  // If a PPS with the same id already exists, replace it.
+  *pps_id = pps->pps_pic_parameter_set_id;
+  active_pps_[*pps_id] = std::move(pps);
+
+  return kOk;
+}
+
+// 7.3.2.6 Adaptation parameter set
+// APS conveys slice level information which may be shared by
+// multiple slices of a picture or slices of different pictures.
+// There might be many APSs for a bitstream, and would be typically
+// updated very frequently.
+H266Parser::Result H266Parser::ParseAPS(const H266NALU& nalu,
+                                        int* aps_id,
+                                        H266APS::ParamType* type) {
+  DCHECK(aps_id);
+
+  int aps_type;
+  READ_BITS_OR_RETURN(3, &aps_type);
+  IN_RANGE_OR_RETURN(aps_type, 0, 2);
+  std::unique_ptr<H266APS> aps = std::make_unique<H266APS>(aps_type);
+
+  aps->nal_unit_type = nalu.nal_unit_type;
+  aps->nuh_layer_id = nalu.nuh_layer_id;
+  aps->aps_params_type = aps_type;
+
+  READ_BITS_OR_RETURN(5, &aps->aps_adaptation_parameter_set_id);
+  if (aps->aps_params_type == H266APS::kAlf ||
+      aps->aps_params_type == H266APS::kScalingList) {
+    IN_RANGE_OR_RETURN(aps->aps_adaptation_parameter_set_id, 0, 7);
+  } else if (aps->aps_params_type == H266APS::kLmcs) {
+    IN_RANGE_OR_RETURN(aps->aps_adaptation_parameter_set_id, 0, 3);
+  }
+  READ_BOOL_OR_RETURN(&aps->aps_chroma_present_flag);
+
+  if (aps->aps_params_type == H266APS::kAlf) {
+    // 7.3.2.18: Adaptive loop filter
+    H266AlfData* alf_data = &std::get<H266AlfData>(aps->data);
+    READ_BOOL_OR_RETURN(&alf_data->alf_luma_filter_signal_flag);
+    if (aps->aps_chroma_present_flag) {
+      READ_BOOL_OR_RETURN(&alf_data->alf_chroma_filter_signal_flag);
+      READ_BOOL_OR_RETURN(&alf_data->alf_cc_cb_filter_signal_flag);
+      READ_BOOL_OR_RETURN(&alf_data->alf_cc_cr_filter_signal_flag);
+    } else {
+      alf_data->alf_chroma_filter_signal_flag = 0;
+      alf_data->alf_cc_cb_filter_signal_flag = 0;
+      alf_data->alf_cc_cr_filter_signal_flag = 0;
+    }
+    // 7.4.3.18: at least one of above signal flag should be 1.
+    TRUE_OR_RETURN(alf_data->alf_luma_filter_signal_flag ||
+                   alf_data->alf_chroma_filter_signal_flag ||
+                   alf_data->alf_cc_cb_filter_signal_flag ||
+                   alf_data->alf_cc_cr_filter_signal_flag);
+
+    if (alf_data->alf_luma_filter_signal_flag) {
+      READ_BOOL_OR_RETURN(&alf_data->alf_luma_clip_flag);
+      READ_UE_OR_RETURN(&alf_data->alf_luma_num_filters_signalled_minus1);
+      IN_RANGE_OR_RETURN(alf_data->alf_luma_num_filters_signalled_minus1, 0,
+                         kNumAlfFilters - 1);
+
+      if (alf_data->alf_luma_num_filters_signalled_minus1 > 0) {
+        int signaled_filters_len = base::bits::Log2Ceiling(
+            alf_data->alf_luma_num_filters_signalled_minus1 + 1);
+        for (int filter_idx = 0; filter_idx < kNumAlfFilters; filter_idx++) {
+          READ_BITS_OR_RETURN(signaled_filters_len,
+                              &std::get<H266AlfData>(aps->data)
+                                   .alf_luma_coeff_delta_idx[filter_idx]);
+          IN_RANGE_OR_RETURN(alf_data->alf_luma_coeff_delta_idx[filter_idx], 0,
+                             alf_data->alf_luma_num_filters_signalled_minus1);
+        }
+      }
+
+      for (int sf_idx = 0;
+           sf_idx <= alf_data->alf_luma_num_filters_signalled_minus1;
+           sf_idx++) {
+        for (int j = 0; j < 12; j++) {
+          READ_UE_OR_RETURN(
+              &std::get<H266AlfData>(aps->data).alf_luma_coeff_abs[sf_idx][j]);
+          IN_RANGE_OR_RETURN(alf_data->alf_luma_coeff_abs[sf_idx][j], 0, 128);
+          if (alf_data->alf_luma_coeff_abs[sf_idx][j]) {
+            // alf_luma_coeff_sign[sf_idx][j] equals to 0 indicates a positive
+            // value and otherwise a negative value.
+            READ_BOOL_OR_RETURN(&std::get<H266AlfData>(aps->data)
+                                     .alf_luma_coeff_sign[sf_idx][j]);
+          } else {
+            alf_data->alf_luma_coeff_sign[sf_idx][j] = 0;
+          }
+        }
+      }
+
+      if (alf_data->alf_luma_clip_flag) {
+        for (int sf_idx = 0;
+             sf_idx <= alf_data->alf_luma_num_filters_signalled_minus1;
+             sf_idx++) {
+          for (int j = 0; j < 12; j++) {
+            READ_BITS_OR_RETURN(
+                2,
+                &std::get<H266AlfData>(aps->data).alf_luma_clip_idx[sf_idx][j]);
+          }
+        }
+      }
+    }
+
+    if (alf_data->alf_chroma_filter_signal_flag) {
+      READ_BOOL_OR_RETURN(
+          &std::get<H266AlfData>(aps->data).alf_chroma_clip_flag);
+      READ_UE_OR_RETURN(
+          &std::get<H266AlfData>(aps->data).alf_chroma_num_alt_filters_minus1);
+      IN_RANGE_OR_RETURN(alf_data->alf_chroma_num_alt_filters_minus1, 0, 7);
+
+      for (int alt_idx = 0;
+           alt_idx <= alf_data->alf_chroma_num_alt_filters_minus1; alt_idx++) {
+        for (int j = 0; j < 6; j++) {
+          READ_UE_OR_RETURN(&std::get<H266AlfData>(aps->data)
+                                 .alf_chroma_coeff_abs[alt_idx][j]);
+          IN_RANGE_OR_RETURN(alf_data->alf_chroma_coeff_abs[alt_idx][j], 0,
+                             128);
+          if (alf_data->alf_chroma_coeff_abs[alt_idx][j] > 0) {
+            READ_BOOL_OR_RETURN(&std::get<H266AlfData>(aps->data)
+                                     .alf_chroma_coeff_sign[alt_idx][j]);
+          } else {
+            alf_data->alf_chroma_coeff_sign[alt_idx][j] = 0;
+          }
+        }
+
+        if (alf_data->alf_chroma_clip_flag) {
+          for (int j = 0; j < 6; j++) {
+            READ_BITS_OR_RETURN(2, &alf_data->alf_chroma_clip_idx[alt_idx][j]);
+          }
+        }
+      }
+    } else {
+      alf_data->alf_chroma_clip_flag = 0;
+    }
+
+    if (alf_data->alf_cc_cb_filter_signal_flag) {
+      READ_UE_OR_RETURN(&alf_data->alf_cc_cb_filters_signalled_minus1);
+      IN_RANGE_OR_RETURN(alf_data->alf_cc_cb_filters_signalled_minus1, 0, 3);
+
+      for (int k = 0; k < alf_data->alf_cc_cb_filters_signalled_minus1 + 1;
+           k++) {
+        for (int j = 0; j < 7; j++) {
+          READ_BITS_OR_RETURN(3, &alf_data->alf_cc_cb_mapped_coeff_abs[k][j]);
+          if (alf_data->alf_cc_cb_mapped_coeff_abs[k][j]) {
+            READ_BOOL_OR_RETURN(&alf_data->alf_cc_cb_coeff_sign[k][j]);
+          } else {
+            alf_data->alf_cc_cb_coeff_sign[k][j] = 0;
+          }
+        }
+      }
+    }
+
+    if (alf_data->alf_cc_cr_filter_signal_flag) {
+      READ_UE_OR_RETURN(&alf_data->alf_cc_cr_filters_signalled_minus1);
+      IN_RANGE_OR_RETURN(alf_data->alf_cc_cr_filters_signalled_minus1, 0, 3);
+
+      for (int k = 0; k < alf_data->alf_cc_cr_filters_signalled_minus1 + 1;
+           k++) {
+        for (int j = 0; j < 7; j++) {
+          READ_BITS_OR_RETURN(3, &alf_data->alf_cc_cr_mapped_coeff_abs[k][j]);
+          if (alf_data->alf_cc_cr_mapped_coeff_abs[k][j]) {
+            READ_BOOL_OR_RETURN(&alf_data->alf_cc_cr_coeff_sign[k][j]);
+          } else {
+            alf_data->alf_cc_cr_coeff_sign[k][j] = 0;
+          }
+        }
+      }
+    }
+  } else if (aps->aps_params_type == H266APS::kLmcs) {
+    H266LmcsData* lmcs_data = &std::get<H266LmcsData>(aps->data);
+    READ_UE_OR_RETURN(&lmcs_data->lmcs_min_bin_idx);
+    IN_RANGE_OR_RETURN(lmcs_data->lmcs_min_bin_idx, 0, 15);
+    READ_UE_OR_RETURN(&lmcs_data->lmcs_delta_max_bin_idx);
+    IN_RANGE_OR_RETURN(lmcs_data->lmcs_delta_max_bin_idx, 0, 15);
+    READ_UE_OR_RETURN(&lmcs_data->lmcs_delta_cw_prec_minus1);
+    IN_RANGE_OR_RETURN(lmcs_data->lmcs_delta_cw_prec_minus1, 0, 14);
+
+    int lmcs_max_bin_idx = 15 - lmcs_data->lmcs_delta_max_bin_idx;
+    TRUE_OR_RETURN(lmcs_max_bin_idx >= lmcs_data->lmcs_min_bin_idx);
+
+    for (int i = lmcs_data->lmcs_min_bin_idx; i <= lmcs_max_bin_idx; i++) {
+      READ_BITS_OR_RETURN(lmcs_data->lmcs_delta_cw_prec_minus1 + 1,
+                          &lmcs_data->lmcs_delta_abs_cw[i]);
+      if (lmcs_data->lmcs_delta_abs_cw[i] > 0) {
+        READ_BOOL_OR_RETURN(&lmcs_data->lmcs_delta_sign_cw_flag[i]);
+      } else {
+        lmcs_data->lmcs_delta_sign_cw_flag[i] = 0;
+      }
+    }
+
+    if (aps->aps_chroma_present_flag) {
+      READ_BITS_OR_RETURN(3, &lmcs_data->lmcs_delta_abs_crs);
+      if (lmcs_data->lmcs_delta_abs_crs > 0) {
+        READ_BOOL_OR_RETURN(&lmcs_data->lmcs_delta_sign_crs_flag);
+      } else {
+        lmcs_data->lmcs_delta_sign_crs_flag = 0;
+      }
+    } else {
+      lmcs_data->lmcs_delta_abs_crs = 0;
+      lmcs_data->lmcs_delta_sign_crs_flag = 0;
+    }
+  } else if (aps->aps_params_type == H266APS::kScalingList) {
+    // VVC defines default quantization matrices(QM) for INTER_2x2,
+    // INTER_4x4, INTRA_8x8 & INTER_8x8 with flat value of 16 in them.
+    // Other sizes, including 16x16, 32x32, 64x64 are upsampled from the 8x8
+    // quantization matrix.
+    // If explicit scaling list is signaled in SPS/PH/SH/APS, VVC allows encoder
+    // customize up to 28 quantization matrices. For QM of 16x16, 32x32 and
+    // 64x64, the DC values are coded explicitly, while only 64(8x8) AC values
+    // for every such matrix may be coded explicitly, with the entire matrix
+    // upsampled to desired size.
+
+    H266ScalingListData* scaling_list_data =
+        &(std::get<H266ScalingListData>(aps->data));
+
+    int max_id_delta = 0, matrix_size = 0, ref_id = 0;
+    int scaling_matrix_pred2x2[2][2][2], scaling_matrix_pred4x4[6][4][4],
+        scaling_matrix_pred8x8[20][8][8];
+    int scaling_matrix_dc_pred[28];
+
+    // id: [0, 1]:   2x2,   INTRA2x2 & INTER2x2
+    //     [2, 7]:   4x4,   INTRA4x4_Y|U|V & INTER4x4_Y|U|V
+    //     [8, 13]:  8x8,   INTRA8x8_Y|U|V & INTER8x8_Y|U|V
+    //     [14, 19]: 16x16, INTRA16x16_Y|U|V & INTER16x16_Y|U|V
+    //     [20, 25]: 32x32, INTRA32x32_Y|U|V & INTER32x32_Y|U|V
+    //     [26, 27]: 64x64, INTRA64x64_Y & INTER64x64_Y
+
+    for (int id = 0; id < 28; id++) {
+      // Equation 101
+      max_id_delta = (id < 2) ? id : ((id < 8) ? (id - 2) : (id - 8));
+      // Equation 103
+      matrix_size = (id < 2) ? 2 : ((id < 8) ? 4 : 8);
+
+      scaling_list_data->scaling_list_copy_mode_flag[id] = 1;
+      if (aps->aps_chroma_present_flag || id % 3 == 2 || id == 27) {
+        READ_BOOL_OR_RETURN(
+            &scaling_list_data->scaling_list_copy_mode_flag[id]);
+        if (!scaling_list_data->scaling_list_copy_mode_flag[id]) {
+          READ_BOOL_OR_RETURN(
+              &scaling_list_data->scaling_list_pred_mode_flag[id]);
+        }
+
+        // id 0/2/8 are for 2x2/4x4/8x8 initial lists so they don't have
+        // the scaling_list_pred_id_delta syntax signaled.
+        if ((scaling_list_data->scaling_list_copy_mode_flag[id] ||
+             scaling_list_data->scaling_list_pred_mode_flag[id]) &&
+            id != 0 && id != 2 && id != 8) {
+          READ_UE_OR_RETURN(&scaling_list_data->scaling_list_pred_id_delta[id]);
+          IN_RANGE_OR_RETURN(scaling_list_data->scaling_list_pred_id_delta[id],
+                             0, max_id_delta);
+        }
+
+        if (!scaling_list_data->scaling_list_copy_mode_flag[id]) {
+          int next_coef = 0;
+          if (id > 13) {
+            READ_SE_OR_RETURN(
+                &scaling_list_data->scaling_list_dc_coef[id - 14]);
+            IN_RANGE_OR_RETURN(scaling_list_data->scaling_list_dc_coef[id - 14],
+                               -128, 127);
+
+            next_coef += scaling_list_data->scaling_matrix_dc_rec[id - 14];
+          }
+
+          for (int i = 0; i < matrix_size * matrix_size; i++) {
+            int x = kDiagScanOrder8x8[i][0], y = kDiagScanOrder8x8[i][1];
+            if (!(id > 25 && x >= 4 && y >= 4)) {
+              READ_SE_OR_RETURN(
+                  &scaling_list_data->scaling_list_delta_coef[id][i]);
+              IN_RANGE_OR_RETURN(
+                  scaling_list_data->scaling_list_delta_coef[id][i], -128, 127);
+
+              next_coef += scaling_list_data->scaling_list_delta_coef[id][i];
+            }
+            if (id < 2) {
+              scaling_list_data->scaling_list_2x2[id][i] = next_coef;
+            } else if (id < 8) {
+              scaling_list_data->scaling_list_4x4[id - 2][i] = next_coef;
+            } else {
+              scaling_list_data->scaling_list_8x8[id - 8][i] = next_coef;
+            }
+          }
+        }
+
+        // Equation 102
+        ref_id = id - scaling_list_data->scaling_list_pred_id_delta[id];
+
+        if (!scaling_list_data->scaling_list_copy_mode_flag[id] &&
+            !scaling_list_data->scaling_list_pred_mode_flag[id]) {
+          scaling_matrix_dc_pred[id] = 8;
+          if (id < 2) {
+            std::fill_n(scaling_matrix_pred2x2[id][0],
+                        matrix_size * matrix_size, 8);
+          } else if (id < 8) {
+            std::fill_n(scaling_matrix_pred4x4[id - 2][0],
+                        matrix_size * matrix_size, 8);
+          } else {
+            std::fill_n(scaling_matrix_pred8x8[id - 8][0],
+                        matrix_size * matrix_size, 8);
+          }
+        } else if (scaling_list_data->scaling_list_pred_id_delta[id] == 0) {
+          scaling_matrix_dc_pred[id] = 16;
+          if (id < 2) {
+            std::fill_n(scaling_matrix_pred2x2[id][0],
+                        matrix_size * matrix_size, 16);
+          } else if (id < 8) {
+            std::fill_n(scaling_matrix_pred4x4[id - 2][0],
+                        matrix_size * matrix_size, 16);
+          } else {
+            std::fill_n(scaling_matrix_pred8x8[id - 8][0],
+                        matrix_size * matrix_size, 16);
+          }
+        } else {
+          if (id < 2 && id > 0 & ref_id >= 0) {
+            memcpy(&scaling_matrix_pred2x2[id][0],
+                   &scaling_list_data->scaling_matrix_rec_2x2[ref_id][0][0],
+                   4 * sizeof(int));
+          } else if (id < 8 && id > 2 && ref_id >= 2) {
+            memcpy(&scaling_matrix_pred4x4[id - 2][0][0],
+                   &scaling_list_data->scaling_matrix_rec_4x4[ref_id - 2][0][0],
+                   16 * sizeof(int));
+          } else if (ref_id >= 8) {
+            memcpy(&scaling_matrix_pred8x8[id - 8][0][0],
+                   &scaling_list_data->scaling_matrix_rec_8x8[ref_id - 8][0][0],
+                   64 * sizeof(int));
+          }
+          if (ref_id > 13) {
+            scaling_matrix_dc_pred[id] =
+                scaling_list_data->scaling_matrix_dc_rec[ref_id - 14];
+          } else {
+            if (id < 2) {
+              scaling_matrix_dc_pred[id] = scaling_matrix_pred2x2[id][0][0];
+            } else if (id < 8) {
+              scaling_matrix_dc_pred[id] = scaling_matrix_pred4x4[id - 2][0][0];
+            } else {
+              scaling_matrix_dc_pred[id] = scaling_matrix_pred8x8[id - 8][0][0];
+            }
+          }
+        }
+
+        // Equation 104
+        if (id > 13) {
+          scaling_list_data->scaling_matrix_dc_rec[id - 14] =
+              (scaling_matrix_dc_pred[id] +
+               scaling_list_data->scaling_list_dc_coef[id - 14]) &
+              255;
+        }
+      }
+
+      // Equation 105
+      int rec_x = 0, rec_y = 0, k = 0;
+      if (id < 2) {
+        for (k = 0; k <= 3; k++) {
+          rec_x = kDiagScanOrder2x2[k][0];
+          rec_y = kDiagScanOrder2x2[k][1];
+          scaling_list_data->scaling_matrix_rec_2x2[id][rec_x][rec_y] =
+              (scaling_matrix_pred2x2[id][rec_x][rec_y] +
+               scaling_list_data->scaling_list_2x2[id][k]) &
+              255;
+        }
+      } else if (id < 8) {
+        for (k = 0; k <= 15; k++) {
+          rec_x = kDiagScanOrder4x4[k][0];
+          rec_y = kDiagScanOrder4x4[k][1];
+          scaling_list_data->scaling_matrix_rec_4x4[id - 2][rec_x][rec_y] =
+              (scaling_matrix_pred4x4[id - 2][rec_x][rec_y] +
+               scaling_list_data->scaling_list_4x4[id - 2][k]) &
+              255;
+        }
+      } else {
+        for (k = 0; k <= 63; k++) {
+          rec_x = kDiagScanOrder8x8[k][0];
+          rec_y = kDiagScanOrder8x8[k][1];
+          scaling_list_data->scaling_matrix_rec_8x8[id - 8][rec_x][rec_y] =
+              (scaling_matrix_pred8x8[id - 8][rec_x][rec_y] +
+               scaling_list_data->scaling_list_8x8[id - 8][k]) &
+              255;
+        }
+      }
+    }
+  }
+
+  // If an APS with the same id already exists, replace it.
+  *aps_id = aps->aps_adaptation_parameter_set_id;
+  switch (aps->aps_params_type) {
+    case 0:
+      *type = H266APS::ParamType::kAlf;
+      active_alf_aps_[*aps_id] = std::move(aps);
+      break;
+    case 1:
+      *type = H266APS::ParamType::kLmcs;
+      active_lmcs_aps_[*aps_id] = std::move(aps);
+      break;
+    case 2:
+      *type = H266APS::ParamType::kScalingList;
+      active_scaling_list_aps_[*aps_id] = std::move(aps);
+      break;
+  }
+
+  return kOk;
+}
+
 const H266VPS* H266Parser::GetVPS(int vps_id) const {
   auto it = active_vps_.find(vps_id);
   if (it == active_vps_.end()) {
@@ -1842,6 +2904,46 @@ const H266SPS* H266Parser::GetSPS(int sps_id) const {
   }
 
   return it->second.get();
+}
+
+const H266PPS* H266Parser::GetPPS(int pps_id) const {
+  auto it = active_pps_.find(pps_id);
+  if (it == active_pps_.end()) {
+    DVLOG(1) << "Requested a nonexistent PPS id " << pps_id;
+    return nullptr;
+  }
+
+  return it->second.get();
+}
+
+const H266APS* H266Parser::GetAPS(const H266APS::ParamType& type,
+                                  int aps_id) const {
+  switch (type) {
+    case H266APS::ParamType::kAlf: {
+      auto it = active_alf_aps_.find(aps_id);
+      if (it == active_alf_aps_.end()) {
+        DVLOG(1) << "Requested a nonexistent ALF APS id " << aps_id;
+        return nullptr;
+      }
+      return it->second.get();
+    }
+    case H266APS::ParamType::kLmcs: {
+      auto it = active_lmcs_aps_.find(aps_id);
+      if (it == active_lmcs_aps_.end()) {
+        DVLOG(1) << "Requested a nonexistent LMCS APS id " << aps_id;
+        return nullptr;
+      }
+      return it->second.get();
+    }
+    case H266APS::ParamType::kScalingList: {
+      auto it = active_scaling_list_aps_.find(aps_id);
+      if (it == active_scaling_list_aps_.end()) {
+        DVLOG(1) << "Requested a nonexistent ScalingData APS id " << aps_id;
+        return nullptr;
+      }
+      return it->second.get();
+    }
+  }
 }
 
 }  // namespace media

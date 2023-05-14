@@ -75,7 +75,7 @@ export class XfCloudPanel extends XfBase {
     converter: {
       fromAttribute:
           (value: string) => {
-            if (value in CloudPanelType) {
+            if (value && value.toUpperCase() in CloudPanelType) {
               return value as CloudPanelType;
             }
             console.warn(`Failed to convert ${value} to CloudPanelType`);
@@ -101,6 +101,7 @@ export class XfCloudPanel extends XfBase {
   static get events() {
     return {
       DRIVE_SETTINGS_CLICKED: 'drive_settings_clicked',
+      PANEL_CLOSED: 'panel_closed',
     } as const;
   }
 
@@ -119,7 +120,7 @@ export class XfCloudPanel extends XfBase {
    * Show the element relative to the cloud icon that was clicked.
    */
   showAt(el: HTMLElement) {
-    this.$panel_!.showAt(el, {top: el.offsetTop + el.offsetHeight + 8});
+    this.$panel_!.showAt(el, {top: el.offsetTop + el.offsetHeight + 20});
   }
 
   /**
@@ -129,6 +130,21 @@ export class XfCloudPanel extends XfBase {
     if (this.open) {
       this.$panel_!.close();
     }
+  }
+
+  /**
+   * Refires the close event to ensure it's a known `XfCloudPanel` event to
+   * subscribe to.
+   */
+  override async connectedCallback() {
+    super.connectedCallback();
+    await this.updateComplete;
+    this.$panel_!.addEventListener('close', () => {
+      this.dispatchEvent(new CustomEvent(XfCloudPanel.events.PANEL_CLOSED, {
+        bubbles: true,
+        composed: true,
+      }));
+    });
   }
 
   /**
@@ -190,10 +206,8 @@ export class XfCloudPanel extends XfBase {
           </div>
         </div>
         <div class="divider"></div>
-        <div class="menu">
-          <button class="action" @click=${this.onSettingsClicked_}>${
+        <button class="action" @click=${this.onSettingsClicked_}>${
         str('GOOGLE_DRIVE_SETTINGS_LINK')}</button>
-        </div>
       </div>
     </cr-action-menu>`;
   }
@@ -228,6 +242,7 @@ function getCSS() {
     }
 
     .body {
+      background-color: var(--cros-sys-base_elevated);
       display: flex;
       flex-direction: column;
       margin: -8px 0;
@@ -241,7 +256,7 @@ function getCSS() {
     }
 
     xf-icon {
-      padding: 27px 0px 20px;
+      padding: 27px 0px 8px;
     }
 
     xf-icon[type="bulk_pinning_done"] {
@@ -258,7 +273,7 @@ function getCSS() {
 
     .status-description {
       color: var(--cros-text-color-secondary);
-      font-size: 13px;
+      font: var(--cros-annotation-1-font);
       line-height: 20px;
       padding: 0px 16px 20px;
       text-align: center;
@@ -266,8 +281,7 @@ function getCSS() {
 
     .progress {
       color: var(--cros-text-color-primary);
-      font-size: 13px;
-      font-weight: 500;
+      font: var(--cros-button-2-font);
       line-height: 20px;
       margin-inline: 16px;
       padding-top: 20px;
@@ -275,12 +289,12 @@ function getCSS() {
 
     .progress-description {
       color: var(--cros-text-color-secondary);
+      font: var(--cros-annotation-1-font);
       padding-bottom: 20px;
       padding-inline: 16px;
     }
 
     .progress-bar {
-      background-color: var(--cros-sys-primary_container);
       border-radius: 10px;
       height: 4px;
       margin: 8px 0 8px;
@@ -289,6 +303,7 @@ function getCSS() {
     }
 
     progress::-webkit-progress-bar {
+      background-color: var(--cros-sys-primary_container);
       border-radius: 10px;
     }
 
@@ -306,6 +321,11 @@ function getCSS() {
     button.action {
       background-color: var(--cros-sys-base_elevated);
       border: 0;
+      font: var(--cros-button-2-font);
+      height: 52px;
+      padding-bottom: 8px;
+      padding-inline: 16px;
+      padding-top: 8px;
       text-align: left;
     }
 
@@ -314,29 +334,23 @@ function getCSS() {
     }
 
     .action {
-      font-size: 13px;
-      font-weight: 500;
-      line-height: 8px;
-      padding: 20px 0 20px;
-      padding-inline: 16px;
       width: 100%;
     }
 
     .action:hover {
       background: var(--cros-sys-hover_on_subtle);
     }
-
-    .menu {
-      height: 48px;
-    }
   `;
 }
 
 export type CloudPanelSettingsClickEvent = CustomEvent;
 
+export type CloudPanelCloseEvent = CustomEvent;
+
 declare global {
   interface HTMLElementEventMap {
     [XfCloudPanel.events.DRIVE_SETTINGS_CLICKED]: CloudPanelSettingsClickEvent;
+    [XfCloudPanel.events.PANEL_CLOSED]: CloudPanelCloseEvent;
   }
 
   interface HTMLElementTagNameMap {

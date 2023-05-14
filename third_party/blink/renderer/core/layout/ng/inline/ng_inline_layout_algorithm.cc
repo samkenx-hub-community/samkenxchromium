@@ -303,9 +303,8 @@ void NGInlineLayoutAlgorithm::CreateLine(
       DCHECK(item.TextType() == NGTextType::kNormal ||
              item.TextType() == NGTextType::kSymbolMarker);
       if (UNLIKELY(item_result.is_hyphenated)) {
-        DCHECK(item_result.hyphen_string);
-        DCHECK(item_result.hyphen_shape_result);
-        LayoutUnit hyphen_inline_size = item_result.HyphenInlineSize();
+        DCHECK(item_result.hyphen);
+        LayoutUnit hyphen_inline_size = item_result.hyphen.InlineSize();
         line_box->AddChild(item, item_result, item_result.TextOffset(),
                            box->text_top,
                            item_result.inline_size - hyphen_inline_size,
@@ -618,13 +617,12 @@ void NGInlineLayoutAlgorithm::PlaceHyphen(const NGInlineItemResult& item_result,
                                           NGInlineBoxState* box) {
   DCHECK(item_result.item);
   DCHECK(item_result.is_hyphenated);
-  DCHECK(item_result.hyphen_string);
-  DCHECK(item_result.hyphen_shape_result);
-  DCHECK_EQ(hyphen_inline_size, item_result.HyphenInlineSize());
+  DCHECK(item_result.hyphen);
+  DCHECK_EQ(hyphen_inline_size, item_result.hyphen.InlineSize());
   const NGInlineItem& item = *item_result.item;
   line_box->AddChild(
-      item, ShapeResultView::Create(item_result.hyphen_shape_result.get()),
-      item_result.hyphen_string, box->text_top, hyphen_inline_size,
+      item, ShapeResultView::Create(&item_result.hyphen.GetShapeResult()),
+      item_result.hyphen.Text(), box->text_top, hyphen_inline_size,
       box->text_height, item.BidiLevel());
 }
 
@@ -1007,8 +1005,9 @@ absl::optional<LayoutUnit> NGInlineLayoutAlgorithm::ApplyJustify(
   // matches to the |ShapeResult|.
   DCHECK(!line_info->Results().empty());
   const NGInlineItemResult& last_item_result = line_info->Results().back();
-  if (last_item_result.hyphen_string)
-    line_text_builder.Append(last_item_result.hyphen_string);
+  if (last_item_result.hyphen) {
+    line_text_builder.Append(last_item_result.hyphen.Text());
+  }
 
   // Compute the spacing to justify.
   // Releasing string, StringBuilder reset.
@@ -1056,7 +1055,7 @@ absl::optional<LayoutUnit> NGInlineLayoutAlgorithm::ApplyJustify(
                                               shape_result->StartIndex());
       item_result.inline_size = shape_result->SnappedWidth();
       if (UNLIKELY(item_result.is_hyphenated))
-        item_result.inline_size += item_result.HyphenInlineSize();
+        item_result.inline_size += item_result.hyphen.InlineSize();
       item_result.shape_result = ShapeResultView::Create(shape_result.get());
     } else if (item_result.item->Type() == NGInlineItem::kAtomicInline) {
       float spacing_before = 0.0f;
@@ -1280,7 +1279,6 @@ const NGLayoutResult* NGInlineLayoutAlgorithm::Layout() {
   bool is_line_created = false;
   LayoutUnit line_block_size;
   LayoutUnit block_delta;
-  NGLineInfo line_info;
   const auto* opportunities_it = opportunities.begin();
   while (opportunities_it != opportunities.end()) {
     const NGLayoutOpportunity& opportunity = *opportunities_it;
@@ -1322,19 +1320,29 @@ const NGLayoutResult* NGInlineLayoutAlgorithm::Layout() {
           NGParagraphLineBreaker::AttemptParagraphBalancing(
               Node(), ConstraintSpace(), line_opportunity));
     }
-    absl::optional<NGLineLayoutOpportunity> saved_line_opportunity;
-    if (const absl::optional<LayoutUnit>& balanced_available_width =
-            context_->BalancedAvailableWidth()) {
-      saved_line_opportunity = line_opportunity;
-      NGParagraphLineBreaker::PrepareForNextLine(*balanced_available_width,
-                                                 &line_opportunity);
-    }
 
-    NGLineBreaker line_breaker(
-        Node(), NGLineBreakerMode::kContent, ConstraintSpace(),
-        line_opportunity, leading_floats, handled_leading_floats_index,
-        break_token, column_spanner_path_, &ExclusionSpace());
-    line_breaker.NextLine(&line_info);
+    absl::optional<NGLineLayoutOpportunity> saved_line_opportunity;
+    bool is_line_info_cached = false;
+    NGLineInfo& line_info =
+        context_->GetLineInfo(break_token, is_line_info_cached);
+    if (UNLIKELY(is_line_info_cached)) {
+      // Update the BFC block offset because it was not known when the
+      // `line_info` was cached.
+      line_info.SetBfcBlockOffset(line_opportunity.bfc_block_offset);
+    } else {
+      if (const absl::optional<LayoutUnit>& balanced_available_width =
+              context_->BalancedAvailableWidth()) {
+        saved_line_opportunity = line_opportunity;
+        NGParagraphLineBreaker::PrepareForNextLine(*balanced_available_width,
+                                                   &line_opportunity);
+      }
+
+      NGLineBreaker line_breaker(
+          Node(), NGLineBreakerMode::kContent, ConstraintSpace(),
+          line_opportunity, leading_floats, handled_leading_floats_index,
+          break_token, column_spanner_path_, &ExclusionSpace());
+      line_breaker.NextLine(&line_info);
+    }
 
     if (UNLIKELY(Node().IsInitialLetterBox())) {
       // Because `NGLineBreaker` doesn't calculate the inline size of initial

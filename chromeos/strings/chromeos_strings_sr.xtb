@@ -5,6 +5,7 @@
 <translation id="1018219910092211213">DNS не може да се разреши</translation>
 <translation id="1018656279737460067">Отказано</translation>
 <translation id="1022433422498218992">Опште контроле</translation>
+<translation id="1022628058306505708">Ток Земље</translation>
 <translation id="1047458377670401304"><ph name="CPU_NAME" /> (<ph name="THREAD_COUNT" /> нити, <ph name="CPU_MAX_CLOCK_SPEED" /> GHz)</translation>
 <translation id="1047773237499189053">Доступна је нова функција. Користите тастер са стрелицом нагоре да бисте сазнали више.</translation>
 <translation id="1059913517121127803">Покретање скенирања није успело</translation>
@@ -115,6 +116,7 @@
 <translation id="1801418420130173017">Онемогућите тамну тему</translation>
 <translation id="1807246157184219062">Светлa</translation>
 <translation id="1827738518074806965">Ликовна галерија</translation>
+<translation id="1838374766361614909">Обришите претрагу</translation>
 <translation id="1851218745569890714">Видео конференције</translation>
 <translation id="1852934301711881861">Инсталирај Chrome OS Flex</translation>
 <translation id="1856388568474281774">Стрелица надоле</translation>
@@ -234,6 +236,7 @@
 <translation id="2902312830803030883">Још радњи</translation>
 <translation id="2926057806159140518">Унесите корисничко име и лозинку или скенирајте QR кôд</translation>
 <translation id="2940811910881150316">Тестирање уређаја није успело. Поново отворите поклопац да бисте га тестирали.</translation>
+<translation id="2981143481017883351">Сада су доступни ексклузивни елементи за Chromebook</translation>
 <translation id="3008341117444806826">ОСВЕЖИ</translation>
 <translation id="3009958530611748826">Изаберите фолдер за чување</translation>
 <translation id="3017079585324758401">Позадина</translation>
@@ -270,6 +273,7 @@
 <translation id="3286515922899063534"><ph name="CURRENT" /> GHz</translation>
 <translation id="3291996639387199448">Смер кључа</translation>
 <translation id="3294437725009624529">Гост</translation>
+<translation id="3303855915957856445">Нису пронађени резултати претраге</translation>
 <translation id="3310640316857623290">Кашњење DNS-а знатно премашује дозвољену граничну вредност</translation>
 <translation id="3328783797891415197">Тест је у току</translation>
 <translation id="3340011300870565703">Уређај има <ph name="BATTERY_PERCENTAGE" />% батерије десне слушалице.</translation>
@@ -278,6 +282,7 @@
 <translation id="3360306038446926262">Windows</translation>
 <translation id="3368922792935385530">Повезан</translation>
 <translation id="3369013195428705271">Желите ли стварно да обришете сву историју штампања? Задаци штампања који су у току се не бришу.</translation>
+<translation id="3386675685417744672">Ексклузивно за Chromebook</translation>
 <translation id="3404249063913988450">Омогућите чувар екрана</translation>
 <translation id="3413935475507503304">Да бисте наставили са ажурирањем, кликните на Даље.</translation>
 <translation id="3434107140712555581"><ph name="BATTERY_PERCENTAGE" />%</translation>
@@ -356,6 +361,7 @@
 <translation id="404928562651467259">УПОЗОРЕЊЕ</translation>
 <translation id="4054683689023980771">Преузима се слика</translation>
 <translation id="4060260348856573701">Нови назив приступне тачке</translation>
+<translation id="4079743696465895866">Изаберите ексклузивне илустрације за Chromebook</translation>
 <translation id="4093865285251893588">Слика профила</translation>
 <translation id="409427325554347132">Сачувај детаље теста</translation>
 <translation id="4095829376260267438">WPA2WPA3</translation>
@@ -473,7 +479,6 @@
 <translation id="4921665434385737356">Напуњено <ph name="RATE" /> за <ph name="NUM_SECONDS" /> сек.</translation>
 <translation id="4930320165497208503">Да бисте подесили или ажурирали везу, идите у <ph name="BEGIN_LINK" />Подешавања<ph name="END_LINK" />.</translation>
 <translation id="4932733599132424254">Датум</translation>
-<translation id="4937657825850660613">Половина</translation>
 <translation id="4950314376641394653">Фирмвер <ph name="DEVICE_NAME" /> је ажуриран на верзију <ph name="VERSION" /></translation>
 <translation id="4971925105143343452">Делимично</translation>
 <translation id="4972592110715526173">промена режима</translation>
@@ -622,6 +627,7 @@
 <translation id="6184793017104303157">B4</translation>
 <translation id="6189418609903030344">Капацитет батерије се смањује током коришћења</translation>
 <translation id="6191293864534840972">Сервери за имена су погрешног формата</translation>
+<translation id="6205145102504628069">Ток у клауду</translation>
 <translation id="6213737986933151570">CDMA1XRTT</translation>
 <translation id="6223066887782788441">Изађите из приказа преко целог екрана</translation>
 <translation id="6223752125779001553">Нису доступни скенери</translation>
@@ -664,6 +670,7 @@
 <translation id="6494974875566443634">Прилагођавање</translation>
 <translation id="6500818810472529210">Погледајте резултат у Google претрази</translation>
 <translation id="650266656685499220">Да бисте направили албуме, идите у Google слике</translation>
+<translation id="6505750420152840539">Од зоре до мрака</translation>
 <translation id="6516990319416533844">Да бисте тестирали брзину пуњења батерије, дозволите да се батерија мало испразни</translation>
 <translation id="6517239166834772319">Истражите</translation>
 <translation id="6526200165918397681">Препознај позадину</translation>
@@ -773,11 +780,12 @@
 <translation id="7427315641433634153">MSCHAP</translation>
 <translation id="7458970041932198923">Повежите се на мрежу и поново учитајте страницу да бисте видели и подесили аватаре.</translation>
 <translation id="7469648432129124067">Откривен је портал</translation>
-<translation id="7481312909269577407">Проследи</translation>
+<translation id="7481312909269577407">Напред</translation>
 <translation id="7487067081878637334">Технологија</translation>
 <translation id="7490813197707563893">MAC адреса</translation>
 <translation id="7491478667760509108">Изађите из плутајућег приказа</translation>
 <translation id="7497215489070763236">CA сертификат сервера</translation>
+<translation id="7501957181231305652">или</translation>
 <translation id="7502658306369382406">IPv6 адреса</translation>
 <translation id="7515998400212163428">Android</translation>
 <translation id="7528507600602050979">Садржај помоћи није доступан</translation>
@@ -794,6 +802,7 @@
 <translation id="7620771111601174153">Сазнајте више у Центру за помоћ</translation>
 <translation id="763165478673169849">Време последњег ресетовања</translation>
 <translation id="7648838807254605802">Велико HTTPS кашњење</translation>
+<translation id="765159867434478292">Подели</translation>
 <translation id="7656388927906093505">Уређај је миш.</translation>
 <translation id="7658239707568436148">Откажи</translation>
 <translation id="7665800271478495366">Промените аватар</translation>

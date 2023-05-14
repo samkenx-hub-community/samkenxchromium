@@ -293,7 +293,7 @@ class WPTResultsProcessor:
         }
         self.has_regressions: bool = False
 
-    def _copy_results_viewer(self):
+    def copy_results_viewer(self):
         files_to_copy = ['results.html', 'results.html.version']
         for file in files_to_copy:
             source = self.path_finder.path_from_blink_tools(
@@ -384,7 +384,7 @@ class WPTResultsProcessor:
                 before this manager exited; a well-behaved caller should avoid
                 this.
         """
-        self._copy_results_viewer()
+        self.copy_results_viewer()
         events = queue.SimpleQueue()
         worker = threading.Thread(target=self._consume_events,
                                   args=(events, ),

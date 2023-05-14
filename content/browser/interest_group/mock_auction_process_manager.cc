@@ -114,7 +114,8 @@ void MockBidderWorklet::SendPendingSignalsRequests() {
 }
 
 void MockBidderWorklet::ReportWin(
-    const std::string& interest_group_name,
+    auction_worklet::mojom::ReportingIdField reporting_id_field,
+    const std::string& reporting_id,
     const absl::optional<std::string>& auction_signals_json,
     const absl::optional<std::string>& per_buyer_signals_json,
     const absl::optional<GURL>& direct_from_seller_per_buyer_signals,
@@ -205,7 +206,8 @@ void MockBidderWorklet::InvokeGenerateBidCallback(
     std::vector<auction_worklet::mojom::PrivateAggregationRequestPtr>
         pa_requests,
     auction_worklet::mojom::GenerateBidDependencyLatenciesPtr
-        dependency_latencies) {
+        dependency_latencies,
+    auction_worklet::mojom::RejectReason reject_reason) {
   WaitForGenerateBid();
 
   base::RunLoop run_loop;
@@ -240,6 +242,7 @@ void MockBidderWorklet::InvokeGenerateBidCallback(
         /*non_kanon_pa_requests=*/{},
         /*bidding_latency=*/bidding_latency_,
         /*generate_bid_dependency_latencies=*/std::move(dependency_latencies),
+        reject_reason,
         /*errors=*/std::vector<std::string>());
     return;
   }
@@ -262,6 +265,7 @@ void MockBidderWorklet::InvokeGenerateBidCallback(
       /*non_kanon_pa_requests=*/{},
       /*bidding_latency=*/bidding_latency_,
       /*generate_bid_dependency_latencies=*/std::move(dependency_latencies),
+      reject_reason,
       /*errors=*/std::vector<std::string>());
 }
 
@@ -380,6 +384,8 @@ void MockSellerWorklet::ReportResult(
     auction_worklet::mojom::ComponentAuctionOtherSellerPtr
         browser_signals_other_seller,
     const url::Origin& browser_signal_interest_group_owner,
+    const absl::optional<std::string>&
+        browser_signal_buyer_and_seller_reporting_id,
     const GURL& browser_signal_render_url,
     double browser_signal_bid,
     const absl::optional<blink::AdCurrency>& browser_signal_bid_currency,

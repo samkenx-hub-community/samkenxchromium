@@ -43,11 +43,22 @@ public class OmniboxFeatures {
                     ChromeFeatureList.OMNIBOX_MODERNIZE_VISUAL_UPDATE,
                     "modernize_visual_update_merge_clipboard_on_ntp", false);
 
+    public static final String TAB_STRIP_REDESIGN_DISABLE_TOOLBAR_REORDERING_PARAM =
+            "disable_toolbar_reordering";
+    public static final BooleanCachedFieldTrialParameter
+            TAB_STRIP_REDESIGN_DISABLE_TOOLBAR_REORDERING =
+                    new BooleanCachedFieldTrialParameter(ChromeFeatureList.TAB_STRIP_REDESIGN,
+                            TAB_STRIP_REDESIGN_DISABLE_TOOLBAR_REORDERING_PARAM, false);
+
     private static final MutableFlagWithSafeDefault sOmniboxConsumesImeInsets =
             new MutableFlagWithSafeDefault(ChromeFeatureList.OMNIBOX_CONSUMERS_IME_INSETS, false);
     private static final MutableFlagWithSafeDefault sShouldAdaptToNarrowTabletWindows =
             new MutableFlagWithSafeDefault(
                     ChromeFeatureList.OMNIBOX_ADAPT_NARROW_TABLET_WINDOWS, false);
+
+    private static final MutableFlagWithSafeDefault sJourneysActionChipFlag =
+            new MutableFlagWithSafeDefault(
+                    ChromeFeatureList.OMNIBOX_HISTORY_CLUSTER_ACTION_CHIP, false);
     private static final MutableFlagWithSafeDefault sJourneysRowUiFlag =
             new MutableFlagWithSafeDefault(
                     ChromeFeatureList.OMNIBOX_HISTORY_CLUSTER_PROVIDER, false);
@@ -65,6 +76,13 @@ public class OmniboxFeatures {
     private static final MutableFlagWithSafeDefault sWarmRecycledViewPoolFlag =
             new MutableFlagWithSafeDefault(
                     ChromeFeatureList.OMNIBOX_WARM_RECYCLED_VIEW_POOL, false);
+
+    /**
+     * @return Whether Toolbar reordering for tab strip redesign is disabled.
+     */
+    public static boolean isTabStripToolbarReorderingDisabled() {
+        return TAB_STRIP_REDESIGN_DISABLE_TOOLBAR_REORDERING.getValue();
+    }
 
     /**
      * @param context The activity context.
@@ -153,6 +171,11 @@ public class OmniboxFeatures {
      */
     public static boolean shouldAddMostVisitedTilesRecycledViewPool() {
         return ChromeFeatureList.sOmniboxMostVisitedTilesAddRecycledViewPool.isEnabled();
+    }
+
+    /** Whether Journeys suggestions should be shown as an action chip. */
+    public static boolean isJourneysActionChipEnabled() {
+        return sJourneysActionChipFlag.isEnabled();
     }
 
     /** Whether Journeys suggestions should be shown in a dedicated row. */

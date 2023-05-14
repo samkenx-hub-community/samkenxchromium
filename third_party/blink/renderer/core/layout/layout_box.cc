@@ -90,6 +90,7 @@
 #include "third_party/blink/renderer/core/layout/ng/table/layout_ng_table.h"
 #include "third_party/blink/renderer/core/layout/ng/table/layout_ng_table_cell.h"
 #include "third_party/blink/renderer/core/layout/shapes/shape_outside_info.h"
+#include "third_party/blink/renderer/core/layout/text_utils.h"
 #include "third_party/blink/renderer/core/loader/resource/image_resource_content.h"
 #include "third_party/blink/renderer/core/page/autoscroll_controller.h"
 #include "third_party/blink/renderer/core/page/chrome_client.h"
@@ -240,16 +241,13 @@ LayoutUnit FileUploadControlIntrinsicInlineSize(const HTMLInputElement& input,
   constexpr int kDefaultWidthNumChars = 34;
   constexpr UChar kCharacter = '0';
   const String character_as_string = String(&kCharacter, 1u);
-  const Font& font = box.StyleRef().GetFont();
   const float min_default_label_width =
       kDefaultWidthNumChars *
-      font.Width(ConstructTextRun(character_as_string, box.StyleRef(),
-                                  TextRun::kAllowTrailingExpansion));
+      ComputeTextWidth(character_as_string, box.StyleRef());
 
   const String label =
       input.GetLocale().QueryString(IDS_FORM_FILE_NO_FILE_LABEL);
-  float default_label_width = font.Width(ConstructTextRun(
-      label, box.StyleRef(), TextRun::kAllowTrailingExpansion));
+  float default_label_width = ComputeTextWidth(label, box.StyleRef());
   if (HTMLInputElement* button = input.UploadButton()) {
     if (auto* button_box = button->GetLayoutBox()) {
       LayoutUnit max;
@@ -331,9 +329,8 @@ LayoutUnit MenuListIntrinsicInlineSize(const HTMLSelectElement& select,
       style.ApplyTextTransform(&text);
       // We apply SELECT's style, not OPTION's style because max_option_width is
       // used to determine intrinsic width of the menulist box.
-      TextRun text_run = ConstructTextRun(text, style);
       max_option_width =
-          std::max(max_option_width, style.GetFont().Width(text_run));
+          std::max(max_option_width, ComputeTextWidth(text, style));
     }
   }
 
@@ -1560,8 +1557,9 @@ PhysicalRect LayoutBox::PhysicalBackgroundRect(
       }
 
       // The background color is painted into the last layer.
-      if (!cur->Next() && !background_color.HasAlpha())
+      if (!cur->Next() && background_color.IsOpaque()) {
         layer_known_opaque = true;
+      }
 
       // If neither the image nor the color are opaque then skip this layer.
       if (!layer_known_opaque)
@@ -1570,7 +1568,7 @@ PhysicalRect LayoutBox::PhysicalBackgroundRect(
       // Ignore invisible background layers for kBackgroundPaintedExtent.
       DCHECK_EQ(rect_type, kBackgroundPaintedExtent);
       if (!cur->GetImage() &&
-          (cur->Next() || background_color.AlphaAsInteger() == 0)) {
+          (cur->Next() || background_color.IsFullyTransparent())) {
         continue;
       }
       // A content-box clipped fill layer can be scrolled into the padding box
@@ -6159,21 +6157,25 @@ bool LayoutBox::BackgroundClipBorderBoxIsEquivalentToPaddingBox() const {
   }
 
   if (StyleRef().BorderTopWidth() &&
-      (ResolveColor(GetCSSPropertyBorderTopColor()).HasAlpha() ||
-       StyleRef().BorderTopStyle() != EBorderStyle::kSolid))
+      (!ResolveColor(GetCSSPropertyBorderTopColor()).IsOpaque() ||
+       StyleRef().BorderTopStyle() != EBorderStyle::kSolid)) {
     return false;
+  }
   if (StyleRef().BorderRightWidth() &&
-      (ResolveColor(GetCSSPropertyBorderRightColor()).HasAlpha() ||
-       StyleRef().BorderRightStyle() != EBorderStyle::kSolid))
+      (!ResolveColor(GetCSSPropertyBorderRightColor()).IsOpaque() ||
+       StyleRef().BorderRightStyle() != EBorderStyle::kSolid)) {
     return false;
+  }
   if (StyleRef().BorderBottomWidth() &&
-      (ResolveColor(GetCSSPropertyBorderBottomColor()).HasAlpha() ||
-       StyleRef().BorderBottomStyle() != EBorderStyle::kSolid))
+      (!ResolveColor(GetCSSPropertyBorderBottomColor()).IsOpaque() ||
+       StyleRef().BorderBottomStyle() != EBorderStyle::kSolid)) {
     return false;
+  }
   if (StyleRef().BorderLeftWidth() &&
-      (ResolveColor(GetCSSPropertyBorderLeftColor()).HasAlpha() ||
-       StyleRef().BorderLeftStyle() != EBorderStyle::kSolid))
+      (!ResolveColor(GetCSSPropertyBorderLeftColor()).IsOpaque() ||
+       StyleRef().BorderLeftStyle() != EBorderStyle::kSolid)) {
     return false;
+  }
 
   return true;
 }
@@ -6215,7 +6217,7 @@ BackgroundPaintLocation LayoutBox::ComputeBackgroundPaintLocationIfComposited()
     // bottommost value from the background property (see final-bg-layer in
     // https://drafts.csswg.org/css-backgrounds/#the-background).
     if (!layer->GetImage() && !layer->Next() &&
-        background_color.AlphaAsInteger() > 0 &&
+        !background_color.IsFullyTransparent() &&
         StyleRef().IsScrollbarGutterAuto()) {
       // Solid color layers with an effective background clip of the padding box
       // can be treated as local.
@@ -6234,7 +6236,7 @@ BackgroundPaintLocation LayoutBox::ComputeBackgroundPaintLocationIfComposited()
         // iterations of the loop). For the latter case, the first paint of the
         // images doesn't matter because it will be covered by the second paint
         // of the opaque color.
-        if (!background_color.HasAlpha()) {
+        if (background_color.IsOpaque()) {
           paint_location = kBackgroundPaintInBothSpaces;
           continue;
         }

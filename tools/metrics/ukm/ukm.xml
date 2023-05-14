@@ -680,7 +680,7 @@ be describing additional metrics about the same event.
   </metric>
 </event>
 
-<event name="AdsInterestGroup.AuctionLatency">
+<event name="AdsInterestGroup.AuctionLatency.V2">
   <owner>orrb@google.com</owner>
   <owner>chrome-ads-core@google.com</owner>
   <summary>
@@ -4031,6 +4031,38 @@ be describing additional metrics about the same event.
   </metric>
 </event>
 
+<event name="Blink.JavaScriptFramework.Versions" singular="True">
+  <owner>houssein@chromium.org</owner>
+  <owner>nrosenthal@chromium.org</owner>
+  <summary>
+    Metrics stating the detected major+minor version of known frameworks when
+    detected. This event is recorded when the page is loaded. Note that a page
+    can use multiple frameworks at the same time, hence why this reports each
+    framework individually instead of a single number. The version numbers here
+    are a bit mask: 0xMMmm (Major+minor), e.g. version 16.3 would be 0x1003
+  </summary>
+  <metric name="AngularVersion">
+    <summary>
+      A bitmask (0xMMmm) representing the Angular version
+    </summary>
+  </metric>
+  <metric name="NextJSVersion">
+    <summary>
+      A bitmask (0xMMmm) representing the NextJS version
+    </summary>
+  </metric>
+  <metric name="NuxtVersion">
+    <summary>
+      A bitmask (0xMMmm) representing the Nuxt version
+    </summary>
+  </metric>
+  <metric name="VueVersion">
+    <summary>
+      A bitmask (0xMMmm) representing the Vue version
+    </summary>
+  </metric>
+</event>
+
 <event name="Blink.PageLoad">
   <owner>schenney@chromium.org</owner>
   <owner>paint-dev@chromium.org</owner>
@@ -6676,11 +6708,25 @@ be describing additional metrics about the same event.
     navigates away. For most of the UI surfaces, only the last event (e.g.
     displayed or clicked) is recorded.
   </summary>
-  <metric name="CQ.ChildElementCount">
+  <metric name="ATX.ComponentPosition">
     <summary>
-      The number of child elements shown within the CQ suface, e.g. the number
-      of related queries in the related queries component. Clamped to a max
-      value of 10.
+      The position of the ATX surface in the page.
+    </summary>
+  </metric>
+  <metric name="ATX.LastEvent" enum="Companion.UiEvent">
+    <summary>
+      The last event on the ATX surface.
+    </summary>
+  </metric>
+  <metric name="CQ.ClickPosition">
+    <summary>
+      The position of the CQ element that was clicked with respect to its parent
+      list.
+    </summary>
+  </metric>
+  <metric name="CQ.ComponentPosition">
+    <summary>
+      The position of the CQ surface in the page.
     </summary>
   </metric>
   <metric name="CQ.LastEvent" enum="Companion.UiEvent">
@@ -6688,9 +6734,54 @@ be describing additional metrics about the same event.
       The last event on the CQ surface.
     </summary>
   </metric>
-  <metric name="OpenTrigger" enum="Companion.OpenTrigger">
+  <metric name="CQ.NumEntriesAvailable">
+    <summary>
+      The number of child elements available within the CQ suface after
+      eligibility check after text finder API. Clamped to a max value of 10.
+    </summary>
+  </metric>
+  <metric name="CQ.NumEntriesShown">
+    <summary>
+      The number of child elements actually shown within the CQ suface after
+      eligibility check through text finder API. Clamped to a max value of 10.
+    </summary>
+  </metric>
+  <metric name="OpenTrigger" enum="SidePanelOpenTrigger">
     <summary>
       The UI location from which the companion page was opened.
+    </summary>
+  </metric>
+  <metric name="PageEntities.ClickPosition">
+    <summary>
+      The position of the page entities element that was clicked with respect to
+      its parent list.
+    </summary>
+  </metric>
+  <metric name="PageEntities.ComponentPosition">
+    <summary>
+      The position of the page entities surface in the page.
+    </summary>
+  </metric>
+  <metric name="PageEntities.LastEvent" enum="Companion.UiEvent">
+    <summary>
+      The last event on the page entities surface.
+    </summary>
+  </metric>
+  <metric name="PageEntities.NumEntriesAvailable">
+    <summary>
+      The number of child elements available within the page entities suface.
+      Clamped to a max value of 10.
+    </summary>
+  </metric>
+  <metric name="PageEntities.NumEntriesShown">
+    <summary>
+      The number of child elements shown within the page entities suface.
+      Clamped to a max value of 10.
+    </summary>
+  </metric>
+  <metric name="PH.ComponentPosition">
+    <summary>
+      The position of the PH surface in the page.
     </summary>
   </metric>
   <metric name="PH.Feedback" enum="Companion.PhFeedback">
@@ -6711,6 +6802,95 @@ be describing additional metrics about the same event.
   <metric name="RegionSearch.ClickCount">
     <summary>
       The number of times region search in the multimodal box was clicked.
+    </summary>
+  </metric>
+  <metric name="RelQr.ClickPosition">
+    <summary>
+      The position of the RelQr element that was clicked with respect to its
+      parent list.
+    </summary>
+  </metric>
+  <metric name="RelQr.ComponentPosition">
+    <summary>
+      The position of the RelQr surface in the page.
+    </summary>
+  </metric>
+  <metric name="RelQr.LastEvent" enum="Companion.UiEvent">
+    <summary>
+      The last event on the RelQr surface.
+    </summary>
+  </metric>
+  <metric name="RelQr.NumEntriesAvailable">
+    <summary>
+      The number of child elements available within the RelQr suface. Clamped to
+      a max value of 10.
+    </summary>
+  </metric>
+  <metric name="RelQr.NumEntriesShown">
+    <summary>
+      The number of child elements shown within the RelQr suface. Clamped to a
+      max value of 10.
+    </summary>
+  </metric>
+  <metric name="RelQs.ClickPosition">
+    <summary>
+      The position of the RelQs element that was clicked with respect to its
+      parent list.
+    </summary>
+  </metric>
+  <metric name="RelQs.ComponentPosition">
+    <summary>
+      The position of the RelQs surface in the page.
+    </summary>
+  </metric>
+  <metric name="RelQs.LastEvent" enum="Companion.UiEvent">
+    <summary>
+      The last event on the RelQs surface.
+    </summary>
+  </metric>
+  <metric name="RelQs.NumEntriesAvailable">
+    <summary>
+      The number of child elements available within the RelQs suface. Clamped to
+      a max value of 10.
+    </summary>
+  </metric>
+  <metric name="RelQs.NumEntriesShown">
+    <summary>
+      The number of child elements shown within the RelQs suface. Clamped to a
+      max value of 10.
+    </summary>
+  </metric>
+  <metric name="TextSearchCount">
+    <summary>
+      The number of times text search box was used.
+    </summary>
+  </metric>
+  <metric name="VQ.ClickPosition">
+    <summary>
+      The position of the VQ element that was clicked with respect to its parent
+      list.
+    </summary>
+  </metric>
+  <metric name="VQ.ComponentPosition">
+    <summary>
+      The position of the VQ surface in the page.
+    </summary>
+  </metric>
+  <metric name="VQ.LastEvent" enum="Companion.UiEvent">
+    <summary>
+      The last event on the VQ surface.
+    </summary>
+  </metric>
+  <metric name="VQ.NumEntriesAvailable">
+    <summary>
+      The number of child elements available within the VQ suface. Clamped to a
+      max value of 10.
+    </summary>
+  </metric>
+  <metric name="VQ.NumEntriesShown">
+    <summary>
+      The number of child elements shown within the VQ suface. Clamped to a max
+      value of 10.
     </summary>
   </metric>
 </event>
@@ -7432,6 +7612,12 @@ be describing additional metrics about the same event.
     <summary>
       True when the site before the redirect chain is the same as the site at
       the end of the chain.
+    </summary>
+  </metric>
+  <metric name="IsPartialRedirectChain">
+    <summary>
+      True if the chain is missing the end URL. Any comparisons to the final
+      site are invalid for this redirect.
     </summary>
   </metric>
   <metric name="RedirectAndFinalSiteSame" enum="BooleanSameSite">

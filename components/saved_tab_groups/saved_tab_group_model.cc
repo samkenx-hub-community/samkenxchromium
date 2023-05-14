@@ -8,6 +8,9 @@
 #include <memory>
 #include <vector>
 
+#include "base/metrics/histogram_functions.h"
+#include "base/metrics/user_metrics.h"
+#include "base/metrics/user_metrics_action.h"
 #include "base/observer_list.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/uuid.h"
@@ -19,6 +22,19 @@
 #include "components/tab_groups/tab_group_id.h"
 #include "components/tab_groups/tab_group_visual_data.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
+
+namespace {
+void RecordGroupDeletedMetric(const SavedTabGroup* removed_group) {
+  const base::TimeDelta duration_saved =
+      base::Time::Now() - removed_group->creation_time_windows_epoch_micros();
+
+  base::UmaHistogramCounts1M("TabGroups.SavedTabGroupLifespan",
+                             duration_saved.InMinutes());
+
+  base::RecordAction(
+      base::UserMetricsAction("TabGroups_SavedTabGroups_Deleted"));
+}
+}  // anonymous namespace
 
 SavedTabGroupModel::SavedTabGroupModel() = default;
 SavedTabGroupModel::~SavedTabGroupModel() = default;
@@ -82,10 +98,13 @@ void SavedTabGroupModel::Remove(const tab_groups::TabGroupId tab_group_id) {
   const int index = GetIndexOf(tab_group_id).value();
   base::Uuid removed_guid = Get(tab_group_id)->saved_guid();
   std::unique_ptr<SavedTabGroup> removed_group = RemoveImpl(index);
+
   UpdateGroupPositionsImpl();
   for (auto& observer : observers_) {
     observer.SavedTabGroupRemovedLocally(removed_group.get());
   }
+
+  RecordGroupDeletedMetric(removed_group.get());
 }
 
 void SavedTabGroupModel::Remove(const base::Uuid& id) {
@@ -95,10 +114,13 @@ void SavedTabGroupModel::Remove(const base::Uuid& id) {
   const int index = GetIndexOf(id).value();
   base::Uuid removed_guid = Get(id)->saved_guid();
   std::unique_ptr<SavedTabGroup> removed_group = RemoveImpl(index);
+
   UpdateGroupPositionsImpl();
   for (auto& observer : observers_) {
     observer.SavedTabGroupRemovedLocally(removed_group.get());
   }
+
+  RecordGroupDeletedMetric(removed_group.get());
 }
 
 void SavedTabGroupModel::UpdateVisualData(
@@ -459,6 +481,9 @@ void SavedTabGroupModel::OnGroupClosedInTabStrip(
   for (auto& observer : observers_) {
     observer.SavedTabGroupUpdatedLocally(saved_group.saved_guid());
   }
+
+  base::RecordAction(
+      base::UserMetricsAction("TabGroups_SavedTabGroups_Closed"));
 }
 
 void SavedTabGroupModel::OnGroupOpenedInTabStrip(

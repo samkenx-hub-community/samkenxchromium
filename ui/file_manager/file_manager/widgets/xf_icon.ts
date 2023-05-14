@@ -32,6 +32,7 @@ export class XfIcon extends XfBase {
     return {
       EXTRA_SMALL: 'extra_small',
       SMALL: 'small',
+      MEDIUM: 'medium',
       LARGE: 'large',
     } as const;
   }
@@ -140,6 +141,10 @@ function getCSS() {
       width: 16px;
     }
 
+    :host([size="extra_small"]) span:not(.keep-color) {
+      -webkit-mask-size: 16px;
+    }
+
     :host([size="small"]) span {
       height: 20px;
       width: 20px;
@@ -149,8 +154,13 @@ function getCSS() {
       -webkit-mask-size: 20px;
     }
 
-    :host([size="small"]) span.keep-color {
-      background-size: 20px;
+    :host([size="medium"]) span {
+      height: 32px;
+      width: 32px;
+    }
+
+    :host([size="medium"]) span:not(.keep-color) {
+      -webkit-mask-size: 32px;
     }
 
     :host([size="large"]) span {
@@ -160,10 +170,6 @@ function getCSS() {
 
     :host([size="large"]) span:not(.keep-color) {
       -webkit-mask-size: 48px;
-    }
-
-    :host([size="large"]) span.keep-color {
-      background-size: 48px;
     }
 
     :host([type="android_files"]) span {
@@ -212,6 +218,10 @@ function getCSS() {
 
     :host([type="drive_logo"]) span {
       -webkit-mask-image: url(../foreground/images/files/ui/drive_logo.svg);
+    }
+
+    :host([type="drive_bulk_pinning"]) span {
+      -webkit-mask-image: url(../foreground/images/files/ui/drive_bulk_pinning.svg);
     }
 
     :host([type="excel"]) span {
@@ -415,6 +425,21 @@ function getCSS() {
 
     :host([type='word']) span {
       background-color: var(--cros-sys-file_ms_word);
+    }
+
+    /**
+     * These icons are never shown on their own but are shown as suffix icons,
+     * hence why they are smaller with offset margins. At the moment these are
+     * only supported with "small" size prefix icons.
+     */
+    :host([type='cloud_done']) span,
+    :host([type='cloud_error']) span,
+    :host([type='cloud_offline']) span,
+    :host([type='cloud_sync']) span {
+      margin-inline-start: 10px;
+      margin-top: 8px;
+      height: 12px;
+      width: 12px;
     }
   `;
 }

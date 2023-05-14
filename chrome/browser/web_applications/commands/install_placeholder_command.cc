@@ -70,8 +70,6 @@ base::Value InstallPlaceholderCommand::ToDebugValue() const {
   return base::Value(debug_value_.Clone());
 }
 
-void InstallPlaceholderCommand::OnSyncSourceRemoved() {}
-
 void InstallPlaceholderCommand::OnShutdown() {
   Abort(webapps::InstallResultCode::kCancelledOnWebAppProviderShuttingDown);
 }
@@ -193,8 +191,6 @@ void InstallPlaceholderCommand::OnInstallFinalized(
       app_id,
       ConvertExternalInstallSourceToInstallSource(
           install_options_.install_source));
-
-  RecordAppBanner(web_contents_.get(), install_options_.install_url);
 
   webapps::InstallableMetrics::TrackInstallResult(webapps::IsSuccess(code));
 

@@ -210,6 +210,7 @@
 #include "render_frame_host_impl.h"
 #include "services/metrics/public/cpp/ukm_builders.h"
 #include "services/metrics/public/cpp/ukm_source_id.h"
+#include "services/network/public/cpp/attribution_reporting_runtime_features.h"
 #include "services/network/public/cpp/cors/origin_access_list.h"
 #include "services/network/public/cpp/features.h"
 #include "services/network/public/cpp/is_potentially_trustworthy.h"
@@ -302,18 +303,12 @@ BASE_FEATURE(kDisableFrameNameUpdateOnNonCurrentRenderFrameHost,
              "DisableFrameNameUpdateOnNonCurrentRenderFrameHost",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Evict when accessibility events occur while in back/forward cache. Remove
-// once the https://crbug.com/1341507 is resolved. This crash started to happen
-// on Android with bfcache experiments, so we're enabling this flag only on
-// Android.
+// Evict when accessibility events occur while in back/forward cache.
+// Disabling on all platforms since https://crbug.com/1341507 has been addressed
+// and no significant crashes are happening with experiments.
 BASE_FEATURE(kEvictOnAXEvents,
              "EvictOnAXEvents",
-#if BUILDFLAG(IS_ANDROID)
-             base::FEATURE_ENABLED_BY_DEFAULT
-#else
-             base::FEATURE_DISABLED_BY_DEFAULT
-#endif
-);
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kUnblockSpeechSynthesisForBFCache,
              "UnblockSpeechSynthesisForBFCache",
@@ -8203,11 +8198,14 @@ void RenderFrameHostImpl::CreateFencedFrame(
 void RenderFrameHostImpl::SendFencedFrameReportingBeacon(
     const std::string& event_data,
     const std::string& event_type,
-    const std::vector<blink::FencedFrame::ReportingDestination>& destinations) {
+    const std::vector<blink::FencedFrame::ReportingDestination>& destinations,
+    const network::AttributionReportingRuntimeFeatures&
+        attribution_reporting_runtime_features) {
   for (const blink::FencedFrame::ReportingDestination& destination :
        destinations) {
-    SendFencedFrameReportingBeaconInternal(event_data, event_type, destination,
-                                           /*from_renderer=*/true);
+    SendFencedFrameReportingBeaconInternal(
+        event_data, event_type, destination,
+        /*from_renderer=*/true, attribution_reporting_runtime_features);
   }
 }
 
@@ -8269,7 +8267,8 @@ void RenderFrameHostImpl::MaybeSendFencedFrameReportingBeacon(
        info->destinations) {
     initiator_rfh->SendFencedFrameReportingBeaconInternal(
         info->data, blink::kFencedFrameTopNavigationBeaconType, destination,
-        /*from_renderer=*/false, navigation_request.GetNavigationId());
+        /*from_renderer=*/false, info->attribution_reporting_runtime_features,
+        navigation_request.GetNavigationId());
   }
 }
 
@@ -8278,6 +8277,8 @@ void RenderFrameHostImpl::SendFencedFrameReportingBeaconInternal(
     const std::string& event_type,
     blink::FencedFrame::ReportingDestination destination,
     bool from_renderer,
+    network::AttributionReportingRuntimeFeatures
+        attribution_reporting_runtime_features,
     absl::optional<int64_t> navigation_id) {
   if (!IsActive()) {
     // reportEvent is not allowed when this RenderFrameHost or one of its
@@ -8335,7 +8336,9 @@ void RenderFrameHostImpl::SendFencedFrameReportingBeaconInternal(
   std::string error_message;
   if (!fenced_frame_properties->fenced_frame_reporter_->SendReport(
           event_type, event_data, destination,
-          /*request_initiator_frame=*/this, error_message, navigation_id)) {
+          /*request_initiator_frame=*/this,
+          attribution_reporting_runtime_features, error_message,
+          navigation_id)) {
     AddMessageToConsole(blink::mojom::ConsoleMessageLevel::kError,
                         error_message);
   }
@@ -8343,7 +8346,9 @@ void RenderFrameHostImpl::SendFencedFrameReportingBeaconInternal(
 
 void RenderFrameHostImpl::SetFencedFrameAutomaticBeaconReportEventData(
     const std::string& event_data,
-    const std::vector<blink::FencedFrame::ReportingDestination>& destinations) {
+    const std::vector<blink::FencedFrame::ReportingDestination>& destinations,
+    const network::AttributionReportingRuntimeFeatures&
+        attribution_reporting_runtime_features) {
   if (event_data.length() > blink::kFencedFrameMaxBeaconLength) {
     mojo::ReportBadMessage(
         "The data provided to SetFencedFrameAutomaticBeaconReportEventData() "
@@ -8363,8 +8368,8 @@ void RenderFrameHostImpl::SetFencedFrameAutomaticBeaconReportEventData(
   }
   CHECK(owner_);  // See `owner_` invariants about `IsActive()`.
 
-  owner_->SetFencedFrameAutomaticBeaconReportEventData(event_data,
-                                                       destinations);
+  owner_->SetFencedFrameAutomaticBeaconReportEventData(
+      event_data, destinations, attribution_reporting_runtime_features);
 }
 
 void RenderFrameHostImpl::OnViewTransitionOptInChanged(
@@ -9512,6 +9517,15 @@ void RenderFrameHostImpl::RecordNavigationSuddenTerminationHandlers() {
   uint32_t navigation_termination =
       is_main_frame() ? NavigationSuddenTerminationDisablerType::kMainFrame : 0;
 
+  if (is_initial_empty_document()) {
+    navigation_termination |=
+        NavigationSuddenTerminationDisablerType::kInitialEmptyDocument;
+  }
+
+  if (!GetLastCommittedURL().SchemeIsHTTPOrHTTPS()) {
+    navigation_termination |= NavigationSuddenTerminationDisablerType::kNotHttp;
+  }
+
   base::UmaHistogramExactLinear(
       "Navigation.SuddenTerminationDisabler.AllOrigins",
       navigation_termination |
@@ -9875,20 +9889,26 @@ void RenderFrameHostImpl::CommitNavigation(
       }
     }
 
-    // Set up prefetch loader factory.
-    std::unique_ptr<blink::PendingURLLoaderFactoryBundle>
-        factory_bundle_for_prefetch;
-    mojo::PendingRemote<network::mojom::URLLoaderFactory>
-        prefetch_loader_factory;
+    // Set up the subresource loader factory that will pass requests from the
+    // renderer to the originally intended network service endpoint. To save
+    // memory, this is intentionally shared for prefetch, topics, and
+    // keep-alive.
+    scoped_refptr<network::SharedURLLoaderFactory>
+        subresource_proxying_factory_bundle;
     if (subresource_loader_factories) {
       // Clone the factory bundle for prefetch.
       auto bundle = base::MakeRefCounted<blink::URLLoaderFactoryBundle>(
           std::move(subresource_loader_factories));
       subresource_loader_factories = CloneFactoryBundle(bundle);
-      factory_bundle_for_prefetch = CloneFactoryBundle(bundle);
+
+      subresource_proxying_factory_bundle =
+          network::SharedURLLoaderFactory::Create(CloneFactoryBundle(bundle));
     }
 
-    if (factory_bundle_for_prefetch) {
+    // Set up prefetch loader factory.
+    mojo::PendingRemote<network::mojom::URLLoaderFactory>
+        prefetch_loader_factory;
+    if (subresource_proxying_factory_bundle) {
       if (prefetched_signed_exchange_cache_) {
         prefetched_signed_exchange_cache_->RecordHistograms();
         // Reset |prefetched_signed_exchange_cache_|, not to reuse the cached
@@ -9904,8 +9924,7 @@ void RenderFrameHostImpl::CommitNavigation(
       storage_partition->GetPrefetchURLLoaderService()->GetFactory(
           prefetch_loader_factory.InitWithNewPipeAndPassReceiver(),
           navigation_request->frame_tree_node()->frame_tree_node_id(),
-          std::move(factory_bundle_for_prefetch),
-          weak_ptr_factory_.GetWeakPtr(),
+          subresource_proxying_factory_bundle, weak_ptr_factory_.GetWeakPtr(),
           EnsurePrefetchedSignedExchangeCache());
     }
 
@@ -9915,33 +9934,19 @@ void RenderFrameHostImpl::CommitNavigation(
     // are intended for disjoint request types (i.e.
     // fetch(<url>, {browsingTopics: true}) v.s. <link rel="prefetch">).
     mojo::PendingRemote<network::mojom::URLLoaderFactory> topics_loader_factory;
-    if (base::FeatureList::IsEnabled(blink::features::kBrowsingTopics)) {
-      std::unique_ptr<blink::PendingURLLoaderFactoryBundle>
-          factory_bundle_for_topics;
+    if (base::FeatureList::IsEnabled(blink::features::kBrowsingTopics) &&
+        subresource_proxying_factory_bundle) {
+      // Also set-up URLLoaderFactory for topics using the same loader
+      // factories.
+      base::WeakPtr<BrowsingTopicsURLLoaderService::BindContext> bind_context =
+          GetStoragePartition()
+              ->GetBrowsingTopicsURLLoaderService()
+              ->GetFactory(
+                  topics_loader_factory.InitWithNewPipeAndPassReceiver(),
+                  subresource_proxying_factory_bundle);
 
-      if (subresource_loader_factories) {
-        // Clone the factory bundle for topics.
-        auto bundle = base::MakeRefCounted<blink::URLLoaderFactoryBundle>(
-            std::move(subresource_loader_factories));
-        subresource_loader_factories = CloneFactoryBundle(bundle);
-        factory_bundle_for_topics = CloneFactoryBundle(bundle);
-      }
-
-      if (factory_bundle_for_topics) {
-        // Also set-up URLLoaderFactory for topics using the same loader
-        // factories.
-        auto* storage_partition = GetStoragePartition();
-
-        base::WeakPtr<BrowsingTopicsURLLoaderService::BindContext>
-            bind_context =
-                storage_partition->GetBrowsingTopicsURLLoaderService()
-                    ->GetFactory(
-                        topics_loader_factory.InitWithNewPipeAndPassReceiver(),
-                        std::move(factory_bundle_for_topics));
-
-        navigation_request->set_topics_url_loader_service_bind_context(
-            bind_context);
-      }
+      navigation_request->set_topics_url_loader_service_bind_context(
+          bind_context);
     }
 
     // Set up keepalive loader factory. It is used to proxy the keepalive
@@ -9950,29 +9955,20 @@ void RenderFrameHostImpl::CommitNavigation(
     // https://docs.google.com/document/d/1ZzxMMBvpqn8VZBZKnb7Go8TWjnrGcXuLS_USwVVRUvY/edit
     // Note that this loader does not depend on `prefetch_loader_factory` nor
     // `topics_loader_factory`.
+    //
+    // TODO(https://crbug.com/1441113): we should allow both keepalive and
+    // browsing_topics.
     mojo::PendingRemote<network::mojom::URLLoaderFactory>
         keep_alive_loader_factory;
     if (base::FeatureList::IsEnabled(
-            blink::features::kKeepAliveInBrowserMigration)) {
-      std::unique_ptr<blink::PendingURLLoaderFactoryBundle>
-          factory_bundle_for_keep_alive;
-
-      if (subresource_loader_factories) {
-        // Clone the factory bundle for keepalive.
-        auto bundle = base::MakeRefCounted<blink::URLLoaderFactoryBundle>(
-            std::move(subresource_loader_factories));
-        subresource_loader_factories = CloneFactoryBundle(bundle);
-        factory_bundle_for_keep_alive = CloneFactoryBundle(bundle);
-      }
-
-      if (factory_bundle_for_keep_alive) {
-        // Also setting up URLLoaderFactory for keepalive using the same loader
-        // factories.
-        GetStoragePartition()->GetKeepAliveURLLoaderService()->BindFactory(
-            keep_alive_loader_factory.InitWithNewPipeAndPassReceiver(),
-            std::move(factory_bundle_for_keep_alive),
-            navigation_request->GetPolicyContainerHost());
-      }
+            blink::features::kKeepAliveInBrowserMigration) &&
+        subresource_proxying_factory_bundle) {
+      // Also setting up URLLoaderFactory for keepalive using the same loader
+      // factories.
+      GetStoragePartition()->GetKeepAliveURLLoaderService()->BindFactory(
+          keep_alive_loader_factory.InitWithNewPipeAndPassReceiver(),
+          subresource_proxying_factory_bundle,
+          navigation_request->GetPolicyContainerHost());
     }
 
     mojom::NavigationClient* navigation_client =

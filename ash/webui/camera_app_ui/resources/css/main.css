@@ -116,10 +116,15 @@ input[type=checkbox] {
 .menu-header .icon,
 .menu-item .icon,
 .menu-item.expandable::after {
+  align-items: center;
+  /* TODO(pihsun): Remove these two after all background image
+   * usage are removed. */
   background-position: center;
   background-repeat: no-repeat;
+  display: flex;
   flex-shrink: 0;
   height: 40px;
+  justify-content: center;
   width: 40px;
 }
 
@@ -312,7 +317,7 @@ body:is(.taking.video, .should-handle-intent-result) #modes-group {
   transform: none;
 }
 
-#modes-group .mode-item:has(input:disabled) {
+#modes-group .mode-item:has(input[data-disabled=true]) {
   opacity: 0.38;
 }
 
@@ -383,7 +388,7 @@ body:is(:not(.recording), .enable-gif-recording, .should-handle-intent-result) :
   --secondary-color: white;
 }
 
-:is(#start-takephoto, #video-snapshot):enabled:hover::after {
+:is(#start-takephoto, #video-snapshot, #stop-takephoto):enabled:hover::after {
   background: var(--cros-sys-hover_on_prominent);
   border-radius: 50%;
   content: '';
@@ -392,7 +397,8 @@ body:is(:not(.recording), .enable-gif-recording, .should-handle-intent-result) :
   position: absolute;
 }
 
-:is(#start-takephoto, #video-snapshot):enabled:active svg-wrapper {
+:is(#start-takephoto, #video-snapshot, #stop-takephoto):enabled:active
+  svg-wrapper {
   color: var(--cros-sys-secondary);
 }
 
@@ -400,12 +406,9 @@ body.taking #start-takephoto:active {
   transform: unset;
 }
 
-#stop-takephoto {
-  background-image: url(/images/camera_shutter_photo_stop.svg);
-}
-
-#stop-takephoto:hover {
-  background-image: url(/images/camera_shutter_photo_stop_hover.svg);
+#stop-takephoto svg-wrapper {
+  color: var(--cros-sys-inverse_surface);
+  --secondary-color: var(--cros-sys-secondary_container);
 }
 
 #recordvideo {
@@ -530,22 +533,20 @@ body:not(.multi-camera) #switch-device {
 }
 
 #camera-mode {
-  background-image: url(/images/camera_mode_photo.svg);
   height: 40px;
   visibility: hidden;
   width: 40px;
+
+  :is(svg-wrapper) {
+    display: none;
+  }
 }
 
-body.scan #camera-mode {
-  background-image: url(/images/camera_mode_scan.svg);
-}
-
-body.video #camera-mode {
-  background-image: url(/images/camera_mode_video.svg);
-}
-
-body.portrait #camera-mode {
-  background-image: url(/images/camera_mode_portrait.svg);
+body:not(.scan):not(.video):not(.portrait) #camera-mode svg-wrapper.photo,
+body.scan #camera-mode svg-wrapper.scan,
+body.video #camera-mode svg-wrapper.video,
+body.portrait #camera-mode svg-wrapper.portrait {
+  display: unset;
 }
 
 body.mode-switching:not(.streaming) #camera-mode {
@@ -1254,7 +1255,6 @@ button.menu-item {
 
 .menu-header button.icon {
   /* Icon image is small enough and won't be covered by -1px */
-  background-image: url(/images/settings_button_back.svg);
   outline-offset: -1px;
 }
 
@@ -1264,35 +1264,6 @@ html[dir=rtl] .menu-header .icon {
 
 .menu-header .icon:hover {
   background-color: var(--cros-sys-hover_on_subtle);
-}
-
-#settings-gridtype .icon {
-  background-image: url(/images/settings_grid_type.svg);
-}
-
-#settings-timerdur .icon {
-  background-image: url(/images/settings_timer_duration.svg);
-}
-
-#settings-photo-resolution .icon,
-#settings-video-resolution .icon {
-  background-image: url(/images/settings_resolution.svg);
-}
-
-#settings-photo-aspect-ratio .icon {
-  background-image: url(/images/settings_aspect_ratio.svg);
-}
-
-#settings-expert .icon {
-  background-image: url(/images/settings_expert.svg);
-}
-
-#settings-feedback .icon {
-  background-image: url(/images/settings_feedback.svg);
-}
-
-#settings-help .icon {
-  background-image: url(/images/settings_help.svg);
 }
 
 #view-warning,
@@ -1315,11 +1286,33 @@ html[dir=rtl] .menu-header .icon {
 }
 
 .dialog {
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--cros-sys-scrim);
 }
 
+/*
+ * The icon on the splash screen is not using either data-svg or
+ * svg-wrapper, and is done with pure CSS, to avoid waiting on JS,
+ * and minimize the time before app load and the icon is displayed.
+ *
+ * We also provide fallback value for the background colors to
+ * minimize the flicker when JS is load, since the definition CSS
+ * of dynamic color tokens is also loaded by JS.
+ *
+ * TODO(pihsun): Remove background color fallback when dynamic color is default
+ * on, and the colors.css is moved into HTML.
+ */
 #view-splash {
-  background: no-repeat center url(/images/camera_mode_photo.svg), var(--grey-900);
+  align-items: center;
+  background: var(--cros-sys-app_base, var(--grey-900));
+  display: flex;
+  justify-content: center;
+}
+
+#view-splash .icon {
+  -webkit-mask: url(/images/camera_mode_photo.svg);
+  background: var(--cros-sys-on_surface, var(--grey-200));
+  height: 40px;
+  width: 40px;
 }
 
 .hidden {
@@ -1415,26 +1408,15 @@ body:not(.video) #settings-video-resolution {
 }
 
 .fps-button {
+  border-radius: 12px;
   height: 40px;
   margin-inline-end: 8px;
   margin-inline-start: 8px;
   width: 40px;
 }
 
-#view-video-resolution-settings .fps-30 {
-  background-image: url(/images/camera_button_fps_30_unchecked.svg);
-}
-
-#view-video-resolution-settings .fps-30.checked {
-  background-image: url(/images/camera_button_fps_30_checked.svg);
-}
-
-#view-video-resolution-settings .fps-60 {
-  background-image: url(/images/camera_button_fps_60_unchecked.svg);
-}
-
-#view-video-resolution-settings .fps-60.checked {
-  background-image: url(/images/camera_button_fps_60_checked.svg);
+.fps-button.checked {
+  background: var(--cros-sys-primary_container);
 }
 
 [tabindex] {
@@ -1455,31 +1437,33 @@ body:not(.video) #settings-video-resolution {
 
 #nudge {
   align-items: center;
-  background: var(--grey-900);
-  border-radius: 6px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 4px 8px rgba(0, 0, 0, 0.15);
+  background: var(--cros-sys-base_elevated);
+  border-radius: var(--border-radius-rounded-with-short-side);
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.1), 0 4px 4px rgba(0, 0, 0, 0.2);
   display: flex;
   gap: 8px;
-  opacity: 0.8;
-  padding: 8px 10px;
+  padding: 8px 16px;
   position: absolute;
   top: 68px;  /* 8px below |record_time| element */
   z-index: 2;
 }
 
 #nudge .warning-icon {
-  background: url(/images/circle_warning_icon.svg);
   height: 20px;
   width: 20px;
+
+  :is(svg-wrapper) {
+    color: var(--cros-sys-warning);
+  }
 }
 
 #nudge .warning-msg {
-  color: var(--grey-400);
+  color: var(--cros-sys-on_surface);
   font: 400 14px/20px Roboto;
 }
 
 .low-storage-dialog-popup {
-  background: var(--grey-900);
+  background: var(--cros-sys-base_elevated);
   border-radius: 8px;
   display: flex;
   flex-direction: column;
@@ -1494,7 +1478,7 @@ body:not(.video) #settings-video-resolution {
 }
 
 .low-storage-dialog-popup .dialog-description {
-  color: var(--grey-400);
+  color: var(--cros-sys-secondary);
   font: 400 14px/20px var(--default-font-family);
 }
 
@@ -1513,7 +1497,6 @@ body:not(.video) #settings-video-resolution {
 }
 
 .low-storage-dialog-buttons .external-link-icon {
-  background: url(/images/external_link_icon.svg);
   height: 20px;
   width: 20px;
 }

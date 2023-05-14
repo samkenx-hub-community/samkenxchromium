@@ -63,10 +63,10 @@
 #include "base/allocator/partition_allocator/partition_oom.h"
 #include "base/allocator/partition_allocator/partition_page.h"
 #include "base/allocator/partition_allocator/partition_ref_count.h"
-#include "base/allocator/partition_allocator/pkey.h"
 #include "base/allocator/partition_allocator/reservation_offset_table.h"
 #include "base/allocator/partition_allocator/tagging.h"
 #include "base/allocator/partition_allocator/thread_cache.h"
+#include "base/allocator/partition_allocator/thread_isolation/thread_isolation.h"
 #include "build/build_config.h"
 
 #if BUILDFLAG(USE_STARSCAN)
@@ -180,11 +180,6 @@ struct PartitionOptions {
     kEnabled,
   };
 
-  enum class AddDummyRefCount : uint8_t {
-    kDisabled,
-    kEnabled,
-  };
-
   enum class UseConfigurablePool : uint8_t {
     kNo,
     kIfAvailable,
@@ -198,13 +193,12 @@ struct PartitionOptions {
       Cookie cookie,
       BackupRefPtr backup_ref_ptr,
       BackupRefPtrZapping backup_ref_ptr_zapping,
-      UseConfigurablePool use_configurable_pool,
-      AddDummyRefCount add_dummy_ref_count = AddDummyRefCount::kDisabled
-#if BUILDFLAG(ENABLE_PKEYS)
+      UseConfigurablePool use_configurable_pool
+#if BUILDFLAG(ENABLE_THREAD_ISOLATION)
       ,
-      int pkey = internal::kDefaultPkey
+      ThreadIsolationOption thread_isolation = ThreadIsolationOption()
 #endif
-      )
+          )
       : aligned_alloc(aligned_alloc),
         thread_cache(thread_cache),
         quarantine(quarantine),
@@ -212,9 +206,9 @@ struct PartitionOptions {
         backup_ref_ptr(backup_ref_ptr),
         backup_ref_ptr_zapping(backup_ref_ptr_zapping),
         use_configurable_pool(use_configurable_pool)
-#if BUILDFLAG(ENABLE_PKEYS)
+#if BUILDFLAG(ENABLE_THREAD_ISOLATION)
         ,
-        pkey(pkey)
+        thread_isolation(thread_isolation)
 #endif
   {
   }
@@ -226,9 +220,8 @@ struct PartitionOptions {
   BackupRefPtr backup_ref_ptr;
   BackupRefPtrZapping backup_ref_ptr_zapping;
   UseConfigurablePool use_configurable_pool;
-  AddDummyRefCount add_dummy_ref_count = AddDummyRefCount::kDisabled;
-#if BUILDFLAG(ENABLE_PKEYS)
-  int pkey;
+#if BUILDFLAG(ENABLE_THREAD_ISOLATION)
+  ThreadIsolationOption thread_isolation;
 #endif
 };
 
@@ -290,12 +283,9 @@ struct PA_ALIGNAS(64) PA_COMPONENT_EXPORT(PARTITION_ALLOC) PartitionRoot {
 #endif  // PA_CONFIG(ENABLE_MAC11_MALLOC_SIZE_HACK)
 #endif  // BUILDFLAG(ENABLE_BACKUP_REF_PTR_SUPPORT)
     bool use_configurable_pool;
-#if PA_CONFIG(HAS_MEMORY_TAGGING)
-    bool memory_tagging_enabled_;
-#endif
 
-#if BUILDFLAG(ENABLE_PKEYS)
-    int pkey;
+#if BUILDFLAG(ENABLE_THREAD_ISOLATION)
+    ThreadIsolationOption thread_isolation;
 #endif
 
 #if PA_CONFIG(EXTRAS_REQUIRED)
@@ -544,13 +534,15 @@ struct PA_ALIGNAS(64) PA_COMPONENT_EXPORT(PARTITION_ALLOC) PartitionRoot {
 
   PA_ALWAYS_INLINE PageAccessibilityConfiguration GetPageAccessibility() const;
   PA_ALWAYS_INLINE PageAccessibilityConfiguration
-      PageAccessibilityWithPkeyIfEnabled(
+      PageAccessibilityWithThreadIsolationIfEnabled(
           PageAccessibilityConfiguration::Permissions) const;
 
   PA_ALWAYS_INLINE size_t
   AllocationCapacityFromSlotStart(uintptr_t slot_start) const;
   PA_ALWAYS_INLINE size_t
   AllocationCapacityFromRequestedSize(size_t size) const;
+
+  PA_ALWAYS_INLINE bool IsMemoryTaggingEnabled() const;
 
   // Frees memory from this partition, if possible, by decommitting pages or
   // even entire slot spans. |flags| is an OR of base::PartitionPurgeFlags.
@@ -645,9 +637,9 @@ struct PA_ALIGNAS(64) PA_COMPONENT_EXPORT(PARTITION_ALLOC) PartitionRoot {
       return internal::kConfigurablePoolHandle;
     }
 #endif
-#if BUILDFLAG(ENABLE_PKEYS)
-    if (flags.pkey != internal::kDefaultPkey) {
-      return internal::kPkeyPoolHandle;
+#if BUILDFLAG(ENABLE_THREAD_ISOLATION)
+    if (flags.thread_isolation.enabled) {
+      return internal::kThreadIsolatedPoolHandle;
     }
 #endif
 #if BUILDFLAG(ENABLE_BACKUP_REF_PTR_SUPPORT)
@@ -677,7 +669,7 @@ struct PA_ALIGNAS(64) PA_COMPONENT_EXPORT(PARTITION_ALLOC) PartitionRoot {
     // If quarantine is enabled and the tag overflows, move the containing slot
     // to quarantine, to prevent the attacker from exploiting a pointer that has
     // an old tag.
-    if (PA_LIKELY(memory_tagging_enabled())) {
+    if (PA_LIKELY(IsMemoryTaggingEnabled())) {
       return internal::HasOverflowTag(object);
     }
     // Default behaviour if MTE is not enabled for this PartitionRoot.
@@ -809,19 +801,6 @@ struct PA_ALIGNAS(64) PA_COMPONENT_EXPORT(PARTITION_ALLOC) PartitionRoot {
 
   PA_ALWAYS_INLINE bool uses_configurable_pool() const {
     return flags.use_configurable_pool;
-  }
-
-  // Returns whether MTE is supported for this partition root. Because MTE
-  // stores tagging information in the high bits of the pointer, it causes
-  // issues with components like V8's ArrayBuffers which use custom pointer
-  // representations. All custom representations encountered so far rely on an
-  // "is in configurable pool?" check, so we use that as a proxy.
-  bool memory_tagging_enabled() const {
-#if PA_CONFIG(HAS_MEMORY_TAGGING)
-    return flags.memory_tagging_enabled_;
-#else
-    return false;
-#endif
   }
 
   // To make tests deterministic, it is necessary to uncap the amount of memory
@@ -1209,6 +1188,21 @@ PA_ALWAYS_INLINE void PartitionRoot<thread_safe>::FreeWithFlags(
   FreeNoHooks(object);
 }
 
+// Returns whether MTE is supported for this partition root. Because MTE stores
+// tagging information in the high bits of the pointer, it causes issues with
+// components like V8's ArrayBuffers which use custom pointer representations.
+// All custom representations encountered so far rely on an "is in configurable
+// pool?" check, so we use that as a proxy.
+template <bool thread_safe>
+PA_ALWAYS_INLINE bool PartitionRoot<thread_safe>::IsMemoryTaggingEnabled()
+    const {
+#if PA_CONFIG(HAS_MEMORY_TAGGING)
+  return !flags.use_configurable_pool;
+#else
+  return false;
+#endif
+}
+
 // static
 template <bool thread_safe>
 PA_ALWAYS_INLINE void PartitionRoot<thread_safe>::FreeNoHooks(void* object) {
@@ -1253,7 +1247,7 @@ PA_ALWAYS_INLINE void PartitionRoot<thread_safe>::FreeNoHooks(void* object) {
   PA_DCHECK(slot_span == SlotSpan::FromSlotStart(slot_start));
 
 #if PA_CONFIG(HAS_MEMORY_TAGGING)
-  if (PA_LIKELY(root->memory_tagging_enabled())) {
+  if (PA_LIKELY(root->IsMemoryTaggingEnabled())) {
     const size_t slot_size = slot_span->bucket->slot_size;
     if (PA_LIKELY(slot_size <= internal::kMaxMemoryTaggingSize)) {
       // slot_span is untagged at this point, so we have to recover its tag
@@ -1759,12 +1753,12 @@ PartitionRoot<thread_safe>::GetPageAccessibility() const {
   PageAccessibilityConfiguration::Permissions permissions =
       PageAccessibilityConfiguration::kReadWrite;
 #if PA_CONFIG(HAS_MEMORY_TAGGING)
-  if (memory_tagging_enabled()) {
+  if (IsMemoryTaggingEnabled()) {
     permissions = PageAccessibilityConfiguration::kReadWriteTagged;
   }
 #endif
-#if BUILDFLAG(ENABLE_PKEYS)
-  return PageAccessibilityConfiguration(permissions, flags.pkey);
+#if BUILDFLAG(ENABLE_THREAD_ISOLATION)
+  return PageAccessibilityConfiguration(permissions, flags.thread_isolation);
 #else
   return PageAccessibilityConfiguration(permissions);
 #endif
@@ -1772,10 +1766,10 @@ PartitionRoot<thread_safe>::GetPageAccessibility() const {
 
 template <bool thread_safe>
 PA_ALWAYS_INLINE PageAccessibilityConfiguration
-PartitionRoot<thread_safe>::PageAccessibilityWithPkeyIfEnabled(
+PartitionRoot<thread_safe>::PageAccessibilityWithThreadIsolationIfEnabled(
     PageAccessibilityConfiguration::Permissions permissions) const {
-#if BUILDFLAG(ENABLE_PKEYS)
-  return PageAccessibilityConfiguration(permissions, flags.pkey);
+#if BUILDFLAG(ENABLE_THREAD_ISOLATION)
+  return PageAccessibilityConfiguration(permissions, flags.thread_isolation);
 #endif
   return PageAccessibilityConfiguration(permissions);
 }

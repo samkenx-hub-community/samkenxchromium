@@ -591,6 +591,8 @@ void SellerWorklet::ReportResult(
     const absl::optional<GURL>& direct_from_seller_auction_signals,
     mojom::ComponentAuctionOtherSellerPtr browser_signals_other_seller,
     const url::Origin& browser_signal_interest_group_owner,
+    const absl::optional<std::string>&
+        browser_signal_buyer_and_seller_reporting_id,
     const GURL& browser_signal_render_url,
     double browser_signal_bid,
     const absl::optional<blink::AdCurrency>& browser_signal_bid_currency,
@@ -622,6 +624,8 @@ void SellerWorklet::ReportResult(
       std::move(browser_signals_other_seller);
   report_result_task->browser_signal_interest_group_owner =
       browser_signal_interest_group_owner;
+  report_result_task->browser_signal_buyer_and_seller_reporting_id =
+      browser_signal_buyer_and_seller_reporting_id;
   report_result_task->browser_signal_render_url = browser_signal_render_url;
   report_result_task->browser_signal_bid = browser_signal_bid;
   report_result_task->browser_signal_bid_currency =
@@ -1092,6 +1096,11 @@ void SellerWorklet::V8State::ScoreAd(
         }
         if (drop_for_invalid_currency) {
           score = 0;
+          // If scoreAd() didn't already specify a reject reason, note the
+          // currency mismatch.
+          if (reject_reason == mojom::RejectReason::kNotAvailable) {
+            reject_reason = mojom::RejectReason::kWrongScoreAdCurrency;
+          }
         }
       }
     }
@@ -1138,6 +1147,10 @@ void SellerWorklet::V8State::ScoreAd(
     return;
   }
 
+  // This bid got accepted by scoreAd(), so clear any reject reason it may have
+  // set.
+  reject_reason = mojom::RejectReason::kNotAvailable;
+
   // If this is a component auction that modified the bid, validate the bid. Do
   // this after checking the score to avoid validating modified bid values from
   // reporting errors when desirability is <= 0.
@@ -1158,7 +1171,6 @@ void SellerWorklet::V8State::ScoreAd(
     // This is a component auction that did not modify the bid; e.g. it's using
     // the bidder's bid as its own. Therefore, check it against our own
     // currency requirements.
-    // TODO(morlovich): One of the spots we want a new reject reason.
     if (!VerifySellerCurrency(
             /*provided_currency=*/bid_currency,
             /*expected_seller_currency=*/
@@ -1166,12 +1178,12 @@ void SellerWorklet::V8State::ScoreAd(
             /*component_expect_bid_currency=*/component_expect_bid_currency,
             decision_logic_url_, "bid passthrough", errors_out)) {
       score = 0;
+      reject_reason = mojom::RejectReason::kWrongScoreAdCurrency;
     }
   }
 
   PostScoreAdCallbackToUserThread(
-      std::move(callback), score,
-      /*reject_reason=*/mojom::RejectReason::kNotAvailable,
+      std::move(callback), score, reject_reason,
       std::move(component_auction_modified_bid_params), bid_in_seller_currency,
       scoring_signals_data_version,
       context_recycler.for_debugging_only_bindings()->TakeLossReportUrl(),
@@ -1190,6 +1202,8 @@ void SellerWorklet::V8State::ReportResult(
         direct_from_seller_result_auction_signals,
     mojom::ComponentAuctionOtherSellerPtr browser_signals_other_seller,
     const url::Origin& browser_signal_interest_group_owner,
+    const absl::optional<std::string>&
+        browser_signal_buyer_and_seller_reporting_id,
     const GURL& browser_signal_render_url,
     double browser_signal_bid,
     const absl::optional<blink::AdCurrency>& browser_signal_bid_currency,
@@ -1237,6 +1251,10 @@ void SellerWorklet::V8State::ReportResult(
       !browser_signals_dict.Set(
           "interestGroupOwner",
           browser_signal_interest_group_owner.Serialize()) ||
+      (browser_signal_buyer_and_seller_reporting_id.has_value() &&
+       !browser_signals_dict.Set(
+           "buyerAndSellerReportingId",
+           *browser_signal_buyer_and_seller_reporting_id)) ||
       !browser_signals_dict.Set("renderUrl",
                                 browser_signal_render_url.spec()) ||
       !browser_signals_dict.Set("bid", browser_signal_bid) ||
@@ -1770,6 +1788,7 @@ void SellerWorklet::RunReportResultIfReady(
           std::move(task->direct_from_seller_result_auction_signals),
           std::move(task->browser_signals_other_seller),
           std::move(task->browser_signal_interest_group_owner),
+          std::move(task->browser_signal_buyer_and_seller_reporting_id),
           std::move(task->browser_signal_render_url), task->browser_signal_bid,
           std::move(task->browser_signal_bid_currency),
           task->browser_signal_desirability,

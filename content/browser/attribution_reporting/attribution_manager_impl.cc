@@ -198,11 +198,11 @@ void RecordCreateReportStatus(CreateReportResult result) {
                                 result.event_level_status());
   static_assert(
       AttributionTrigger::AggregatableResult::kMaxValue ==
-          AttributionTrigger::AggregatableResult::kReportWindowPassed,
-      "Bump version of Conversions.AggregatableReport.CreateReportStatus3 "
+          AttributionTrigger::AggregatableResult::kExcessiveReports,
+      "Bump version of Conversions.AggregatableReport.CreateReportStatus4 "
       "histogram.");
   base::UmaHistogramEnumeration(
-      "Conversions.AggregatableReport.CreateReportStatus3",
+      "Conversions.AggregatableReport.CreateReportStatus4",
       result.aggregatable_status());
 }
 
@@ -577,12 +577,12 @@ void AttributionManagerImpl::HandleSource(
   }
 
   // TODO(csharrison): Consider enforcing this limit after checking metrics.
-  bool allowed_by_destination_window = throttler_.UpdateAndGetAllowed(
+  DestinationThrottler::Result throttle_result = throttler_.UpdateAndGetResult(
       source.registration().destination_set,
       net::SchemefulSite(source.common_info().source_origin()),
       net::SchemefulSite(source.common_info().reporting_origin()));
-  base::UmaHistogramBoolean("Conversions.SourceAllowedByDestinationWindowLimit",
-                            allowed_by_destination_window);
+  base::UmaHistogramEnumeration("Conversions.DestinationThrottlerResult",
+                                throttle_result);
 
   MaybeEnqueueEvent(std::move(source));
 }
@@ -922,14 +922,13 @@ void AttributionManagerImpl::OnClearDataComplete() {
 }
 
 void AttributionManagerImpl::GetAllDataKeys(
-    base::OnceCallback<void(std::vector<AttributionManager::DataKey>)>
-        callback) {
+    base::OnceCallback<void(std::set<DataKey>)> callback) {
   attribution_storage_.AsyncCall(&AttributionStorage::GetAllDataKeys)
       .Then(std::move(callback));
 }
 
 void AttributionManagerImpl::RemoveAttributionDataByDataKey(
-    const AttributionManager::DataKey& data_key,
+    const DataKey& data_key,
     base::OnceClosure callback) {
   attribution_storage_.AsyncCall(&AttributionStorage::DeleteByDataKey)
       .WithArgs(data_key)

@@ -1000,7 +1000,7 @@
           'isolate_profile_data',
           'nougat-x86-emulator',
           'emulator-4-cores',
-          'linux-bionic',
+          'linux-jammy',
           'x86-64',
         ],
         'additional_compile_targets': [
@@ -3960,16 +3960,6 @@
     'name': 'chromium.goma',
     'mixins': ['chromium-tester-service-account'],
     'machines': {
-      'Chromium Android ARM 32-bit Goma RBE ToT': {
-        'additional_compile_targets': [
-          'all',
-        ],
-      },
-      'Chromium Android ARM 32-bit Goma RBE ToT (ATS)': {
-        'additional_compile_targets': [
-          'all',
-        ],
-      },
       'Chromium Linux Goma RBE Staging': {
         'mixins': [
           'linux-bionic',
@@ -3981,29 +3971,7 @@
           'gtest_tests': 'goma_gtests',
         },
       },
-      'Chromium Linux Goma RBE Staging (clobber)': {
-        'mixins': [
-          'linux-bionic',
-        ],
-        'additional_compile_targets': [
-          'all',
-        ],
-        'test_suites': {
-          'gtest_tests': 'goma_gtests',
-        },
-      },
       'Chromium Linux Goma RBE Staging (dbg)': {
-        'mixins': [
-          'linux-bionic',
-        ],
-        'additional_compile_targets': [
-          'all',
-        ],
-        'test_suites': {
-          'gtest_tests': 'goma_gtests',
-        },
-      },
-      'Chromium Linux Goma RBE Staging (dbg) (clobber)': {
         'mixins': [
           'linux-bionic',
         ],
@@ -4027,17 +3995,6 @@
           'gtest_tests': 'goma_gtests',
         },
       },
-      'Chromium Mac Goma RBE Staging (clobber)': {
-        'mixins': [
-          'mac_x64',
-        ],
-        'additional_compile_targets': [
-          'chrome',
-        ],
-        'test_suites': {
-          'gtest_tests': 'goma_gtests',
-        },
-      },
       'Chromium Mac Goma RBE Staging (dbg)': {
         'mixins': [
           'mac_x64',
@@ -4049,32 +4006,11 @@
           'gtest_tests': 'goma_gtests',
         },
       },
-      'Chromium Mac Goma RBE ToT': {
-        'mixins': [
-          'mac_x64',
-        ],
-        'additional_compile_targets': [
-          'chrome',
-        ],
-        'test_suites': {
-          'gtest_tests': 'goma_gtests',
-        },
-      },
-      'Chromium iOS Goma RBE ToT': {
-        'additional_compile_targets': [
-          'all',
-        ],
-      },
       # ChromeOS (simple chrome) builders.
       # Note:
       # chromeos-amd64-generic-rel-goma-* builders mirror targets of
       # chromeos-amd64-generic-rel.
       'chromeos-amd64-generic-rel-goma-rbe-staging': {
-        'additional_compile_targets': [
-          'chromiumos_preflight',
-        ],
-      },
-      'chromeos-amd64-generic-rel-goma-rbe-tot': {
         'additional_compile_targets': [
           'chromiumos_preflight',
         ],
@@ -4086,14 +4022,6 @@
     'mixins': ['chromium-tester-service-account'],
     'machines': {
       'Mac Builder (dbg) Goma RBE Canary (clobber)': {
-        'additional_compile_targets': [
-          'all',
-        ],
-        'test_suites': {
-          'gtest_tests': 'goma_mac_gtests',
-        },
-      },
-      'Mac Builder (dbg) Goma RBE Latest Client (clobber)': {
         'additional_compile_targets': [
           'all',
         ],
@@ -4122,17 +4050,7 @@
           'chromedriver_webview_shell_apk',
         ],
       },
-      'android-archive-dbg-goma-rbe-ats-latest': {
-        'additional_compile_targets': [
-          'chromedriver_webview_shell_apk',
-        ],
-      },
       'android-archive-dbg-goma-rbe-canary': {
-        'additional_compile_targets': [
-          'chromedriver_webview_shell_apk',
-        ],
-      },
-      'android-archive-dbg-goma-rbe-latest': {
         'additional_compile_targets': [
           'chromedriver_webview_shell_apk',
         ],
@@ -4145,33 +4063,12 @@
           'chromiumos_preflight',
         ],
       },
-      'chromeos-amd64-generic-rel-goma-rbe-latest': {
-        'additional_compile_targets': [
-          'chromiumos_preflight',
-        ],
-      },
       'ios-device-goma-rbe-canary-clobber': {
         'additional_compile_targets': [
           'all',
         ]
       },
-      'ios-device-goma-rbe-latest-clobber': {
-        'additional_compile_targets': [
-          'all',
-        ]
-      },
       'linux-archive-rel-goma-rbe-ats-canary': {
-        'additional_compile_targets': [
-          'all',
-        ],
-        'mixins': [
-          'linux-bionic',
-        ],
-        'test_suites': {
-          'gtest_tests': 'goma_gtests',
-        },
-      },
-      'linux-archive-rel-goma-rbe-ats-latest': {
         'additional_compile_targets': [
           'all',
         ],
@@ -4193,28 +4090,7 @@
           'gtest_tests': 'goma_gtests',
         },
       },
-      'linux-archive-rel-goma-rbe-latest': {
-        'additional_compile_targets': [
-          'all',
-        ],
-        'mixins': [
-          'linux-bionic',
-        ],
-        'test_suites': {
-          'gtest_tests': 'goma_gtests',
-        },
-      },
       'mac-archive-rel-goma-rbe-canary': {
-        'additional_compile_targets': [
-          # Due to disk shortage, we build 'chrome' instead of 'all'.
-          # See crbug.com/899425
-          'chrome',
-        ],
-        'test_suites': {
-          'gtest_tests': 'goma_mac_gtests',
-        },
-      },
-      'mac-archive-rel-goma-rbe-latest': {
         'additional_compile_targets': [
           # Due to disk shortage, we build 'chrome' instead of 'all'.
           # See crbug.com/899425
@@ -4762,6 +4638,17 @@
           'gpu_telemetry_tests': 'gpu_fyi_mac_release_telemetry_tests',
         },
       },
+      'Mac FYI Retina Release (Apple M2)': {
+        'os_type': 'mac',
+        'browser_config': 'release',
+        'mixins': [
+          'mac_arm64_apple_m2_retina_gpu_stable',
+        ],
+        'test_suites': {
+          'gtest_tests': 'gpu_fyi_mac_release_gtests',
+          'gpu_telemetry_tests': 'gpu_fyi_mac_release_telemetry_tests',
+        },
+      },
       'Mac FYI Retina Release (NVIDIA)': {
         'os_type': 'mac',
         'browser_config': 'release',
@@ -4931,7 +4818,7 @@
       },
       'Cast Linux': {
         'mixins': [
-          'linux-bionic',
+          'linux-jammy',
         ],
         'additional_compile_targets': [
           'cast_shell',
@@ -5300,7 +5187,7 @@
       },
       'Linux TSan Tests': {
         'mixins': [
-          'linux-bionic',
+          'linux-jammy',
         ],
         'test_suites': {
           'gtest_tests': 'chromium_linux_and_gl_and_vulkan_gtests',
@@ -6644,6 +6531,7 @@
         'test_suites': {
           'isolated_scripts': 'android_finch_smoke_tests',
         },
+        'os_type': 'android',
       },
       'chromeos-arm-generic-cfi-thin-lto-chrome-reclient': {
         'additional_compile_targets': [
@@ -6674,6 +6562,7 @@
         'test_suites': {
           'isolated_scripts': 'chrome_finch_smoke_tests',
         },
+        'os_type': 'linux',
       },
       'mac-arm64-finch-smoke-chrome': {
         'mixins': [
@@ -6683,6 +6572,7 @@
         'test_suites': {
           'isolated_scripts': 'chrome_finch_smoke_tests',
         },
+        'os_type': 'mac',
       },
       'mac-chrome-reclient': {
         'additional_compile_targets': [
@@ -6732,6 +6622,7 @@
         'test_suites': {
           'isolated_scripts': 'chrome_finch_smoke_tests',
         },
+        'os_type': 'win',
       },
     },
   },
@@ -6762,7 +6653,9 @@
         ],
         'test_suites': {
           'gtest_tests': 'chromeos_browser_finch_tests',
+          'isolated_scripts': 'chrome_finch_smoke_tests',
         },
+        'os_type': 'chromeos',
       },
       'chromeos-brya-chrome-skylab-fyi': {
         'additional_compile_targets': [

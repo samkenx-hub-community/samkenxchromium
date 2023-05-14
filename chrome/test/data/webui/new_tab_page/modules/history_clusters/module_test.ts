@@ -55,6 +55,7 @@ function createSampleCluster(
         id: BigInt(111),
         visits: createLayoutSuitableSampleVisits(layout),
         label: '',
+        tabGroupName: 'My Tab Group Name',
         labelMatchPositions: [],
         relatedSearches: createRelatedSearches(numRelatedSearches),
         imageUrl: undefined,
@@ -206,11 +207,13 @@ suite('NewTabPageModulesHistoryClustersModuleTest', () => {
               openAllButton.innerText.trim());
           openAllButton.click();
 
-          const urls = await handler.whenCalled('openUrlsInTabGroup');
+          const [urls, tabGroupName] =
+              await handler.whenCalled('openUrlsInTabGroup');
           assertEquals(3, urls.length);
           assertEquals(`${GOOGLE_SEARCH_BASE_URL}?q=foo`, urls[0].url);
           assertEquals('https://www.foo.com/1', urls[1].url);
           assertEquals('https://www.foo.com/2', urls[2].url);
+          assertEquals('My Tab Group Name', tabGroupName);
         });
 
     test('Backend is notified when module is dismissed', async () => {
@@ -499,6 +502,40 @@ suite('NewTabPageModulesHistoryClustersModuleTest', () => {
       assertTrue(!!cartTile);
       assertTrue(!!moduleElement.cart);
       assertEquals(1, questTiles.length);
+    });
+
+    test('Cart tile clicking metrics are collected', async () => {
+      loadTimeData.overrideValues({
+        modulesChromeCartInHistoryClustersModuleEnabled: true,
+      });
+
+      const cart: Cart = Object.assign({
+        domain: 'foo.com',
+        merchant: 'Foo',
+        cartUrl: {url: 'https://foo.com'},
+        productImageUrls: [],
+        discountText: '',
+        relativeDate: '6 mins ago',
+      });
+      const moduleElement = await initializeModule(
+          [createSampleCluster(HistoryClusterLayoutType.LAYOUT_1)], cart);
+
+      assertEquals(1, handler.getCallCount('getCartForCluster'));
+      assertTrue(!!moduleElement);
+      await waitAfterNextRender(moduleElement);
+      const cartTile = moduleElement.shadowRoot!.getElementById('cartTile');
+      assertTrue(!!cartTile);
+      assertTrue(!!moduleElement.cart);
+
+      // Act.
+      cartTile.click();
+
+      // Assert.
+      assertEquals(
+          1,
+          metrics.count(
+              `NewTabPage.HistoryClusters.Layout1.Click`,
+              HistoryClusterElementType.CART));
     });
   });
 });
