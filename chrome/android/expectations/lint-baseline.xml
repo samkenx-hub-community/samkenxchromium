@@ -91,28 +91,6 @@
 
     <issue
         id="NewApi"
-        message="Call requires API level 26 (current min is 24): `shouldQueryAutofillSuggestion`"
-        errorLine1="        if (mAutofillMenuItemTitle != 0 &amp;&amp; mAutofillProvider.shouldQueryAutofillSuggestion()) {"
-        errorLine2="                                                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="../../components/android_autofill/browser/java/src/org/chromium/components/autofill/AutofillActionModeCallback.java"
-            line="43"
-            column="62"/>
-    </issue>
-
-    <issue
-        id="NewApi"
-        message="Call requires API level 26 (current min is 24): `queryAutofillSuggestion`"
-        errorLine1="            mAutofillProvider.queryAutofillSuggestion();"
-        errorLine2="                              ~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="../../components/android_autofill/browser/java/src/org/chromium/components/autofill/AutofillActionModeCallback.java"
-            line="55"
-            column="31"/>
-    </issue>
-
-    <issue
-        id="NewApi"
         message="Call requires API level 26 (current min is 24): `deleteLegacyChannels`"
         errorLine1="            mChannelsInitializer.deleteLegacyChannels();"
         errorLine2="                                 ~~~~~~~~~~~~~~~~~~~~">
@@ -7088,17 +7066,6 @@
             file="../../chrome/android/java/src/org/chromium/chrome/browser/password_manager/settings/PasswordSettings.java"
             line="658"
             column="16"/>
-    </issue>
-
-    <issue
-        id="AssertionSideEffect"
-        message="Assertion condition has a side effect: sValuesReturned.boolValues.put(preferenceName, flag)"
-        errorLine1="            assert ChromeFeatureList.sInstantStart.isEnabled();"
-        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="../../chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/pseudotab/PseudoTab.java"
-            line="300"
-            column="20"/>
     </issue>
 
     <issue

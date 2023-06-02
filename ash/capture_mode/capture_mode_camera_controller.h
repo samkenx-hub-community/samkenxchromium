@@ -223,7 +223,7 @@ class ASH_EXPORT CaptureModeCameraController
   // http://b/230917107#comment12 for more details).
   void OnCaptureSessionStarted();
 
-  void OnRecordingStarted(CaptureModeBehavior* active_behavior);
+  void OnRecordingStarted(const CaptureModeBehavior* active_behavior);
   void OnRecordingEnded();
 
   // Called when the `CameraVideoFrameHandler` of the current
@@ -253,6 +253,7 @@ class ASH_EXPORT CaptureModeCameraController
   // SystemTrayObserver:
   void OnSystemTrayBubbleShown() override;
   void OnFocusLeavingSystemTray(bool reverse) override {}
+  void OnStatusAreaAnchoredBubbleShown() override;
 
   void SetOnCameraListReceivedForTesting(base::OnceClosure callback) {
     on_camera_list_received_for_test_ = std::move(callback);

@@ -5,6 +5,7 @@
 package org.chromium.chrome.browser.omnibox.suggestions;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.res.Resources;
 import android.os.Handler;
 import android.os.SystemClock;
@@ -26,10 +27,13 @@ import org.chromium.base.metrics.RecordUserAction;
 import org.chromium.base.supplier.Supplier;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.omnibox.LocationBarDataProvider;
+import org.chromium.chrome.browser.omnibox.OmniboxMetrics;
+import org.chromium.chrome.browser.omnibox.OmniboxMetrics.RefineActionUsage;
 import org.chromium.chrome.browser.omnibox.R;
 import org.chromium.chrome.browser.omnibox.UrlBarEditingTextStateProvider;
 import org.chromium.chrome.browser.omnibox.styles.OmniboxResourceProvider;
 import org.chromium.chrome.browser.omnibox.suggestions.AutocompleteController.OnSuggestionsReceivedListener;
+import org.chromium.chrome.browser.omnibox.suggestions.action.OmniboxActionFactoryImpl;
 import org.chromium.chrome.browser.omnibox.suggestions.base.HistoryClustersProcessor.OpenHistoryClustersDelegate;
 import org.chromium.chrome.browser.omnibox.suggestions.basic.BasicSuggestionProcessor.BookmarkState;
 import org.chromium.chrome.browser.omnibox.voice.VoiceRecognitionHandler;
@@ -44,9 +48,8 @@ import org.chromium.chrome.browser.ui.theme.BrandedColorScheme;
 import org.chromium.components.metrics.OmniboxEventProtos.OmniboxEventProto.PageClassification;
 import org.chromium.components.omnibox.AutocompleteMatch;
 import org.chromium.components.omnibox.AutocompleteResult;
-import org.chromium.components.omnibox.OmniboxMetrics;
-import org.chromium.components.omnibox.OmniboxMetrics.RefineActionUsage;
 import org.chromium.components.omnibox.OmniboxSuggestionType;
+import org.chromium.components.omnibox.action.OmniboxAction;
 import org.chromium.components.omnibox.action.OmniboxActionDelegate;
 import org.chromium.content_public.browser.WebContents;
 import org.chromium.ui.base.PageTransition;
@@ -90,6 +93,7 @@ class AutocompleteMediator implements OnSuggestionsReceivedListener,
     private final @NonNull Callback<Tab> mBringTabToFrontCallback;
     private final @NonNull Supplier<TabWindowManager> mTabWindowManagerSupplier;
     private final @NonNull Runnable mClearFocusCallback;
+    private final @NonNull OmniboxActionDelegate mOmniboxActionDelegate;
 
     private @NonNull AutocompleteResult mAutocompleteResult = AutocompleteResult.EMPTY_RESULT;
     private @Nullable Runnable mCurrentAutocompleteRequest;
@@ -170,13 +174,19 @@ class AutocompleteMediator implements OnSuggestionsReceivedListener,
         mBringTabToFrontCallback = bringTabToFrontCallback;
         mTabWindowManagerSupplier = tabWindowManagerSupplier;
         mSuggestionModels = mListPropertyModel.get(SuggestionListProperties.SUGGESTION_MODELS);
-        mDropdownViewInfoListBuilder = new DropdownItemViewInfoListBuilder(activityTabSupplier,
-                bookmarkState, omniboxActionDelegate, openHistoryClustersDelegate);
+        mOmniboxActionDelegate = omniboxActionDelegate;
+        mDropdownViewInfoListBuilder = new DropdownItemViewInfoListBuilder(
+                activityTabSupplier, bookmarkState, openHistoryClustersDelegate);
         mDropdownViewInfoListBuilder.setShareDelegateSupplier(shareDelegateSupplier);
         mDropdownViewInfoListManager =
                 new DropdownItemViewInfoListManager(mSuggestionModels, context);
         mClearFocusCallback = this::finishInteraction;
         OmniboxResourceProvider.invalidateDrawableCache();
+
+        var pm = context.getPackageManager();
+        var dialIntent = new Intent(Intent.ACTION_DIAL);
+        OmniboxActionFactoryImpl.get().setDialerAvailable(
+                !pm.queryIntentActivities(dialIntent, 0).isEmpty());
     }
 
     /**
@@ -199,6 +209,9 @@ class AutocompleteMediator implements OnSuggestionsReceivedListener,
         if (mAutocomplete != null) {
             stopAutocomplete(false);
             mAutocomplete.removeOnSuggestionsReceivedListener(this);
+        }
+        if (mNativeInitialized) {
+            OmniboxActionFactoryImpl.get().destroyNativeFactory();
         }
         mHandler.removeCallbacks(mClearFocusCallback);
         mDropdownViewInfoListBuilder.destroy();
@@ -279,6 +292,7 @@ class AutocompleteMediator implements OnSuggestionsReceivedListener,
      */
     void onNativeInitialized() {
         mNativeInitialized = true;
+        OmniboxActionFactoryImpl.get().initNativeFactory();
         // TODO(b/277805322): remove this Feature and parameter once we've run a holdback
         // experiment.
         mClearFocusAfterNavigation =
@@ -412,6 +426,12 @@ class AutocompleteMediator implements OnSuggestionsReceivedListener,
         }
 
         loadUrlForOmniboxMatch(matchIndex, suggestion, url, mLastActionUpTimestamp, true);
+    }
+
+    @Override
+    public void onOmniboxActionClicked(@NonNull OmniboxAction action) {
+        action.execute(mOmniboxActionDelegate);
+        finishInteraction();
     }
 
     /**

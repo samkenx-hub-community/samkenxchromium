@@ -32,6 +32,7 @@ Es posible que algunas funciones no estén disponibles y que no se guarden los c
  con la vinculación. <ph name="IDS_BLUETOOTH_DEVICE_CHOOSER_AUTHORIZE_BLUETOOTH_LINK" /></translation>
 <translation id="1547295885616600893">ChromeOS se ha creado gracias a <ph name="BEGIN_LINK_CROS_OSS" />software libre<ph name="END_LINK_CROS_OSS" /> adicional.</translation>
 <translation id="1553358976309200471">Actualizar Chrome</translation>
+<translation id="1555506416658437797">editar los métodos de pago.</translation>
 <translation id="1583073672411044740"><ph name="EXISTING_USER" /> ya ha iniciado sesión en este perfil de Chrome. Se creará un perfil nuevo de Chrome para <ph name="USER_EMAIL_ADDRESS" />.</translation>
 <translation id="1587223624401073077">Google Chrome está utilizando la cámara.</translation>
 <translation id="1587325591171447154"><ph name="FILE_NAME" /> es peligroso, por lo que Chrome lo ha bloqueado.</translation>
@@ -83,6 +84,7 @@ Es posible que algunas funciones no estén disponibles y que no se guarden los c
 <translation id="234869673307233423">Chrome no puede comprobar tus contraseñas. Vuelve a intentarlo más tarde.</translation>
 <translation id="235650106824528204">El administrador del perfil de trabajo puede quitar cualquier dato de Chrome generado durante el uso de este perfil, como los marcadores, el historial, las contraseñas y otros ajustes. <ph name="LEARN_MORE" /></translation>
 <translation id="2359808026110333948">Continuar</translation>
+<translation id="2399868464369312507">Google Chrome está intentando editar los métodos de pago.</translation>
 <translation id="2401189691232800402">Sistema ChromeOS</translation>
 <translation id="2467438592969358367">Google Chrome quiere exportar tus contraseñas. Escribe tu contraseña de Windows para permitirlo.</translation>
 <translation id="2485422356828889247">Desinstalar</translation>
@@ -259,6 +261,7 @@ Google Chrome no puede recuperar tu configuración.</translation>
 <translation id="5756509061973259733">Ya existe un perfil de Chrome con esa cuenta en este dispositivo.</translation>
 <translation id="5795887333006832406"><ph name="PAGE_TITLE" /> ‑ Google Chrome Canary</translation>
 <translation id="5804318322022881572">No se ha podido iniciar Chrome. Inténtalo de nuevo.</translation>
+<translation id="585620188971323280">modificar la configuración para completar los métodos de pago.</translation>
 <translation id="5895138241574237353">Reiniciar</translation>
 <translation id="5903106910045431592"><ph name="PAGE_TITLE" />, inicio de sesión en la red</translation>
 <translation id="5924017743176219022">Conectando a Internet...</translation>
@@ -391,11 +394,13 @@ Los permisos que hayas dado a sitios web y aplicaciones se pueden aplicar a esta
 <translation id="8418845734693287262">ChromeOS no ha podido sincronizar tus datos porque la información de inicio de sesión de tu cuenta está obsoleta.</translation>
 <translation id="8433638294851456451">Para enviar un número desde aquí a tu teléfono Android, inicia sesión en Chrome con ambos dispositivos.</translation>
 <translation id="8451192282033883849"><ph name="MANAGER_NAME" /> gestiona tu cuenta. Tu administrador puede ver y editar este perfil del navegador Chrome y sus datos, como los marcadores, el historial o las contraseñas.</translation>
+<translation id="8496177819998570653">&amp;Gestor de contraseñas de Google</translation>
 <translation id="8498858610309223613">Se acaba de instalar una actualización de seguridad especial para Google Chrome. Reinicia ahora y restauraremos las pestañas.</translation>
 <translation id="8504220326736535258">Chrome ha bloqueado este archivo porque contiene malware.</translation>
 <translation id="8516431725144212809">Tus intereses estimados por Chrome</translation>
 <translation id="8521348052903287641">Regla entrante para que Google Chrome Dev permita tráfico mDNS.</translation>
 <translation id="8540666473246803645">Google Chrome</translation>
+<translation id="8544217240017914508">Google Chrome está intentando modificar la configuración para completar los métodos de pago.</translation>
 <translation id="8550334526674375523">Este perfil de trabajo es completamente independiente de tu perfil personal.</translation>
 <translation id="8556340503434111824">Hay una nueva versión de Google Chrome disponible que funciona a una velocidad sin precedentes.</translation>
 <translation id="8571790202382503603">Los perfiles de Chrome te permiten organizar todos tus elementos de Chrome. Esto permite separar el trabajo del entretenimiento con más facilidad.</translation>

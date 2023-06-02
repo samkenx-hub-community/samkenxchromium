@@ -95,15 +95,9 @@ class NetworkFeaturePodControllerTest
       public testing::WithParamInterface<bool> {
  public:
   void SetUp() override {
-    std::vector<base::test::FeatureRef> features = {
-        features::kQsRevamp, chromeos::features::kJellyroll};
-    if (IsQsRevampEnabled()) {
-      feature_list_.InitWithFeatures(/*enabled_features=*/features,
-                                     /*disabled_features=*/{});
-    } else {
-      feature_list_.InitWithFeatures(/*enabled_features=*/{},
-                                     /*disabled_features=*/features);
-    }
+    feature_list_.InitWithFeatureStates(
+        {{features::kQsRevamp, IsQsRevampEnabled()},
+         {chromeos::features::kJellyroll, IsQsRevampEnabled()}});
 
     AshTestBase::SetUp();
 
@@ -245,20 +239,21 @@ class NetworkFeaturePodControllerTest
 
   bool IsDetailedViewEmpty() {
     if (IsQsRevampEnabled()) {
-      return quick_settings_view()->detailed_view()->children().empty();
+      auto* container = quick_settings_view()->detailed_view_container();
+      return container->children().empty();
     } else {
-      return unified_view()->detailed_view()->children().empty();
+      return unified_view()->detailed_view_container()->children().empty();
     }
   }
 
   void CheckNetworkDetailedViewFocused() {
     views::View::Views children;
     if (IsQsRevampEnabled()) {
-      EXPECT_TRUE(quick_settings_view()->detailed_view());
-      children = quick_settings_view()->detailed_view()->children();
+      EXPECT_TRUE(quick_settings_view()->detailed_view_container());
+      children = quick_settings_view()->detailed_view_container()->children();
     } else {
-      EXPECT_TRUE(unified_view()->detailed_view());
-      children = unified_view()->detailed_view()->children();
+      EXPECT_TRUE(unified_view()->detailed_view_container());
+      children = unified_view()->detailed_view_container()->children();
     }
     ASSERT_EQ(1u, children.size());
     EXPECT_STREQ("NetworkDetailedNetworkViewImpl",

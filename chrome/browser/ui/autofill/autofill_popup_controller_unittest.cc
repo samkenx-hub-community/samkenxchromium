@@ -110,7 +110,8 @@ class MockAutofillExternalDelegate : public AutofillExternalDelegate {
                            Suggestion::FrontendId frontend_id,
                            const Suggestion::BackendId& backend_id) override {}
   bool RemoveSuggestion(const std::u16string& value,
-                        Suggestion::FrontendId frontend_id) override {
+                        Suggestion::FrontendId frontend_id,
+                        Suggestion::BackendId backend_id) override {
     return true;
   }
   base::WeakPtr<AutofillExternalDelegate> GetWeakPtr() {
@@ -288,13 +289,14 @@ class AutofillPopupControllerUnitTest : public ChromeRenderViewHostTestHarness {
   test::AutofillUnitTestEnvironment autofill_test_environment_;
   std::unique_ptr<NiceMock<MockAutofillExternalDelegate>> external_delegate_;
   std::unique_ptr<NiceMock<MockAutofillPopupView>> autofill_popup_view_;
-  raw_ptr<NiceMock<TestAutofillPopupController>> autofill_popup_controller_ =
-      nullptr;
+  raw_ptr<NiceMock<TestAutofillPopupController>, DanglingUntriaged>
+      autofill_popup_controller_ = nullptr;
 };
 
 TEST_F(AutofillPopupControllerUnitTest, RemoveSuggestion) {
-  ShowSuggestions({Suggestion::FrontendId(1), Suggestion::FrontendId(1),
-                   POPUP_ITEM_ID_AUTOFILL_OPTIONS});
+  ShowSuggestions({Suggestion::FrontendId(PopupItemId::kAddressEntry),
+                   Suggestion::FrontendId(PopupItemId::kAddressEntry),
+                   PopupItemId::kAutofillOptions});
 
   // Generate a popup, so it can be hidden later. It doesn't matter what the
   // external_delegate thinks is being shown in the process, since we are just
@@ -314,7 +316,7 @@ TEST_F(AutofillPopupControllerUnitTest, RemoveSuggestion) {
 }
 
 TEST_F(AutofillPopupControllerUnitTest, UpdateDataListValues) {
-  ShowSuggestions({Suggestion::FrontendId(1)});
+  ShowSuggestions({Suggestion::FrontendId(PopupItemId::kAddressEntry)});
 
   // Add one data list entry.
   std::u16string value1 = u"data list value 1";
@@ -334,19 +336,19 @@ TEST_F(AutofillPopupControllerUnitTest, UpdateDataListValues) {
   EXPECT_EQ(label1, result0.labels[0][0].value);
   EXPECT_EQ(std::u16string(), result0.additional_label);
   EXPECT_EQ(label1, popup_controller().GetSuggestionLabelsAt(0)[0][0].value);
-  EXPECT_EQ(POPUP_ITEM_ID_DATALIST_ENTRY, result0.frontend_id);
+  EXPECT_EQ(PopupItemId::kDatalistEntry, result0.frontend_id);
 
   Suggestion result1 = popup_controller().GetSuggestionAt(1);
   EXPECT_EQ(std::u16string(), result1.main_text.value);
   EXPECT_TRUE(result1.labels.empty());
   EXPECT_EQ(std::u16string(), result1.additional_label);
-  EXPECT_EQ(POPUP_ITEM_ID_SEPARATOR, result1.frontend_id);
+  EXPECT_EQ(PopupItemId::kSeparator, result1.frontend_id);
 
   Suggestion result2 = popup_controller().GetSuggestionAt(2);
   EXPECT_EQ(std::u16string(), result2.main_text.value);
   EXPECT_TRUE(result2.labels.empty());
   EXPECT_EQ(std::u16string(), result2.additional_label);
-  EXPECT_EQ(1, result2.frontend_id.as_int());
+  EXPECT_EQ(PopupItemId::kAddressEntry, result2.frontend_id.as_popup_item_id());
 
   // Add two data list entries (which should replace the current one).
   std::u16string value2 = u"data list value 2";
@@ -372,7 +374,7 @@ TEST_F(AutofillPopupControllerUnitTest, UpdateDataListValues) {
   EXPECT_EQ(label2, popup_controller().GetSuggestionAt(1).labels[0][0].value);
   EXPECT_EQ(std::u16string(),
             popup_controller().GetSuggestionAt(1).additional_label);
-  EXPECT_EQ(POPUP_ITEM_ID_SEPARATOR,
+  EXPECT_EQ(PopupItemId::kSeparator,
             popup_controller().GetSuggestionAt(2).frontend_id);
 
   // Clear all data list values.
@@ -380,12 +382,14 @@ TEST_F(AutofillPopupControllerUnitTest, UpdateDataListValues) {
   popup_controller().UpdateDataListValues(data_list_values, data_list_labels);
 
   ASSERT_EQ(1, popup_controller().GetLineCount());
-  EXPECT_EQ(1, popup_controller().GetSuggestionAt(0).frontend_id.as_int());
+  EXPECT_EQ(
+      PopupItemId::kAddressEntry,
+      popup_controller().GetSuggestionAt(0).frontend_id.as_popup_item_id());
 }
 
 TEST_F(AutofillPopupControllerUnitTest, PopupsWithOnlyDataLists) {
   // Create the popup with a single datalist element.
-  ShowSuggestions({POPUP_ITEM_ID_DATALIST_ENTRY});
+  ShowSuggestions({PopupItemId::kDatalistEntry});
 
   // Replace the datalist element with a new one.
   std::u16string value1 = u"data list value 1";
@@ -402,7 +406,7 @@ TEST_F(AutofillPopupControllerUnitTest, PopupsWithOnlyDataLists) {
   EXPECT_EQ(label1, popup_controller().GetSuggestionAt(0).labels[0][0].value);
   EXPECT_EQ(std::u16string(),
             popup_controller().GetSuggestionAt(0).additional_label);
-  EXPECT_EQ(POPUP_ITEM_ID_DATALIST_ENTRY,
+  EXPECT_EQ(PopupItemId::kDatalistEntry,
             popup_controller().GetSuggestionAt(0).frontend_id);
 
   // Clear datalist values and check that the popup becomes hidden.
@@ -468,7 +472,7 @@ TEST_F(AutofillPopupControllerUnitTest, GetOrCreate) {
 
 TEST_F(AutofillPopupControllerUnitTest, ProperlyResetController) {
   ShowSuggestions(
-      {POPUP_ITEM_ID_AUTOCOMPLETE_ENTRY, POPUP_ITEM_ID_AUTOCOMPLETE_ENTRY});
+      {PopupItemId::kAutocompleteEntry, PopupItemId::kAutocompleteEntry});
 
   // Now show a new popup with the same controller, but with fewer items.
   WeakPtr<AutofillPopupControllerImpl> controller =
@@ -525,7 +529,7 @@ TEST_F(AutofillPopupControllerUnitTest, ShouldReportHidingPopupReason) {
 // This is a regression test for crbug.com/521133 to ensure that we don't crash
 // when suggestions updates race with user selections.
 TEST_F(AutofillPopupControllerUnitTest, SelectInvalidSuggestion) {
-  ShowSuggestions({Suggestion::FrontendId(1)});
+  ShowSuggestions({Suggestion::FrontendId(PopupItemId::kAddressEntry)});
 
   EXPECT_CALL(*delegate(), DidAcceptSuggestion).Times(0);
 
@@ -534,7 +538,7 @@ TEST_F(AutofillPopupControllerUnitTest, SelectInvalidSuggestion) {
 }
 
 TEST_F(AutofillPopupControllerUnitTest, AcceptSuggestionRespectsTimeout) {
-  ShowSuggestions({Suggestion::FrontendId(1)});
+  ShowSuggestions({Suggestion::FrontendId(PopupItemId::kAddressEntry)});
 
   // Calls before the threshold are ignored.
   EXPECT_CALL(*delegate(), DidAcceptSuggestion).Times(0);
@@ -548,7 +552,7 @@ TEST_F(AutofillPopupControllerUnitTest, AcceptSuggestionRespectsTimeout) {
 }
 
 TEST_F(AutofillPopupControllerUnitTest, AcceptSuggestionWithoutThreshold) {
-  ShowSuggestions({Suggestion::FrontendId(1)});
+  ShowSuggestions({Suggestion::FrontendId(PopupItemId::kAddressEntry)});
 
   // Calls are accepted immediately.
   EXPECT_CALL(*delegate(), DidAcceptSuggestion).Times(1);
@@ -557,7 +561,7 @@ TEST_F(AutofillPopupControllerUnitTest, AcceptSuggestionWithoutThreshold) {
 
 TEST_F(AutofillPopupControllerUnitTest,
        AcceptSuggestionTimeoutIsUpdatedOnPopupMove) {
-  ShowSuggestions({Suggestion::FrontendId(1)});
+  ShowSuggestions({Suggestion::FrontendId(PopupItemId::kAddressEntry)});
 
   // Calls before the threshold are ignored.
   EXPECT_CALL(*delegate(), DidAcceptSuggestion).Times(0);
@@ -568,7 +572,7 @@ TEST_F(AutofillPopupControllerUnitTest,
   task_environment()->FastForwardBy(base::Milliseconds(400));
   // Show the suggestions again (simulating, e.g., a click somewhere slightly
   // different).
-  ShowSuggestions({Suggestion::FrontendId(1)});
+  ShowSuggestions({Suggestion::FrontendId(PopupItemId::kAddressEntry)});
 
   EXPECT_CALL(*delegate(), DidAcceptSuggestion).Times(0);
   popup_controller().AcceptSuggestion(0);
@@ -675,7 +679,7 @@ class AutofillPopupControllerAccessibilityUnitTest
 // Test for successfully firing controls changed event for popup show/hide.
 TEST_F(AutofillPopupControllerAccessibilityUnitTest,
        FireControlsChangedEventDuringShowAndHide) {
-  ShowSuggestions({Suggestion::FrontendId(1)});
+  ShowSuggestions({Suggestion::FrontendId(PopupItemId::kAddressEntry)});
   // Manually fire the event for popup show since setting the test view results
   // in the fire controls changed event not being sent.
   popup_controller().FireControlsChangedEvent(true);
@@ -693,7 +697,7 @@ TEST_F(AutofillPopupControllerAccessibilityUnitTest,
   EXPECT_CALL(mock_ax_platform_node_delegate_, GetFromTreeIDAndNodeID)
       .WillOnce(Return(nullptr));
 
-  ShowSuggestions({Suggestion::FrontendId(1)});
+  ShowSuggestions({Suggestion::FrontendId(PopupItemId::kAddressEntry)});
   // Manually fire the event for popup show since setting the test view results
   // in the fire controls changed event not being sent.
   popup_controller().FireControlsChangedEvent(true);
@@ -708,7 +712,7 @@ TEST_F(AutofillPopupControllerAccessibilityUnitTest,
   EXPECT_CALL(*autofill_popup_view_, GetAxUniqueId)
       .WillOnce(testing::Return(absl::nullopt));
 
-  ShowSuggestions({Suggestion::FrontendId(1)});
+  ShowSuggestions({Suggestion::FrontendId(PopupItemId::kAddressEntry)});
   // Manually fire the event for popup show since setting the test view results
   // in the fire controls changed event not being sent.
   popup_controller().FireControlsChangedEvent(true);

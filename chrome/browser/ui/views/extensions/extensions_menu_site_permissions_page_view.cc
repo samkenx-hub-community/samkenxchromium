@@ -207,13 +207,7 @@ ExtensionsMenuSitePermissionsPageView::ExtensionsMenuSitePermissionsPageView(
                           views::Builder<views::ImageView>().CopyAddressTo(
                               &extension_icon_),
                           views::Builder<views::Label>().CopyAddressTo(
-                              &extension_name_)),
-                  // Close button.
-                  views::Builder<views::Button>(
-                      views::BubbleFrameView::CreateCloseButton(
-                          base::BindRepeating(
-                              &ExtensionsMenuHandler::CloseBubble,
-                              base::Unretained(menu_handler))))),
+                              &extension_name_))),
           // Content.
           views::Builder<views::BoxLayoutView>()
               .SetOrientation(views::BoxLayout::Orientation::kVertical)
@@ -272,7 +266,9 @@ void ExtensionsMenuSitePermissionsPageView::Update(
     const ui::ImageModel& extension_icon,
     const std::u16string& current_site,
     PermissionsManager::UserSiteAccess user_site_access,
-    bool is_show_requests_toggle_on) {
+    bool is_show_requests_toggle_on,
+    bool is_on_site_enabled,
+    bool is_on_all_sites_enabled) {
   extension_icon_->SetImage(extension_icon);
   extension_name_->SetText(extension_name);
 
@@ -288,6 +284,12 @@ void ExtensionsMenuSitePermissionsPageView::Update(
           PermissionsManager::UserSiteAccess::kOnSite, current_site));
     }
   }
+
+  // Enable the site access buttons accordingly. The extension is guaranteed to
+  // at least have "on click" enabled when this page is opened.
+  site_access_buttons[kOnSiteButtonIndex]->SetEnabled(is_on_site_enabled);
+  site_access_buttons[kOnAllSitesButtonIndex]->SetEnabled(
+      is_on_all_sites_enabled);
 
   UpdateShowRequestsToggle(is_show_requests_toggle_on);
 }

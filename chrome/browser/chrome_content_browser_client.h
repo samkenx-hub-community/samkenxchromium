@@ -207,7 +207,7 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
   bool CanCommitURL(content::RenderProcessHost* process_host,
                     const GURL& url) override;
   void OverrideNavigationParams(
-      content::SiteInstance* site_instance,
+      absl::optional<GURL> source_process_site_url,
       ui::PageTransition* transition,
       bool* is_renderer_initiated,
       content::Referrer* referrer,
@@ -228,7 +228,6 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
   bool ShouldEmbeddedFramesTryToReuseExistingProcess(
       content::RenderFrameHost* outermost_main_frame) override;
   void SiteInstanceGotProcess(content::SiteInstance* site_instance) override;
-  void SiteInstanceDeleting(content::SiteInstance* site_instance) override;
   bool ShouldSwapBrowsingInstancesForNavigation(
       content::SiteInstance* site_instance,
       const GURL& current_effective_url,
@@ -579,7 +578,9 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
           header_client,
       bool* bypass_redirect_checks,
       bool* disable_secure_dns,
-      network::mojom::URLLoaderFactoryOverridePtr* factory_override) override;
+      network::mojom::URLLoaderFactoryOverridePtr* factory_override,
+      scoped_refptr<base::SequencedTaskRunner> navigation_response_task_runner)
+      override;
   std::vector<std::unique_ptr<content::URLLoaderRequestInterceptor>>
   WillCreateURLLoaderRequestInterceptors(
       content::NavigationUIData* navigation_ui_data,
@@ -716,8 +717,10 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
   bool IsBuiltinComponent(content::BrowserContext* browser_context,
                           const url::Origin& origin) override;
 
-  bool ShouldBlockRendererDebugURL(const GURL& url,
-                                   content::BrowserContext* context) override;
+  bool ShouldBlockRendererDebugURL(
+      const GURL& url,
+      content::BrowserContext* context,
+      content::RenderFrameHost* render_frame_host) override;
 
   ui::AXMode GetAXModeForBrowserContext(
       content::BrowserContext* browser_context) override;
@@ -742,6 +745,9 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
       bool get_topics,
       bool observe,
       std::vector<blink::mojom::EpochTopicPtr>& topics) override;
+
+  int NumVersionsInTopicsEpochs(
+      content::RenderFrameHost* main_frame) const override;
 
   bool IsBluetoothScanningBlocked(content::BrowserContext* browser_context,
                                   const url::Origin& requesting_origin,
@@ -797,6 +803,8 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
   bool IsJitDisabledForSite(content::BrowserContext* browser_context,
                             const GURL& site_url) override;
   ukm::UkmService* GetUkmService() override;
+
+  blink::mojom::OriginTrialsSettingsPtr GetOriginTrialsSettings() override;
 
   void OnKeepaliveRequestStarted(
       content::BrowserContext* browser_context) override;

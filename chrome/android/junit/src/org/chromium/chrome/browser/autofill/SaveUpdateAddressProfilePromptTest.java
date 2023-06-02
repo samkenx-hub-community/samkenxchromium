@@ -16,6 +16,7 @@ import android.widget.TextView;
 
 import androidx.test.filters.SmallTest;
 
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -51,7 +52,8 @@ import org.chromium.ui.test.util.modaldialog.FakeModalDialogManager;
 /** Unit tests for {@link SaveUpdateAddressProfilePrompt}. */
 @RunWith(BaseRobolectricTestRunner.class)
 @Config(manifest = Config.NONE)
-@EnableFeatures({ChromeFeatureList.AUTOFILL_ADDRESS_PROFILE_SAVE_PROMPT_NICKNAME_SUPPORT})
+@EnableFeatures({ChromeFeatureList.AUTOFILL_ADDRESS_PROFILE_SAVE_PROMPT_NICKNAME_SUPPORT,
+        ChromeFeatureList.AUTOFILL_ENABLE_SUPPORT_FOR_HONORIFIC_PREFIXES})
 public class SaveUpdateAddressProfilePromptTest {
     private static final long NATIVE_SAVE_UPDATE_ADDRESS_PROFILE_PROMPT_CONTROLLER = 100L;
     private static final boolean NO_MIGRATION = false;
@@ -64,6 +66,8 @@ public class SaveUpdateAddressProfilePromptTest {
     private SaveUpdateAddressProfilePromptController.Natives mPromptControllerJni;
     @Mock
     private AutofillProfileBridge.Natives mAutofillProfileBridgeJni;
+    @Mock
+    private PersonalDataManager mPersonalDataManager;
     @Mock
     private Profile mProfile;
     @Mock
@@ -80,6 +84,7 @@ public class SaveUpdateAddressProfilePromptTest {
     @Before
     public void setUp() {
         MockitoAnnotations.initMocks(this);
+        PersonalDataManager.setInstanceForTesting(mPersonalDataManager);
 
         mActivity = Robolectric.setupActivity(TestActivity.class);
 
@@ -90,12 +95,17 @@ public class SaveUpdateAddressProfilePromptTest {
         mJniMocker.mock(AutofillProfileBridgeJni.TEST_HOOKS, mAutofillProfileBridgeJni);
     }
 
+    @After
+    public void tearDown() {
+        PersonalDataManager.setInstanceForTesting(null);
+    }
+
     private void createAndShowPrompt(boolean isUpdate) {
         createAndShowPrompt(isUpdate, NO_MIGRATION);
     }
 
     private void createAndShowPrompt(boolean isUpdate, boolean isMigrationToAccount) {
-        AutofillProfile dummyProfile = new AutofillProfile();
+        AutofillProfile dummyProfile = AutofillProfile.builder().build();
         mModalDialogManager = new FakeModalDialogManager(ModalDialogType.APP);
         mPrompt = new SaveUpdateAddressProfilePrompt(mPromptController, mModalDialogManager,
                 mActivity, mProfile, dummyProfile, isUpdate, isMigrationToAccount);

@@ -134,6 +134,19 @@ void SetAXNodeDataHtmlTag(v8::Isolate* isolate,
                                    html_tag);
 }
 
+void SetAXNodeDataDisplay(v8::Isolate* isolate,
+                          gin::Dictionary* v8_dict,
+                          ui::AXNodeData* ax_node_data) {
+  v8::Local<v8::Value> v8_display;
+  v8_dict->Get("display", &v8_display);
+  std::string display;
+  if (!gin::Converter<std::string>::FromV8(isolate, v8_display, &display)) {
+    return;
+  }
+  ax_node_data->AddStringAttribute(ax::mojom::StringAttribute::kDisplay,
+                                   display);
+}
+
 void SetAXNodeDataTextDirection(v8::Isolate* isolate,
                                 gin::Dictionary* v8_dict,
                                 ui::AXNodeData* ax_node_data) {
@@ -290,6 +303,7 @@ ui::AXTreeUpdate GetSnapshotFromV8SnapshotLite(
     SetAXNodeDataTextDirection(isolate, &v8_node_dict, &ax_node_data);
     SetAXNodeDataTextStyle(isolate, &v8_node_dict, &ax_node_data);
     SetAXNodeDataUrl(isolate, &v8_node_dict, &ax_node_data);
+    SetAXNodeDataDisplay(isolate, &v8_node_dict, &ax_node_data);
     snapshot.nodes.push_back(ax_node_data);
   }
 
@@ -350,7 +364,7 @@ ReadAnythingAppController* ReadAnythingAppController::Install(
 
   v8::Local<v8::Object> chrome =
       content::GetOrCreateChromeObject(isolate, context);
-  chrome->Set(context, gin::StringToV8(isolate, "readAnything"), handle.ToV8())
+  chrome->Set(context, gin::StringToV8(isolate, "readingMode"), handle.ToV8())
       .Check();
   return controller;
 }
@@ -408,7 +422,7 @@ void ReadAnythingAppController::OnActiveAXTreeIDChanged(
 
   // TODO(b/1266555): Use v8::Function rather than javascript. If possible,
   // replace this function call with firing an event.
-  std::string script = "chrome.readAnything.showLoading();";
+  std::string script = "chrome.readingMode.showLoading();";
   render_frame_->ExecuteJavaScript(base::ASCIIToUTF16(script));
 
   // When the UI first constructs, this function may be called before tree_id
@@ -449,9 +463,8 @@ void ReadAnythingAppController::Distill() {
 void ReadAnythingAppController::OnAXTreeDistilled(
     const ui::AXTreeID& tree_id,
     const std::vector<ui::AXNodeID>& content_node_ids) {
-  // Reset state.
-  // TODO(accessibility): this call resets selection, so it's not completely
-  // clear what `PostProcessSelection` does below.
+  // Reset state, including the current side panel selection so we can update
+  // it based on the new main panel selection in PostProcessSelection below.
   model_.Reset(content_node_ids);
 
   // Return early if any of the following scenarios occurred while waiting for
@@ -474,7 +487,8 @@ void ReadAnythingAppController::OnAXTreeDistilled(
     model_.ComputeDisplayNodeIdsForDistilledTree();
   }
 
-  // Draw selection (if one exists) and the content.
+  // Draw the selection in the side panel (if one exists in the main panel) and
+  // the content if the selection is not in the distilled content.
   PostProcessSelection();
 
   // TODO(crbug.com/1266555): If no content nodes were identified, the
@@ -502,7 +516,7 @@ void ReadAnythingAppController::Draw() {
   // -- that is, it is awaiting distillation or never requested distillation.
   // TODO(abigailbklein): Use v8::Function rather than javascript. If possible,
   // replace this function call with firing an event.
-  std::string script = "chrome.readAnything.updateContent();";
+  std::string script = "chrome.readingMode.updateContent();";
   render_frame_->ExecuteJavaScript(base::ASCIIToUTF16(script));
 }
 
@@ -511,7 +525,7 @@ void ReadAnythingAppController::DrawSelection() {
   // -- that is, it is awaiting distillation or never requested distillation.
   // TODO(abigailbklein): Use v8::Function rather than javascript. If possible,
   // replace this function call with firing an event.
-  std::string script = "chrome.readAnything.updateSelection();";
+  std::string script = "chrome.readingMode.updateSelection();";
   render_frame_->ExecuteJavaScript(base::ASCIIToUTF16(script));
 }
 
@@ -520,7 +534,7 @@ void ReadAnythingAppController::OnThemeChanged(ReadAnythingThemePtr new_theme) {
 
   // TODO(abigailbklein): Use v8::Function rather than javascript. If possible,
   // replace this function call with firing an event.
-  std::string script = "chrome.readAnything.updateTheme();";
+  std::string script = "chrome.readingMode.updateTheme();";
   render_frame_->ExecuteJavaScript(base::ASCIIToUTF16(script));
 }
 
@@ -557,6 +571,8 @@ gin::ObjectTemplateBuilder ReadAnythingAppController::GetObjectTemplateBuilder(
       .SetMethod("shouldBold", &ReadAnythingAppController::ShouldBold)
       .SetMethod("isOverline", &ReadAnythingAppController::IsOverline)
       .SetMethod("onConnected", &ReadAnythingAppController::OnConnected)
+      .SetMethod("onCopy", &ReadAnythingAppController::OnCopy)
+      .SetMethod("onScroll", &ReadAnythingAppController::OnScroll)
       .SetMethod("onLinkClicked", &ReadAnythingAppController::OnLinkClicked)
       .SetMethod("isSelectable", &ReadAnythingAppController::isSelectable)
       .SetMethod("onSelectionChange",
@@ -637,6 +653,16 @@ std::string ReadAnythingAppController::GetHtmlTag(
 
   if (ui::IsTextField(ax_node->GetRole())) {
     return "div";
+  }
+
+  // Some divs are marked with role=heading and aria-level=# to indicate
+  // the heading level, so use the <h#> tag directly.
+  if (ax_node->GetRole() == ax::mojom::Role::kHeading) {
+    std::string aria_level;
+    ax_node->GetHtmlAttribute("aria-level", &aria_level);
+    if (!aria_level.empty()) {
+      return "h" + aria_level;
+    }
   }
 
   // Replace mark element with bold element for readability
@@ -723,6 +749,14 @@ void ReadAnythingAppController::OnConnected() {
       std::move(page_handler_factory_receiver));
 }
 
+void ReadAnythingAppController::OnCopy() const {
+  page_handler_->OnCopy();
+}
+
+void ReadAnythingAppController::OnScroll(bool on_selection) const {
+  model_.OnScroll(on_selection, /* from_reading_mode= */ true);
+}
+
 void ReadAnythingAppController::OnLinkClicked(ui::AXNodeID ax_node_id) const {
   DCHECK_NE(model_.active_tree_id(), ui::AXTreeIDUnknown());
   // Prevent link clicks while distillation is in progress, as it means that the
@@ -748,13 +782,21 @@ void ReadAnythingAppController::OnSelectionChange(ui::AXNodeID anchor_node_id,
     return;
   }
 
-  // Ignore the selection if it's collapsed, which is created by a simple click.
-  if ((anchor_offset == focus_offset) && (anchor_node_id == focus_node_id)) {
+  // Ignore the new selection if it's collapsed, which is created by a simple
+  // click, unless there was a previous selection, in which case the click
+  // clears the selection, so we should tell the main page to clear too.
+  if ((anchor_offset == focus_offset) && (anchor_node_id == focus_node_id) &&
+      !model_.has_selection()) {
     return;
   }
 
   ui::AXNode* focus_node = model_.GetAXNode(focus_node_id);
   ui::AXNode* anchor_node = model_.GetAXNode(anchor_node_id);
+  if (!focus_node || !anchor_node) {
+    // Sometimes when the side panel size is adjusted, a focus or anchor node
+    // may be null. Return early if this happens.
+    return;
+  }
   // Some text fields, like Gmail, allow a <div> to be returned as a focus
   // node for selection, most frequently when a triple click causes an entire
   // range of text to be selected, including non-text nodes. This can cause

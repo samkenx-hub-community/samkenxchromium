@@ -498,8 +498,9 @@ bool V4L2SliceVideoDecodeAccelerator::SetupFormats() {
 
   size_t input_size;
   gfx::Size max_resolution, min_resolution;
-  device_->GetSupportedResolution(input_format_fourcc_, &min_resolution,
-                                  &max_resolution);
+  GetSupportedResolution(base::BindRepeating(&V4L2Device::Ioctl, device_),
+                         input_format_fourcc_, &min_resolution,
+                         &max_resolution);
   if (max_resolution.width() > 1920 && max_resolution.height() > 1088)
     input_size = kInputBufferMaxSizeFor4k;
   else
@@ -1120,6 +1121,10 @@ void V4L2SliceVideoDecodeAccelerator::DecodeBufferTask() {
         }
         VLOGF(2) << "Decoder requesting a new set of surfaces";
         InitiateSurfaceSetChange();
+        return;
+
+      case AcceleratedVideoDecoder::kColorSpaceChange:
+        NOTIMPLEMENTED_LOG_ONCE();
         return;
 
       case AcceleratedVideoDecoder::kRanOutOfStreamData:

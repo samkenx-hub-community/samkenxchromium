@@ -95,6 +95,11 @@ AutofillProfile ConstructCompleteProfile() {
                                            VerificationStatus::kParsed);
   profile.SetRawInfoWithVerificationStatus(ADDRESS_HOME_LANDMARK, u"Red tree",
                                            VerificationStatus::kObserved);
+  profile.SetRawInfoWithVerificationStatus(ADDRESS_HOME_BETWEEN_STREETS,
+                                           u"Marcos y Oliva",
+                                           VerificationStatus::kObserved);
+  profile.SetRawInfoWithVerificationStatus(ADDRESS_HOME_ADMIN_LEVEL2, u"Oxaca",
+                                           VerificationStatus::kObserved);
 
   // All of the following types don't store verification statuses.
   // Set email, phone and company values.
@@ -191,7 +196,10 @@ ContactInfoSpecifics ConstructCompleteSpecifics() {
            ContactInfoSpecifics::PARSED);
   SetToken(specifics.mutable_address_landmark(), "Red tree",
            ContactInfoSpecifics::OBSERVED);
-
+  SetToken(specifics.mutable_address_between_streets(), "Marcos y Oliva",
+           ContactInfoSpecifics::OBSERVED);
+  SetToken(specifics.mutable_address_admin_level_2(), "Oxaca",
+           ContactInfoSpecifics::OBSERVED);
   // All of the following types don't store verification statuses in
   // AutofillProfile. This corresponds to `VERIFICATION_STATUS_UNSPECIFIED`.
   // Set email, phone and company values and statuses.
@@ -218,8 +226,11 @@ ContactInfoSpecifics ConstructCompleteSpecifics() {
 class ContactInfoSyncUtilTest : public testing::Test {
  public:
   ContactInfoSyncUtilTest() {
-    features_.InitAndEnableFeature(
-        features::kAutofillEnableNewStreetLevelFieldTypes);
+    features_.InitWithFeatures(
+        {features::kAutofillEnableSupportForLandmark,
+         features::kAutofillEnableSupportForBetweenStreets,
+         features::kAutofillEnableSupportForAdminLevel2},
+        {});
   }
 
  private:

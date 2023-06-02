@@ -6,6 +6,7 @@
 
 #include <map>
 
+#include "base/functional/callback_helpers.h"
 #include "base/memory/raw_ptr.h"
 #include "base/metrics/metrics_hashes.h"
 #include "base/test/gmock_callback_support.h"
@@ -374,8 +375,10 @@ class TrainingDataCollectorImplTest : public ::testing::Test {
   NiceMock<processing::MockFeatureListQueryProcessor> feature_list_processor_;
   NiceMock<MockHistogramSignalHandler> histogram_signal_handler_;
   NiceMock<MockUserActionSignalHandler> user_action_signal_handler_;
-  raw_ptr<NiceMock<MockSignalStorageConfig>> signal_storage_config_;
-  raw_ptr<test::TestSegmentInfoDatabase> test_segment_info_db_;
+  raw_ptr<NiceMock<MockSignalStorageConfig>, DanglingUntriaged>
+      signal_storage_config_;
+  raw_ptr<test::TestSegmentInfoDatabase, DanglingUntriaged>
+      test_segment_info_db_;
   std::unique_ptr<TrainingDataCollectorImpl> collector_;
   TestingPrefServiceSimple prefs_;
   std::vector<std::unique_ptr<Config>> configs_;
@@ -544,7 +547,7 @@ TEST_F(TrainingDataCollectorImplTest, ContinuousWithExactPrediction) {
 
   Init();
   collector()->OnDecisionTime(kTestOptimizationTarget0, nullptr,
-                              proto::TrainingOutputs::TriggerConfig::ONDEMAND);
+                              kOnDemandDecisionType);
   task_environment()->RunUntilIdle();
   clock()->Advance(kNextUserSession);
   WaitForContinuousCollection();
@@ -571,7 +574,7 @@ TEST_F(TrainingDataCollectorImplTest, ContinuousWithFlexibleObservation) {
 
   Init();
   collector()->OnDecisionTime(kTestOptimizationTarget0, nullptr,
-                              proto::TrainingOutputs::TriggerConfig::ONDEMAND);
+                              kOnDemandDecisionType);
   task_environment()->RunUntilIdle();
   clock()->Advance(kNextUserSession);
   WaitForContinuousCollection();
@@ -661,7 +664,7 @@ TEST_F(TrainingDataCollectorImplTest, DataCollectionWithUMATrigger) {
   // Wait for input collection to be done and cached in memory.
   auto input_context = base::MakeRefCounted<InputContext>();
   collector()->OnDecisionTime(kTestOptimizationTarget0, input_context,
-                              proto::TrainingOutputs::TriggerConfig::ONDEMAND);
+                              kOnDemandDecisionType);
   task_environment()->RunUntilIdle();
   clock()->Advance(kTriggerDuration);
   ExpectUkmCount(0u);
@@ -689,7 +692,7 @@ TEST_F(TrainingDataCollectorImplTest, DataCollectionWithUserActionTrigger) {
   // Wait for input collection to be done and cached in memory.
   auto input_context = base::MakeRefCounted<InputContext>();
   collector()->OnDecisionTime(kTestOptimizationTarget0, input_context,
-                              proto::TrainingOutputs::TriggerConfig::ONDEMAND);
+                              kOnDemandDecisionType);
   task_environment()->RunUntilIdle();
   clock()->Advance(kTriggerDuration);
   ExpectUkmCount(0u);
@@ -731,9 +734,9 @@ TEST_F(TrainingDataCollectorImplTest,
   Init();
   auto input_context = base::MakeRefCounted<InputContext>();
   collector()->OnDecisionTime(kTestOptimizationTarget0, input_context,
-                              proto::TrainingOutputs::TriggerConfig::ONDEMAND);
+                              kOnDemandDecisionType);
   collector()->OnDecisionTime(kTestOptimizationTarget1, input_context,
-                              proto::TrainingOutputs::TriggerConfig::ONDEMAND);
+                              kOnDemandDecisionType);
   task_environment()->RunUntilIdle();
   ExpectUkmCount(0u);
 
@@ -752,8 +755,7 @@ TEST_F(TrainingDataCollectorImplTest, DataCollectionWithTimeTrigger) {
 
   // Create a segment that contain a time delay trigger and a uma trigger.
   auto* segment_info =
-      CreateSegmentInfo(kTestOptimizationTarget0,
-                        proto::TrainingOutputs::TriggerConfig::ONDEMAND);
+      CreateSegmentInfo(kTestOptimizationTarget0, kOnDemandDecisionType);
   AddTimeTrigger(segment_info, base::Seconds(10));
   Init();
 
@@ -763,7 +765,7 @@ TEST_F(TrainingDataCollectorImplTest, DataCollectionWithTimeTrigger) {
   test_recorder()->SetOnAddEntryCallback(
       Segmentation_ModelExecution::kEntryName, run_loop.QuitClosure());
   collector()->OnDecisionTime(kTestOptimizationTarget0, input_context,
-                              proto::TrainingOutputs::TriggerConfig::ONDEMAND);
+                              kOnDemandDecisionType);
   task_environment()->RunUntilIdle();
   ExpectUkmCount(0u);
 
@@ -799,7 +801,7 @@ TEST_F(TrainingDataCollectorImplTest, DataCollectionWithStoreToDisk) {
   // the training data.
   Init();
   collector()->OnDecisionTime(kTestOptimizationTarget0, nullptr,
-                              proto::TrainingOutputs::TriggerConfig::ONDEMAND);
+                              kOnDemandDecisionType);
   task_environment()->RunUntilIdle();
   ExpectUkmCount(0);
   clock()->Advance(kNextUserSession);
@@ -811,6 +813,46 @@ TEST_F(TrainingDataCollectorImplTest, DataCollectionWithStoreToDisk) {
   // training request, trigger observation and record the ukm.
   Init();
   ExpectResult1Ukm();
+}
+
+TEST_F(TrainingDataCollectorImplTest, DataCollectionWithTriggerAPI) {
+  EXPECT_CALL(*feature_list_processor(),
+              ProcessFeatureList(_, _, _, _, _, _, _))
+      .WillRepeatedly(RunOnceCallback<6>(false, ModelProvider::Request{1.f},
+                                         ModelProvider::Response{2.f, 3.f}));
+
+  // Create a segment.
+  CreateSegmentInfo(kTestOptimizationTarget0, kOnDemandDecisionType);
+  Init();
+
+  // Wait for input collection to be done and cached in memory.
+  auto input_context = base::MakeRefCounted<InputContext>();
+  base::RunLoop run_loop;
+  test_recorder()->SetOnAddEntryCallback(
+      Segmentation_ModelExecution::kEntryName, run_loop.QuitClosure());
+  auto request_id = collector()->OnDecisionTime(
+      kTestOptimizationTarget0, input_context, kOnDemandDecisionType);
+  task_environment()->RunUntilIdle();
+  ExpectUkmCount(0u);
+
+  TrainingLabels label;
+  label.output_metric = {{kHistogramName0, kSample}};
+  // Trigger output collection and ukm data recording.
+  collector()->CollectTrainingData(kTestOptimizationTarget0, request_id, label,
+                                   base::DoNothing());
+  run_loop.Run();
+  ExpectUkmCount(1u);
+  ExpectUkm({Segmentation_ModelExecution::kOptimizationTargetName,
+             Segmentation_ModelExecution::kModelVersionName,
+             Segmentation_ModelExecution::kInput0Name,
+             Segmentation_ModelExecution::kActualResultName,
+             Segmentation_ModelExecution::kActualResult2Name,
+             Segmentation_ModelExecution::kActualResult3Name},
+            {kTestOptimizationTarget0, kModelVersion,
+             SegmentationUkmHelper::FloatToInt64(1.f),
+             SegmentationUkmHelper::FloatToInt64(2.f),
+             SegmentationUkmHelper::FloatToInt64(3.f),
+             SegmentationUkmHelper::FloatToInt64(kSample)});
 }
 
 }  // namespace

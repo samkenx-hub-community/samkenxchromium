@@ -64,6 +64,18 @@ enum class COMPONENT_EXPORT(KCER) Error {
   kFailedToReadAttribute = 15,
   kFailedToWriteAttribute = 16,
   kFailedToParseKeyPermissions = 17,
+  kUnexpectedSigningScheme = 18,
+  kKeyDoesNotSupportSigningScheme = 19,
+  kFailedToSignFailedToDigest = 20,
+  kFailedToSignFailedToAddPrefix = 21,
+  kFailedToSignFailedToGetSignatureLength = 22,
+  kFailedToSign = 23,
+  kFailedToSignBadSignatureLength = 24,
+  kFailedToDerEncode = 25,
+  kInputTooLong = 26,
+  kFailedToListKeys = 27,
+  kFailedToRemovePrivateKey = 28,
+  kFailedToRemovePublicKey = 29,
 };
 
 // Handles for tokens on ChromeOS.
@@ -95,6 +107,8 @@ enum class COMPONENT_EXPORT(KCER) EllipticCurve {
   kP256,
 };
 
+// Possible sign schemes (aka algorithms) for Kcer::Sign() method. Maps 1-to-1
+// to OpenSSL SSL_* constants. It is allowed to cast SigningScheme to SSL_*.
 enum class COMPONENT_EXPORT(KCER) SigningScheme {
   kRsaPkcs1Sha1 = SSL_SIGN_RSA_PKCS1_SHA1,
   kRsaPkcs1Sha256 = SSL_SIGN_RSA_PKCS1_SHA256,
@@ -118,6 +132,9 @@ class COMPONENT_EXPORT(KCER) PublicKey {
   PublicKey(PublicKey&&);
   PublicKey& operator=(PublicKey&&);
   ~PublicKey();
+
+  bool operator==(const PublicKey& other) const;
+  bool operator!=(const PublicKey& other) const;
 
   Token GetToken() const { return token_; }
   const Pkcs11Id& GetPkcs11Id() const { return pkcs11_id_; }

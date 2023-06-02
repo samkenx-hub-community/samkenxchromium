@@ -325,8 +325,8 @@ WebViewImpl::WebViewImpl(const std::string& id,
       is_detached_(false),
       parent_(parent),
       client_(std::move(client)),
-      frame_tracker_(new FrameTracker(client_.get(), this, browser_info)),
-      dialog_manager_(new JavaScriptDialogManager(client_.get(), browser_info)),
+      frame_tracker_(new FrameTracker(client_.get(), this)),
+      dialog_manager_(new JavaScriptDialogManager(client_.get())),
       mobile_emulation_override_manager_(
           new MobileEmulationOverrideManager(client_.get(),
                                              std::move(mobile_device),
@@ -348,9 +348,9 @@ WebViewImpl::WebViewImpl(const std::string& id,
   // all related calls to their parent. All WebViews must have either parent_
   // or navigation_tracker_
   if (!parent_) {
-    navigation_tracker_ = std::unique_ptr<PageLoadStrategy>(
-        PageLoadStrategy::Create(page_load_strategy, client_.get(), this,
-                                 browser_info, dialog_manager_.get()));
+    navigation_tracker_ =
+        std::unique_ptr<PageLoadStrategy>(PageLoadStrategy::Create(
+            page_load_strategy, client_.get(), this, dialog_manager_.get()));
   }
   client_->SetOwner(this);
 }
@@ -840,15 +840,6 @@ Status WebViewImpl::CallFunction(const std::string& frame,
                                  result);
 }
 
-Status WebViewImpl::CallAsyncFunction(const std::string& frame,
-                                      const std::string& function,
-                                      const base::Value::List& args,
-                                      const base::TimeDelta& timeout,
-                                      std::unique_ptr<base::Value>* result) {
-  return CallAsyncFunctionInternal(
-      frame, function, args, false, timeout, result);
-}
-
 Status WebViewImpl::CallUserSyncScript(const std::string& frame,
                                        const std::string& script,
                                        const base::Value::List& args,
@@ -879,8 +870,7 @@ Status WebViewImpl::CallUserAsyncFunction(
     const base::Value::List& args,
     const base::TimeDelta& timeout,
     std::unique_ptr<base::Value>* result) {
-  return CallAsyncFunctionInternal(
-      frame, function, args, true, timeout, result);
+  return CallAsyncFunctionInternal(frame, function, args, timeout, result);
 }
 
 // TODO (crbug.com/chromedriver/4364): Simplify this function
@@ -1573,13 +1563,12 @@ Status WebViewImpl::CallAsyncFunctionInternal(
     const std::string& frame,
     const std::string& function,
     const base::Value::List& args,
-    bool is_user_supplied,
     const base::TimeDelta& timeout,
     std::unique_ptr<base::Value>* result) {
   base::Value::List async_args;
   async_args.Append("return (" + function + ").apply(null, arguments);");
   async_args.Append(args.Clone());
-  async_args.Append(is_user_supplied);
+  async_args.Append(/*is_user_supplied=*/true);
   std::unique_ptr<base::Value> tmp;
   Timeout local_timeout(timeout);
   Status status = CallFunctionWithTimeout(frame, kExecuteAsyncScriptScript,

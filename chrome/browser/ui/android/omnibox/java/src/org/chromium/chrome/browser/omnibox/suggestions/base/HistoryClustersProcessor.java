@@ -11,17 +11,17 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import org.chromium.chrome.browser.omnibox.OmniboxFeatures;
+import org.chromium.chrome.browser.omnibox.OmniboxMetrics;
 import org.chromium.chrome.browser.omnibox.UrlBarEditingTextStateProvider;
 import org.chromium.chrome.browser.omnibox.suggestions.FaviconFetcher;
 import org.chromium.chrome.browser.omnibox.suggestions.SuggestionHost;
+import org.chromium.chrome.browser.omnibox.suggestions.action.HistoryClustersAction;
 import org.chromium.chrome.browser.omnibox.suggestions.basic.BasicSuggestionProcessor;
 import org.chromium.chrome.browser.omnibox.suggestions.basic.SuggestionViewProperties;
 import org.chromium.components.omnibox.AutocompleteMatch;
-import org.chromium.components.omnibox.OmniboxMetrics;
-import org.chromium.components.omnibox.action.HistoryClustersAction;
 import org.chromium.components.omnibox.action.OmniboxAction;
 import org.chromium.components.omnibox.action.OmniboxActionDelegate;
-import org.chromium.components.omnibox.action.OmniboxActionType;
+import org.chromium.components.omnibox.action.OmniboxActionId;
 import org.chromium.ui.modelutil.PropertyModel;
 
 import java.util.List;
@@ -48,7 +48,7 @@ public class HistoryClustersProcessor extends BasicSuggestionProcessor {
             @NonNull Context context, @NonNull SuggestionHost suggestionHost,
             @NonNull UrlBarEditingTextStateProvider editingTextProvider,
             @NonNull FaviconFetcher faviconFetcher, @NonNull BookmarkState bookmarkState) {
-        super(context, suggestionHost, null, editingTextProvider, faviconFetcher, bookmarkState);
+        super(context, suggestionHost, editingTextProvider, faviconFetcher, bookmarkState);
         mOpenHistoryClustersDelegate = openHistoryClustersDelegate;
         mContext = context;
     }
@@ -94,6 +94,11 @@ public class HistoryClustersProcessor extends BasicSuggestionProcessor {
         mJourneysActionShownPosition = position;
     }
 
+    @Override
+    public boolean allowOmniboxActions() {
+        return false;
+    }
+
     private void onJourneysSuggestionClicked(HistoryClustersAction action, int position) {
         if (mOpenHistoryClustersDelegate != null) {
             String query = action.query;
@@ -114,7 +119,7 @@ public class HistoryClustersProcessor extends BasicSuggestionProcessor {
         List<OmniboxAction> actions = suggestion.getActions();
         if (actions.size() != 1) return null;
         OmniboxAction action = actions.get(0);
-        if (action.actionId == OmniboxActionType.HISTORY_CLUSTERS) {
+        if (action.actionId == OmniboxActionId.HISTORY_CLUSTERS) {
             return HistoryClustersAction.from(action);
         }
         return null;

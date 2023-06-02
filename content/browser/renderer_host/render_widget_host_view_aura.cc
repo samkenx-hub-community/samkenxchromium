@@ -1579,9 +1579,12 @@ void RenderWidgetHostViewAura::ExtendSelectionAndReplace(
     size_t before,
     size_t after,
     const base::StringPiece16 replacement_text) {
-  // TODO(crbug.com/1443726): Implement this using a custom Mojo method on
-  // FrameWidgetInputHandler.
-  NOTIMPLEMENTED_LOG_ONCE();
+  auto* input_handler = GetFrameWidgetInputHandlerForFocusedWidget();
+  if (!input_handler) {
+    return;
+  }
+  input_handler->ExtendSelectionAndReplace(before, after,
+                                           std::u16string(replacement_text));
 }
 #endif
 
@@ -1926,8 +1929,11 @@ void RenderWidgetHostViewAura::OnDeviceScaleFactorChanged(
   if (!window_->GetRootWindow())
     return;
 
-  if (needs_to_update_display_metrics_)
+  // TODO(crbug.com/1446142): Add unittest for lacros.
+  if (needs_to_update_display_metrics_ ||
+      old_device_scale_factor != new_device_scale_factor) {
     ProcessDisplayMetricsChanged();
+  }
 
   SynchronizeVisualProperties(cc::DeadlinePolicy::UseDefaultDeadline(),
                               window_->GetLocalSurfaceId());

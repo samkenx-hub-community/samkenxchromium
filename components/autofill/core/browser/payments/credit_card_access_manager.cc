@@ -24,6 +24,7 @@
 #include "components/autofill/core/browser/autofill_progress_dialog_type.h"
 #include "components/autofill/core/browser/browser_autofill_manager.h"
 #include "components/autofill/core/browser/data_model/credit_card.h"
+#include "components/autofill/core/browser/form_data_importer.h"
 #include "components/autofill/core/browser/metrics/form_events/credit_card_form_event_logger.h"
 #include "components/autofill/core/browser/metrics/payments/better_auth_metrics.h"
 #include "components/autofill/core/browser/metrics/payments/card_unmask_flow_metrics.h"
@@ -68,7 +69,19 @@ CreditCardAccessManager::CreditCardAccessManager(
       personal_data_manager_(personal_data_manager),
       form_event_logger_(form_event_logger) {}
 
-CreditCardAccessManager::~CreditCardAccessManager() = default;
+CreditCardAccessManager::~CreditCardAccessManager() {
+  // This clears the GUID of the most recently autofilled card with no
+  // interactive authentication flow upon page navigation, as page navigation
+  // results in us destroying the current CreditCardAccessManager and creating a
+  // new one.
+  if (client_) {
+    if (auto* form_data_importer = client_->GetFormDataImporter()) {
+      form_data_importer
+          ->SetGuidOfCardIfNoInteractiveAuthenticationFlowCompleted(
+              absl::nullopt);
+    }
+  }
+}
 
 void CreditCardAccessManager::UpdateCreditCardFormEventLogger() {
   std::vector<CreditCard*> credit_cards =
@@ -1101,6 +1114,13 @@ void CreditCardAccessManager::FetchLocalOrFullServerCard() {
     // the user.
     accessor_->OnCreditCardFetched(CreditCardFetchResult::kSuccess, card_.get(),
                                    /*cvc=*/u"");
+
+    // This local card autofill flow did not have any interactive
+    // authentication, so notify the FormDataImporter of this.
+    client_->GetFormDataImporter()
+        ->SetGuidOfCardIfNoInteractiveAuthenticationFlowCompleted(
+            card_->guid());
+
     // `accessor_->OnCreditCardFetched()` makes a copy of `card` and `cvc`
     // before it asynchronously fills them into the form. Thus we can safely
     // call `Reset()` here, and we should as from this class' point of view the
@@ -1162,6 +1182,15 @@ void CreditCardAccessManager::OnVirtualCardUnmaskResponseReceived(
         accessor_->OnCreditCardFetched(
             CreditCardFetchResult::kSuccess, card_.get(),
             base::UTF8ToUTF16(response_details.dcvv));
+
+        // If the server responded with success and the real pan, no interactive
+        // authentication happened. It's also possible that the server does not
+        // provide the real pan but requests an authentication which is handled
+        // below.
+        client_->GetFormDataImporter()
+            ->SetGuidOfCardIfNoInteractiveAuthenticationFlowCompleted(
+                card_->guid());
+
         autofill_metrics::LogServerCardUnmaskResult(
             autofill_metrics::ServerCardUnmaskResult::kRiskBasedUnmasked,
             AutofillClient::PaymentsRpcCardType::kVirtualCard,
@@ -1416,13 +1445,12 @@ void CreditCardAccessManager::StartDeviceAuthenticationForFilling(
     base::WeakPtr<Accessor> accessor,
     const CreditCard* card,
     const std::u16string& cvc) {
-  scoped_refptr<device_reauth::DeviceAuthenticator> device_authenticator =
-      client_->GetDeviceAuthenticator();
+  device_authenticator_ = client_->GetDeviceAuthenticator();
 
   // Since this function should only be called on platforms where the
   // DeviceAuthenticator is present, we should always have a
   // DeviceAuthenticator.
-  CHECK(device_authenticator);
+  CHECK(device_authenticator_);
 
   is_authentication_in_progress_ = true;
 
@@ -1430,24 +1458,30 @@ void CreditCardAccessManager::StartDeviceAuthenticationForFilling(
   CHECK(record_type == CreditCard::LOCAL_CARD ||
         record_type == CreditCard::VIRTUAL_CARD);
 
+  base::OnceClosure on_reauth_completed =
+      base::BindOnce(&CreditCardAccessManager::OnReauthCompleted,
+                     weak_ptr_factory_.GetWeakPtr());
+
   // TODO(crbug.com/1427216): Add the iOS branching logic as well.
 #if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
-  device_authenticator->AuthenticateWithMessage(
+  device_authenticator_->AuthenticateWithMessage(
       l10n_util::GetStringUTF16(IDS_PAYMENTS_AUTOFILL_FILLING_MANDATORY_REAUTH),
       base::BindOnce(
           &CreditCardAccessManager::OnDeviceAuthenticationResponseForFilling,
-          weak_ptr_factory_.GetWeakPtr(), accessor, card, cvc));
+          weak_ptr_factory_.GetWeakPtr(), accessor, card, cvc)
+          .Then(std::move(on_reauth_completed)));
 #elif BUILDFLAG(IS_ANDROID)
   // TODO(crbug.com/1427216): Convert this to
   // DeviceAuthenticator::AuthenticateWithMessage() with the correct message
   // once it is supported. Currently, the message is "Verify it's you".
-  device_authenticator->Authenticate(
+  device_authenticator_->Authenticate(
       record_type == CreditCard::LOCAL_CARD
           ? device_reauth::DeviceAuthRequester::kLocalCardAutofill
           : device_reauth::DeviceAuthRequester::kVirtualCardAutofill,
       base::BindOnce(
           &CreditCardAccessManager::OnDeviceAuthenticationResponseForFilling,
-          weak_ptr_factory_.GetWeakPtr(), accessor, card, cvc),
+          weak_ptr_factory_.GetWeakPtr(), accessor, card, cvc)
+          .Then(std::move(on_reauth_completed)),
       /*use_last_valid_auth=*/true);
 #else
   NOTREACHED_NORETURN();
@@ -1470,6 +1504,10 @@ void CreditCardAccessManager::OnDeviceAuthenticationResponseForFilling(
   // `Reset()` here, and we should as from this class' point of view the
   // authentication flow is complete.
   Reset();
+}
+
+void CreditCardAccessManager::OnReauthCompleted() {
+  device_authenticator_.reset();
 }
 
 }  // namespace autofill

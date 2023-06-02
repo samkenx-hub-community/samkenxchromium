@@ -129,6 +129,7 @@
 #include "content/public/browser/navigation_entry_restore_context.h"
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/network_service_instance.h"
+#include "content/public/browser/network_service_util.h"
 #include "content/public/browser/notification_details.h"
 #include "content/public/browser/notification_service.h"
 #include "content/public/browser/notification_types.h"
@@ -143,7 +144,6 @@
 #include "content/public/browser/web_contents_observer.h"
 #include "content/public/common/content_client.h"
 #include "content/public/common/content_switches.h"
-#include "content/public/common/network_service_util.h"
 #include "content/public/common/url_constants.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
@@ -2753,7 +2753,8 @@ IN_PROC_BROWSER_TEST_F(SSLUITest, TestRefNavigation) {
 // crash the browser (crbug.com/1966).
 // TODO(crbug.com/1119359, crbug.com/1338068): Test is flaky on Linux and Chrome
 // OS.
-#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
+#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) || \
+    BUILDFLAG(IS_CHROMEOS_LACROS)
 #define MAYBE_TestCloseTabWithUnsafePopup DISABLED_TestCloseTabWithUnsafePopup
 #else
 #define MAYBE_TestCloseTabWithUnsafePopup TestCloseTabWithUnsafePopup
@@ -2787,6 +2788,10 @@ IN_PROC_BROWSER_TEST_F(SSLUITest, MAYBE_TestCloseTabWithUnsafePopup) {
   ASSERT_TRUE(popup->GetController().GetVisibleEntry());
   EXPECT_EQ(https_server_expired_.GetURL("/ssl/bad_iframe.html"),
             popup->GetController().GetVisibleEntry()->GetURL());
+  // The interstitial showing is posted to the message loop and this happens
+  // after the navigation, so we need to additionally wait for that to be
+  // processed.
+  base::RunLoop().RunUntilIdle();
   EXPECT_TRUE(chrome_browser_interstitials::IsShowingInterstitial(popup));
 
   // Add another tab to make sure the browser does not exit when we close
@@ -4453,7 +4458,7 @@ IN_PROC_BROWSER_TEST_F(SSLNetworkTimeBrowserTest, OnDemandFetchClockOk) {
       content::NotificationService::AllSources());
   ui_test_utils::NavigateToURLWithDisposition(
       browser(), https_server_expired_.GetURL("/"),
-      WindowOpenDisposition::CURRENT_TAB, ui_test_utils::BROWSER_TEST_NONE);
+      WindowOpenDisposition::CURRENT_TAB, ui_test_utils::BROWSER_TEST_NO_WAIT);
 
   // Once |interstitial_timer_observer| has fired, the request has been
   // sent. Override the nonce that NetworkTimeTracker expects so that
@@ -4500,7 +4505,7 @@ IN_PROC_BROWSER_TEST_F(SSLNetworkTimeBrowserTest, OnDemandFetchClockWrong) {
 
   ui_test_utils::NavigateToURLWithDisposition(
       browser(), https_server_expired_.GetURL("/"),
-      WindowOpenDisposition::CURRENT_TAB, ui_test_utils::BROWSER_TEST_NONE);
+      WindowOpenDisposition::CURRENT_TAB, ui_test_utils::BROWSER_TEST_NO_WAIT);
 
   // Once |interstitial_timer_observer| has fired, the request has been
   // sent. Override the nonce that NetworkTimeTracker expects so that
@@ -4556,7 +4561,7 @@ IN_PROC_BROWSER_TEST_F(SSLNetworkTimeBrowserTest, StopBeforeTimeoutExpires) {
 
   ui_test_utils::NavigateToURLWithDisposition(
       browser(), https_server_expired_.GetURL("/"),
-      WindowOpenDisposition::CURRENT_TAB, ui_test_utils::BROWSER_TEST_NONE);
+      WindowOpenDisposition::CURRENT_TAB, ui_test_utils::BROWSER_TEST_NO_WAIT);
   interstitial_timer_observer.WaitForTimerStarted();
 
   EXPECT_TRUE(contents->IsLoading());
@@ -4592,7 +4597,7 @@ IN_PROC_BROWSER_TEST_F(SSLNetworkTimeBrowserTest, ReloadBeforeTimeoutExpires) {
 
   ui_test_utils::NavigateToURLWithDisposition(
       browser(), https_server_expired_.GetURL("/"),
-      WindowOpenDisposition::CURRENT_TAB, ui_test_utils::BROWSER_TEST_NONE);
+      WindowOpenDisposition::CURRENT_TAB, ui_test_utils::BROWSER_TEST_NO_WAIT);
   interstitial_timer_observer.WaitForTimerStarted();
 
   EXPECT_TRUE(contents->IsLoading());
@@ -4629,7 +4634,7 @@ IN_PROC_BROWSER_TEST_F(SSLNetworkTimeBrowserTest,
 
   ui_test_utils::NavigateToURLWithDisposition(
       browser(), https_server_expired_.GetURL("/"),
-      WindowOpenDisposition::CURRENT_TAB, ui_test_utils::BROWSER_TEST_NONE);
+      WindowOpenDisposition::CURRENT_TAB, ui_test_utils::BROWSER_TEST_NO_WAIT);
   interstitial_timer_observer.WaitForTimerStarted();
 
   EXPECT_TRUE(contents->IsLoading());
@@ -4986,7 +4991,7 @@ IN_PROC_BROWSER_TEST_F(CommonNameMismatchBrowserTest,
 
   ui_test_utils::NavigateToURLWithDisposition(
       browser(), https_server_mismatched_url,
-      WindowOpenDisposition::CURRENT_TAB, ui_test_utils::BROWSER_TEST_NONE);
+      WindowOpenDisposition::CURRENT_TAB, ui_test_utils::BROWSER_TEST_NO_WAIT);
   interstitial_timer_observer.WaitForTimerStarted();
 
   EXPECT_TRUE(contents->IsLoading());
@@ -5048,7 +5053,7 @@ IN_PROC_BROWSER_TEST_F(CommonNameMismatchBrowserTest,
 
   ui_test_utils::NavigateToURLWithDisposition(
       browser(), https_server_mismatched_url,
-      WindowOpenDisposition::CURRENT_TAB, ui_test_utils::BROWSER_TEST_NONE);
+      WindowOpenDisposition::CURRENT_TAB, ui_test_utils::BROWSER_TEST_NO_WAIT);
   interstitial_timer_observer.WaitForTimerStarted();
 
   EXPECT_TRUE(contents->IsLoading());
@@ -5108,7 +5113,7 @@ IN_PROC_BROWSER_TEST_F(CommonNameMismatchBrowserTest,
 
   ui_test_utils::NavigateToURLWithDisposition(
       browser(), https_server_mismatched_url,
-      WindowOpenDisposition::CURRENT_TAB, ui_test_utils::BROWSER_TEST_NONE);
+      WindowOpenDisposition::CURRENT_TAB, ui_test_utils::BROWSER_TEST_NO_WAIT);
   interstitial_timer_observer.WaitForTimerStarted();
 
   EXPECT_TRUE(contents->IsLoading());
@@ -5426,9 +5431,7 @@ IN_PROC_BROWSER_TEST_F(SSLUITest, SameDocumentHasSSLStateNoLoad) {
 
   // Simulate clicking on a bookmark.
   {
-    content::WindowedNotificationObserver observer(
-        content::NOTIFICATION_LOAD_STOP,
-        content::NotificationService::AllSources());
+    content::LoadStopObserver observer(tab);
     NavigateParams navigate_params(browser(), start_url,
                                    ui::PAGE_TRANSITION_AUTO_BOOKMARK);
     Navigate(&navigate_params);

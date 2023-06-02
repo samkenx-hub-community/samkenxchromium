@@ -45,6 +45,7 @@
 #include "base/metrics/user_metrics.h"
 #include "base/sequence_checker.h"
 #include "base/task/single_thread_task_runner.h"
+#include "chromeos/constants/chromeos_features.h"
 #include "chromeos/strings/grit/chromeos_strings.h"
 #include "chromeos/ui/vector_icons/vector_icons.h"
 #include "skia/ext/image_operations.h"
@@ -73,6 +74,7 @@
 #include "ui/views/controls/menu/menu_runner.h"
 #include "ui/views/controls/menu/menu_types.h"
 #include "ui/views/focus/focus_search.h"
+#include "ui/views/highlight_border.h"
 #include "ui/views/layout/box_layout.h"
 #include "ui/views/view_class_properties.h"
 #include "ui/views/widget/widget.h"
@@ -156,6 +158,9 @@ constexpr int kButtonMarginLeftDp = kButtonMarginRightDp - 4;
 // Spacing between the button image and label.
 constexpr int kImageLabelSpacingDp = 8;
 
+// The highlight radius of the button.
+constexpr int kButtonHighlightRadiusDp = 16;
+
 void AnimateButtonOpacity(ui::Layer* layer,
                           float target_opacity,
                           base::TimeDelta animation_duration,
@@ -206,7 +211,14 @@ class LoginShelfButton : public PillButton {
   }
 
   void UpdateButtonColors() {
-    SetEnabledTextColorIds(GetButtonTextColorId());
+    if (chromeos::features::IsJellyrollEnabled()) {
+      SetPillButtonType(PillButton::kDefaultElevatedLargeWithIconLeading);
+      SetBorder(std::make_unique<views::HighlightBorder>(
+          kButtonHighlightRadiusDp,
+          views::HighlightBorder::Type::kHighlightBorderNoShadow));
+    } else {
+      SetEnabledTextColorIds(GetButtonTextColorId());
+    }
     SetImageModel(
         views::Button::STATE_NORMAL,
         ui::ImageModel::FromVectorIcon(*icon_, GetButtonIconColorId()));

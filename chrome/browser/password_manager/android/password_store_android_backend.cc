@@ -26,7 +26,6 @@
 #include "base/task/sequenced_task_runner.h"
 #include "base/time/time.h"
 #include "chrome/browser/password_manager/android/password_manager_lifecycle_helper_impl.h"
-#include "chrome/browser/password_manager/android/password_store_android_backend_api_error_codes.h"
 #include "chrome/browser/password_manager/android/password_store_android_backend_bridge_helper.h"
 #include "chrome/browser/password_manager/android/password_store_operation_target.h"
 #include "chrome/browser/password_manager/android/password_sync_controller_delegate_android.h"
@@ -36,6 +35,7 @@
 #include "components/password_manager/core/browser/login_database.h"
 #include "components/password_manager/core/browser/password_form.h"
 #include "components/password_manager/core/browser/password_manager_eviction_util.h"
+#include "components/password_manager/core/browser/password_store_android_backend_api_error_codes.h"
 #include "components/password_manager/core/browser/password_store_backend.h"
 #include "components/password_manager/core/browser/password_store_backend_metrics_recorder.h"
 #include "components/password_manager/core/browser/password_store_util.h"
@@ -44,9 +44,9 @@
 #include "components/password_manager/core/common/password_manager_pref_names.h"
 #include "components/prefs/pref_service.h"
 #include "components/sync/base/user_selectable_type.h"
-#include "components/sync/driver/sync_service.h"
-#include "components/sync/driver/sync_user_settings.h"
 #include "components/sync/model/proxy_model_type_controller_delegate.h"
+#include "components/sync/service/sync_service.h"
+#include "components/sync/service/sync_user_settings.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 
 namespace password_manager {
@@ -932,9 +932,6 @@ void PasswordStoreAndroidBackend::OnCompleteWithLogins(
 
   // Since the API call has succeeded, it's safe to reenable saving.
   prefs_->SetBoolean(prefs::kSavePasswordsSuspendedByError, false);
-  // A successful API call means that the user is no longer in a broken auth
-  // state. Reset the counter.
-  prefs_->SetInteger(password_manager::prefs::kTimesUPMAuthErrorShown, 0);
 
   reply->RecordMetrics(/*error=*/absl::nullopt);
   DCHECK(reply->Holds<LoginsOrErrorReply>());
@@ -955,9 +952,6 @@ void PasswordStoreAndroidBackend::OnLoginsChanged(JobId job_id,
 
   // Since the API call has succeeded, it's safe to reenable saving.
   prefs_->SetBoolean(prefs::kSavePasswordsSuspendedByError, false);
-  // A successful API all means that the user is no longer in a broken auth
-  // state. Reset the counter.
-  prefs_->SetInteger(password_manager::prefs::kTimesUPMAuthErrorShown, 0);
 
   main_task_runner_->PostTask(
       FROM_HERE,

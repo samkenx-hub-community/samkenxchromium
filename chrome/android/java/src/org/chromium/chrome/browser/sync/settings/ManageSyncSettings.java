@@ -35,9 +35,9 @@ import org.chromium.base.task.PostTask;
 import org.chromium.base.task.TaskTraits;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.AppHooks;
-import org.chromium.chrome.browser.BackPressHelper;
 import org.chromium.chrome.browser.SyncFirstSetupCompleteSource;
 import org.chromium.chrome.browser.autofill.PersonalDataManager;
+import org.chromium.chrome.browser.back_press.BackPressHelper;
 import org.chromium.chrome.browser.feedback.FragmentHelpAndFeedbackLauncher;
 import org.chromium.chrome.browser.feedback.HelpAndFeedbackLauncher;
 import org.chromium.chrome.browser.profiles.Profile;
@@ -704,7 +704,7 @@ public class ManageSyncSettings extends PreferenceFragmentCompat
                 return;
             case SyncError.SYNC_SETUP_INCOMPLETE:
                 mSyncService.setSyncRequested();
-                mSyncService.setFirstSetupComplete(
+                mSyncService.setInitialSyncFeatureSetupComplete(
                         SyncFirstSetupCompleteSource.ADVANCED_FLOW_INTERRUPTED_TURN_SYNC_ON);
                 return;
             case SyncError.NO_ERROR:
@@ -724,7 +724,8 @@ public class ManageSyncSettings extends PreferenceFragmentCompat
 
     private void confirmSettings() {
         RecordUserAction.record("Signin_Signin_ConfirmAdvancedSyncSettings");
-        SyncService.get().setFirstSetupComplete(SyncFirstSetupCompleteSource.ADVANCED_FLOW_CONFIRM);
+        SyncService.get().setInitialSyncFeatureSetupComplete(
+                SyncFirstSetupCompleteSource.ADVANCED_FLOW_CONFIRM);
 
         Profile profile = Profile.getLastUsedRegularProfile();
         UnifiedConsentServiceBridge.setUrlKeyedAnonymizedDataCollectionEnabled(

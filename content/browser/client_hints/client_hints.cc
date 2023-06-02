@@ -282,7 +282,7 @@ RenderWidgetHostView* GetRenderWidgetHostViewFromFrameTreeNode(
   if (!frame_tree_node || !frame_tree_node->current_frame_host())
     return nullptr;
 
-  return frame_tree_node->current_frame_host()->GetView();
+  return frame_tree_node->current_frame_host()->GetMainFrame()->GetView();
 }
 
 gfx::Size GetViewportSize(FrameTreeNode* frame_tree_node,
@@ -588,7 +588,7 @@ struct ClientHintsExtendedData {
           frame_tree_node->GetFencedFrameProperties();
       base::span<const blink::mojom::PermissionsPolicyFeature> permissions;
       if (fenced_frame_properties) {
-        permissions = fenced_frame_properties->required_permissions_to_load;
+        permissions = fenced_frame_properties->effective_enabled_permissions;
       }
       permissions_policy = blink::PermissionsPolicy::CreateForFencedFrame(
           resource_origin, permissions);
@@ -1145,6 +1145,31 @@ ParseAndPersistAcceptCHForNavigation(
   for (const WebClientHintsType type : accept_ch) {
     enabled_hints.SetIsEnabled(outermost_main_frame_origin.GetURL(),
                                third_party_url, response_headers, type, true);
+  }
+
+  // Note that if Sec-CH-UA-Reduced or Sec-CH-UA-Full is persisted for an
+  // embedded frame and the response has a valid origin trial token, we should
+  // append the hint to Accept-CH cache instead of overwrite existing Accept-CH
+  // cache.
+  //
+  // TODO(crbug.com/1258063): Delete this call when the UserAgentReduction
+  // Origin Trial is finished.
+  if (!frame_tree_node->IsMainFrame()) {
+    // If embedded frame has no valid origin trial token, then stop update the
+    // Accept-CH cache.
+    if (!enabled_hints.IsEnabled(WebClientHintsType::kUAReduced) &&
+        !enabled_hints.IsEnabled(WebClientHintsType::kFullUserAgent)) {
+      return absl::nullopt;
+    }
+
+    // Add existing client hints to the enabled hints which contains the origin
+    // trial client hints to update the Accept-CH cache.
+    blink::EnabledClientHints existing_hints;
+    DCHECK(delegate);
+    delegate->GetAllowedClientHintsFromSource(origin, &existing_hints);
+    for (const WebClientHintsType type : existing_hints.GetEnabledHints()) {
+      enabled_hints.SetIsEnabled(type, true);
+    }
   }
 
   const std::vector<WebClientHintsType> persisted_hints =

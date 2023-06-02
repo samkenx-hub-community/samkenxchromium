@@ -4,6 +4,8 @@
 #ifndef COMPONENTS_FEED_CORE_V2_VIEW_DEMOTION_H_
 #define COMPONENTS_FEED_CORE_V2_VIEW_DEMOTION_H_
 
+#include <stdint.h>
+
 #include <iosfwd>
 #include <vector>
 #include "base/functional/callback_forward.h"
@@ -24,7 +26,7 @@ struct DocViewCount {
   // Uniquely identifies content.
   uint64_t docid = 0;
   // Number of views.
-  uint64_t view_count = 0;
+  int64_t view_count = 0;
 
   bool operator==(const DocViewCount& rhs) const;
 };

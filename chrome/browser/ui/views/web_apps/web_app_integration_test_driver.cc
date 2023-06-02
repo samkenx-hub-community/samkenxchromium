@@ -161,6 +161,7 @@
 #if BUILDFLAG(IS_MAC)
 #include <ImageIO/ImageIO.h>
 
+#include "base/mac/mac_util.h"
 #include "base/process/launch.h"
 #include "chrome/browser/apps/app_shim/app_shim_manager_mac.h"
 #include "chrome/browser/apps/app_shim/web_app_shim_manager_delegate_mac.h"
@@ -169,6 +170,8 @@
 #include "chrome/browser/web_applications/app_shim_registry_mac.h"
 #include "chrome/browser/web_applications/os_integration/web_app_shortcut_mac.h"
 #include "chrome/browser/web_applications/web_app_ui_manager.h"
+#include "chrome/common/mac/app_mode_common.h"
+#include "chrome/test/base/launchservices_utils_mac.h"
 #include "net/base/filename_util.h"
 #include "skia/ext/skia_utils_mac.h"
 #endif
@@ -471,7 +474,7 @@ class PageLoadWaiter final : public content::WebContentsObserver {
   base::RunLoop run_loop_;
 };
 
-Browser* GetBrowserForAppId(const Profile* profile, const AppId& app_id) {
+Browser* GetAppBrowserForAppId(const Profile* profile, const AppId& app_id) {
   const BrowserList* browser_list = BrowserList::GetInstance();
   for (auto it = browser_list->begin_browsers_ordered_by_activation();
        it != browser_list->end_browsers_ordered_by_activation(); ++it) {
@@ -487,7 +490,22 @@ Browser* GetBrowserForAppId(const Profile* profile, const AppId& app_id) {
 }
 
 bool AreAppBrowsersOpen(const Profile* profile, const AppId& app_id) {
-  return GetBrowserForAppId(profile, app_id) != nullptr;
+  return GetAppBrowserForAppId(profile, app_id) != nullptr;
+}
+
+content::WebContents* GetAnyWebContentsForAppId(const AppId& app_id) {
+  auto* browser_list = BrowserList::GetInstance();
+  for (Browser* browser : *browser_list) {
+    for (int i = 0; i < browser->tab_strip_model()->GetTabCount(); i++) {
+      content::WebContents* web_contents =
+          browser->tab_strip_model()->GetWebContentsAt(i);
+      const AppId* web_contents_id = WebAppTabHelper::GetAppId(web_contents);
+      if (web_contents_id && *web_contents_id == app_id) {
+        return web_contents;
+      }
+    }
+  }
+  return nullptr;
 }
 
 class UninstallCompleteWaiter final : public BrowserListObserver,
@@ -952,13 +970,13 @@ void WebAppIntegrationTestDriver::AwaitManifestUpdate(Site site) {
     // Only close windows if immediate updating is not enabled.
     if (!base::FeatureList::IsEnabled(
             features::kWebAppManifestImmediateUpdating)) {
-      Browser* browser = GetBrowserForAppId(profile(), app_id);
+      Browser* browser = GetAppBrowserForAppId(profile(), app_id);
       while (browser != nullptr) {
         if (browser == app_browser_) {
           app_browser_ = nullptr;
         }
         delegate_->CloseBrowserSynchronously(browser);
-        browser = GetBrowserForAppId(profile(), app_id);
+        browser = GetAppBrowserForAppId(profile(), app_id);
       }
     }
     waiting_for_update_run_loop_->Run();
@@ -1253,8 +1271,8 @@ void WebAppIntegrationTestDriver::InstallSubApp(
 
   std::string sub_url = GetSiteConfiguration(subapp).relative_url;
   // The argument of add() is a dictionary-valued dictionary:
-  // { $unhashed_app_id : {'installURL' : $installURL} }
-  // In our case, both $unhashed_app_id and $installURL are sub_url.
+  // { $manifest_id : {'installURL' : $installURL} }
+  // In our case, both $manifest_id and $installURL are sub_url.
   base::Value::Dict inner_dict;
   inner_dict.Set("installURL", sub_url);
   base::Value::Dict outer_dict;
@@ -1510,7 +1528,7 @@ void WebAppIntegrationTestDriver::LaunchFromChromeApps(Site site) {
 
   // The app_browser_ is needed only for apps that open in a new window, and is
   // nullptr for apps that launch in a tab.
-  app_browser_ = GetBrowserForAppId(profile(), app_id);
+  app_browser_ = GetAppBrowserForAppId(profile(), app_id);
   active_app_id_ = app_id;
 #endif
   AfterStateChangeAction();
@@ -1597,7 +1615,7 @@ void WebAppIntegrationTestDriver::LaunchFromPlatformShortcut(Site site) {
     // If there already is an open app browser for this app the launch is not
     // expected to open a new one, so only wait for a new browser to be added
     // if there wasn't an open one already.
-    app_browser_ = GetBrowserForAppId(profile(), app_id);
+    app_browser_ = GetAppBrowserForAppId(profile(), app_id);
     bool had_open_browsers = false;
     for (auto* profile : GetAllProfiles()) {
       auto* provider = GetProviderForProfile(profile);
@@ -2317,7 +2335,7 @@ void WebAppIntegrationTestDriver::UninstallPolicyApp(Site site) {
       }));
   // If there are still install sources, the app might not be fully uninstalled,
   // so this will listen for the removal of the policy install source.
-  provider()->install_finalizer().SetRemoveManagementTypeCallbackForTesting(
+  observer.SetWebAppSourceRemovedDelegate(
       base::BindLambdaForTesting([&](const AppId& app_id) {
         if (policy_app->id == app_id) {
           run_loop.Quit();
@@ -2372,7 +2390,8 @@ void WebAppIntegrationTestDriver::UninstallFromOs(Site site) {
 }
 
 #if BUILDFLAG(IS_MAC)
-void WebAppIntegrationTestDriver::CorruptAppShim(Site site) {
+void WebAppIntegrationTestDriver::CorruptAppShim(Site site,
+                                                 AppShimCorruption corruption) {
   if (!BeforeStateChangeAction(__FUNCTION__)) {
     return;
   }
@@ -2385,7 +2404,35 @@ void WebAppIntegrationTestDriver::CorruptAppShim(Site site) {
   base::FilePath bin_path = app_path.AppendASCII("Contents")
                                 .AppendASCII("MacOS")
                                 .AppendASCII("app_mode_loader");
-  EXPECT_TRUE(base::DeleteFile(bin_path));
+
+  switch (corruption) {
+    case AppShimCorruption::kNoExecutable:
+      EXPECT_TRUE(base::DeleteFile(bin_path));
+      break;
+    case AppShimCorruption::kIncompatibleVersion: {
+      // Find and replace the entry point symbol in the app shim executable with
+      // something that definitely doesn't exist in the Chrome framework.
+      std::string bin_contents;
+      EXPECT_TRUE(base::ReadFileToString(bin_path, &bin_contents));
+      auto pos = bin_contents.find(APP_SHIM_ENTRY_POINT_NAME_STRING);
+      ASSERT_NE(pos, std::string::npos);
+      bin_contents[pos] = 'D';
+      EXPECT_TRUE(base::WriteFile(bin_path, bin_contents));
+
+      // Since we modified the binary, we need to re-sign it.
+      if (base::mac::IsAtLeastOS12()) {
+        std::string codesign_output;
+        std::vector<std::string> codesign_argv = {
+            "codesign", "--force", "--sign", "-", bin_path.value()};
+        EXPECT_TRUE(base::GetAppOutputAndError(base::CommandLine(codesign_argv),
+                                               &codesign_output))
+            << "Failed to sign executable at " << bin_path << ": "
+            << codesign_output;
+      }
+      break;
+    }
+  }
+
   AfterStateChangeAction();
 }
 
@@ -3361,14 +3408,18 @@ void WebAppIntegrationTestDriver::CheckWindowDisplayStandalone() {
   AfterStateCheckAction();
 }
 
-void WebAppIntegrationTestDriver::CheckHasSubApp(Site subapp) {
+void WebAppIntegrationTestDriver::CheckHasSubApp(Site parent_app,
+                                                 Site sub_app) {
   if (!BeforeStateCheckAction(__FUNCTION__)) {
     return;
   }
-  content::WebContents* web_contents =
-      app_browser()->tab_strip_model()->GetActiveWebContents();
 
-  auto subapp_url = GetSiteConfiguration(subapp).relative_url;
+  content::WebContents* web_contents =
+      GetAnyWebContentsForAppId(GetAppIdBySiteMode(parent_app));
+  ASSERT_TRUE(web_contents)
+      << "No open tab or window for the parent app was found.";
+
+  auto sub_app_url = GetSiteConfiguration(sub_app).relative_url;
 
   const base::Value& list_result =
       content::EvalJs(web_contents, "navigator.subApps.list()").value;
@@ -3376,37 +3427,44 @@ void WebAppIntegrationTestDriver::CheckHasSubApp(Site subapp) {
   const base::Value::Dict& list_result_dict = list_result.GetDict();
 
   // Check that list() contained the subapp_url key.
-  EXPECT_NE(nullptr, list_result_dict.FindDict(subapp_url));
+  EXPECT_NE(nullptr, list_result_dict.FindDict(sub_app_url));
 
   AfterStateCheckAction();
 }
 
-void WebAppIntegrationTestDriver::CheckNotHasSubApp(Site subapp) {
+void WebAppIntegrationTestDriver::CheckNotHasSubApp(Site parent_app,
+                                                    Site sub_app) {
   if (!BeforeStateCheckAction(__FUNCTION__)) {
     return;
   }
-  content::WebContents* web_contents =
-      app_browser()->tab_strip_model()->GetActiveWebContents();
 
-  auto subapp_url = GetSiteConfiguration(subapp).relative_url;
+  content::WebContents* web_contents =
+      GetAnyWebContentsForAppId(GetAppIdBySiteMode(parent_app));
+  ASSERT_TRUE(web_contents)
+      << "No open tab or window for the parent app was found.";
+
+  auto sub_app_url = GetSiteConfiguration(sub_app).relative_url;
 
   const base::Value& list_result =
       content::EvalJs(web_contents, "navigator.subApps.list()").value;
 
   const base::Value::Dict& list_result_dict = list_result.GetDict();
 
-  // Check that list() did not contain the subapp_url key.
-  EXPECT_EQ(nullptr, list_result_dict.FindDict(subapp_url));
+  // Check that list() did not contain the sub_app_url key.
+  EXPECT_EQ(nullptr, list_result_dict.FindDict(sub_app_url));
 
   AfterStateCheckAction();
 }
 
-void WebAppIntegrationTestDriver::CheckNoSubApps() {
+void WebAppIntegrationTestDriver::CheckNoSubApps(Site parent_app) {
   if (!BeforeStateCheckAction(__FUNCTION__)) {
     return;
   }
+
   content::WebContents* web_contents =
-      app_browser()->tab_strip_model()->GetActiveWebContents();
+      GetAnyWebContentsForAppId(GetAppIdBySiteMode(parent_app));
+  ASSERT_TRUE(web_contents)
+      << "No open tab or window for the parent app was found.";
 
   const base::Value& result =
       content::EvalJs(web_contents, "navigator.subApps.list()").value;
@@ -3786,6 +3844,10 @@ void WebAppIntegrationTestDriver::InstallPolicyAppInternal(
     base::Value default_launch_container,
     const bool create_shortcut,
     const bool install_as_shortcut) {
+  // Many CUJs rely on operating on an opened window / tab after installation,
+  // and this state is true for all installations except for policy install. To
+  // help keep CUJs combined for all installs, do a navigation here.
+  MaybeNavigateTabbedBrowserInScope(site);
   GURL url = GetUrlForSite(site);
   WebAppTestInstallWithOsHooksObserver observer(profile());
   observer.BeginListening();
@@ -3835,14 +3897,14 @@ void WebAppIntegrationTestDriver::UninstallPolicyAppById(Profile* profile,
       }));
   // If there are still install sources, the app might not be fully uninstalled,
   // so this will listen for the removal of the policy install source.
-  WebAppProvider* provider = WebAppProvider::GetForTest(profile);
-  provider->install_finalizer().SetRemoveManagementTypeCallbackForTesting(
+  observer.SetWebAppSourceRemovedDelegate(
       base::BindLambdaForTesting([&](const AppId& app_id) {
         if (id == app_id) {
           run_loop.Quit();
         }
       }));
 
+  WebAppProvider* provider = WebAppProvider::GetForTest(profile);
   const WebApp* web_app = provider->registrar_unsafe().GetAppById(id);
   ASSERT_TRUE(web_app);
 
@@ -4154,14 +4216,20 @@ bool WebAppIntegrationTestDriver::LaunchFromAppShim(
       override_registration_->test_override->chrome_apps_folder(), app_name,
       app_id);
 
+  base::FilePath chrome_path = ::test::GuessAppBundlePath();
+  chrome_path =
+      chrome_path.Append("Contents")
+          .Append("MacOS")
+          .Append(chrome_path.BaseName().RemoveFinalExtension().value());
+
   AppShimLaunchWaiter launch_waiter(wait_for_complete_launch);
   apps::AppShimManager::Get()->SetAppShimObserverForTesting(&launch_waiter);
-
   LaunchShimForTesting(app_path, urls,
                        base::BindOnce(&AppShimLaunchWaiter::OnLaunchStarted,
                                       launch_waiter.AsWeakPtr()),
                        base::BindOnce(&AppShimLaunchWaiter::OnShimTerminated,
-                                      launch_waiter.AsWeakPtr()));
+                                      launch_waiter.AsWeakPtr()),
+                       chrome_path);
   launch_waiter.Wait();
 
   apps::AppShimManager::Get()->SetAppShimObserverForTesting(nullptr);

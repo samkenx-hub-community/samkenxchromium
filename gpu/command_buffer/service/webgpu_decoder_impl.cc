@@ -38,7 +38,7 @@
 #include "gpu/command_buffer/service/isolation_key_provider.h"
 #include "gpu/command_buffer/service/shared_context_state.h"
 #include "gpu/command_buffer/service/shared_image/shared_image_factory.h"
-#include "gpu/command_buffer/service/shared_image/shared_image_format_utils.h"
+#include "gpu/command_buffer/service/shared_image/shared_image_format_service_utils.h"
 #include "gpu/command_buffer/service/shared_image/shared_image_manager.h"
 #include "gpu/command_buffer/service/shared_image/shared_image_representation.h"
 #include "gpu/command_buffer/service/skia_utils.h"
@@ -51,8 +51,10 @@
 #include "third_party/blink/public/common/tokens/tokens.h"
 #include "third_party/skia/include/core/SkPromiseImageTexture.h"
 #include "third_party/skia/include/gpu/GrBackendSemaphore.h"
+#include "third_party/skia/include/gpu/ganesh/SkSurfaceGanesh.h"
 
 #if BUILDFLAG(IS_WIN)
+#include <dawn/native/D3D11Backend.h>
 #include <dawn/native/D3D12Backend.h>
 #include "ui/gl/gl_angle_util_win.h"
 #endif
@@ -380,10 +382,11 @@ class WebGPUDecoderImpl final : public WebGPUDecoder {
   // only if not returning an error.
   error::Error current_decoder_error_ = error::kNoError;
 
-  void DiscoverAdapters();
+  void DiscoverPhysicalDevices();
 
   WGPUAdapter CreatePreferredAdapter(WGPUPowerPreference power_preference,
-                                     bool force_fallback) const;
+                                     bool force_fallback,
+                                     bool compatibility_mode) const;
 
   // Decide if a device feature is exposed to render process.
   bool IsFeatureExposed(WGPUAdapter adapter, WGPUFeatureName feature) const;
@@ -446,6 +449,7 @@ class WebGPUDecoderImpl final : public WebGPUDecoder {
   WebGPUAdapterName use_webgpu_adapter_ = WebGPUAdapterName::kDefault;
   WebGPUPowerPreference use_webgpu_power_preference_ =
       WebGPUPowerPreference::kNone;
+  bool force_webgpu_compat_ = false;
   std::vector<std::string> require_enabled_toggles_;
   std::vector<std::string> require_disabled_toggles_;
   bool allow_unsafe_apis_;
@@ -613,7 +617,7 @@ class WebGPUDecoderImpl final : public WebGPUDecoder {
       DCHECK(buffer_size);
 
       base::CheckedNumeric<uint32_t> checked_bytes_per_row(
-          BitsPerPixel(format) / 8);
+          format.BitsPerPixel() / 8);
       checked_bytes_per_row *= size.width();
 
       uint32_t packed_bytes_per_row;
@@ -854,7 +858,7 @@ class WebGPUDecoderImpl final : public WebGPUDecoder {
 
       // It's ok to pass in empty GrFlushInfo here since SignalSemaphores()
       // will populate it with semaphores and call GrDirectContext::flush.
-      surface->flush();
+      skgpu::ganesh::Flush(surface);
       // Transition the image back to the desired end state. This is used for
       // transitioning the image to the external queue for Vulkan/GL interop.
       scoped_write_access->ApplyBackendSurfaceEndState();
@@ -1102,6 +1106,7 @@ WebGPUDecoderImpl::WebGPUDecoderImpl(
   enable_unsafe_webgpu_ = gpu_preferences.enable_unsafe_webgpu;
   use_webgpu_adapter_ = gpu_preferences.use_webgpu_adapter;
   use_webgpu_power_preference_ = gpu_preferences.use_webgpu_power_preference;
+  force_webgpu_compat_ = gpu_preferences.force_webgpu_compat;
   require_enabled_toggles_ = gpu_preferences.enabled_dawn_features_list;
   require_disabled_toggles_ = gpu_preferences.disabled_dawn_features_list;
 
@@ -1178,7 +1183,7 @@ ContextResult WebGPUDecoderImpl::Initialize(
     use_webgpu_adapter_ = WebGPUAdapterName::kSwiftShader;
   }
 
-  DiscoverAdapters();
+  DiscoverPhysicalDevices();
   return ContextResult::kSuccess;
 }
 
@@ -1189,6 +1194,8 @@ bool WebGPUDecoderImpl::IsFeatureExposed(WGPUAdapter adapter,
     case WGPUFeatureName_TimestampQueryInsidePasses:
     case WGPUFeatureName_PipelineStatisticsQuery:
     case WGPUFeatureName_ChromiumExperimentalDp4a:
+    // TODO(dawn:1664): Enable Float32Filterable by default once it is tested.
+    case WGPUFeatureName_Float32Filterable:
     // TODO(crbug.com/1258986): DawnMultiPlanarFormats is a stable feature in
     // Dawn, but currently we hide it from Render process as unsafe apis, so
     // that 0-copy code path, which explicitly checks this feature, is protected
@@ -1248,8 +1255,9 @@ void WebGPUDecoderImpl::RequestAdapterImpl(
 #endif  // BUILDFLAG(IS_LINUX)
   }
 
-  WGPUAdapter adapter =
-      CreatePreferredAdapter(options->powerPreference, force_fallback_adapter);
+  WGPUAdapter adapter = CreatePreferredAdapter(
+      options->powerPreference, force_fallback_adapter,
+      options->compatibilityMode || force_webgpu_compat_);
 
   if (adapter == nullptr) {
     // There are no adapters to return since webgpu is not supported here
@@ -1509,7 +1517,7 @@ bool WebGPUDecoderImpl::use_blocklist() const {
            base::Contains(require_disabled_toggles_, "adapter_blocklist"));
 }
 
-void WebGPUDecoderImpl::DiscoverAdapters() {
+void WebGPUDecoderImpl::DiscoverPhysicalDevices() {
   dawn_instance_->EnableAdapterBlocklist(use_blocklist());
 
 #if BUILDFLAG(IS_WIN)
@@ -1524,32 +1532,41 @@ void WebGPUDecoderImpl::DiscoverAdapters() {
   d3d11_device.As(&dxgi_device);
   Microsoft::WRL::ComPtr<IDXGIAdapter> dxgi_adapter;
   dxgi_device->GetAdapter(&dxgi_adapter);
-  dawn::native::d3d12::AdapterDiscoveryOptions options(std::move(dxgi_adapter));
-  dawn_instance_->DiscoverAdapters(&options);
+
+  dawn::native::d3d12::PhysicalDeviceDiscoveryOptions d3d12Options(
+      dxgi_adapter);
+  dawn_instance_->DiscoverPhysicalDevices(&d3d12Options);
+
+  if (use_webgpu_adapter_ == WebGPUAdapterName::kD3D11) {
+    dawn::native::d3d11::PhysicalDeviceDiscoveryOptions d3d11Options(
+        std::move(dxgi_adapter));
+    dawn_instance_->DiscoverPhysicalDevices(&d3d11Options);
+  }
 
 #if BUILDFLAG(ENABLE_VULKAN)
-  // Also discover the SwiftShader adapter. It will be discovered by default
-  // for other OSes in DiscoverDefaultAdapters.
-  dawn::native::vulkan::AdapterDiscoveryOptions swiftShaderOptions;
+  // Also discover the SwiftShader physical device. It will be discovered by
+  // default for other OSes in DiscoverDefaultPhysicalDevices.
+  dawn::native::vulkan::PhysicalDeviceDiscoveryOptions swiftShaderOptions;
   swiftShaderOptions.forceSwiftShader = true;
-  dawn_instance_->DiscoverAdapters(&swiftShaderOptions);
+  dawn_instance_->DiscoverPhysicalDevices(&swiftShaderOptions);
 #endif  // BUILDFLAG(ENABLE_VULKAN)
   if (use_webgpu_adapter_ == WebGPUAdapterName::kOpenGLES) {
-    // Discover default adapters to also discover the OpenGLES adapter.
+    // Discover default physical devices to also discover the OpenGLES one.
     // TODO(senorblanco): This may incorrectly discover a compat adapter that
     // does not match the one ANGLE is using.
-    dawn_instance_->DiscoverDefaultAdapters();
+    dawn_instance_->DiscoverDefaultPhysicalDevices();
   }
 #else   // BUILDFLAG(IS_WIN)
-  // Only discover default adapters on non-Windows. Windows requires
+  // Only discover default physical devices on non-Windows. Windows requires
   // compatibility with ANGLE. Other adapters will not be compatible.
-  dawn_instance_->DiscoverDefaultAdapters();
+  dawn_instance_->DiscoverDefaultPhysicalDevices();
 #endif  // BUILDFLAG(IS_WIN)
 }
 
 WGPUAdapter WebGPUDecoderImpl::CreatePreferredAdapter(
     WGPUPowerPreference power_preference,
-    bool force_fallback) const {
+    bool force_fallback,
+    bool compatibility_mode) const {
   // Build the list of available adapters.
   std::vector<dawn::native::Adapter> adapters;
   for (dawn::native::Adapter& adapter : dawn_instance_->GetAdapters()) {
@@ -1574,7 +1591,15 @@ WGPUAdapter WebGPUDecoderImpl::CreatePreferredAdapter(
       continue;
     }
 
-    if (use_webgpu_adapter_ == WebGPUAdapterName::kOpenGLES) {
+    if (compatibility_mode != adapterProperties.compatibilityMode) {
+      continue;
+    }
+
+    if (use_webgpu_adapter_ == WebGPUAdapterName::kD3D11) {
+      if (adapterProperties.backendType == WGPUBackendType_D3D11) {
+        adapters.push_back(adapter);
+      }
+    } else if (use_webgpu_adapter_ == WebGPUAdapterName::kOpenGLES) {
       if (adapterProperties.backendType == WGPUBackendType_OpenGLES) {
         adapters.push_back(adapter);
       }

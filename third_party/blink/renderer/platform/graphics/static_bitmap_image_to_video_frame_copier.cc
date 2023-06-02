@@ -7,7 +7,7 @@
 #include "base/functional/callback_helpers.h"
 #include "base/trace_event/trace_event.h"
 #include "build/build_config.h"
-#include "components/viz/common/resources/resource_format_utils.h"
+#include "components/viz/common/resources/shared_image_format_utils.h"
 #include "gpu/command_buffer/client/raster_interface.h"
 #include "media/base/video_frame.h"
 #include "media/base/video_util.h"
@@ -102,8 +102,8 @@ void StaticBitmapImageToVideoFrameCopier::Convert(
       // format that is backing `image->GetMailboxHolder()`, or, alternatively,
       // expose an accelerated SkImage.
       if (accelerated_frame_pool_->CopyRGBATextureToVideoFrame(
-              viz::SharedImageFormat::SinglePlane(
-                  viz::SkColorTypeToResourceFormat(kRGBA_8888_SkColorType)),
+              viz::SkColorTypeToSinglePlaneSharedImageFormat(
+                  kRGBA_8888_SkColorType),
               gfx::Size(image->width(), image->height()),
               gfx::ColorSpace::CreateSRGB(),
               image->IsOriginTopLeft() ? kTopLeft_GrSurfaceOrigin
@@ -272,7 +272,7 @@ void StaticBitmapImageToVideoFrameCopier::OnYUVPixelsReadAsync(
     DLOG(ERROR) << "Couldn't read SkImage using async callback";
     return;
   }
-  yuv_frame->set_color_space(gfx::ColorSpace::CreateREC709());
+  yuv_frame->set_color_space(gfx::ColorSpace::CreateREC601());
   std::move(callback).Run(yuv_frame);
 }
 

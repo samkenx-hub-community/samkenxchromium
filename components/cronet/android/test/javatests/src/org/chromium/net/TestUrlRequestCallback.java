@@ -4,13 +4,12 @@
 
 package org.chromium.net;
 
-import static junit.framework.Assert.assertEquals;
+import static com.google.common.truth.Truth.assertThat;
+
 import static junit.framework.Assert.assertFalse;
-import static junit.framework.Assert.assertNotNull;
-import static junit.framework.Assert.assertNull;
 import static junit.framework.Assert.assertTrue;
 
-import static org.chromium.net.CronetTestRule.assertContains;
+import static org.junit.Assert.fail;
 
 import android.os.ConditionVariable;
 import android.os.StrictMode;
@@ -198,7 +197,7 @@ public class TestUrlRequestCallback extends UrlRequest.Callback {
             // Termination shouldn't take long. Use 1 min which should be more than enough.
             mExecutorService.awaitTermination(1, TimeUnit.MINUTES);
         } catch (InterruptedException e) {
-            assertTrue("ExecutorService is interrupted while waiting for termination", false);
+            fail("ExecutorService is interrupted while waiting for termination");
         }
         assertTrue(mExecutorService.isTerminated());
     }
@@ -210,7 +209,7 @@ public class TestUrlRequestCallback extends UrlRequest.Callback {
         assertFalse(request.isDone());
         assertTrue(mResponseStep == ResponseStep.NOTHING
                 || mResponseStep == ResponseStep.ON_RECEIVED_REDIRECT);
-        assertNull(mError);
+        assertThat(mError).isNull();
 
         mResponseStep = ResponseStep.ON_RECEIVED_REDIRECT;
         mRedirectUrlList.add(newLocationUrl);
@@ -228,7 +227,7 @@ public class TestUrlRequestCallback extends UrlRequest.Callback {
         assertFalse(request.isDone());
         assertTrue(mResponseStep == ResponseStep.NOTHING
                 || mResponseStep == ResponseStep.ON_RECEIVED_REDIRECT);
-        assertNull(mError);
+        assertThat(mError).isNull();
 
         mResponseStep = ResponseStep.ON_RESPONSE_STARTED;
         mResponseInfo = info;
@@ -244,7 +243,7 @@ public class TestUrlRequestCallback extends UrlRequest.Callback {
         assertFalse(request.isDone());
         assertTrue(mResponseStep == ResponseStep.ON_RESPONSE_STARTED
                 || mResponseStep == ResponseStep.ON_READ_COMPLETED);
-        assertNull(mError);
+        assertThat(mError).isNull();
 
         mResponseStep = ResponseStep.ON_READ_COMPLETED;
 
@@ -269,11 +268,11 @@ public class TestUrlRequestCallback extends UrlRequest.Callback {
     public void onSucceeded(UrlRequest request, UrlResponseInfo info) {
         checkExecutorThread();
         assertTrue(request.isDone());
-        assertTrue(mResponseStep == ResponseStep.ON_RESPONSE_STARTED
-                || mResponseStep == ResponseStep.ON_READ_COMPLETED);
+        assertThat(mResponseStep)
+                .isAnyOf(ResponseStep.ON_RESPONSE_STARTED, ResponseStep.ON_READ_COMPLETED);
         assertFalse(mOnErrorCalled);
         assertFalse(mOnCanceledCalled);
-        assertNull(mError);
+        assertThat(mError).isNull();
 
         mResponseStep = ResponseStep.ON_SUCCEEDED;
         mResponseInfo = info;
@@ -292,17 +291,17 @@ public class TestUrlRequestCallback extends UrlRequest.Callback {
         checkExecutorThread();
         assertTrue(request.isDone());
         // Shouldn't happen after success.
-        assertTrue(mResponseStep != ResponseStep.ON_SUCCEEDED);
+        assertThat(mResponseStep).isNotEqualTo(ResponseStep.ON_SUCCEEDED);
         // Should happen at most once for a single request.
         assertFalse(mOnErrorCalled);
         assertFalse(mOnCanceledCalled);
-        assertNull(mError);
+        assertThat(mError).isNull();
         if (mCallbackExceptionThrown) {
-            assertTrue(error instanceof CallbackException);
-            assertContains("Exception received from UrlRequest.Callback", error.getMessage());
-            assertNotNull(error.getCause());
-            assertTrue(error.getCause() instanceof IllegalStateException);
-            assertContains("Listener Exception.", error.getCause().getMessage());
+            assertThat(error).isInstanceOf(CallbackException.class);
+            assertThat(error).hasMessageThat().contains(
+                    "Exception received from UrlRequest.Callback");
+            assertThat(error).hasCauseThat().isInstanceOf(IllegalStateException.class);
+            assertThat(error).hasCauseThat().hasMessageThat().contains("Listener Exception.");
         }
 
         mResponseStep = ResponseStep.ON_FAILED;
@@ -320,7 +319,7 @@ public class TestUrlRequestCallback extends UrlRequest.Callback {
         // Should happen at most once for a single request.
         assertFalse(mOnCanceledCalled);
         assertFalse(mOnErrorCalled);
-        assertNull(mError);
+        assertThat(mError).isNull();
 
         mResponseStep = ResponseStep.ON_CANCELED;
         mOnCanceledCalled = true;
@@ -351,7 +350,7 @@ public class TestUrlRequestCallback extends UrlRequest.Callback {
 
     private void checkExecutorThread() {
         if (!mAllowDirectExecutor) {
-            assertEquals(mExecutorThread, Thread.currentThread());
+            assertThat(Thread.currentThread()).isEqualTo(mExecutorThread);
         }
     }
 

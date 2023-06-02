@@ -14,9 +14,11 @@
 - (void)passwordDetailsCoordinatorDidRemove:
     (PasswordDetailsCoordinator*)coordinator;
 
-// Called when a passwword is currently being deleted from the
-// details page.
-- (void)passwordDetailsWillDeletePassword;
+// Called when the user tapped on the cancel button. This is never called when
+// the view is presented in the Settings context, because in these cases there
+// is a Back button instead of Cancel.
+@optional
+- (void)passwordDetailsCancelButtonWasTapped;
 
 @end
 

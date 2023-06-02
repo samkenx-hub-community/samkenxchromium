@@ -1734,6 +1734,37 @@ void WebLocalFrameImpl::ExtendSelectionAndDelete(int before, int after) {
                                                                   after);
 }
 
+void WebLocalFrameImpl::ExtendSelectionAndReplace(
+    int before,
+    int after,
+    const WebString& replacement_text) {
+  TRACE_EVENT0("blink", "WebLocalFrameImpl::extendSelectionAndReplace");
+
+  // EditContext and WebPlugin do not support atomic replacement.
+  if (EditContext* edit_context =
+          GetFrame()->GetInputMethodController().GetActiveEditContext()) {
+    edit_context->ExtendSelectionAndDelete(before, after);
+    edit_context->CommitText(replacement_text, std::vector<ui::ImeTextSpan>(),
+                             blink::WebRange(), 0);
+    return;
+  }
+
+  if (WebPlugin* plugin = FocusedPluginIfInputMethodSupported()) {
+    plugin->ExtendSelectionAndDelete(before, after);
+    plugin->CommitText(replacement_text, std::vector<ui::ImeTextSpan>(),
+                       blink::WebRange(), 0);
+    return;
+  }
+
+  // TODO(editing-dev): The use of UpdateStyleAndLayout
+  // needs to be audited.  See http://crbug.com/590369 for more details.
+  GetFrame()->GetDocument()->UpdateStyleAndLayout(
+      DocumentUpdateReason::kSelection);
+
+  GetFrame()->GetInputMethodController().ExtendSelectionAndReplace(
+      before, after, replacement_text);
+}
+
 void WebLocalFrameImpl::DeleteSurroundingText(int before, int after) {
   TRACE_EVENT0("blink", "WebLocalFrameImpl::deleteSurroundingText");
   if (WebPlugin* plugin = FocusedPluginIfInputMethodSupported()) {
@@ -2785,9 +2816,11 @@ void WebLocalFrameImpl::DownloadURL(
                           std::move(blob_url_token));
 }
 
-void WebLocalFrameImpl::WillPotentiallyStartOutermostMainFrameNavigation(
-    const WebURL& url) const {
-  GetFrame()->WillPotentiallyStartOutermostMainFrameNavigation(url);
+void WebLocalFrameImpl::MaybeStartOutermostMainFrameNavigation(
+    const WebVector<WebURL>& urls) const {
+  Vector<KURL> kurls;
+  std::move(urls.begin(), urls.end(), std::back_inserter(kurls));
+  GetFrame()->MaybeStartOutermostMainFrameNavigation(std::move(kurls));
 }
 
 bool WebLocalFrameImpl::WillStartNavigation(const WebNavigationInfo& info) {

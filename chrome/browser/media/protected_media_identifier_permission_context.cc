@@ -10,7 +10,6 @@
 #include "base/metrics/user_metrics.h"
 #include "base/strings/string_split.h"
 #include "build/build_config.h"
-#include "build/chromeos_buildflags.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/pref_names.h"
@@ -46,13 +45,27 @@
 #error This file currently only supports Chrome OS, Android and Windows.
 #endif
 
+#if BUILDFLAG(IS_CHROMEOS_LACROS)
+#include "chromeos/crosapi/mojom/prefs.mojom.h"
+#endif  // BUILDFLAG(IS_CHROMEOS_LACROS)
+
 ProtectedMediaIdentifierPermissionContext::
     ProtectedMediaIdentifierPermissionContext(
         content::BrowserContext* browser_context)
     : PermissionContextBase(
           browser_context,
           ContentSettingsType::PROTECTED_MEDIA_IDENTIFIER,
-          blink::mojom::PermissionsPolicyFeature::kEncryptedMedia) {}
+          blink::mojom::PermissionsPolicyFeature::kEncryptedMedia) {
+#if BUILDFLAG(IS_CHROMEOS_LACROS)
+  // base::Unretained is safe because this object is built as a singleton and
+  // lives while the browser process is alive.
+  attestation_enabled_observer_ = std::make_unique<CrosapiPrefObserver>(
+      crosapi::mojom::PrefPath::kAttestationForContentProtectionEnabled,
+      base::BindRepeating(&ProtectedMediaIdentifierPermissionContext::
+                              OnAttestationEnabledChanged,
+                          base::Unretained(this)));
+#endif  // BUILDFLAG(IS_CHROMEOS_LACROS)
+}
 
 ProtectedMediaIdentifierPermissionContext::
     ~ProtectedMediaIdentifierPermissionContext() {
@@ -67,7 +80,8 @@ ProtectedMediaIdentifierPermissionContext::GetPermissionStatusInternal(
            << embedding_origin.spec() << ")";
 
   if (!requesting_origin.is_valid() || !embedding_origin.is_valid() ||
-      !IsProtectedMediaIdentifierEnabled()) {
+      !IsProtectedMediaIdentifierEnabled(
+          Profile::FromBrowserContext(browser_context()))) {
     return CONTENT_SETTING_BLOCK;
   }
 
@@ -127,12 +141,13 @@ void ProtectedMediaIdentifierPermissionContext::UpdateTabContext(
 
 // TODO(xhwang): We should consolidate the "protected content" related pref
 // across platforms.
+// static
 bool ProtectedMediaIdentifierPermissionContext::
-    IsProtectedMediaIdentifierEnabled() const {
+    IsProtectedMediaIdentifierEnabled(Profile* profile) {
 #if BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_WIN)
-  Profile* profile = Profile::FromBrowserContext(browser_context());
   // Identifier is not allowed in incognito or guest mode.
-  if (profile->IsOffTheRecord() || profile->IsGuestSession()) {
+  if (profile != nullptr &&
+      (profile->IsOffTheRecord() || profile->IsGuestSession())) {
     DVLOG(1) << "Protected media identifier disabled in incognito or guest "
                 "mode.";
     return false;
@@ -146,20 +161,32 @@ bool ProtectedMediaIdentifierPermissionContext::
     return false;
   }
 
-#if BUILDFLAG(IS_CHROMEOS_ASH)
   // This could be disabled by the device policy or by a switch in content
   // settings.
-  bool enabled_for_device = false;
+  bool attestation_enabled = true;
+#if BUILDFLAG(IS_CHROMEOS_ASH)
   if (!ash::CrosSettings::Get()->GetBoolean(
-          ash::kAttestationForContentProtectionEnabled, &enabled_for_device) ||
-      !enabled_for_device) {
+          ash::kAttestationForContentProtectionEnabled, &attestation_enabled)) {
+    attestation_enabled = false;
+  }
+#elif BUILDFLAG(IS_CHROMEOS_LACROS)
+  attestation_enabled = attestation_enabled_;
+#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
+  if (!attestation_enabled) {
     DVLOG(1) << "Protected media identifier disabled by the user or by device "
                 "policy.";
     return false;
   }
-#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 #endif  // BUILDFLAG(IS_CHROMEOS)
 #endif  // BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_WIN)
 
   return true;
 }
+
+#if BUILDFLAG(IS_CHROMEOS_LACROS)
+void ProtectedMediaIdentifierPermissionContext::OnAttestationEnabledChanged(
+    base::Value value) {
+  DCHECK(value.is_bool());
+  attestation_enabled_ = value.GetBool();
+}
+#endif  // BUILDFLAG(IS_CHROMEOS_LACROS)

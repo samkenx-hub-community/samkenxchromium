@@ -4,10 +4,13 @@
 
 #include "services/network/attribution/attribution_request_helper.h"
 
+#include <stdint.h>
+
 #include <functional>
 #include <memory>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "base/check.h"
 #include "base/feature_list.h"
@@ -15,6 +18,7 @@
 #include "base/functional/callback.h"
 #include "base/memory/ptr_util.h"
 #include "base/metrics/histogram_functions.h"
+#include "base/rand_util.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_piece.h"
 #include "base/uuid.h"
@@ -26,8 +30,8 @@
 #include "services/network/attribution/attribution_verification_mediator.h"
 #include "services/network/attribution/attribution_verification_mediator_metrics_recorder.h"
 #include "services/network/attribution/boringssl_verification_cryptographer.h"
+#include "services/network/attribution/request_headers_internal.h"
 #include "services/network/public/cpp/attribution_reporting_runtime_features.h"
-#include "services/network/public/cpp/attribution_utils.h"
 #include "services/network/public/cpp/features.h"
 #include "services/network/public/cpp/is_potentially_trustworthy.h"
 #include "services/network/public/cpp/resource_request.h"
@@ -285,41 +289,38 @@ void AttributionRequestHelper::OnDoneProcessingVerificationResponse(
 // https://wicg.github.io/attribution-reporting-api/#mark-a-request-for-attribution-reporting-eligibility
 void SetAttributionReportingHeaders(net::URLRequest& url_request,
                                     const ResourceRequest& request) {
-  base::StringPiece eligibility_header;
-  switch (request.attribution_reporting_eligibility) {
-    case AttributionReportingEligibility::kUnset:
-      return;
-    case AttributionReportingEligibility::kEmpty:
-      eligibility_header = "";
-      break;
-    case AttributionReportingEligibility::kEventSource:
-      eligibility_header = "event-source";
-      break;
-    case AttributionReportingEligibility::kNavigationSource:
-      eligibility_header = "navigation-source";
-      break;
-    case AttributionReportingEligibility::kTrigger:
-      eligibility_header = "trigger";
-      break;
-    case AttributionReportingEligibility::kEventSourceOrTrigger:
-      eligibility_header = "event-source, trigger";
-      break;
+  if (request.attribution_reporting_eligibility ==
+      AttributionReportingEligibility::kUnset) {
+    return;
   }
+
+  uint64_t grease_bits = base::RandUint64();
+
+  std::string eligible_header = SerializeAttributionReportingEligibleHeader(
+      request.attribution_reporting_eligibility,
+      AttributionReportingHeaderGreaseOptions::FromBits(grease_bits & 0xff));
+  grease_bits >>= 8;
+
   url_request.SetExtraRequestHeaderByName("Attribution-Reporting-Eligible",
-                                          eligibility_header,
+                                          std::move(eligible_header),
                                           /*overwrite=*/true);
 
   // Note that it's important that the network process check both the
   // base::Feature (which is set from the browser, so trustworthy) and the
   // runtime feature (which can be spoofed in a compromised renderer, so is
   // best-effort).
-  if (request.attribution_reporting_runtime_features.cross_app_web_enabled &&
+  if (request.attribution_reporting_runtime_features.Has(
+          AttributionReportingRuntimeFeature::kCrossAppWeb) &&
       base::FeatureList::IsEnabled(
           features::kAttributionReportingCrossAppWeb)) {
     url_request.SetExtraRequestHeaderByName(
         "Attribution-Reporting-Support",
-        GetAttributionSupportHeader(request.attribution_reporting_support),
+        GetAttributionSupportHeader(
+            request.attribution_reporting_support,
+            AttributionReportingHeaderGreaseOptions::FromBits(grease_bits &
+                                                              0xff)),
         /*overwrite=*/true);
+    grease_bits >>= 8;
   }
 }
 

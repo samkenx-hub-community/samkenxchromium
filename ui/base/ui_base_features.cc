@@ -110,7 +110,7 @@ BASE_FEATURE(kLacrosResourcesFileSharing,
 // Enabling this fixes b/265853952.
 BASE_FEATURE(kAlwaysConfirmComposition,
              "AlwaysConfirmComposition",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+             base::FEATURE_DISABLED_BY_DEFAULT);
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 
 // Update of the virtual keyboard settings UI as described in
@@ -391,7 +391,8 @@ bool IsSwipeToMoveCursorEnabled() {
       base::android::BuildInfo::GetInstance()->sdk_int() >=
       base::android::SDK_VERSION_R;
 #else
-      base::FeatureList::IsEnabled(kSwipeToMoveCursor);
+      base::FeatureList::IsEnabled(kSwipeToMoveCursor) ||
+      IsTouchTextEditingRedesignEnabled();
 #endif
   return enabled;
 }
@@ -430,7 +431,8 @@ BASE_FEATURE(kEnableVariableRefreshRate,
              "EnableVariableRefreshRate",
              base::FEATURE_DISABLED_BY_DEFAULT);
 bool IsVariableRefreshRateEnabled() {
-  return base::FeatureList::IsEnabled(kEnableVariableRefreshRate);
+  return base::FeatureList::GetStateIfOverridden(kEnableVariableRefreshRate)
+      .value_or(base::FeatureList::IsEnabled(kEnableVariableRefreshRate));
 }
 
 // Fixes b/267944900.
@@ -443,23 +445,10 @@ BASE_FEATURE(kWaylandCancelComposition,
              "WaylandCancelComposition",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-BASE_FEATURE(kWaylandScreenCoordinatesEnabled,
-             "WaylandScreenCoordinatesEnabled",
-#if BUILDFLAG(IS_CHROMEOS_LACROS)
-             base::FEATURE_ENABLED_BY_DEFAULT
-#else
-             base::FEATURE_DISABLED_BY_DEFAULT
-#endif
-);
-
-bool IsWaylandScreenCoordinatesEnabled() {
-  return base::FeatureList::IsEnabled(kWaylandScreenCoordinatesEnabled);
-}
-
 // Enables chrome color management wayland protocol for lacros.
 BASE_FEATURE(kLacrosColorManagement,
              "LacrosColorManagement",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 bool IsLacrosColorManagementEnabled() {
   return base::FeatureList::IsEnabled(kLacrosColorManagement);
@@ -502,7 +491,7 @@ ChromeRefresh2023Level GetChromeRefresh2023Level() {
 #if !BUILDFLAG(IS_LINUX)
 BASE_FEATURE(kWebUiSystemFont,
              "WebUiSystemFont",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 #endif
 
 #if BUILDFLAG(IS_MAC)
@@ -523,9 +512,5 @@ BASE_FEATURE(kCr2023MacFontSmoothing,
              "Cr2023MacFontSmoothing",
              base::FEATURE_ENABLED_BY_DEFAULT);
 #endif
-
-BASE_FEATURE(kUseNanosecondsForMotionEvent,
-             "UseNanosecondsForMotionEvent",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 }  // namespace features

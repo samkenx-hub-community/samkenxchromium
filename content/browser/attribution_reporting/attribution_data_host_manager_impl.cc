@@ -578,7 +578,9 @@ void AttributionDataHostManagerImpl::NotifyNavigationRegistrationData(
     network::AttributionReportingRuntimeFeatures runtime_features,
     bool is_final_response) {
   if (auto header = RegistrarAndHeader::Get(
-          headers, runtime_features.cross_app_web_enabled)) {
+          headers,
+          runtime_features.Has(
+              network::AttributionReportingRuntimeFeature::kCrossAppWeb))) {
     auto [it, inserted] = registrations_.emplace(
         source_origin, is_within_fenced_frame, std::move(input_event),
         render_frame_id,
@@ -652,12 +654,10 @@ void AttributionDataHostManagerImpl::SourceDataAvailable(
     return;
   }
 
+  // TODO(csharrison): Remove `nav_type` via reverting crrev.com/c/4070064.
   auto source_type = SourceType::kEvent;
   if (auto nav_type = context->nav_type()) {
     source_type = SourceType::kNavigation;
-
-    base::UmaHistogramEnumeration(
-        "Conversions.SourceRegistration.NavigationType.Background", *nav_type);
   }
 
   attribution_manager_->HandleSource(
@@ -688,29 +688,33 @@ void AttributionDataHostManagerImpl::TriggerDataAvailable(
 }
 
 void AttributionDataHostManagerImpl::OsSourceDataAvailable(
-    const GURL& registration_url) {
+    std::vector<GURL> registration_urls) {
   const ReceiverContext* context = GetReceiverContextForSource();
   if (!context) {
     return;
   }
 
-  attribution_manager_->HandleOsRegistration(
-      OsRegistration(registration_url, context->context_origin(),
-                     context->input_event()),
-      context->render_frame_id());
+  for (GURL& url : registration_urls) {
+    attribution_manager_->HandleOsRegistration(
+        OsRegistration(std::move(url), context->context_origin(),
+                       context->input_event()),
+        context->render_frame_id());
+  }
 }
 
 void AttributionDataHostManagerImpl::OsTriggerDataAvailable(
-    const GURL& registration_url) {
+    std::vector<GURL> registration_urls) {
   const ReceiverContext* context = GetReceiverContextForTrigger();
   if (!context) {
     return;
   }
 
-  attribution_manager_->HandleOsRegistration(
-      OsRegistration(registration_url, context->context_origin(),
-                     /*input_event=*/absl::nullopt),
-      context->render_frame_id());
+  for (GURL& url : registration_urls) {
+    attribution_manager_->HandleOsRegistration(
+        OsRegistration(std::move(url), context->context_origin(),
+                       /*input_event=*/absl::nullopt),
+        context->render_frame_id());
+  }
 }
 
 void AttributionDataHostManagerImpl::OnReceiverDisconnected() {
@@ -774,8 +778,9 @@ void AttributionDataHostManagerImpl::NotifyFencedFrameReportingBeaconData(
     return;
   }
 
-  auto attribution_header =
-      RegistrarAndHeader::Get(headers, runtime_features.cross_app_web_enabled);
+  auto attribution_header = RegistrarAndHeader::Get(
+      headers, runtime_features.Has(
+                   network::AttributionReportingRuntimeFeature::kCrossAppWeb));
   if (!attribution_header) {
     MaybeOnRegistrationsFinished(it);
     return;
@@ -829,14 +834,6 @@ void AttributionDataHostManagerImpl::OnWebSourceParsed(
     if (source.has_value()) {
       attribution_manager_->HandleSource(std::move(*source),
                                          registrations->render_frame_id());
-
-      if (const auto* navigation =
-              absl::get_if<SourceRegistrations::ForegroundNavigation>(
-                  &registrations->data())) {
-        base::UmaHistogramEnumeration(
-            "Conversions.SourceRegistration.NavigationType.Foreground",
-            navigation->nav_type);
-      }
     } else {
       attribution_manager_->NotifyFailedSourceRegistration(
           pending_decode.header, registrations->source_origin(),

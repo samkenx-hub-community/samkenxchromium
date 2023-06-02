@@ -756,10 +756,14 @@ IN_PROC_BROWSER_TEST_F(WebIdAuthzBrowserTest, Authz_openPopUpWindow) {
   // Points the id assertion endpoint to a servlet.
   config_details.id_assertion_endpoint_url = "/authz/id_assertion_endpoint.php";
 
+  // Points to the relative url of the authorization servlet.
+  std::string continue_on = "/authz.html";
+
   // Add a servlet to serve a response for the id assertoin endpoint.
   config_details.servlets["/authz/id_assertion_endpoint.php"] =
       base::BindRepeating(
-          [](const HttpRequest& request) -> std::unique_ptr<HttpResponse> {
+          [](std::string url,
+             const HttpRequest& request) -> std::unique_ptr<HttpResponse> {
             std::string content;
             content += "client_id=client_id_1&";
             content += "nonce=12345&";
@@ -774,10 +778,11 @@ IN_PROC_BROWSER_TEST_F(WebIdAuthzBrowserTest, Authz_openPopUpWindow) {
             response->set_content_type("text/json");
             // scope=calendar.readonly was requested, so need to
             // return a continuation url instead of a token.
-            response->set_content(
-                R"({"continue_on": "https://idp.example/continue.php"})");
+            auto body = R"({"continue_on": ")" + url + R"("})";
+            response->set_content(body);
             return response;
-          });
+          },
+          continue_on);
 
   idp_server()->SetConfigResponseDetails(config_details);
 
@@ -807,13 +812,17 @@ IN_PROC_BROWSER_TEST_F(WebIdAuthzBrowserTest, Authz_openPopUpWindow) {
 
   base::RunLoop run_loop;
   EXPECT_CALL(*controller, ShowModalDialog(_, _))
-      .WillOnce(::testing::WithArg<0>([&modal, &run_loop](const GURL& url) {
-        // When the pop-up window is opened, resolve it immediately by
-        // returning a test web contents, which can then later be used
-        // to refer to the identity registry.
-        run_loop.Quit();
-        return modal->web_contents();
-      }));
+      .WillOnce(::testing::WithArg<0>(
+          [&config_url, continue_on, &modal, &run_loop](const GURL& url) {
+            // Expect that the relative continue_on url will be resolved
+            // before opening the dialog.
+            EXPECT_EQ(url.spec(), config_url.Resolve(continue_on));
+            // When the pop-up window is opened, resolve it immediately by
+            // returning a test web contents, which can then later be used
+            // to refer to the identity registry.
+            run_loop.Quit();
+            return modal->web_contents();
+          }));
 
   std::string script = R"(
           var result = navigator.credentials.get({

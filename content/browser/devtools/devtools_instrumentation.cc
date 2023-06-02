@@ -9,6 +9,7 @@
 #include "base/trace_event/traced_value.h"
 #include "components/download/public/common/download_create_info.h"
 #include "components/download/public/common/download_item.h"
+#include "components/download/public/common/download_url_parameters.h"
 #include "content/browser/devtools/browser_devtools_agent_host.h"
 #include "content/browser/devtools/devtools_issue_storage.h"
 #include "content/browser/devtools/devtools_url_loader_interceptor.h"
@@ -42,6 +43,7 @@
 #include "content/browser/web_contents/web_contents_impl.h"
 #include "content/browser/web_package/signed_exchange_envelope.h"
 #include "content/public/browser/browser_context.h"
+#include "devtools_agent_host_impl.h"
 #include "devtools_instrumentation.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
 #include "mojo/public/cpp/bindings/self_owned_receiver.h"
@@ -91,6 +93,23 @@ void DispatchToAgents(int frame_tree_node_id,
   FrameTreeNode* ftn = FrameTreeNode::GloballyFindByID(frame_tree_node_id);
   if (ftn)
     DispatchToAgents(ftn, method, std::forward<Args>(args)...);
+}
+
+template <typename Handler, typename... MethodArgs, typename... Args>
+void DispatchToAgents(WebContents* web_contents,
+                      void (Handler::*method)(MethodArgs...),
+                      Args&&... args) {
+  auto agent_host = DevToolsAgentHost::GetForTab(web_contents);
+  if (agent_host) {
+    DispatchToAgents(static_cast<DevToolsAgentHostImpl*>(agent_host.get()),
+                     method, std::forward<Args>(args)...);
+  }
+  if (content::DevToolsAgentHost::HasFor(web_contents)) {
+    DispatchToAgents(
+        static_cast<DevToolsAgentHostImpl*>(
+            content::DevToolsAgentHost::GetOrCreateFor(web_contents).get()),
+        method, std::forward<Args>(args)...);
+  }
 }
 
 std::unique_ptr<protocol::Audits::InspectorIssue> BuildHeavyAdIssue(
@@ -231,6 +250,12 @@ std::string FederatedAuthRequestResultToProtocol(
       return FederatedAuthRequestIssueReasonEnum::RpPageNotVisible;
     case FederatedAuthRequestResult::kError: {
       return FederatedAuthRequestIssueReasonEnum::ErrorIdToken;
+    }
+    case FederatedAuthRequestResult::kErrorSilentMediationFailure: {
+      return FederatedAuthRequestIssueReasonEnum::SilentMediationFailure;
+    }
+    case FederatedAuthRequestResult::kErrorThirdPartyCookiesBlocked: {
+      return FederatedAuthRequestIssueReasonEnum::ThirdPartyCookiesBlocked;
     }
     case FederatedAuthRequestResult::kSuccess: {
       DCHECK(false);
@@ -407,6 +432,13 @@ void OnFrameTreeNodeDestroyed(FrameTreeNode& frame_tree_node) {
   }
 }
 
+bool IsPrerenderAllowed(FrameTree& frame_tree) {
+  bool is_allowed = true;
+  DispatchToAgents(frame_tree.root(),
+                   &protocol::PageHandler::IsPrerenderingAllowed, is_allowed);
+  return is_allowed;
+}
+
 void WillInitiatePrerender(FrameTree& frame_tree) {
   DCHECK(frame_tree.is_prerendering());
   auto* wc = WebContentsImpl::FromFrameTreeNode(frame_tree.root());
@@ -418,11 +450,6 @@ void DidActivatePrerender(
     const NavigationRequest& nav_request,
     const base::UnguessableToken& initiator_devtools_navigation_token) {
   FrameTreeNode* ftn = nav_request.frame_tree_node();
-  WebContentsImpl* web_contents = WebContentsImpl::FromFrameTreeNode(ftn);
-  // Record prerender activation here because users don't necessarily open
-  // DevTools when the activation is triggered. If the DevTools is not opened at
-  // the moment, recording the activation here will still preserve the signal.
-  web_contents->set_last_navigation_was_prerender_activation_for_devtools();
   DispatchToAgents(ftn, &protocol::PreloadHandler::DidActivatePrerender,
                    initiator_devtools_navigation_token, nav_request);
   UpdateChildFrameTrees(ftn, /* update_target_info= */ true);
@@ -466,16 +493,17 @@ void DidUpdatePrerenderStatus(
     int initiator_frame_tree_node_id,
     const base::UnguessableToken& initiator_devtools_navigation_token,
     const GURL& prerender_url,
-    PreloadingTriggeringOutcome status) {
+    PreloadingTriggeringOutcome status,
+    absl::optional<PrerenderFinalStatus> prerender_status) {
   auto* ftn = FrameTreeNode::GloballyFindByID(initiator_frame_tree_node_id);
   // ftn will be null if this is browser-initiated, which has no initiator.
-  if (ftn) {
-    std::string initiating_frame_id =
-        ftn->current_frame_host()->devtools_frame_token().ToString();
-    DispatchToAgents(ftn, &protocol::PreloadHandler::DidUpdatePrerenderStatus,
-                     initiator_devtools_navigation_token, initiating_frame_id,
-                     prerender_url, status);
+  if (!ftn) {
+    return;
   }
+
+  DispatchToAgents(ftn, &protocol::PreloadHandler::DidUpdatePrerenderStatus,
+                   initiator_devtools_navigation_token, prerender_url, status,
+                   prerender_status);
 }
 
 namespace {
@@ -587,6 +615,18 @@ bool ShouldBypassCSP(const NavigationRequest& nav_request) {
       return true;
   }
   return false;
+}
+
+void ApplyNetworkOverridesForDownload(
+    RenderFrameHostImpl* rfh,
+    download::DownloadUrlParameters* parameters) {
+  FrameTreeNode* ftn =
+      FrameTreeNode::GloballyFindByID(rfh->GetFrameTreeNodeId());
+  if (ftn) {
+    DispatchToAgents(
+        ftn, &protocol::EmulationHandler::ApplyNetworkOverridesForDownload,
+        parameters);
+  }
 }
 
 void WillBeginDownload(download::DownloadCreateInfo* info,
@@ -1249,10 +1289,11 @@ void DidCreateProcessForAuctionWorklet(RenderFrameHostImpl* owner,
   // TracingHandler lives on the very root, not local root.
   // TODO(morlovich): This may not be right for fenced frames, though
   // that should not currently matter.
-  FrameTreeNode* node = owner->GetMainFrame()->frame_tree_node();
-  if (!node)
+  WebContents* web_contents = WebContents::FromRenderFrameHost(owner);
+  if (!web_contents) {
     return;
-  DispatchToAgents(node, &protocol::TracingHandler::AddProcess, pid);
+  }
+  DispatchToAgents(web_contents, &protocol::TracingHandler::AddProcess, pid);
 }
 
 void WillStartDragging(FrameTreeNode* main_frame_tree_node,
@@ -1891,13 +1932,12 @@ void WillShowFedCmDialog(RenderFrameHost* render_frame_host, bool* intercept) {
   DispatchToAgents(ftn, &protocol::FedCmHandler::WillShowDialog, intercept);
 }
 
-void OnFedCmAccountsDialogShown(RenderFrameHost* render_frame_host,
-                                bool auto_reauthn) {
+void OnFedCmAccountsDialogShown(RenderFrameHost* render_frame_host) {
   FrameTreeNode* ftn = FrameTreeNode::From(render_frame_host);
   if (!ftn) {
     return;
   }
-  DispatchToAgents(ftn, &protocol::FedCmHandler::OnDialogShown, auto_reauthn);
+  DispatchToAgents(ftn, &protocol::FedCmHandler::OnDialogShown);
 }
 
 }  // namespace devtools_instrumentation

@@ -720,9 +720,6 @@ NGGridLayoutTrackCollection::CreateSubgridTrackCollection(
     // Opposite direction subgrids iterate backwards.
     const wtf_size_t first_set_index =
         is_opposite_direction_in_root_grid ? end_set_index : begin_set_index;
-    const wtf_size_t last_set_index =
-        is_opposite_direction_in_root_grid ? begin_set_index : end_set_index;
-
     LayoutUnit first_set_offset = sets_geometry_[first_set_index].offset;
 
     if (is_opposite_direction_in_root_grid) {
@@ -740,21 +737,36 @@ NGGridLayoutTrackCollection::CreateSubgridTrackCollection(
           subgrid_sets_geometry.emplace_back(sets_geometry_[current_index]);
       if (is_opposite_direction_in_root_grid) {
         set.offset = first_set_offset - set.offset;
+
+        // Opposite direction subgrids take their offset from the current index,
+        // but their track counts from the subsequent index.
+        const wtf_size_t next_index = current_index + 1;
+        DCHECK_LT(next_index, sets_geometry_.size());
+        set.track_count = sets_geometry_[next_index].track_count;
       } else {
         set.offset -= first_set_offset;
       }
+      DCHECK_GT(set.track_count, 0U);
       set.offset += subgrid_gutter_size_delta / 2;
     }
+    const wtf_size_t last_set_index =
+        is_opposite_direction_in_root_grid ? begin_set_index : end_set_index;
     auto& last_set =
         subgrid_sets_geometry.emplace_back(sets_geometry_[last_set_index]);
 
     if (is_opposite_direction_in_root_grid) {
       last_set.offset = first_set_offset - last_set.offset;
+      // Opposite direction subgrids take their offset from the current index,
+      // but their track counts from the subsequent index.
+      const wtf_size_t next_index = last_set_index + 1;
+      DCHECK_LT(next_index, sets_geometry_.size());
+      last_set.track_count = sets_geometry_[next_index].track_count;
     } else {
       last_set.offset -= first_set_offset;
     }
     last_set.offset +=
         subgrid_gutter_size_delta - subgrid_margin_border_scrollbar_padding_end;
+    DCHECK_GT(last_set.track_count, 0U);
   }
 
   // Copy the last indefinite indices in the subgrid's span.
@@ -767,17 +779,29 @@ NGGridLayoutTrackCollection::CreateSubgridTrackCollection(
     subgrid_last_indefinite_index.ReserveInitialCapacity(set_span_size + 1);
     subgrid_last_indefinite_index.push_back(kNotFound);
 
-    for (wtf_size_t i = begin_set_index + 1; i <= end_set_index; ++i) {
-      subgrid_last_indefinite_index.push_back(
-          (last_indefinite_index_[i] == kNotFound ||
-           last_indefinite_index_[i] < begin_set_index)
-              ? kNotFound
-              : last_indefinite_index_[i] - begin_set_index);
-    }
+    wtf_size_t last_indefinite_index = kNotFound;
+    for (wtf_size_t i = 1; i <= set_span_size; ++i) {
+      // Opposite direction subgrids need to iterate backwards.
+      const wtf_size_t current_index = is_opposite_direction_in_root_grid
+                                           ? end_set_index - i
+                                           : begin_set_index + i;
+      const wtf_size_t next_index = is_opposite_direction_in_root_grid
+                                        ? current_index - 1
+                                        : current_index + 1;
 
-    // TODO(kschmi): Handle `subgrid_last_indefinite_index` when
-    // `is_opposite_direction_to_parent`. This can be done by looking at the
-    // difference between subsequent entries.
+      if (last_indefinite_index_[current_index] == kNotFound ||
+          next_index == last_indefinite_index_.size()) {
+        subgrid_last_indefinite_index.push_back(kNotFound);
+      } else {
+        // Map the last indefinite index from the parent track collection by
+        // looking for a change in subsequent entries.
+        if (last_indefinite_index_[current_index] !=
+            last_indefinite_index_[next_index]) {
+          last_indefinite_index = i;
+        }
+        subgrid_last_indefinite_index.push_back(last_indefinite_index);
+      }
+    }
   }
 
   // Copy the major and minor baselines in the subgrid's span.

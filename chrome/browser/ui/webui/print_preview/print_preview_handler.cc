@@ -114,8 +114,7 @@ mojom::PrinterType GetPrinterTypeForUserAction(UserActionBuckets user_action) {
     case UserActionBuckets::kOpenInMacPreview:
       return mojom::PrinterType::kLocal;
     default:
-      NOTREACHED();
-      return mojom::PrinterType::kLocal;
+      NOTREACHED_NORETURN();
   }
 }
 
@@ -229,8 +228,7 @@ UserActionBuckets DetermineUserAction(const base::Value::Dict& settings) {
     case mojom::PrinterType::kLocal:
       break;
     default:
-      NOTREACHED();
-      break;
+      NOTREACHED_NORETURN();
   }
 
   if (settings.FindBool(kSettingShowSystemDialog).value_or(false))
@@ -597,13 +595,9 @@ void PrintPreviewHandler::HandleGetPrinters(const base::Value::List& args) {
     return;
   }
 
-  PrinterHandler* handler = GetPrinterHandler(printer_type);
-  if (!handler) {
-    RejectJavascriptCallback(base::Value(callback_id), base::Value());
-    return;
-  }
   // Make sure all in progress requests are canceled before new printer search
   // starts.
+  PrinterHandler* handler = GetPrinterHandler(printer_type);
   handler->Reset();
   handler->StartGetPrinters(
       base::BindRepeating(&PrintPreviewHandler::OnAddedPrinters,
@@ -640,11 +634,6 @@ void PrintPreviewHandler::HandleGetPrinterCapabilities(
   }
 
   PrinterHandler* handler = GetPrinterHandler(printer_type);
-  if (!handler) {
-    RejectJavascriptCallback(base::Value(callback_id), base::Value());
-    return;
-  }
-
   handler->StartGetCapability(
       *printer_name,
       base::BindOnce(&PrintPreviewHandler::SendPrinterCapabilities,
@@ -756,16 +745,19 @@ void PrintPreviewHandler::HandlePrint(const base::Value::List& args) {
   ReportUserActionHistogram(user_action);
 
 #if BUILDFLAG(ENABLE_PRINT_CONTENT_ANALYSIS)
+  std::string device_name = *settings.FindString(kSettingDeviceName);
+
   auto on_verdict =
       base::BindOnce(&PrintPreviewHandler::OnVerdictByEnterprisePolicy,
                      weak_factory_.GetWeakPtr(), user_action,
                      std::move(settings), data, callback_id);
 
-  auto hide_preview = base::BindOnce(&PrintPreviewUI::OnHidePreviewDialog,
-                                     print_preview_ui()->GetWeakPointer());
+  auto hide_preview = base::BindOnce(&PrintPreviewHandler::OnHidePreviewDialog,
+                                     weak_factory_.GetWeakPtr());
 
   enterprise_connectors::PrintIfAllowedByPolicy(
-      data, GetInitiator(), std::move(on_verdict), std::move(hide_preview));
+      data, GetInitiator(), std::move(device_name), std::move(on_verdict),
+      std::move(hide_preview));
 
 #else
   FinishHandlePrint(user_action, std::move(settings), data, callback_id);
@@ -785,6 +777,10 @@ void PrintPreviewHandler::OnVerdictByEnterprisePolicy(
     OnPrintResult(callback_id, base::Value("NOT_ALLOWED"));
   }
 }
+
+void PrintPreviewHandler::OnHidePreviewDialog() {
+  print_preview_ui()->OnHidePreviewDialog();
+}
 #endif  // BUILDFLAG(ENABLE_PRINT_CONTENT_ANALYSIS)
 
 void PrintPreviewHandler::FinishHandlePrint(
@@ -794,10 +790,6 @@ void PrintPreviewHandler::FinishHandlePrint(
     const std::string& callback_id) {
   PrinterHandler* handler =
       GetPrinterHandler(GetPrinterTypeForUserAction(user_action));
-  if (!handler) {
-    RejectJavascriptCallback(base::Value(callback_id), base::Value());
-    return;
-  }
   handler->StartPrint(print_preview_ui()->initiator_title(),
                       std::move(settings), data,
                       base::BindOnce(&PrintPreviewHandler::OnPrintResult,
@@ -1084,14 +1076,17 @@ void PrintPreviewHandler::SendPageCountReady(int page_count,
                     base::Value(request_id), base::Value(fit_to_page_scaling));
 }
 
-void PrintPreviewHandler::SendPageLayoutReady(base::Value::Dict layout,
-                                              bool has_custom_page_size_style,
-                                              int request_id) {
+void PrintPreviewHandler::SendPageLayoutReady(
+    base::Value::Dict layout,
+    bool all_pages_have_custom_size,
+    bool all_pages_have_custom_orientation,
+    int request_id) {
   if (!ShouldReceiveRendererMessage(request_id))
     return;
 
   FireWebUIListener("page-layout-ready", std::move(layout),
-                    base::Value(has_custom_page_size_style));
+                    base::Value(all_pages_have_custom_size),
+                    base::Value(all_pages_have_custom_orientation));
 }
 
 void PrintPreviewHandler::SendPagePreviewReady(int page_index,
@@ -1161,8 +1156,7 @@ PrinterHandler* PrintPreviewHandler::GetPrinterHandler(
     }
     return local_printer_handler_.get();
   }
-  NOTREACHED();
-  return nullptr;
+  NOTREACHED_NORETURN();
 }
 
 PdfPrinterHandler* PrintPreviewHandler::GetPdfPrinterHandler() {

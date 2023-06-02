@@ -38,12 +38,6 @@ BASE_FEATURE(kAppManagementAppDetails,
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
-BASE_FEATURE(kAppDeduplicationService,
-             "AppDeduplicationService",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
-
-#if BUILDFLAG(IS_CHROMEOS_ASH)
 BASE_FEATURE(kAppDeduplicationServiceFondue,
              "AppDeduplicationServiceFondue",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -167,6 +161,12 @@ BASE_FEATURE(kCrostiniArcSideload,
              "CrostiniArcSideload",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+// Enables the new UI for browser created shortcut backed by web app system
+// on Chrome OS.
+BASE_FEATURE(kCrosWebAppShortcutUiUpdate,
+             "CrosWebAppShortcutUiUpdate",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Enables distributed model for TPM1.2, i.e., using tpm_managerd and
 // attestationd.
 BASE_FEATURE(kCryptohomeDistributedModel,
@@ -247,6 +247,13 @@ const base::FeatureParam<OsIntegrationSubManagersStage>
         &kOsIntegrationSubManagers, "stage",
         OsIntegrationSubManagersStage::kWriteConfig, &sub_manager_stages};
 #endif
+
+#if BUILDFLAG(IS_CHROMEOS)
+// If enabled, specified extensions cannot be closed via the task manager.
+BASE_FEATURE(kDesktopTaskManagerEndProcessDisabledForExtension,
+             "DesktopTaskManagerEndProcessDisabledForExtension",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+#endif  // BUILDFLAG(IS_CHROMEOS)
 
 // Generates customised default offline page that is shown when web app is
 // offline if no custom page is provided by developer.
@@ -392,12 +399,17 @@ BASE_FEATURE(kEnableRestrictedWebApis,
 // Enable WebHID on extension service workers.
 BASE_FEATURE(kEnableWebHidOnExtensionServiceWorker,
              "EnableWebHidOnExtensionServiceWorker",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 #endif
 
 // Enable WebUSB on extension service workers.
 BASE_FEATURE(kEnableWebUsbOnExtensionServiceWorker,
              "EnableWebUsbOnExtensionServiceWorker",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Enable extended descriptions for key settings in Chrome settings.
+BASE_FEATURE(kExtendedSettingsDescriptions,
+             "ExtendedSettingsDescriptions",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 #if !BUILDFLAG(IS_ANDROID)
@@ -769,6 +781,12 @@ constexpr base::FeatureParam<std::string> kKAnonymityServiceQueryServer{
 constexpr base::FeatureParam<base::TimeDelta> kKAnonymityServiceQueryInterval{
     &kKAnonymityService, "KAnonymityServiceJoinInterval", base::Days(1)};
 
+// When enabled, LCP critical path predictor will optimize the subsequent visits
+// to websites using performance hints collected in the past page loads.
+BASE_FEATURE(kLCPCriticalPathPredictor,
+             "LCPCriticalPathPredictor",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // When enabled, the k-Anonymity Service will send requests to the Join and
 // Query k-anonymity servers.
 BASE_FEATURE(kKAnonymityServiceOHTTPRequests,
@@ -993,6 +1011,11 @@ BASE_FEATURE(kRemoveSupervisedUsersOnStartup,
 #endif
 
 #if !BUILDFLAG(IS_ANDROID)
+// Enables extensions module in Safety Check.
+BASE_FEATURE(kSafetyCheckExtensions,
+             "SafetyCheckExtensions",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Enables notification permission module in Safety Check.
 BASE_FEATURE(kSafetyCheckNotificationPermissions,
              "SafetyCheckNotificationPermissions",
@@ -1131,9 +1154,9 @@ BASE_FEATURE(kTreatUnsafeDownloadsAsActive,
              "TreatUnsafeDownloadsAsActive",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Block downloads delivered over insecure transports (i.e. not over HTTPS).
-BASE_FEATURE(kBlockInsecureDownloads,
-             "BlockInsecureDownloads",
+// Show warnings on downloads not delivered over HTTPS.
+BASE_FEATURE(kInsecureDownloadWarnings,
+             "InsecureDownloadWarnings",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // TrustSafetySentimentSurvey

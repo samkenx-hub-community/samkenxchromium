@@ -45,7 +45,6 @@
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
-#include "third_party/blink/public/mojom/webid/federated_auth_request.mojom.h"
 #include "ui/base/page_transition_types.h"
 #include "url/gurl.h"
 #include "url/origin.h"
@@ -112,7 +111,7 @@ static const std::initializer_list<IdentityRequestAccount> kSingleAccount{{
     "Ken R. Example",           // name
     "Ken",                      // given_name
     GURL(),                     // picture
-    std::vector<std::string>()  // hints
+    std::vector<std::string>()  // login_hints
 }};
 
 static const std::initializer_list<IdentityRequestAccount>
@@ -122,7 +121,7 @@ static const std::initializer_list<IdentityRequestAccount>
         "Ken R. Example",     // name
         "Ken",                // given_name
         GURL(),               // picture
-        {kAccountId, kEmail}  // hints
+        {kAccountId, kEmail}  // login_hints
     }};
 
 static const std::initializer_list<IdentityRequestAccount> kMultipleAccounts{
@@ -132,7 +131,7 @@ static const std::initializer_list<IdentityRequestAccount> kMultipleAccounts{
         "Nicolas P",                 // name
         "Nicolas",                   // given_name
         GURL(),                      // picture
-        std::vector<std::string>(),  // hints
+        std::vector<std::string>(),  // login_hints
         LoginState::kSignUp          // login_state
     },
     {
@@ -141,7 +140,7 @@ static const std::initializer_list<IdentityRequestAccount> kMultipleAccounts{
         "Peter K",                   // name
         "Peter",                     // given_name
         GURL(),                      // picture
-        std::vector<std::string>(),  // hints
+        std::vector<std::string>(),  // login_hints
         LoginState::kSignIn          // login_state
     },
     {
@@ -150,7 +149,7 @@ static const std::initializer_list<IdentityRequestAccount> kMultipleAccounts{
         "Zachary T",                 // name
         "Zach",                      // given_name
         GURL(),                      // picture
-        std::vector<std::string>(),  // hints
+        std::vector<std::string>(),  // login_hints
         LoginState::kSignUp          // login_state
     }};
 
@@ -162,7 +161,7 @@ static const std::initializer_list<IdentityRequestAccount>
             "Nicolas P",                                // name
             "Nicolas",                                  // given_name
             GURL(),                                     // picture
-            {kAccountIdNicolas, kAccountEmailNicolas},  // hints
+            {kAccountIdNicolas, kAccountEmailNicolas},  // login_hints
             LoginState::kSignUp                         // login_state
         },
         {
@@ -171,7 +170,7 @@ static const std::initializer_list<IdentityRequestAccount>
             "Peter K",                              // name
             "Peter",                                // given_name
             GURL(),                                 // picture
-            {kAccountIdPeter, kAccountEmailPeter},  // hints
+            {kAccountIdPeter, kAccountEmailPeter},  // login_hints
             LoginState::kSignIn                     // login_state
         },
         {
@@ -180,7 +179,7 @@ static const std::initializer_list<IdentityRequestAccount>
             "Zachary T",                          // name
             "Zach",                               // given_name
             GURL(),                               // picture
-            {kAccountIdZach, kAccountEmailZach},  // hints
+            {kAccountIdZach, kAccountEmailZach},  // login_hints
             LoginState::kSignUp                   // login_state
         }};
 
@@ -212,6 +211,7 @@ struct RequestParameters {
 struct RequestExpectations {
   absl::optional<RequestTokenStatus> return_status;
   std::vector<FederatedAuthRequestResult> devtools_issue_statuses;
+  std::vector<std::string> standalone_console_messages;
   absl::optional<std::string> selected_idp_config_url;
 };
 
@@ -325,6 +325,7 @@ static const MockConfiguration kConfigurationValid{
 static const RequestExpectations kExpectationSuccess{
     RequestTokenStatus::kSuccess,
     {FederatedAuthRequestResult::kSuccess},
+    /*standalone_console_messages=*/{},
     kProviderUrlFull};
 
 static const RequestParameters kDefaultMultiIdpRequestParameters{
@@ -704,7 +705,7 @@ class TestAutoReauthnPermissionDelegate
  public:
   std::set<url::Origin> embargoed_origins_;
 
-  void RecordDisplayAndEmbargo(const url::Origin& origin) override {
+  void RecordEmbargoForAutoReauthn(const url::Origin& origin) override {
     embargoed_origins_.insert(origin);
   }
 };
@@ -872,12 +873,14 @@ class FederatedAuthRequestImplTest : public RenderViewHostImplTestHarness {
         EXPECT_EQ(0, issue_count);
       }
       CheckConsoleMessages(expectation.devtools_issue_statuses,
+                           expectation.standalone_console_messages,
                            configuration.succeed_with_console_message);
     }
   }
 
   void CheckConsoleMessages(
       const std::vector<FederatedAuthRequestResult>& devtools_issue_statuses,
+      const std::vector<std::string>& standalone_console_messages,
       bool succeed_with_console_message) {
     std::vector<std::string> messages =
         RenderFrameHostTester::For(main_rfh())->GetConsoleMessages();
@@ -894,8 +897,11 @@ class FederatedAuthRequestImplTest : public RenderViewHostImplTestHarness {
           webid::GetConsoleErrorMessageFromResult(expected_status);
       did_expect_any_messages = true;
       ASSERT_GE(expected_message_index, 0u);
-      EXPECT_EQ(expected_message, messages[expected_message_index]);
-      --expected_message_index;
+      EXPECT_EQ(expected_message, messages[expected_message_index--]);
+    }
+    for (const std::string& expected_message : standalone_console_messages) {
+      ASSERT_GE(expected_message_index, 0u);
+      EXPECT_EQ(expected_message, messages[expected_message_index--]);
     }
 
     if (!did_expect_any_messages)
@@ -973,13 +979,20 @@ class FederatedAuthRequestImplTest : public RenderViewHostImplTestHarness {
 
   ukm::TestAutoSetUkmRecorder* ukm_recorder() { return ukm_recorder_.get(); }
 
-  void ExpectRequestTokenStatusUKM(TokenStatus status) {
-    ExpectRequestTokenStatusUKMInternal(status, FedCmEntry::kEntryName);
-    ExpectRequestTokenStatusUKMInternal(status, FedCmIdpEntry::kEntryName);
+  void ExpectStatusMetrics(
+      TokenStatus status,
+      MediationRequirement requirement = MediationRequirement::kOptional) {
+    histogram_tester_.ExpectUniqueSample("Blink.FedCm.Status.RequestIdToken",
+                                         status, 1);
+    histogram_tester_.ExpectUniqueSample(
+        "Blink.FedCm.Status.MediationRequirement", requirement, 1);
+    ExpectStatusUKMInternal(status, requirement, FedCmEntry::kEntryName);
+    ExpectStatusUKMInternal(status, requirement, FedCmIdpEntry::kEntryName);
   }
 
-  void ExpectRequestTokenStatusUKMInternal(TokenStatus status,
-                                           const char* entry_name) {
+  void ExpectStatusUKMInternal(TokenStatus status,
+                               MediationRequirement requirement,
+                               const char* entry_name) {
     auto entries = ukm_recorder()->GetEntriesByName(entry_name);
 
     ASSERT_FALSE(entries.empty())
@@ -1068,16 +1081,22 @@ class FederatedAuthRequestImplTest : public RenderViewHostImplTestHarness {
   }
 
   void ExpectAutoReauthnMetrics(
-      FedCmMetrics::NumReturningAccounts expected_returning_accounts,
+      absl::optional<FedCmMetrics::NumAccounts> expected_returning_accounts,
       bool expected_succeeded,
       bool expected_auto_reauthn_setting_blocked,
-      bool expected_auto_reauthn_embargoed) {
+      bool expected_auto_reauthn_embargoed,
+      bool expected_prevent_silent_access) {
     // UMA checks
     histogram_tester_.ExpectUniqueSample("Blink.FedCm.AutoReauthn.Succeeded",
                                          expected_succeeded, 1);
-    histogram_tester_.ExpectUniqueSample(
-        "Blink.FedCm.AutoReauthn.ReturningAccounts",
-        static_cast<int>(expected_returning_accounts), 1);
+    if (expected_returning_accounts.has_value()) {
+      histogram_tester_.ExpectUniqueSample(
+          "Blink.FedCm.AutoReauthn.ReturningAccounts",
+          static_cast<int>(*expected_returning_accounts), 1);
+    } else {
+      histogram_tester_.ExpectTotalCount(
+          "Blink.FedCm.AutoReauthn.ReturningAccounts", 0);
+    }
     histogram_tester_.ExpectUniqueSample(
         "Blink.FedCm.AutoReauthn.BlockedByContentSettings",
         expected_auto_reauthn_setting_blocked, 1);
@@ -1087,6 +1106,9 @@ class FederatedAuthRequestImplTest : public RenderViewHostImplTestHarness {
     histogram_tester_.ExpectTotalCount(
         "Blink.FedCm.AutoReauthn.TimeFromEmbargoWhenBlocked",
         expected_auto_reauthn_embargoed ? 1 : 0);
+    histogram_tester_.ExpectUniqueSample(
+        "Blink.FedCm.AutoReauthn.BlockedByPreventSilentAccess",
+        expected_prevent_silent_access, 1);
 
     // UKM checks
     auto entries = ukm_recorder()->GetEntriesByName(FedCmEntry::kEntryName);
@@ -1105,6 +1127,8 @@ class FederatedAuthRequestImplTest : public RenderViewHostImplTestHarness {
             entry, "AutoReauthn.BlockedByEmbargo"));
         EXPECT_FALSE(ukm_recorder()->GetEntryMetric(
             entry, "AutoReauthn.TimeFromEmbargoWhenBlocked"));
+        EXPECT_FALSE(ukm_recorder()->GetEntryMetric(
+            entry, "AutoReauthn.BlockedByPreventSilentAccess"));
         continue;
       }
       EXPECT_FALSE(metric_found) << "Found more than one AutoReauthn entry";
@@ -1113,8 +1137,13 @@ class FederatedAuthRequestImplTest : public RenderViewHostImplTestHarness {
 
       metric = ukm_recorder()->GetEntryMetric(entry,
                                               "AutoReauthn.ReturningAccounts");
-      ASSERT_TRUE(metric) << "AutoReauthn.ReturningAccounts was not found";
-      EXPECT_EQ(static_cast<int>(expected_returning_accounts), *metric);
+      if (expected_returning_accounts) {
+        ASSERT_TRUE(metric) << "AutoReauthn.ReturningAccounts was not found";
+        EXPECT_EQ(static_cast<int>(*expected_returning_accounts), *metric);
+      } else {
+        EXPECT_FALSE(metric)
+            << "AutoReauthn.ReturningAccounts should not have been recorded";
+      }
 
       metric = ukm_recorder()->GetEntryMetric(
           entry, "AutoReauthn.BlockedByContentSettings");
@@ -1130,6 +1159,12 @@ class FederatedAuthRequestImplTest : public RenderViewHostImplTestHarness {
       metric = ukm_recorder()->GetEntryMetric(
           entry, "AutoReauthn.TimeFromEmbargoWhenBlocked");
       EXPECT_EQ(expected_auto_reauthn_embargoed, !!metric);
+
+      metric = ukm_recorder()->GetEntryMetric(
+          entry, "AutoReauthn.BlockedByPreventSilentAccess");
+      ASSERT_TRUE(metric)
+          << "AutoReauthn.BlockedByPreventSilentAccess was not found";
+      EXPECT_EQ(expected_prevent_silent_access, *metric);
     }
     EXPECT_TRUE(metric_found) << "Did not find AutoReauthn metrics";
     CheckAllFedCmSessionIDs();
@@ -1166,7 +1201,8 @@ class FederatedAuthRequestImplTest : public RenderViewHostImplTestHarness {
 
  protected:
   mojo::Remote<blink::mojom::FederatedAuthRequest> request_remote_;
-  raw_ptr<FederatedAuthRequestImpl> federated_auth_request_impl_;
+  raw_ptr<FederatedAuthRequestImpl, DanglingUntriaged>
+      federated_auth_request_impl_;
 
   std::unique_ptr<TestIdpNetworkRequestManager> test_network_request_manager_;
 
@@ -1226,6 +1262,7 @@ TEST_F(FederatedAuthRequestImplTest, WellKnownNotInList) {
   RequestExpectations request_not_in_list = {
       RequestTokenStatus::kError,
       {FederatedAuthRequestResult::kErrorConfigNotInWellKnown},
+      /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/absl::nullopt};
 
   const char* idp_config_url =
@@ -1250,6 +1287,7 @@ TEST_F(FederatedAuthRequestImplTest, WellKnownHasNoFilename) {
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
       {FederatedAuthRequestResult::kErrorConfigNotInWellKnown},
+      /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/absl::nullopt};
   RunAuthTest(kDefaultRequestParameters, expectations, config);
   EXPECT_TRUE(DidFetchWellKnownAndConfig());
@@ -1263,6 +1301,7 @@ TEST_F(FederatedAuthRequestImplTest, MissingTokenEndpoint) {
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
       {FederatedAuthRequestResult::kErrorFetchingConfigInvalidResponse},
+      /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/absl::nullopt};
   RunAuthTest(kDefaultRequestParameters, expectations, configuration);
   EXPECT_TRUE(DidFetchWellKnownAndConfig());
@@ -1286,6 +1325,7 @@ TEST_F(FederatedAuthRequestImplTest, MissingAccountsEndpoint) {
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
       {FederatedAuthRequestResult::kErrorFetchingConfigInvalidResponse},
+      /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/absl::nullopt};
   RunAuthTest(kDefaultRequestParameters, expectations, configuration);
   EXPECT_TRUE(DidFetchWellKnownAndConfig());
@@ -1319,6 +1359,7 @@ TEST_F(FederatedAuthRequestImplTest, AccountEndpointDifferentOriginIdp) {
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
       {FederatedAuthRequestResult::kErrorFetchingConfigInvalidResponse},
+      /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/absl::nullopt};
   RunAuthTest(kDefaultRequestParameters, expectations, configuration);
   EXPECT_TRUE(DidFetchWellKnownAndConfig());
@@ -1336,13 +1377,12 @@ TEST_F(FederatedAuthRequestImplTest, ProviderNotTrustworthy) {
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
       {FederatedAuthRequestResult::kError},
+      /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/absl::nullopt};
   RunAuthTest(request, expectations, configuration);
   EXPECT_FALSE(DidFetchAnyEndpoint());
 
-  histogram_tester_.ExpectUniqueSample(
-      "Blink.FedCm.Status.RequestIdToken",
-      TokenStatus::kIdpNotPotentiallyTrustworthy, 1);
+  ExpectStatusMetrics(TokenStatus::kIdpNotPotentiallyTrustworthy);
 }
 
 // Test that request fails if accounts endpoint cannot be reached.
@@ -1353,6 +1393,7 @@ TEST_F(FederatedAuthRequestImplTest, AccountEndpointCannotBeReached) {
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
       {FederatedAuthRequestResult::kErrorFetchingAccountsNoResponse},
+      /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/absl::nullopt};
   RunAuthTest(kDefaultRequestParameters, expectations, configuration);
   EXPECT_TRUE(DidFetch(FetchedEndpoint::ACCOUNTS));
@@ -1367,6 +1408,7 @@ TEST_F(FederatedAuthRequestImplTest, AccountsCannotBeParsed) {
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
       {FederatedAuthRequestResult::kErrorFetchingAccountsInvalidResponse},
+      /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/absl::nullopt};
   RunAuthTest(kDefaultRequestParameters, expectations, configuration);
   EXPECT_TRUE(DidFetch(FetchedEndpoint::ACCOUNTS));
@@ -1417,6 +1459,7 @@ TEST_F(FederatedAuthRequestImplTest, AllInvalidEndpoints) {
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
       {FederatedAuthRequestResult::kErrorFetchingConfigInvalidResponse},
+      /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/absl::nullopt};
   RunAuthTest(kDefaultRequestParameters, expectations, configuration);
   EXPECT_TRUE(DidFetchWellKnownAndConfig());
@@ -1486,6 +1529,7 @@ TEST_F(FederatedAuthRequestImplTest,
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
       {FederatedAuthRequestResult::kErrorFetchingIdTokenInvalidResponse},
+      /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/absl::nullopt};
   RunAuthTest(kDefaultRequestParameters, expectations, configuration);
   EXPECT_TRUE(DidFetch(FetchedEndpoint::TOKEN));
@@ -1532,10 +1576,11 @@ TEST_F(FederatedAuthRequestImplTest, AutoReauthnEmbargo) {
   EXPECT_TRUE(test_auto_reauthn_permission_delegate_->embargoed_origins_.count(
       OriginFromString(kRpUrl)));
 
-  ExpectAutoReauthnMetrics(FedCmMetrics::NumReturningAccounts::kOne,
+  ExpectAutoReauthnMetrics(FedCmMetrics::NumAccounts::kOne,
                            /*expected_succeeded=*/true,
                            /*expected_auto_reauthn_setting_blocked=*/false,
-                           /*expected_auto_reauthn_embargoed=*/false);
+                           /*expected_auto_reauthn_embargoed=*/false,
+                           /*expected_prevent_silent_access=*/false);
 }
 
 // Test that auto re-authn with a single account where the account is a
@@ -1572,10 +1617,11 @@ TEST_F(FederatedAuthRequestImplTest,
   EXPECT_EQ(displayed_accounts()[0].login_state, LoginState::kSignIn);
   EXPECT_EQ(dialog_controller_state_.sign_in_mode, SignInMode::kAuto);
 
-  ExpectAutoReauthnMetrics(FedCmMetrics::NumReturningAccounts::kOne,
+  ExpectAutoReauthnMetrics(FedCmMetrics::NumAccounts::kOne,
                            /*expected_succeeded=*/true,
                            /*expected_auto_reauthn_setting_blocked=*/false,
-                           /*expected_auto_reauthn_embargoed=*/false);
+                           /*expected_auto_reauthn_embargoed=*/false,
+                           /*expected_prevent_silent_access=*/false);
 }
 
 // Test that auto re-authn with multiple accounts and a single returning user
@@ -1627,10 +1673,11 @@ TEST_F(FederatedAuthRequestImplTest,
   EXPECT_EQ(CountNumLoginStateIsSignin(), 1);
   EXPECT_EQ(dialog_controller_state_.sign_in_mode, SignInMode::kAuto);
 
-  ExpectAutoReauthnMetrics(FedCmMetrics::NumReturningAccounts::kOne,
+  ExpectAutoReauthnMetrics(FedCmMetrics::NumAccounts::kOne,
                            /*expected_succeeded=*/true,
                            /*expected_auto_reauthn_setting_blocked=*/false,
-                           /*expected_auto_reauthn_embargoed=*/false);
+                           /*expected_auto_reauthn_embargoed=*/false,
+                           /*expected_prevent_silent_access=*/false);
 }
 
 // Test that auto re-authn with multiple accounts and multiple returning users
@@ -1684,10 +1731,11 @@ TEST_F(FederatedAuthRequestImplTest,
   EXPECT_EQ(CountNumLoginStateIsSignin(), 2);
   EXPECT_EQ(dialog_controller_state_.sign_in_mode, SignInMode::kExplicit);
 
-  ExpectAutoReauthnMetrics(FedCmMetrics::NumReturningAccounts::kMultiple,
+  ExpectAutoReauthnMetrics(FedCmMetrics::NumAccounts::kMultiple,
                            /*expected_succeeded=*/false,
                            /*expected_auto_reauthn_setting_blocked=*/false,
-                           /*expected_auto_reauthn_embargoed=*/false);
+                           /*expected_auto_reauthn_embargoed=*/false,
+                           /*expected_prevent_silent_access=*/false);
 }
 
 // Test that auto re-authn with single non-returning account sets the sign-in
@@ -1722,10 +1770,11 @@ TEST_F(FederatedAuthRequestImplTest, AutoReauthnForZeroReturningUsers) {
   EXPECT_EQ(displayed_accounts()[0].login_state, LoginState::kSignUp);
   EXPECT_EQ(dialog_controller_state_.sign_in_mode, SignInMode::kExplicit);
 
-  ExpectAutoReauthnMetrics(FedCmMetrics::NumReturningAccounts::kZero,
+  ExpectAutoReauthnMetrics(FedCmMetrics::NumAccounts::kZero,
                            /*expected_succeeded=*/false,
                            /*expected_auto_reauthn_setting_blocked=*/false,
-                           /*expected_auto_reauthn_embargoed=*/false);
+                           /*expected_auto_reauthn_embargoed=*/false,
+                           /*expected_prevent_silent_access=*/false);
 }
 
 // Test that auto re-authn with multiple accounts and a single returning user
@@ -1750,6 +1799,7 @@ TEST_F(FederatedAuthRequestImplTest,
   ASSERT_EQ(displayed_accounts().size(), 1u);
   EXPECT_EQ(CountNumLoginStateIsSignin(), 1);
   EXPECT_EQ(dialog_controller_state_.sign_in_mode, SignInMode::kExplicit);
+  ExpectStatusMetrics(TokenStatus::kSuccess, MediationRequirement::kRequired);
 }
 
 // Test that auto re-authn with multiple accounts and a single returning user
@@ -1789,6 +1839,12 @@ TEST_F(FederatedAuthRequestImplTest,
   ASSERT_EQ(displayed_accounts().size(), 1u);
   EXPECT_EQ(CountNumLoginStateIsSignin(), 1);
   EXPECT_EQ(dialog_controller_state_.sign_in_mode, SignInMode::kExplicit);
+
+  ExpectAutoReauthnMetrics(FedCmMetrics::NumAccounts::kOne,
+                           /*expected_succeeded=*/false,
+                           /*expected_auto_reauthn_setting_blocked=*/false,
+                           /*expected_auto_reauthn_embargoed=*/false,
+                           /*expected_prevent_silent_access=*/true);
 }
 
 // Test that auto re-authn with multiple accounts and a single returning user
@@ -1915,10 +1971,11 @@ TEST_F(FederatedAuthRequestImplTest,
   EXPECT_EQ(displayed_accounts()[0].login_state, LoginState::kSignIn);
   EXPECT_EQ(dialog_controller_state_.sign_in_mode, SignInMode::kExplicit);
 
-  ExpectAutoReauthnMetrics(FedCmMetrics::NumReturningAccounts::kOne,
+  ExpectAutoReauthnMetrics(FedCmMetrics::NumAccounts::kOne,
                            /*expected_succeeded=*/false,
                            /*expected_auto_reauthn_setting_blocked=*/true,
-                           /*expected_auto_reauthn_embargoed=*/false);
+                           /*expected_auto_reauthn_embargoed=*/false,
+                           /*expected_prevent_silent_access=*/false);
 }
 
 // Test that auto re-authn where the auto re-authn cooldown is on sets
@@ -1952,10 +2009,11 @@ TEST_F(FederatedAuthRequestImplTest, AutoReauthnWithCooldown) {
   EXPECT_EQ(displayed_accounts()[0].login_state, LoginState::kSignIn);
   EXPECT_EQ(dialog_controller_state_.sign_in_mode, SignInMode::kExplicit);
 
-  ExpectAutoReauthnMetrics(FedCmMetrics::NumReturningAccounts::kOne,
+  ExpectAutoReauthnMetrics(FedCmMetrics::NumAccounts::kOne,
                            /*expected_succeeded=*/false,
                            /*expected_auto_reauthn_setting_blocked=*/false,
-                           /*expected_auto_reauthn_embargoed=*/true);
+                           /*expected_auto_reauthn_embargoed=*/true,
+                           /*expected_prevent_silent_access=*/false);
 
   std::vector<std::string> messages =
       RenderFrameHostTester::For(main_rfh())->GetConsoleMessages();
@@ -1990,7 +2048,10 @@ TEST_F(FederatedAuthRequestImplTest,
 
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
-      {FederatedAuthRequestResult::kError},
+      {FederatedAuthRequestResult::kErrorSilentMediationFailure},
+      /*standalone_console_messages=*/
+      {"Silent mediation failed reason: the user has not used FedCM on this "
+       "site with this identity provider."},
       /*selected_idp_config_url=*/absl::nullopt};
   MockConfiguration configuration = kConfigurationValid;
   configuration.mediation_requirement = MediationRequirement::kSilent;
@@ -1998,6 +2059,15 @@ TEST_F(FederatedAuthRequestImplTest,
   RunAuthTest(kDefaultRequestParameters, expectations, configuration);
 
   EXPECT_FALSE(DidFetchAnyEndpoint());
+
+  ExpectStatusMetrics(TokenStatus::kSilentMediationFailure,
+                      MediationRequirement::kSilent);
+
+  ExpectAutoReauthnMetrics(/*expected_returning_accounts=*/absl::nullopt,
+                           /*expected_succeeded=*/false,
+                           /*expected_auto_reauthn_setting_blocked=*/false,
+                           /*expected_auto_reauthn_embargoed=*/false,
+                           /*expected_prevent_silent_access=*/false);
 }
 
 // Test that no network request is sent if `mediation: silent` is used and auto
@@ -2025,7 +2095,11 @@ TEST_F(FederatedAuthRequestImplTest,
 
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
-      {FederatedAuthRequestResult::kError},
+      {FederatedAuthRequestResult::kErrorSilentMediationFailure},
+      /*standalone_console_messages=*/
+      {"Silent mediation failed reason: auto re-authn is in quiet period "
+       "because "
+       "it was recently used on this site."},
       /*selected_idp_config_url=*/absl::nullopt};
   MockConfiguration configuration = kConfigurationValid;
   configuration.mediation_requirement = MediationRequirement::kSilent;
@@ -2033,6 +2107,15 @@ TEST_F(FederatedAuthRequestImplTest,
   RunAuthTest(kDefaultRequestParameters, expectations, configuration);
 
   EXPECT_FALSE(DidFetchAnyEndpoint());
+
+  ExpectStatusMetrics(TokenStatus::kSilentMediationFailure,
+                      MediationRequirement::kSilent);
+
+  ExpectAutoReauthnMetrics(/*expected_returning_accounts=*/absl::nullopt,
+                           /*expected_succeeded=*/false,
+                           /*expected_auto_reauthn_setting_blocked=*/false,
+                           /*expected_auto_reauthn_embargoed=*/true,
+                           /*expected_prevent_silent_access=*/false);
 }
 
 // Test that no network request is sent if `mediation: silent` is used and user
@@ -2059,7 +2142,10 @@ TEST_F(FederatedAuthRequestImplTest,
 
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
-      {FederatedAuthRequestResult::kError},
+      {FederatedAuthRequestResult::kErrorSilentMediationFailure},
+      /*standalone_console_messages=*/
+      {"Silent mediation failed reason: preventSilentAccess() has been invoked "
+       "on the site."},
       /*selected_idp_config_url=*/absl::nullopt};
   MockConfiguration configuration = kConfigurationValid;
   configuration.mediation_requirement = MediationRequirement::kSilent;
@@ -2067,6 +2153,15 @@ TEST_F(FederatedAuthRequestImplTest,
   RunAuthTest(kDefaultRequestParameters, expectations, configuration);
 
   EXPECT_FALSE(DidFetchAnyEndpoint());
+
+  ExpectStatusMetrics(TokenStatus::kSilentMediationFailure,
+                      MediationRequirement::kSilent);
+
+  ExpectAutoReauthnMetrics(/*expected_returning_accounts=*/absl::nullopt,
+                           /*expected_succeeded=*/false,
+                           /*expected_auto_reauthn_setting_blocked=*/false,
+                           /*expected_auto_reauthn_embargoed=*/false,
+                           /*expected_prevent_silent_access=*/true);
 }
 
 // Test that no network request is sent if `mediation: silent` is used and user
@@ -2093,7 +2188,9 @@ TEST_F(FederatedAuthRequestImplTest,
 
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
-      {FederatedAuthRequestResult::kError},
+      {FederatedAuthRequestResult::kErrorSilentMediationFailure},
+      /*standalone_console_messages=*/
+      {"Silent mediation failed reason: the user has disabled auto re-authn."},
       /*selected_idp_config_url=*/absl::nullopt};
   MockConfiguration configuration = kConfigurationValid;
   configuration.mediation_requirement = MediationRequirement::kSilent;
@@ -2101,6 +2198,15 @@ TEST_F(FederatedAuthRequestImplTest,
   RunAuthTest(kDefaultRequestParameters, expectations, configuration);
 
   EXPECT_FALSE(DidFetchAnyEndpoint());
+
+  ExpectStatusMetrics(TokenStatus::kSilentMediationFailure,
+                      MediationRequirement::kSilent);
+
+  ExpectAutoReauthnMetrics(/*expected_returning_accounts=*/absl::nullopt,
+                           /*expected_succeeded=*/false,
+                           /*expected_auto_reauthn_setting_blocked=*/true,
+                           /*expected_auto_reauthn_embargoed=*/false,
+                           /*expected_prevent_silent_access=*/false);
 }
 
 // Test `mediation: silent` could fail silently after fetching accounts
@@ -2154,7 +2260,10 @@ TEST_F(FederatedAuthRequestImplTest,
 
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
-      {FederatedAuthRequestResult::kError},
+      {FederatedAuthRequestResult::kErrorSilentMediationFailure},
+      /*standalone_console_messages=*/
+      {"Silent mediation failed reason: the user has used FedCM with multiple "
+       "accounts on this site."},
       /*selected_idp_config_url=*/absl::nullopt};
   MockConfiguration configuration = kConfigurationValid;
   configuration.mediation_requirement = MediationRequirement::kSilent;
@@ -2166,6 +2275,15 @@ TEST_F(FederatedAuthRequestImplTest,
   RunAuthTest(kDefaultRequestParameters, expectations, configuration);
 
   EXPECT_TRUE(DidFetch(FetchedEndpoint::ACCOUNTS));
+
+  ExpectStatusMetrics(TokenStatus::kSilentMediationFailure,
+                      MediationRequirement::kSilent);
+
+  ExpectAutoReauthnMetrics(FedCmMetrics::NumAccounts::kMultiple,
+                           /*expected_succeeded=*/false,
+                           /*expected_auto_reauthn_setting_blocked=*/false,
+                           /*expected_auto_reauthn_embargoed=*/false,
+                           /*expected_prevent_silent_access=*/false);
 }
 
 // Test that `mediation: required` sets the sign-in mode to explicit even though
@@ -2192,6 +2310,8 @@ TEST_F(FederatedAuthRequestImplTest, AutoReauthnMediationRequired) {
   ASSERT_EQ(displayed_accounts().size(), 1u);
   EXPECT_EQ(displayed_accounts()[0].login_state, LoginState::kSignIn);
   EXPECT_EQ(dialog_controller_state_.sign_in_mode, SignInMode::kExplicit);
+
+  ExpectStatusMetrics(TokenStatus::kSuccess, MediationRequirement::kRequired);
 }
 
 TEST_F(FederatedAuthRequestImplTest, MetricsForSuccessfulSignInCase) {
@@ -2219,9 +2339,6 @@ TEST_F(FederatedAuthRequestImplTest, MetricsForSuccessfulSignInCase) {
   histogram_tester_.ExpectTotalCount("Blink.FedCm.Timing.IdTokenResponse", 1);
   histogram_tester_.ExpectTotalCount("Blink.FedCm.Timing.TurnaroundTime", 1);
 
-  histogram_tester_.ExpectUniqueSample("Blink.FedCm.Status.RequestIdToken",
-                                       TokenStatus::kSuccess, 1);
-
   histogram_tester_.ExpectUniqueSample("Blink.FedCm.IsSignInUser", 1, 1);
 
   ExpectTimingUKM("Timing.ShowAccountsDialog");
@@ -2230,7 +2347,7 @@ TEST_F(FederatedAuthRequestImplTest, MetricsForSuccessfulSignInCase) {
   ExpectTimingUKM("Timing.TurnaroundTime");
   ExpectNoTimingUKM("Timing.CancelOnDialog");
 
-  ExpectRequestTokenStatusUKM(TokenStatus::kSuccess);
+  ExpectStatusMetrics(TokenStatus::kSuccess);
   CheckAllFedCmSessionIDs();
 }
 
@@ -2249,6 +2366,7 @@ TEST_F(FederatedAuthRequestImplTest, MetricsForUIExplicitlyDismissed) {
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
       {FederatedAuthRequestResult::kShouldEmbargo},
+      /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/absl::nullopt};
   RunAuthTest(kDefaultRequestParameters, expectations, configuration);
   EXPECT_FALSE(DidFetch(FetchedEndpoint::TOKEN));
@@ -2265,16 +2383,13 @@ TEST_F(FederatedAuthRequestImplTest, MetricsForUIExplicitlyDismissed) {
   histogram_tester_.ExpectTotalCount("Blink.FedCm.Timing.IdTokenResponse", 0);
   histogram_tester_.ExpectTotalCount("Blink.FedCm.Timing.TurnaroundTime", 0);
 
-  histogram_tester_.ExpectUniqueSample("Blink.FedCm.Status.RequestIdToken",
-                                       TokenStatus::kShouldEmbargo, 1);
-
   ExpectTimingUKM("Timing.ShowAccountsDialog");
   ExpectTimingUKM("Timing.CancelOnDialog");
   ExpectNoTimingUKM("Timing.ContinueOnDialog");
   ExpectNoTimingUKM("Timing.IdTokenResponse");
   ExpectNoTimingUKM("Timing.TurnaroundTime");
 
-  ExpectRequestTokenStatusUKM(TokenStatus::kShouldEmbargo);
+  ExpectStatusMetrics(TokenStatus::kShouldEmbargo);
   CheckAllFedCmSessionIDs();
 }
 
@@ -2363,6 +2478,7 @@ TEST_F(FederatedAuthRequestImplTest, MetricsForWebContentsInvisible) {
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
       {FederatedAuthRequestResult::kErrorRpPageNotVisible},
+      /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/absl::nullopt};
   RunAuthTest(kDefaultRequestParameters, expectations, kConfigurationValid);
   EXPECT_TRUE(DidFetch(FetchedEndpoint::ACCOUNTS));
@@ -2378,15 +2494,13 @@ TEST_F(FederatedAuthRequestImplTest, DisabledWhenThirdPartyCookiesBlocked) {
 
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
-      {FederatedAuthRequestResult::kError},
+      {FederatedAuthRequestResult::kErrorThirdPartyCookiesBlocked},
+      /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/absl::nullopt};
   RunAuthTest(kDefaultRequestParameters, expectations, kConfigurationValid);
   EXPECT_FALSE(DidFetchAnyEndpoint());
 
-  histogram_tester_.ExpectUniqueSample("Blink.FedCm.Status.RequestIdToken",
-                                       TokenStatus::kThirdPartyCookiesBlocked,
-                                       1);
-  ExpectRequestTokenStatusUKM(TokenStatus::kThirdPartyCookiesBlocked);
+  ExpectStatusMetrics(TokenStatus::kThirdPartyCookiesBlocked);
   CheckAllFedCmSessionIDs();
 }
 
@@ -2398,13 +2512,12 @@ TEST_F(FederatedAuthRequestImplTest, MetricsForFeatureIsDisabled) {
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
       {FederatedAuthRequestResult::kError},
+      /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/absl::nullopt};
   RunAuthTest(kDefaultRequestParameters, expectations, kConfigurationValid);
   EXPECT_FALSE(DidFetchAnyEndpoint());
 
-  histogram_tester_.ExpectUniqueSample("Blink.FedCm.Status.RequestIdToken",
-                                       TokenStatus::kDisabledInFlags, 1);
-  ExpectRequestTokenStatusUKM(TokenStatus::kDisabledInFlags);
+  ExpectStatusMetrics(TokenStatus::kDisabledInFlags);
   CheckAllFedCmSessionIDs();
 }
 
@@ -2422,9 +2535,7 @@ TEST_F(FederatedAuthRequestImplTest,
 
   // If double counted, these samples would not be unique so the following
   // checks will fail.
-  histogram_tester_.ExpectUniqueSample("Blink.FedCm.Status.RequestIdToken",
-                                       TokenStatus::kDisabledInFlags, 1);
-  ExpectRequestTokenStatusUKM(TokenStatus::kDisabledInFlags);
+  ExpectStatusMetrics(TokenStatus::kDisabledInFlags);
   CheckAllFedCmSessionIDs();
 }
 
@@ -2442,9 +2553,7 @@ TEST_F(FederatedAuthRequestImplTest,
 
   // If double counted, these samples would not be unique so the following
   // checks will fail.
-  histogram_tester_.ExpectUniqueSample("Blink.FedCm.Status.RequestIdToken",
-                                       TokenStatus::kDisabledInFlags, 1);
-  ExpectRequestTokenStatusUKM(TokenStatus::kDisabledInFlags);
+  ExpectStatusMetrics(TokenStatus::kDisabledInFlags);
   CheckAllFedCmSessionIDs();
 }
 
@@ -2578,6 +2687,7 @@ TEST_F(FederatedAuthRequestImplTest, RequestEmbargo) {
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
       {FederatedAuthRequestResult::kShouldEmbargo},
+      /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/absl::nullopt};
 
   MockConfiguration configuration = kConfigurationValid;
@@ -2607,6 +2717,7 @@ TEST_F(FederatedAuthRequestImplTest, ApiBlockedForOrigin) {
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
       {FederatedAuthRequestResult::kErrorDisabledInSettings},
+      /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/absl::nullopt};
   RunAuthTest(kDefaultRequestParameters, expectations, kConfigurationValid);
   EXPECT_FALSE(DidFetchAnyEndpoint());
@@ -2654,6 +2765,7 @@ TEST_P(FederatedAuthRequestImplTestCancelConsistency, AccountNotSelected) {
   WaitForCurrentAuthRequest();
   RequestExpectations expectations{RequestTokenStatus::kErrorCanceled,
                                    /*devtools_issue_statuses=*/{},
+                                   /*standalone_console_messages=*/{},
                                    /*selected_idp_config_url=*/absl::nullopt};
   CheckAuthExpectations(configuration, expectations);
 }
@@ -2719,6 +2831,7 @@ TEST_F(FederatedAuthRequestImplTest, ApiDisabledAfterAccountsDialogShown) {
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
       {FederatedAuthRequestResult::kErrorDisabledInSettings},
+      /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/absl::nullopt};
 
   url::Origin rp_origin_to_disable = main_test_rfh()->GetLastCommittedOrigin();
@@ -2739,15 +2852,12 @@ TEST_F(FederatedAuthRequestImplTest, ApiDisabledAfterAccountsDialogShown) {
   histogram_tester_.ExpectTotalCount("Blink.FedCm.Timing.IdTokenResponse", 0);
   histogram_tester_.ExpectTotalCount("Blink.FedCm.Timing.TurnaroundTime", 0);
 
-  histogram_tester_.ExpectUniqueSample("Blink.FedCm.Status.RequestIdToken",
-                                       TokenStatus::kDisabledInSettings, 1);
-
   ExpectTimingUKM("Timing.ShowAccountsDialog");
   ExpectNoTimingUKM("Timing.ContinueOnDialog");
   ExpectNoTimingUKM("Timing.IdTokenResponse");
   ExpectNoTimingUKM("Timing.TurnaroundTime");
 
-  ExpectRequestTokenStatusUKM(TokenStatus::kDisabledInSettings);
+  ExpectStatusMetrics(TokenStatus::kDisabledInSettings);
   CheckAllFedCmSessionIDs();
 }
 
@@ -2862,7 +2972,7 @@ TEST_F(FederatedAuthRequestImplTest,
 
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
-      /*devtools_issue_statuses=*/{},
+      /*devtools_issue_statuses=*/{}, /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/absl::nullopt};
   RunAuthTest(kDefaultRequestParameters, expectations, kConfigurationValid);
   EXPECT_TRUE(DidFetch(FetchedEndpoint::ACCOUNTS));
@@ -2883,7 +2993,7 @@ TEST_F(FederatedAuthRequestImplTest,
 
   RequestExpectations expectations = {
       /*return_status=*/absl::nullopt,
-      /*devtools_issue_statuses=*/{},
+      /*devtools_issue_statuses=*/{}, /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/absl::nullopt};
   RunAuthTest(kDefaultRequestParameters, expectations, kConfigurationValid);
   EXPECT_TRUE(DidFetch(FetchedEndpoint::ACCOUNTS));
@@ -2952,6 +3062,7 @@ TEST_F(FederatedAuthRequestImplTest,
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
       {FederatedAuthRequestResult::kErrorFetchingAccountsInvalidResponse},
+      /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/absl::nullopt};
   RunAuthTest(kDefaultRequestParameters, expectations, configuration);
   EXPECT_TRUE(DidFetch(FetchedEndpoint::ACCOUNTS));
@@ -2978,6 +3089,7 @@ TEST_F(FederatedAuthRequestImplTest, IdpSigninStatusTestShowFailureUi) {
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
       {FederatedAuthRequestResult::kError},
+      /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/absl::nullopt};
   RunAuthTest(kDefaultRequestParameters, expectations, configuration);
   EXPECT_TRUE(DidFetch(FetchedEndpoint::ACCOUNTS));
@@ -3000,6 +3112,7 @@ TEST_F(FederatedAuthRequestImplTest,
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
       {FederatedAuthRequestResult::kError},
+      /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/absl::nullopt};
   RunAuthTest(kDefaultRequestParameters, expectations, kConfigurationValid);
   EXPECT_FALSE(DidFetchAnyEndpoint());
@@ -3277,6 +3390,7 @@ TEST_F(FederatedAuthRequestImplTest, FailureUiThenFailDifferentEndpoint) {
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
       {FederatedAuthRequestResult::kErrorFetchingConfigInvalidResponse},
+      /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/absl::nullopt};
   CheckAuthExpectations(kConfigurationValid, expectations);
 
@@ -3336,7 +3450,7 @@ TEST_F(FederatedAuthRequestImplTest,
   // Check that the FedCM request failed after the account picker was shown.
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
-      /*devtools_issue_statuses=*/{},
+      /*devtools_issue_statuses=*/{}, /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/absl::nullopt};
   CheckAuthExpectations(kConfigurationValid, expectations);
   EXPECT_TRUE(did_show_accounts_dialog());
@@ -3377,6 +3491,7 @@ TEST_F(FederatedAuthRequestImplTest,
 
   RequestExpectations expectations{RequestTokenStatus::kErrorCanceled,
                                    {FederatedAuthRequestResult::kErrorCanceled},
+                                   /*standalone_console_messages=*/{},
                                    /*selected_idp_config_url=*/absl::nullopt};
   WaitForCurrentAuthRequest();
   CheckAuthExpectations(kConfigurationValid, expectations);
@@ -3444,8 +3559,10 @@ TEST_F(FederatedAuthRequestImplTest,
   MockConfiguration configuration = kConfigurationValid;
   configuration.idp_info[kProviderUrlFull].accounts_response.parse_status =
       ParseStatus::kInvalidResponseError;
-  RequestExpectations expectations = {
-      RequestTokenStatus::kError, {}, absl::nullopt};
+  RequestExpectations expectations = {RequestTokenStatus::kError,
+                                      {},
+                                      /*standalone_console_messages=*/{},
+                                      absl::nullopt};
   RunAuthTest(kDefaultRequestParameters, expectations, configuration);
   EXPECT_TRUE(DidFetch(FetchedEndpoint::ACCOUNTS));
   EXPECT_FALSE(did_show_accounts_dialog());
@@ -3457,8 +3574,10 @@ TEST_F(FederatedAuthRequestImplTest, MultiIdpError) {
   base::test::ScopedFeatureList list;
   list.InitAndDisableFeature(features::kFedCmMultipleIdentityProviders);
 
-  RequestExpectations expectations = {
-      RequestTokenStatus::kError, {}, absl::nullopt};
+  RequestExpectations expectations = {RequestTokenStatus::kError,
+                                      {},
+                                      /*standalone_console_messages=*/{},
+                                      absl::nullopt};
 
   RunAuthTest(kDefaultMultiIdpRequestParameters, expectations,
               kConfigurationMultiIdpValid);
@@ -3490,6 +3609,7 @@ TEST_F(FederatedAuthRequestImplTest, FirstIdpWellKnownInvalid) {
   RequestExpectations expectations = {
       RequestTokenStatus::kSuccess,
       {FederatedAuthRequestResult::kErrorConfigNotInWellKnown},
+      /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/kProviderTwoUrlFull};
 
   RunAuthTest(kDefaultMultiIdpRequestParameters, expectations, configuration);
@@ -3514,6 +3634,7 @@ TEST_F(FederatedAuthRequestImplTest, SecondIdpWellKnownInvalid) {
   RequestExpectations expectations = {
       RequestTokenStatus::kSuccess,
       {FederatedAuthRequestResult::kErrorConfigNotInWellKnown},
+      /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/kProviderUrlFull};
 
   RunAuthTest(kDefaultMultiIdpRequestParameters, expectations, configuration);
@@ -3539,6 +3660,7 @@ TEST_F(FederatedAuthRequestImplTest, AllWellKnownsInvalid) {
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
       {FederatedAuthRequestResult::kErrorConfigNotInWellKnown},
+      /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/absl::nullopt};
 
   RunAuthTest(kDefaultMultiIdpRequestParameters, expectations, configuration);
@@ -3560,7 +3682,7 @@ TEST_F(FederatedAuthRequestImplTest, DuplicateIdpMultiIdpRequest) {
 
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
-      /*devtools_issue_statuses=*/{},
+      /*devtools_issue_statuses=*/{}, /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/absl::nullopt};
 
   RunAuthTest(request_parameters, expectations, kConfigurationMultiIdpValid);
@@ -3583,7 +3705,7 @@ TEST_F(FederatedAuthRequestImplTest, TooManyRequests) {
   // been finalized.
   RequestExpectations expectations = {
       RequestTokenStatus::kErrorTooManyRequests,
-      /*devtools_issue_statuses=*/{},
+      /*devtools_issue_statuses=*/{}, /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/absl::nullopt};
   RunAuthTest(kDefaultRequestParameters, expectations, configuration);
   EXPECT_FALSE(DidFetchAnyEndpoint());
@@ -3668,6 +3790,7 @@ TEST_F(FederatedAuthRequestImplTest, MetricsEndpointMultiIdpFail) {
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
       {FederatedAuthRequestResult::kShouldEmbargo},
+      /*standalone_console_messages=*/{},
       /* selected_idp_config_url=*/absl::nullopt};
 
   MockConfiguration configuration = kConfigurationMultiIdpValid;
@@ -3711,6 +3834,10 @@ TEST_F(FederatedAuthRequestImplTest, LoginHintSingleAccountIdMatch) {
   RunAuthTest(parameters, kExpectationSuccess, configuration);
   ASSERT_EQ(displayed_accounts().size(), 1u);
   EXPECT_EQ(displayed_accounts()[0].id, kAccountId);
+
+  histogram_tester_.ExpectUniqueSample(
+      "Blink.FedCm.LoginHint.NumMatchingAccounts",
+      FedCmMetrics::NumAccounts::kOne, 1);
 }
 
 TEST_F(FederatedAuthRequestImplTest, LoginHintSingleAccountEmailMatch) {
@@ -3726,6 +3853,10 @@ TEST_F(FederatedAuthRequestImplTest, LoginHintSingleAccountEmailMatch) {
   RunAuthTest(parameters, kExpectationSuccess, configuration);
   ASSERT_EQ(displayed_accounts().size(), 1u);
   EXPECT_EQ(displayed_accounts()[0].email, kEmail);
+
+  histogram_tester_.ExpectUniqueSample(
+      "Blink.FedCm.LoginHint.NumMatchingAccounts",
+      FedCmMetrics::NumAccounts::kOne, 1);
 }
 
 TEST_F(FederatedAuthRequestImplTest, LoginHintSingleAccountNoMatch) {
@@ -3737,6 +3868,7 @@ TEST_F(FederatedAuthRequestImplTest, LoginHintSingleAccountNoMatch) {
   const RequestExpectations expectations = {
       RequestTokenStatus::kError,
       {FederatedAuthRequestResult::kErrorFetchingAccountsListEmpty},
+      /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/absl::nullopt};
 
   MockConfiguration configuration = kConfigurationValid;
@@ -3745,6 +3877,10 @@ TEST_F(FederatedAuthRequestImplTest, LoginHintSingleAccountNoMatch) {
   RunAuthTest(parameters, expectations, configuration);
   EXPECT_TRUE(DidFetch(FetchedEndpoint::ACCOUNTS));
   EXPECT_FALSE(did_show_accounts_dialog());
+
+  histogram_tester_.ExpectUniqueSample(
+      "Blink.FedCm.LoginHint.NumMatchingAccounts",
+      FedCmMetrics::NumAccounts::kZero, 1);
 }
 
 TEST_F(FederatedAuthRequestImplTest, LoginHintFirstAccountMatch) {
@@ -3761,6 +3897,10 @@ TEST_F(FederatedAuthRequestImplTest, LoginHintFirstAccountMatch) {
   RunAuthTest(parameters, kExpectationSuccess, configuration);
   ASSERT_EQ(displayed_accounts().size(), 1u);
   EXPECT_EQ(displayed_accounts()[0].id, kAccountIdNicolas);
+
+  histogram_tester_.ExpectUniqueSample(
+      "Blink.FedCm.LoginHint.NumMatchingAccounts",
+      FedCmMetrics::NumAccounts::kOne, 1);
 }
 
 TEST_F(FederatedAuthRequestImplTest, LoginHintLastAccountMatch) {
@@ -3777,6 +3917,10 @@ TEST_F(FederatedAuthRequestImplTest, LoginHintLastAccountMatch) {
   RunAuthTest(parameters, kExpectationSuccess, configuration);
   ASSERT_EQ(displayed_accounts().size(), 1u);
   EXPECT_EQ(displayed_accounts()[0].id, kAccountIdZach);
+
+  histogram_tester_.ExpectUniqueSample(
+      "Blink.FedCm.LoginHint.NumMatchingAccounts",
+      FedCmMetrics::NumAccounts::kOne, 1);
 }
 
 TEST_F(FederatedAuthRequestImplTest, LoginHintMultipleAccountsNoMatch) {
@@ -3788,6 +3932,7 @@ TEST_F(FederatedAuthRequestImplTest, LoginHintMultipleAccountsNoMatch) {
   const RequestExpectations expectations = {
       RequestTokenStatus::kError,
       {FederatedAuthRequestResult::kErrorFetchingAccountsListEmpty},
+      /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/absl::nullopt};
 
   MockConfiguration configuration = kConfigurationValid;
@@ -3797,6 +3942,10 @@ TEST_F(FederatedAuthRequestImplTest, LoginHintMultipleAccountsNoMatch) {
   RunAuthTest(parameters, expectations, configuration);
   EXPECT_TRUE(DidFetch(FetchedEndpoint::ACCOUNTS));
   EXPECT_FALSE(did_show_accounts_dialog());
+
+  histogram_tester_.ExpectUniqueSample(
+      "Blink.FedCm.LoginHint.NumMatchingAccounts",
+      FedCmMetrics::NumAccounts::kZero, 1);
 }
 
 // Test that when FedCmRpContext flag is enabled and rp_context is specified,
@@ -3839,6 +3988,7 @@ TEST_F(FederatedAuthRequestImplTest, WellKnownInvalidContentType) {
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
       {FederatedAuthRequestResult::kErrorFetchingWellKnownInvalidContentType},
+      /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/absl::nullopt};
 
   base::RunLoop ukm_loop;
@@ -3851,11 +4001,7 @@ TEST_F(FederatedAuthRequestImplTest, WellKnownInvalidContentType) {
   EXPECT_FALSE(did_show_accounts_dialog());
   EXPECT_FALSE(did_show_idp_signin_status_mismatch_dialog());
 
-  histogram_tester_.ExpectUniqueSample(
-      "Blink.FedCm.Status.RequestIdToken",
-      TokenStatus::kWellKnownInvalidContentType, 1);
-
-  ExpectRequestTokenStatusUKM(TokenStatus::kWellKnownInvalidContentType);
+  ExpectStatusMetrics(TokenStatus::kWellKnownInvalidContentType);
   CheckAllFedCmSessionIDs();
 }
 
@@ -3866,6 +4012,7 @@ TEST_F(FederatedAuthRequestImplTest, ConfigInvalidContentType) {
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
       {FederatedAuthRequestResult::kErrorFetchingConfigInvalidContentType},
+      /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/absl::nullopt};
 
   base::RunLoop ukm_loop;
@@ -3878,11 +4025,7 @@ TEST_F(FederatedAuthRequestImplTest, ConfigInvalidContentType) {
   EXPECT_FALSE(did_show_accounts_dialog());
   EXPECT_FALSE(did_show_idp_signin_status_mismatch_dialog());
 
-  histogram_tester_.ExpectUniqueSample("Blink.FedCm.Status.RequestIdToken",
-                                       TokenStatus::kConfigInvalidContentType,
-                                       1);
-
-  ExpectRequestTokenStatusUKM(TokenStatus::kConfigInvalidContentType);
+  ExpectStatusMetrics(TokenStatus::kConfigInvalidContentType);
   CheckAllFedCmSessionIDs();
 }
 
@@ -3903,10 +4046,7 @@ TEST_F(FederatedAuthRequestImplTest, ClientMetadataInvalidContentType) {
   EXPECT_TRUE(did_show_accounts_dialog());
   EXPECT_FALSE(did_show_idp_signin_status_mismatch_dialog());
 
-  histogram_tester_.ExpectUniqueSample("Blink.FedCm.Status.RequestIdToken",
-                                       TokenStatus::kSuccess, 1);
-
-  ExpectRequestTokenStatusUKM(TokenStatus::kSuccess);
+  ExpectStatusMetrics(TokenStatus::kSuccess);
   CheckAllFedCmSessionIDs();
 }
 
@@ -3917,6 +4057,7 @@ TEST_F(FederatedAuthRequestImplTest, AccountsInvalidContentType) {
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
       {FederatedAuthRequestResult::kErrorFetchingAccountsInvalidContentType},
+      /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/absl::nullopt};
 
   base::RunLoop ukm_loop;
@@ -3929,11 +4070,7 @@ TEST_F(FederatedAuthRequestImplTest, AccountsInvalidContentType) {
   EXPECT_FALSE(did_show_accounts_dialog());
   EXPECT_FALSE(did_show_idp_signin_status_mismatch_dialog());
 
-  histogram_tester_.ExpectUniqueSample("Blink.FedCm.Status.RequestIdToken",
-                                       TokenStatus::kAccountsInvalidContentType,
-                                       1);
-
-  ExpectRequestTokenStatusUKM(TokenStatus::kAccountsInvalidContentType);
+  ExpectStatusMetrics(TokenStatus::kAccountsInvalidContentType);
   CheckAllFedCmSessionIDs();
 }
 
@@ -3944,6 +4081,7 @@ TEST_F(FederatedAuthRequestImplTest, IdTokenInvalidContentType) {
   RequestExpectations expectations = {
       RequestTokenStatus::kError,
       {FederatedAuthRequestResult::kErrorFetchingIdTokenInvalidContentType},
+      /*standalone_console_messages=*/{},
       /*selected_idp_config_url=*/absl::nullopt};
 
   base::RunLoop ukm_loop;
@@ -3956,11 +4094,7 @@ TEST_F(FederatedAuthRequestImplTest, IdTokenInvalidContentType) {
   EXPECT_TRUE(did_show_accounts_dialog());
   EXPECT_FALSE(did_show_idp_signin_status_mismatch_dialog());
 
-  histogram_tester_.ExpectUniqueSample("Blink.FedCm.Status.RequestIdToken",
-                                       TokenStatus::kIdTokenInvalidContentType,
-                                       1);
-
-  ExpectRequestTokenStatusUKM(TokenStatus::kIdTokenInvalidContentType);
+  ExpectStatusMetrics(TokenStatus::kIdTokenInvalidContentType);
   CheckAllFedCmSessionIDs();
 }
 
@@ -4009,7 +4143,7 @@ TEST_F(FederatedAuthRequestImplTest, SuccessfulAuthZRequestWithPopUpWindow) {
 
   // Set up the network expectations to return a "continue_on" response
   // rather than the typical idtoken response.
-  GURL continue_on("/more-permissions.php");
+  GURL continue_on = GURL(kProviderUrlFull).Resolve("/more-permissions.php");
   config.continue_on = std::move(continue_on);
 
   // Set up the UI dialog controller to show a pop-up window, rather
@@ -4033,6 +4167,7 @@ TEST_F(FederatedAuthRequestImplTest, SuccessfulAuthZRequestWithPopUpWindow) {
 
   RequestExpectations success = {RequestTokenStatus::kSuccess,
                                  {FederatedAuthRequestResult::kSuccess},
+                                 /*standalone_console_messages=*/{},
                                  /*selected_idp_config_url=*/absl::nullopt};
 
   RunAuthTest(parameters, success, config);
@@ -4043,11 +4178,78 @@ TEST_F(FederatedAuthRequestImplTest, SuccessfulAuthZRequestWithPopUpWindow) {
   EXPECT_FALSE(DidFetch(FetchedEndpoint::CLIENT_METADATA));
 }
 
+// Test successful AuthZ request that request the opening of pop-up
+// windows.
+TEST_F(FederatedAuthRequestImplTest,
+       FailsLoadingAContinueOnForADifferentOrigin) {
+  base::test::ScopedFeatureList list;
+  list.InitAndEnableFeature(features::kFedCmAuthz);
+
+  RequestParameters parameters = kDefaultRequestParameters;
+  parameters.identity_providers[0].scope = {"calendar.readonly"};
+
+  MockConfiguration config = kConfigurationValid;
+  config.succeed_with_console_message = true;
+
+  // Set up the network expectations to return a "continue_on" response
+  // rather than the typical idtoken response.
+  GURL continue_on =
+      GURL("https://another-origin.example").Resolve("/more-permissions.php");
+  config.continue_on = std::move(continue_on);
+
+  RequestExpectations error = {
+      RequestTokenStatus::kError,
+      /*devtools_issue_statuses=*/{},
+      // TODO(https://crbug.com/1429083): introduce a more granular error.
+      /*standalone_console_messages=*/{"Provider's token is invalid."},
+      /*selected_idp_config_url=*/absl::nullopt};
+
+  RunAuthTest(parameters, error, config);
+}
+
 // Test that IdentityRegistry is notified when modal dialog view is closed.
 TEST_F(FederatedAuthRequestImplTest, IdentityRegistryIsNotified) {
   EXPECT_FALSE(test_identity_registry_->notified_);
   federated_auth_request_impl_->CloseModalDialogView();
   EXPECT_TRUE(test_identity_registry_->notified_);
+}
+
+TEST_F(FederatedAuthRequestImplTest, ShouldNotMediateAuthz) {
+  base::test::ScopedFeatureList list;
+  list.InitAndEnableFeature(features::kFedCmAuthz);
+  // A completely unknown oauth scope is being requested.
+  EXPECT_FALSE(
+      FederatedAuthRequestImpl::ShouldMediateAuthz({"calendar.readonly"}));
+  // Just the email scope is being requested.
+  EXPECT_FALSE(FederatedAuthRequestImpl::ShouldMediateAuthz({"email"}));
+  // Just the email scope and the name scope are being requested.
+  EXPECT_FALSE(
+      FederatedAuthRequestImpl::ShouldMediateAuthz({"email", "address"}));
+  // Just the email, picture and name scopes are being requested.
+  EXPECT_FALSE(FederatedAuthRequestImpl::ShouldMediateAuthz(
+      {"email", "address", "phone"}));
+  // When the basic profile scope is passed in addition to others.
+  EXPECT_FALSE(FederatedAuthRequestImpl::ShouldMediateAuthz(
+      {"profile", "email", "calendar.readonly"}));
+}
+
+TEST_F(FederatedAuthRequestImplTest, ShouldMediateAuthz) {
+  base::test::ScopedFeatureList list;
+  list.InitAndEnableFeature(features::kFedCmAuthz);
+  // When scope isn't passed, we default to the basic profile authorization
+  // permission.
+  EXPECT_TRUE(FederatedAuthRequestImpl::ShouldMediateAuthz({}));
+  // When the basic profile authorization scope is passed explicitly.
+  EXPECT_TRUE(
+      FederatedAuthRequestImpl::ShouldMediateAuthz({"profile", "email"}));
+}
+
+TEST_F(FederatedAuthRequestImplTest,
+       ShouldNotMediateAuthzWithoutFeatureEnabled) {
+  // Assert that we always mediate the authorization when the kFedCmAuthz
+  // is not enabled.
+  EXPECT_TRUE(
+      FederatedAuthRequestImpl::ShouldMediateAuthz({"profile", "email"}));
 }
 
 }  // namespace content

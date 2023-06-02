@@ -30,6 +30,8 @@
 #include "ash/style/dot_indicator.h"
 #include "ash/style/style_util.h"
 #include "ash/style/typography.h"
+#include "ash/user_education/user_education_class_properties.h"
+#include "ash/user_education/user_education_controller.h"
 #include "base/auto_reset.h"
 #include "base/check.h"
 #include "base/functional/bind.h"
@@ -40,6 +42,7 @@
 #include "base/time/time.h"
 #include "cc/paint/paint_flags.h"
 #include "chromeos/constants/chromeos_features.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/skia/include/core/SkCanvas.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/accessibility/ax_node_data.h"
@@ -73,6 +76,7 @@
 #include "ui/views/controls/label.h"
 #include "ui/views/controls/menu/menu_runner.h"
 #include "ui/views/focus/focus_manager.h"
+#include "ui/views/view_class_properties.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 
@@ -606,6 +610,17 @@ AppListItemView::AppListItemView(const AppListConfig* app_list_config,
   SetAnimationDuration(base::TimeDelta());
 
   preview_circle_radius_ = 0;
+
+  if (features::IsUserEducationEnabled() && context == Context::kAppsGridView) {
+    if (absl::optional<ui::ElementIdentifier> element_identifier =
+            UserEducationController::Get()->GetElementIdentifierForAppId(
+                item->id())) {
+      // NOTE: Set `kHelpBubbleContextKey` before `views::kElementIdentifierKey`
+      // in case registration causes a help bubble to be created synchronously.
+      SetProperty(kHelpBubbleContextKey, HelpBubbleContext::kAsh);
+      SetProperty(views::kElementIdentifierKey, *element_identifier);
+    }
+  }
 }
 
 void AppListItemView::InitializeIconLoader() {
@@ -898,6 +913,9 @@ bool AppListItemView::InitiateDrag(const gfx::Point& location,
                          weak_ptr_factory_.GetWeakPtr()),
           base::BindOnce(&AppListItemView::OnDragEnded,
                          weak_ptr_factory_.GetWeakPtr()))) {
+    return false;
+  }
+  if (!IsItemDraggable()) {
     return false;
   }
   drag_state_ = DragState::kInitialized;
@@ -1319,7 +1337,7 @@ void AppListItemView::OnBlur() {
 }
 
 int AppListItemView::GetDragOperations(const gfx::Point& press_pt) {
-  if (context_ == Context::kRecentAppsView) {
+  if (!IsItemDraggable()) {
     return ui::DragDropTypes::DRAG_NONE;
   }
 
@@ -1337,8 +1355,12 @@ void AppListItemView::WriteDragData(const gfx::Point& press_pt,
 
   if (item_weak_) {
     data->provider().SetDragImage(GetIconImage(), press_pt.OffsetFromOrigin());
+    const DraggableAppType app_type = is_folder_
+                                          ? DraggableAppType::kFolderAppGridItem
+                                          : DraggableAppType::kAppGridItem;
     base::Pickle data_pickle;
     data_pickle.WriteString(item_weak_->id());
+    data_pickle.WriteInt(static_cast<int>(app_type));
     data->SetPickledData(GetAppItemFormatType(), data_pickle);
   }
 }
@@ -1406,7 +1428,7 @@ void AppListItemView::OnGestureEvent(ui::GestureEvent* event) {
       }
       break;
     case ui::ET_GESTURE_TAP_DOWN:
-      if (GetState() != STATE_DISABLED) {
+      if (GetState() != STATE_DISABLED && IsItemDraggable()) {
         SetState(STATE_PRESSED);
         touch_drag_timer_.Start(
             FROM_HERE, base::Milliseconds(kTouchLongpressDelayInMs),
@@ -1548,6 +1570,10 @@ bool AppListItemView::FireTouchDragTimerForTest() {
 
 bool AppListItemView::IsShowingAppMenu() const {
   return item_menu_model_adapter_ && item_menu_model_adapter_->IsShowingMenu();
+}
+
+bool AppListItemView::IsItemDraggable() const {
+  return context_ != Context::kRecentAppsView;
 }
 
 bool AppListItemView::IsNotificationIndicatorShownForTest() const {

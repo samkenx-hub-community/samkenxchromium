@@ -225,7 +225,6 @@ DEFINE_VARIATION_PARAM(kIPHDiscoverFeedHeaderFeature,
 DEFINE_VARIATION_PARAM(kIPHDefaultSiteViewFeature, "IPH_DefaultSiteView");
 DEFINE_VARIATION_PARAM(kIPHFollowWhileBrowsingFeature,
                        "IPH_FollowWhileBrowsing");
-DEFINE_VARIATION_PARAM(kIPHOverflowMenuTipFeature, "IPH_OverflowMenuTip");
 DEFINE_VARIATION_PARAM(kIPHPriceNotificationsWhileBrowsingFeature,
                        "IPHPriceNotificationsWhileBrowsing");
 DEFINE_VARIATION_PARAM(kIPHiOSDefaultBrowserBadgeEligibilityFeature,
@@ -251,6 +250,8 @@ DEFINE_VARIATION_PARAM(kIPHiOSHistoryOnOverflowMenuFeature,
                        "IPH_iOSHistoryOnOverflowMenuFeature");
 DEFINE_VARIATION_PARAM(kIPHiOSShareToolbarItemFeature,
                        "IPH_iOSShareToolbarItemFeature");
+DEFINE_VARIATION_PARAM(kIPHiOSDefaultBrowserVideoPromoTriggerFeature,
+                       "IPH_iOSDefaultBrowserVideoPromoTriggerFeature");
 #endif  // BUILDFLAG(IS_IOS)
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_APPLE) || BUILDFLAG(IS_LINUX) || \
@@ -293,7 +294,8 @@ DEFINE_VARIATION_PARAM(kIPHReadingListEntryPointFeature,
                        "IPH_ReadingListEntryPoint");
 DEFINE_VARIATION_PARAM(kIPHReadingListInSidePanelFeature,
                        "IPH_ReadingListInSidePanel");
-DEFINE_VARIATION_PARAM(kIPHReopenTabFeature, "IPH_ReopenTab");
+DEFINE_VARIATION_PARAM(kIPHReadingModeSidePanelFeature,
+                       "IPH_ReadingModeSidePanel");
 DEFINE_VARIATION_PARAM(kIPHSideSearchAutoTriggeringFeature,
                        "IPH_SideSearchAutoTriggering");
 DEFINE_VARIATION_PARAM(kIPHSideSearchFeature, "IPH_SideSearch");
@@ -434,7 +436,6 @@ constexpr flags_ui::FeatureEntry::FeatureVariation
         VARIATION_ENTRY(kIPHDiscoverFeedHeaderFeature),
         VARIATION_ENTRY(kIPHDefaultSiteViewFeature),
         VARIATION_ENTRY(kIPHFollowWhileBrowsingFeature),
-        VARIATION_ENTRY(kIPHOverflowMenuTipFeature),
         VARIATION_ENTRY(kIPHPriceNotificationsWhileBrowsingFeature),
         VARIATION_ENTRY(kIPHiOSDefaultBrowserBadgeEligibilityFeature),
         VARIATION_ENTRY(kIPHiOSDefaultBrowserOverflowMenuBadgeFeature),
@@ -474,7 +475,7 @@ constexpr flags_ui::FeatureEntry::FeatureVariation
         VARIATION_ENTRY(kIPHReadingListDiscoveryFeature),
         VARIATION_ENTRY(kIPHReadingListEntryPointFeature),
         VARIATION_ENTRY(kIPHReadingListInSidePanelFeature),
-        VARIATION_ENTRY(kIPHReopenTabFeature),
+        VARIATION_ENTRY(kIPHReadingModeSidePanelFeature),
         VARIATION_ENTRY(kIPHSideSearchAutoTriggeringFeature),
         VARIATION_ENTRY(kIPHSideSearchFeature),
         VARIATION_ENTRY(kIPHSideSearchPageActionLabelFeature),

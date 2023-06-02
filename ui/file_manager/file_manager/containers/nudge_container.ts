@@ -201,6 +201,8 @@ export class NudgeContainer {
       // Self dismissable nudge only dismisses if the user clicks on the nudge.
       this.nudge_.addEventListener(
           'pointerdown', () => this.closeNudge(this.currentNudgeType_), config);
+      anchor.addEventListener(
+          'pointerdown', () => this.closeNudge(this.currentNudgeType_), config);
       const dismissOnKeyDown = info.dismissOnKeyDown;
       if (dismissOnKeyDown) {
         document.addEventListener('keydown', (event: KeyboardEvent) => {
@@ -463,7 +465,8 @@ export const nudgeInfo: {[type in NudgeType]: NudgeInfo} = {
     dismissOnKeyDown: treeDismissOnKeyDownOnTreeItem,
   },
   [NudgeType['SEARCH_V2_EDUCATION_NUDGE']]: {
-    anchor: () => document.querySelector<HTMLSpanElement>('#search-wrapper'),
+    anchor: () =>
+        document.querySelector<HTMLDivElement>('#search-button > .icon'),
     content: () => str('SEARCH_V2_EDUCATION_NUDGE'),
     direction: NudgeDirection.BOTTOM_STARTWARD,
     // Expire after 4 releases (expires when M120 hits Stable).

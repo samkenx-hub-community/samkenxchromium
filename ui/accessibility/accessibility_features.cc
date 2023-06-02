@@ -256,12 +256,13 @@ bool IsAblateSendPendingAccessibilityEventsEnabled() {
 }
 
 #if BUILDFLAG(IS_ANDROID)
-BASE_FEATURE(kAccessibilityAXModes,
-             "AccessibilityAXModes",
+BASE_FEATURE(kAccessibilityPerformanceFiltering,
+             "AccessibilityPerformanceFiltering",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-bool IsAccessibilityAXModesEnabled() {
-  return base::FeatureList::IsEnabled(::features::kAccessibilityAXModes);
+bool IsAccessibilityPerformanceFilteringEnabled() {
+  return base::FeatureList::IsEnabled(
+      ::features::kAccessibilityPerformanceFiltering);
 }
 #endif  // BUILDFLAG(IS_ANDROID)
 
@@ -288,11 +289,6 @@ bool IsReadAnythingWithScreen2xEnabled() {
   return base::FeatureList::IsEnabled(::features::kReadAnythingWithScreen2x) &&
          !base::FeatureList::IsEnabled(
              ::features::kEmergencyDisableScreenAIMainContentExtraction);
-}
-
-bool IsScreenAIServiceNeeded() {
-  return IsPdfOcrEnabled() || IsLayoutExtractionEnabled() ||
-         IsReadAnythingWithScreen2xEnabled();
 }
 
 // This feature is only for debug purposes and for security/privacy reasons,

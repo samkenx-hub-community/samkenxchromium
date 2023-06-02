@@ -47,7 +47,7 @@ BASE_DECLARE_FEATURE(kIPHPriceTrackingPageActionIconLabelFeature);
 BASE_DECLARE_FEATURE(kIPHReadingListDiscoveryFeature);
 BASE_DECLARE_FEATURE(kIPHReadingListEntryPointFeature);
 BASE_DECLARE_FEATURE(kIPHReadingListInSidePanelFeature);
-BASE_DECLARE_FEATURE(kIPHReopenTabFeature);
+BASE_DECLARE_FEATURE(kIPHReadingModeSidePanelFeature);
 BASE_DECLARE_FEATURE(kIPHSideSearchAutoTriggeringFeature);
 BASE_DECLARE_FEATURE(kIPHSideSearchFeature);
 BASE_DECLARE_FEATURE(kIPHSideSearchPageActionLabelFeature);
@@ -183,7 +183,6 @@ BASE_DECLARE_FEATURE(kIPHBadgedTranslateManualTriggerFeature);
 BASE_DECLARE_FEATURE(kIPHDiscoverFeedHeaderFeature);
 BASE_DECLARE_FEATURE(kIPHDefaultSiteViewFeature);
 BASE_DECLARE_FEATURE(kIPHFollowWhileBrowsingFeature);
-BASE_DECLARE_FEATURE(kIPHOverflowMenuTipFeature);
 BASE_DECLARE_FEATURE(kIPHPriceNotificationsWhileBrowsingFeature);
 BASE_DECLARE_FEATURE(kIPHiOSDefaultBrowserBadgeEligibilityFeature);
 BASE_DECLARE_FEATURE(kIPHiOSDefaultBrowserOverflowMenuBadgeFeature);
@@ -198,6 +197,7 @@ BASE_DECLARE_FEATURE(kIPHiOSNewTabToolbarItemFeature);
 BASE_DECLARE_FEATURE(kIPHiOSTabGridToolbarItemFeature);
 BASE_DECLARE_FEATURE(kIPHiOSHistoryOnOverflowMenuFeature);
 BASE_DECLARE_FEATURE(kIPHiOSShareToolbarItemFeature);
+BASE_DECLARE_FEATURE(kIPHiOSDefaultBrowserVideoPromoTriggerFeature);
 #endif  // BUILDFLAG(IS_IOS)
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_APPLE) || BUILDFLAG(IS_LINUX) || \

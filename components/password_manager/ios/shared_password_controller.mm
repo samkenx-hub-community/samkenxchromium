@@ -461,12 +461,13 @@ NSString* const kPasswordFormSuggestionSuffix = @" ••••••••";
     DCHECK(self.delegate.passwordManagerClient);
     NSString* value = [rawSuggestion.value
         stringByAppendingString:kPasswordFormSuggestionSuffix];
-    FormSuggestion* suggestion =
-        [FormSuggestion suggestionWithValue:value
-                         displayDescription:rawSuggestion.displayDescription
-                                       icon:nil
-                                 identifier:0
-                             requiresReauth:YES];
+    FormSuggestion* suggestion = [FormSuggestion
+        suggestionWithValue:value
+         displayDescription:rawSuggestion.displayDescription
+                       icon:nil
+                popupItemId:autofill::PopupItemId::kAutocompleteEntry
+          backendIdentifier:nil
+             requiresReauth:YES];
     [suggestions addObject:suggestion];
   }
   absl::optional<PasswordDropdownState> suggestionState;
@@ -484,7 +485,8 @@ NSString* const kPasswordFormSuggestionSuffix = @" ••••••••";
         suggestionWithValue:suggestPassword
          displayDescription:nil
                        icon:nil
-                 identifier:autofill::POPUP_ITEM_ID_GENERATE_PASSWORD_ENTRY
+                popupItemId:autofill::PopupItemId::kGeneratePasswordEntry
+          backendIdentifier:nil
              requiresReauth:NO];
 
     [suggestions addObject:suggestion];
@@ -531,8 +533,8 @@ NSString* const kPasswordFormSuggestionSuffix = @" ••••••••";
       feature->GetWebFramesManager(_webState)->GetFrameWithId(
           SysNSStringToUTF8(frameID));
 
-  switch (suggestion.identifier) {
-    case autofill::POPUP_ITEM_ID_ALL_SAVED_PASSWORDS_ENTRY: {
+  switch (suggestion.popupItemId) {
+    case autofill::PopupItemId::kAllSavedPasswordsEntry: {
       completion();
       password_manager::metrics_util::LogPasswordDropdownItemSelected(
           password_manager::metrics_util::PasswordDropdownSelectedOption::
@@ -540,7 +542,7 @@ NSString* const kPasswordFormSuggestionSuffix = @" ••••••••";
           [self IsOffTheRecord]);
       return;
     }
-    case autofill::POPUP_ITEM_ID_GENERATE_PASSWORD_ENTRY: {
+    case autofill::PopupItemId::kGeneratePasswordEntry: {
       // Don't call completion because current suggestion state should remain
       // whether user injects a generated password or cancels.
       [self generatePasswordForFormId:uniqueFormID

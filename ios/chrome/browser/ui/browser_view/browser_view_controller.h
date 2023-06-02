@@ -39,15 +39,14 @@ class FullscreenController;
 class PagePlaceholderBrowserAgent;
 @protocol PopupMenuCommands;
 @class PopupMenuCoordinator;
-@class PrimaryToolbarCoordinator;
 @class SafeAreaProvider;
-@class SecondaryToolbarCoordinator;
 @class SideSwipeController;
 @class TabStripCoordinator;
 @class TabStripLegacyCoordinator;
 class TabUsageRecorderBrowserAgent;
 @protocol TextZoomCommands;
 @class ToolbarAccessoryPresenter;
+@class ToolbarCoordinator;
 @protocol IncognitoReauthCommands;
 @class LayoutGuideCenter;
 @protocol LoadQueryCommands;
@@ -55,6 +54,7 @@ class UrlLoadingBrowserAgent;
 class UrlLoadingNotifierBrowserAgent;
 @protocol VoiceSearchController;
 class WebNavigationBrowserAgent;
+class WebStateUpdateBrowserAgent;
 
 typedef struct {
   BubblePresenter* bubblePresenter;
@@ -62,8 +62,7 @@ typedef struct {
   PopupMenuCoordinator* popupMenuCoordinator;
   NewTabPageCoordinator* ntpCoordinator;
   LensCoordinator* lensCoordinator;
-  PrimaryToolbarCoordinator* primaryToolbarCoordinator;
-  SecondaryToolbarCoordinator* secondaryToolbarCoordinator;
+  ToolbarCoordinator* toolbarCoordinator;
   TabStripCoordinator* tabStripCoordinator;
   TabStripLegacyCoordinator* legacyTabStripCoordinator;
   SideSwipeController* sideSwipeController;
@@ -85,6 +84,7 @@ typedef struct {
   WebNavigationBrowserAgent* webNavigationBrowserAgent;
   base::WeakPtr<WebStateList> webStateList;
   SafeAreaProvider* safeAreaProvider;
+  WebStateUpdateBrowserAgent* webStateUpdateBrowserAgent;
 } BrowserViewControllerDependencies;
 
 // The top-level view controller for the browser UI. Manages other controllers

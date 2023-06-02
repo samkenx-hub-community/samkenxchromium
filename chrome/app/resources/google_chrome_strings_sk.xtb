@@ -32,6 +32,7 @@ Niektoré funkcie nemusia byť k dispozícii a zmeny vykonané v predvoľbách s
  v párovaní. <ph name="IDS_BLUETOOTH_DEVICE_CHOOSER_AUTHORIZE_BLUETOOTH_LINK" /></translation>
 <translation id="1547295885616600893">Chrome OS mohol vzniknúť vďaka ďalšiemu <ph name="BEGIN_LINK_CROS_OSS" />softvéru typu open source<ph name="END_LINK_CROS_OSS" />.</translation>
 <translation id="1553358976309200471">Aktualizovať Chrome</translation>
+<translation id="1555506416658437797">upravte spôsoby platby.</translation>
 <translation id="1583073672411044740">Používateľ <ph name="EXISTING_USER" /> je už do tohto profilu Chromu prihlásený. Týmto sa vytvorí nový profil Chromu pre <ph name="USER_EMAIL_ADDRESS" /></translation>
 <translation id="1587223624401073077">Google Chrome používa vašu kameru.</translation>
 <translation id="1587325591171447154">Súbor <ph name="FILE_NAME" /> je nebezpečný, a preto ho Chrome zablokoval.</translation>
@@ -81,6 +82,7 @@ Niektoré funkcie nemusia byť k dispozícii a zmeny vykonané v predvoľbách s
 <translation id="234869673307233423">Chrome nemôže skontrolovať heslá. Skúste to neskôr.</translation>
 <translation id="235650106824528204">Všetky údaje prehliadača Chrome vygenerované počas používania tohto profilu (napríklad vytvorenie záložiek, histórie, hesiel a ďalších nastavení) môžu byť odstránené správcom pracovného profilu. <ph name="LEARN_MORE" /></translation>
 <translation id="2359808026110333948">Pokračovať</translation>
+<translation id="2399868464369312507">Google Chrome sa snaží upraviť spôsoby platby.</translation>
 <translation id="2401189691232800402">Systém Chrome OS</translation>
 <translation id="2467438592969358367">Google Chrome sa pokúša exportovať vaše heslá. Ak to chcete povoliť, zadajte heslo systému Windows.</translation>
 <translation id="2485422356828889247">Odinštalovať</translation>
@@ -257,6 +259,7 @@ Prehliadač Google Chrome nedokáže obnoviť vaše nastavenia.</translation>
 <translation id="5756509061973259733">Profil Chromu s týmto účtom už v tomto zariadení existuje</translation>
 <translation id="5795887333006832406"><ph name="PAGE_TITLE" /> – Google Chrome Canary</translation>
 <translation id="5804318322022881572">Chrome sa nepodarilo spustiť. Skúste to znova.</translation>
+<translation id="585620188971323280">upraviť nastavenia vypĺňania spôsobov platby.</translation>
 <translation id="5895138241574237353">Reštartovať</translation>
 <translation id="5903106910045431592"><ph name="PAGE_TITLE" /> – prihlásenie do siete</translation>
 <translation id="5924017743176219022">Pripája sa k internetu…</translation>
@@ -389,11 +392,13 @@ Povolenia, ktoré ste už udelili webom a aplikáciám, sa môžu vzťahovať n
 <translation id="8418845734693287262">Systému Chrome OS sa nepodarilo synchronizovať vaše údaje, pretože vaše prihlasovacie údaje účtu sú zastarané.</translation>
 <translation id="8433638294851456451">Ak chcete odtiaľto odoslať číslo do svojho telefónu s Androidom, prihláste sa v oboch zariadeniach do Chromu.</translation>
 <translation id="8451192282033883849">Váš účet spravuje <ph name="MANAGER_NAME" />. Váš správca si môže zobraziť a upraviť tento profil prehliadača Chrome vrátane jeho údajov, ako sú záložky, história a heslá.</translation>
+<translation id="8496177819998570653">Správca hesiel Google</translation>
 <translation id="8498858610309223613">Práve bola použitá mimoriadna bezpečnostná aktualizácia pre prehliadač Google Chrome. Po reštartovaní obnovíme vaše karty.</translation>
 <translation id="8504220326736535258">Chrome zablokoval tento súbor, pretože obsahuje malvér</translation>
 <translation id="8516431725144212809">Vaše záujmy podľa odhadu Chromu</translation>
 <translation id="8521348052903287641">Pravidlo pre prichádzajúce prenosy pre prehliadač Google Chrome verzie pre vývojárov, ktoré povoľuje prenos dát mDNS.</translation>
 <translation id="8540666473246803645">Google Chrome</translation>
+<translation id="8544217240017914508">Google Chrome sa pokúša upraviť nastavenia dopĺňania spôsobov platby.</translation>
 <translation id="8550334526674375523">Tento pracovný profil je úplne oddelený od vášho osobného.</translation>
 <translation id="8556340503434111824">K dispozícii je nová verzia prehliadača Google Chrome, ktorá je rýchlejšia ako kedykoľvek predtým.</translation>
 <translation id="8571790202382503603">Profilmi Chromu môžete oddeliť všetok svoj obsah v Chrome. Jednoduchšie tak rozdelíte prácu a zábavu.</translation>

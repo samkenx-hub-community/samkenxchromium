@@ -15,6 +15,7 @@
 #include "chrome/browser/resource_coordinator/lifecycle_unit_state.mojom-shared.h"
 #include "components/performance_manager/public/user_tuning/prefs.h"
 #include "components/prefs/pref_change_registrar.h"
+#include "content/public/browser/web_contents_observer.h"
 #include "content/public/browser/web_contents_user_data.h"
 
 class ChromeBrowserMainExtraPartsPerformanceManager;
@@ -107,6 +108,33 @@ class UserPerformanceTuningManager {
     virtual void OnMemoryMetricsRefreshed() {}
   };
 
+  // Per-tab class to keep track of current memory usage for each tab.
+  class ResourceUsageTabHelper
+      : public content::WebContentsObserver,
+        public content::WebContentsUserData<ResourceUsageTabHelper> {
+   public:
+    ResourceUsageTabHelper(const ResourceUsageTabHelper&) = delete;
+    ResourceUsageTabHelper& operator=(const ResourceUsageTabHelper&) = delete;
+
+    ~ResourceUsageTabHelper() override;
+
+    // content::WebContentsObserver
+    void PrimaryPageChanged(content::Page& page) override;
+
+    uint64_t GetMemoryUsageInBytes() { return memory_usage_bytes_; }
+
+    void SetMemoryUsageInBytes(uint64_t memory_usage_bytes) {
+      memory_usage_bytes_ = memory_usage_bytes;
+    }
+
+   private:
+    friend class content::WebContentsUserData<ResourceUsageTabHelper>;
+    explicit ResourceUsageTabHelper(content::WebContents* contents);
+    WEB_CONTENTS_USER_DATA_KEY_DECL();
+
+    uint64_t memory_usage_bytes_ = 0;
+  };
+
   class PreDiscardResourceUsage
       : public content::WebContentsUserData<PreDiscardResourceUsage> {
    public:
@@ -118,6 +146,11 @@ class UserPerformanceTuningManager {
     // Returns the resource usage estimate in kilobytes.
     uint64_t memory_footprint_estimate_kb() const {
       return memory_footprint_estimate_;
+    }
+
+    void SetMemoryFootprintEstimateKbForTesting(
+        uint64_t memory_footprint_estimate) {
+      memory_footprint_estimate_ = memory_footprint_estimate;
     }
 
     ::mojom::LifecycleUnitDiscardReason discard_reason() const {
@@ -214,7 +247,7 @@ class UserPerformanceTuningManager {
 
     void NotifyTabCountThresholdReached() override;
     void NotifyMemoryThresholdReached() override;
-    void NotifyMemoryMetricsRefreshed() override;
+    void NotifyMemoryMetricsRefreshed(ProxyAndPmfKbVector) override;
   };
 
   explicit UserPerformanceTuningManager(

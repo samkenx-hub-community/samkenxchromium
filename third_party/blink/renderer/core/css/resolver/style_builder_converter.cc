@@ -492,6 +492,11 @@ StyleBuilderConverter::ConvertFontVariationSettings(
 scoped_refptr<FontPalette> StyleBuilderConverter::ConvertFontPalette(
     StyleResolverState& state,
     const CSSValue& value) {
+  return StyleBuilderConverterBase::ConvertFontPalette(value);
+}
+
+scoped_refptr<FontPalette> StyleBuilderConverterBase::ConvertFontPalette(
+    const CSSValue& value) {
   auto* identifier_value = DynamicTo<CSSIdentifierValue>(value);
   if (identifier_value &&
       identifier_value->GetValueID() == CSSValueID::kNormal) {
@@ -1744,6 +1749,12 @@ ScopedCSSName* StyleBuilderConverter::ConvertNoneOrCustomIdent(
     DCHECK_EQ(identifier_value->GetValueID(), CSSValueID::kNone);
     return nullptr;
   }
+  return ConvertCustomIdent(state, value);
+}
+
+ScopedCSSName* StyleBuilderConverter::ConvertCustomIdent(
+    StyleResolverState&,
+    const CSSValue& value) {
   const CSSCustomIdentValue& custom_ident = To<CSSCustomIdentValue>(value);
   return MakeGarbageCollected<ScopedCSSName>(custom_ident.Value(),
                                              custom_ident.GetTreeScope());
@@ -1831,6 +1842,12 @@ StyleOffsetRotation StyleBuilderConverter::ConvertOffsetRotate(
     const CSSValue& value) {
   StyleOffsetRotation result(0, OffsetRotationType::kFixed);
 
+  if (auto* identifier = DynamicTo<CSSIdentifierValue>(value)) {
+    DCHECK_EQ(identifier->GetValueID(), CSSValueID::kAuto);
+    result.type = OffsetRotationType::kAuto;
+    return result;
+  }
+
   const auto& list = To<CSSValueList>(value);
   DCHECK(list.length() == 1 || list.length() == 2);
   for (const auto& item : list) {
@@ -1870,6 +1887,18 @@ LengthPoint StyleBuilderConverter::ConvertPositionOrAuto(
   }
   DCHECK(To<CSSIdentifierValue>(value).GetValueID() == CSSValueID::kAuto);
   return LengthPoint(Length::Auto(), Length::Auto());
+}
+
+LengthPoint StyleBuilderConverter::ConvertOffsetPosition(
+    StyleResolverState& state,
+    const CSSValue& value) {
+  if (value.IsValuePair()) {
+    return ConvertPosition(state, value);
+  }
+  if (To<CSSIdentifierValue>(value).GetValueID() == CSSValueID::kAuto) {
+    return LengthPoint(Length::Auto(), Length::Auto());
+  }
+  return LengthPoint(Length::None(), Length::None());
 }
 
 static float ConvertPerspectiveLength(
@@ -2766,6 +2795,23 @@ RubyPosition StyleBuilderConverter::ConvertRubyPosition(
   return RubyPosition::kBefore;
 }
 
+absl::optional<StyleScrollbarColor>
+StyleBuilderConverter::ConvertScrollbarColor(StyleResolverState& state,
+                                             const CSSValue& value) {
+  auto* identifier_value = DynamicTo<CSSIdentifierValue>(value);
+  if (identifier_value && identifier_value->GetValueID() == CSSValueID::kAuto) {
+    return absl::nullopt;
+  }
+
+  const CSSValueList& list = To<CSSValueList>(value);
+  DCHECK_GE(list.length(), 1u);
+  DCHECK_LE(list.length(), 2u);
+  const StyleColor thumb_color = ConvertStyleColor(state, list.First());
+  const StyleColor track_color = ConvertStyleColor(state, list.Last());
+
+  return StyleScrollbarColor(thumb_color, track_color);
+}
+
 ScrollbarGutter StyleBuilderConverter::ConvertScrollbarGutter(
     StyleResolverState& state,
     const CSSValue& value) {
@@ -3169,6 +3215,22 @@ ScopedCSSNameList* StyleBuilderConverter::ConvertViewTimelineName(
   HeapVector<Member<const ScopedCSSName>> names;
   for (const Member<const CSSValue>& item : To<CSSValueList>(value)) {
     names.push_back(ConvertNoneOrCustomIdent(state, *item));
+  }
+  return MakeGarbageCollected<ScopedCSSNameList>(std::move(names));
+}
+
+ScopedCSSNameList* StyleBuilderConverter::ConvertTimelineScope(
+    StyleResolverState& state,
+    const CSSValue& value) {
+  if (value.IsIdentifierValue()) {
+    DCHECK_EQ(CSSValueID::kNone, To<CSSIdentifierValue>(value).GetValueID());
+    return nullptr;
+  }
+  DCHECK(value.IsScopedValue());
+  DCHECK(value.IsBaseValueList());
+  HeapVector<Member<const ScopedCSSName>> names;
+  for (const Member<const CSSValue>& item : To<CSSValueList>(value)) {
+    names.push_back(ConvertCustomIdent(state, *item));
   }
   return MakeGarbageCollected<ScopedCSSNameList>(std::move(names));
 }

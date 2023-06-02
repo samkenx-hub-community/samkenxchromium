@@ -22,7 +22,7 @@
 #include "components/media_router/browser/presentation/web_contents_presentation_manager.h"
 #include "components/media_router/common/discovery/media_sink_internal.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
-#include "components/sync/driver/sync_service.h"
+#include "components/sync/service/sync_service.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
 #include "mojo/public/cpp/bindings/receiver.h"
 #include "mojo/public/cpp/bindings/remote.h"
@@ -135,7 +135,8 @@ class AccessCodeCastHandler : public access_code_cast::mojom::PageHandler,
   // Contains the info necessary to start a media route.
   std::unique_ptr<MediaRouteStarter> media_route_starter_;
 
-  raw_ptr<AccessCodeCastSinkService> access_code_sink_service_;
+  raw_ptr<AccessCodeCastSinkService, DanglingUntriaged>
+      access_code_sink_service_;
   raw_ptr<signin::IdentityManager> identity_manager_;
   raw_ptr<syncer::SyncService> sync_service_;
 

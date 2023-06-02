@@ -47,6 +47,11 @@ class SharedDictionaryStorageOnDisk : public SharedDictionaryStorage {
       base::TimeDelta expiration,
       const std::string& match) override;
 
+  // Called from `SharedDictionaryManagerOnDisk` when dictionary has been
+  // deleted.
+  void OnDictionaryDeleted(
+      const std::set<base::UnguessableToken>& disk_cache_key_tokens);
+
  protected:
   ~SharedDictionaryStorageOnDisk() override;
 
@@ -57,22 +62,9 @@ class SharedDictionaryStorageOnDisk : public SharedDictionaryStorage {
   class RefCountedSharedDictionary;
   class WrappedSharedDictionary;
 
-  void OnDatabaseRead(net::SQLitePersistentSharedDictionaryStore::Error error,
-                      std::vector<net::SharedDictionaryInfo> info_list);
-  void OnDictionaryWrittenInDiskCache(
-      const GURL& url,
-      base::Time response_time,
-      base::TimeDelta expiration,
-      const std::string& match,
-      SharedDictionaryWriterOnDisk::Result result,
-      size_t size,
-      const net::SHA256HashValue& hash,
-      const base::UnguessableToken& disk_cache_key_token);
-  void OnDictionaryWrittenInDatabase(
-      net::SharedDictionaryInfo info,
-      net::SQLitePersistentSharedDictionaryStore::Error error,
-      absl::optional<int64_t> primary_key_in_database);
-
+  void OnDatabaseRead(
+      net::SQLitePersistentSharedDictionaryStore::DictionaryListOrError result);
+  void OnDictionaryWritten(net::SharedDictionaryInfo info);
   void OnRefCountedSharedDictionaryDeleted(
       const base::UnguessableToken& disk_cache_key_token);
 

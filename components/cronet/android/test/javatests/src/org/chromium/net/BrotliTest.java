@@ -4,8 +4,8 @@
 
 package org.chromium.net;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
+import static com.google.common.truth.Truth.assertThat;
+
 import static org.junit.Assert.assertTrue;
 
 import static org.chromium.net.CronetTestRule.getContext;
@@ -21,6 +21,8 @@ import org.junit.runner.RunWith;
 
 import org.chromium.net.CronetTestRule.OnlyRunNativeCronet;
 import org.chromium.net.CronetTestRule.RequiresMinApi;
+
+import java.util.Arrays;
 
 /**
  * Simple test for Brotli support.
@@ -58,8 +60,8 @@ public class BrotliTest {
         mCronetEngine = builder.build();
         String url = Http2TestServer.getEchoAllHeadersUrl();
         TestUrlRequestCallback callback = startAndWaitForComplete(url);
-        assertEquals(200, callback.mResponseInfo.getHttpStatusCode());
-        assertTrue(callback.mResponseAsString.contains("accept-encoding: gzip, deflate, br"));
+        assertThat(callback.mResponseInfo.getHttpStatusCode()).isEqualTo(200);
+        assertThat(callback.mResponseAsString).contains("accept-encoding: gzip, deflate, br");
     }
 
     @Test
@@ -73,8 +75,8 @@ public class BrotliTest {
         mCronetEngine = builder.build();
         String url = Http2TestServer.getEchoAllHeadersUrl();
         TestUrlRequestCallback callback = startAndWaitForComplete(url);
-        assertEquals(200, callback.mResponseInfo.getHttpStatusCode());
-        assertFalse(callback.mResponseAsString.contains("br"));
+        assertThat(callback.mResponseInfo.getHttpStatusCode()).isEqualTo(200);
+        assertThat(callback.mResponseAsString).doesNotContain("br");
     }
 
     @Test
@@ -89,10 +91,11 @@ public class BrotliTest {
         mCronetEngine = builder.build();
         String url = Http2TestServer.getServeSimpleBrotliResponse();
         TestUrlRequestCallback callback = startAndWaitForComplete(url);
-        assertEquals(200, callback.mResponseInfo.getHttpStatusCode());
+        assertThat(callback.mResponseInfo.getHttpStatusCode()).isEqualTo(200);
         String expectedResponse = "The quick brown fox jumps over the lazy dog";
-        assertEquals(expectedResponse, callback.mResponseAsString);
-        assertEquals(callback.mResponseInfo.getAllHeaders().get("content-encoding").get(0), "br");
+        assertThat(callback.mResponseAsString).isEqualTo(expectedResponse);
+        assertThat(callback.mResponseInfo.getAllHeaders())
+                .containsEntry("content-encoding", Arrays.asList("br"));
     }
 
     private TestUrlRequestCallback startAndWaitForComplete(String url) {

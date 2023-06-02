@@ -24,6 +24,7 @@
 #include "components/commerce/core/metrics/metrics_utils.h"
 #include "components/commerce/core/metrics/scheduled_metrics_manager.h"
 #include "components/commerce/core/pref_names.h"
+#include "components/commerce/core/price_tracking_utils.h"
 #include "components/commerce/core/proto/commerce_subscription_db_content.pb.h"
 #include "components/commerce/core/proto/merchant_trust.pb.h"
 #include "components/commerce/core/proto/price_tracking.pb.h"
@@ -45,7 +46,8 @@
 #include "components/prefs/pref_registry_simple.h"
 #include "components/search/ntp_features.h"
 #include "components/session_proto_db/session_proto_storage.h"
-#include "components/sync/driver/sync_service.h"
+#include "components/sync/service/sync_service.h"
+#include "components/unified_consent/url_keyed_data_collection_consent_helper.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "ui/base/resource/resource_bundle.h"
 
@@ -103,8 +105,13 @@ ShoppingService::ShoppingService(
       locale_on_startup_(locale_on_startup),
       opt_guide_(opt_guide),
       pref_service_(pref_service),
+      sync_service_(sync_service),
       bookmark_model_(bookmark_model),
       power_bookmark_service_(power_bookmark_service),
+      bookmark_consent_throttle_(
+          unified_consent::UrlKeyedDataCollectionConsentHelper::
+              NewPersonalizedBookmarksDataCollectionConsentHelper(
+                  sync_service)),
       weak_ptr_factory_(this) {
   // Register for the types of information we're allowed to receive from
   // optimization guide.
@@ -341,8 +348,10 @@ void ShoppingService::OnProductInfoJsonSanitizationCompleted(
     MergeProductInfoData(cached_info, result.value().GetDict());
   }
 
-  metrics::RecordPDPStateWithLocalMeta(pdp_detected_by_server,
-                                       pdp_detected_by_client);
+  if (base::FeatureList::IsEnabled(kCommerceLocalPDPDetection)) {
+    metrics::RecordPDPStateWithLocalMeta(pdp_detected_by_server,
+                                         pdp_detected_by_client);
+  }
 }
 
 bool ShoppingService::CheckIsPDPFromMetaOnly(
@@ -515,6 +524,18 @@ void ShoppingService::GetUpdatedProductInfoForBookmarks(
 size_t ShoppingService::GetMaxProductBookmarkUpdatesPerBatch() {
   return optimization_guide::features::
       MaxUrlsForOptimizationGuideServiceHintsFetch();
+}
+
+void ShoppingService::GetAllPriceTrackedBookmarks(
+    base::OnceCallback<void(std::vector<const bookmarks::BookmarkNode*>)>
+        callback) {
+  commerce::GetAllPriceTrackedBookmarks(this, bookmark_model_,
+                                        std::move(callback));
+}
+
+std::vector<const bookmarks::BookmarkNode*>
+ShoppingService::GetAllShoppingBookmarks() {
+  return commerce::GetAllShoppingBookmarks(bookmark_model_);
 }
 
 void ShoppingService::GetMerchantInfoForUrl(const GURL& url,
@@ -940,6 +961,24 @@ void ShoppingService::ScheduleSavedProductUpdate() {
 bool ShoppingService::IsShoppingListEligible() {
   return IsShoppingListEligible(account_checker_.get(), pref_service_,
                                 country_on_startup_, locale_on_startup_);
+}
+
+void ShoppingService::WaitForReady(
+    base::OnceCallback<void(ShoppingService*)> callback) {
+  bookmark_consent_throttle_.EnqueueRequest(base::BindOnce(
+      [](base::WeakPtr<ShoppingService> service,
+         syncer::SyncService* sync_service,
+         base::OnceCallback<void(ShoppingService*)> callback,
+         bool has_consent) {
+        if (service.WasInvalidated() || !sync_service ||
+            sync_service->GetTransportState() !=
+                syncer::SyncService::TransportState::ACTIVE) {
+          std::move(callback).Run(nullptr);
+          return;
+        }
+        std::move(callback).Run(service.get());
+      },
+      AsWeakPtr(), sync_service_, std::move(callback)));
 }
 
 bool ShoppingService::IsShoppingListEligible(AccountChecker* account_checker,

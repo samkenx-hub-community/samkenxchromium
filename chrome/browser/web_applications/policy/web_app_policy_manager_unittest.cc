@@ -450,9 +450,9 @@ class WebAppPolicyManagerTest : public ChromeRenderViewHostTestHarness,
 
   void InstallPwa(const std::string& url) {
     std::unique_ptr<WebAppInstallInfo> web_app_info =
-        std::make_unique<WebAppInstallInfo>();
+        std::make_unique<WebAppInstallInfo>(
+            GenerateManifestIdFromStartUrlOnly(GURL(url)));
     web_app_info->start_url = GURL(url);
-    web_app_info->manifest_id = "";
     web_app::test::InstallWebApp(profile(), std::move(web_app_info));
   }
 
@@ -515,15 +515,13 @@ class WebAppPolicyManagerTest : public ChromeRenderViewHostTestHarness,
     install_result_code_ = result_code;
   }
 
-  RunOnOsLoginPolicy GetUrlRunOnOsLoginPolicy(
-      const std::string& unhashed_app_id) {
-    return policy_manager().GetUrlRunOnOsLoginPolicyByUnhashedAppId(
-        unhashed_app_id);
+  RunOnOsLoginPolicy GetUrlRunOnOsLoginPolicy(const std::string& manifest_id) {
+    return policy_manager().GetUrlRunOnOsLoginPolicyByManifestId(manifest_id);
   }
 
-  bool IsPreventCloseEnabled(const std::string& unhashed_app_id) {
+  bool IsPreventCloseEnabled(const std::string& manifest_id) {
     return policy_manager().IsPreventCloseEnabled(
-        web_app::GenerateAppIdFromUnhashed(unhashed_app_id));
+        web_app::GenerateAppIdFromManifestId(GURL(manifest_id)));
   }
 
   void WaitForAppsToSynchronize() {
@@ -537,9 +535,10 @@ class WebAppPolicyManagerTest : public ChromeRenderViewHostTestHarness,
   webapps::InstallResultCode install_result_code_ =
       webapps::InstallResultCode::kSuccessNewInstall;
 
-  raw_ptr<FakeWebAppProvider> provider_;
-  raw_ptr<FakeExternallyManagedAppManager> fake_externally_managed_app_manager_;
-  raw_ptr<WebAppPolicyManager> web_app_policy_manager_;
+  raw_ptr<FakeWebAppProvider, DanglingUntriaged> provider_;
+  raw_ptr<FakeExternallyManagedAppManager, DanglingUntriaged>
+      fake_externally_managed_app_manager_;
+  raw_ptr<WebAppPolicyManager, DanglingUntriaged> web_app_policy_manager_;
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
   std::unique_ptr<ash::TestSystemWebAppManager> test_system_app_manager_;
@@ -1423,7 +1422,7 @@ TEST_P(WebAppPolicyManagerTest, WebAppSettingsPreventClose) {
     }
   ])";
 
-  // Make sure that WebAppRegistrar::GetComputedUnhashedAppId does not fail.
+  // Make sure that WebAppRegistrar::GetComputedManifestId does not fail.
   InstallPwa(kWindowedUrl);
   InstallPwa(kTabbedUrl);
   InstallPwa(kNoContainerUrl);

@@ -393,6 +393,7 @@ class WebContents : public PageNavigator,
   // non-null except during WebContents destruction. This WebContents may
   // have additional main frames for prerendered pages, bfcached pages, etc.
   // See docs/frame_trees.md for more details.
+  virtual const RenderFrameHost* GetPrimaryMainFrame() const = 0;
   virtual RenderFrameHost* GetPrimaryMainFrame() = 0;
 
   // Returns the current page in the primary frame tree of this WebContents.
@@ -1030,7 +1031,8 @@ class WebContents : public PageNavigator,
       const MHTMLGenerationParams& params,
       MHTMLGenerationResult::GenerateMHTMLCallback callback) = 0;
 
-  // Returns the contents MIME type after a navigation.
+  // Returns the MIME type bound to the primary page contents after a primary
+  // page navigation.
   virtual const std::string& GetContentsMimeType() = 0;
 
   // Returns the settings which get passed to the renderer.

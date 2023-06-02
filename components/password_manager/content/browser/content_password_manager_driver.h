@@ -149,7 +149,8 @@ class ContentPasswordManagerDriver
                                const gfx::RectF& bounds) override;
 #if BUILDFLAG(IS_ANDROID)
   void ShowKeyboardReplacingSurface(
-      autofill::mojom::SubmissionReadinessState submission_readiness) override;
+      autofill::mojom::SubmissionReadinessState submission_readiness,
+      bool is_webauthn_form) override;
 #endif
   void CheckSafeBrowsingReputation(const GURL& form_action,
                                    const GURL& frame_url) override;
@@ -169,7 +170,7 @@ class ContentPasswordManagerDriver
   const mojo::AssociatedRemote<autofill::mojom::PasswordGenerationAgent>&
   GetPasswordGenerationAgent();
 
-  raw_ptr<content::RenderFrameHost> render_frame_host_;
+  raw_ptr<content::RenderFrameHost, DanglingUntriaged> render_frame_host_;
   raw_ptr<PasswordManagerClient> client_;
   PasswordGenerationFrameHelper password_generation_helper_;
   PasswordAutofillManager password_autofill_manager_;

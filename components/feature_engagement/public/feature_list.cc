@@ -121,7 +121,6 @@ const base::Feature* const kAllFeatures[] = {
     &kIPHDiscoverFeedHeaderFeature,
     &kIPHDefaultSiteViewFeature,
     &kIPHFollowWhileBrowsingFeature,
-    &kIPHOverflowMenuTipFeature,
     &kIPHPriceNotificationsWhileBrowsingFeature,
     &kIPHiOSDefaultBrowserBadgeEligibilityFeature,
     &kIPHiOSDefaultBrowserOverflowMenuBadgeFeature,
@@ -136,6 +135,7 @@ const base::Feature* const kAllFeatures[] = {
     &kIPHiOSTabGridToolbarItemFeature,
     &kIPHiOSHistoryOnOverflowMenuFeature,
     &kIPHiOSShareToolbarItemFeature,
+    &kIPHiOSDefaultBrowserVideoPromoTriggerFeature,
 #endif  // BUILDFLAG(IS_IOS)
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_APPLE) || BUILDFLAG(IS_LINUX) || \
     BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_FUCHSIA)
@@ -162,7 +162,7 @@ const base::Feature* const kAllFeatures[] = {
     &kIPHReadingListDiscoveryFeature,
     &kIPHReadingListEntryPointFeature,
     &kIPHReadingListInSidePanelFeature,
-    &kIPHReopenTabFeature,
+    &kIPHReadingModeSidePanelFeature,
     &kIPHSideSearchAutoTriggeringFeature,
     &kIPHSideSearchFeature,
     &kIPHSideSearchPageActionLabelFeature,

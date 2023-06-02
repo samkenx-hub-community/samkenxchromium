@@ -40,6 +40,7 @@
 #include "base/strings/strcat.h"
 #include "base/system/sys_info.h"
 #include "chromeos/ash/components/audio/cras_audio_handler.h"
+#include "chromeos/ash/components/dbus/biod/fake_biod_client.h"
 #include "ui/aura/env.h"
 #include "ui/base/accelerators/accelerator.h"
 #include "ui/base/accelerators/accelerator_manager.h"
@@ -91,8 +92,9 @@ int GetEncodedShortcut(const ui::Accelerator& accelerator) {
   }
 
   // Currently KeyboardCode only has 2^8 values. It will be a long time until we
-  // get to 2^16. Even if KeyboardCode has 2^28+ values for some reason, only
-  // the top 5 bits will be overwritten.
+  // get to 2^16. But if KeyboardCode has 2^28+ values for some reason, the top
+  // 5 bits will be overwritten.
+  DCHECK((0xF800 & accelerator.key_code()) == 0);
   return encoded_modifier | accelerator.key_code();
 }
 
@@ -234,6 +236,13 @@ bool CanHandleToggleAppList(
     const ui::Accelerator& accelerator,
     const ui::Accelerator& previous_accelerator,
     const std::set<ui::KeyboardCode>& currently_pressed_keys) {
+  // Check if the accelerator pressed is a RWIN/LWIN, if so perform a
+  // secondary check.
+  if (accelerator.key_code() != ui::VKEY_LWIN &&
+      accelerator.key_code() != ui::VKEY_RWIN) {
+    return true;
+  }
+
   for (auto key : currently_pressed_keys) {
     // The AppList accelerator is triggered on search(VKEY_LWIN) key release.
     // Sometimes users will press and release the search key while holding other
@@ -734,6 +743,8 @@ bool AcceleratorControllerImpl::CanPerformAction(
       return accelerators::CanShowStylusTools();
     case AcceleratorAction::kStartAssistant:
       return true;
+    case AcceleratorAction::kStopScreenRecording:
+      return accelerators::CanStopScreenRecording();
     case AcceleratorAction::kSwapPrimaryDisplay:
       return accelerators::CanSwapPrimaryDisplay();
     case AcceleratorAction::kSwitchIme:
@@ -773,6 +784,8 @@ bool AcceleratorControllerImpl::CanPerformAction(
       return true;
     case AcceleratorAction::kToggleOverview:
       return accelerators::CanToggleOverview();
+    case AcceleratorAction::kToggleSnapGroupWindowsGroupAndUngroup:
+      return accelerators::CanGroupOrUngroupWindows();
     case AcceleratorAction::kToggleSnapGroupWindowsMinimizeAndRestore:
       return accelerators::CanMinimizeSnapGroupWindows();
     case AcceleratorAction::kToggleMultitaskMenu:
@@ -864,6 +877,10 @@ bool AcceleratorControllerImpl::CanPerformAction(
     case AcceleratorAction::kVolumeUp:
     case AcceleratorAction::kWindowMinimize:
       return true;
+    case AcceleratorAction::kTouchFingerprintSensor1:
+    case AcceleratorAction::kTouchFingerprintSensor2:
+    case AcceleratorAction::kTouchFingerprintSensor3:
+      return FakeBiodClient::Get() != nullptr;
   }
 }
 
@@ -1247,6 +1264,9 @@ void AcceleratorControllerImpl::PerformAction(
       base::RecordAction(UserMetricsAction("Accel_Swap_Primary_Display"));
       accelerators::ShiftPrimaryDisplay();
       break;
+    case AcceleratorAction::kStopScreenRecording:
+      accelerators::StopScreenRecording();
+      break;
     case AcceleratorAction::kSwitchIme:
       HandleSwitchIme(accelerator);
       break;
@@ -1348,6 +1368,9 @@ void AcceleratorControllerImpl::PerformAction(
       base::RecordAction(base::UserMetricsAction("Accel_Overview_F5"));
       accelerators::ToggleOverview();
       break;
+    case AcceleratorAction::kToggleSnapGroupWindowsGroupAndUngroup:
+      accelerators::GroupOrUngroupWindowsInSnapGroup();
+      break;
     case AcceleratorAction::kToggleSnapGroupWindowsMinimizeAndRestore:
       base::RecordAction(base::UserMetricsAction(
           "Accel_Toggle_Snap_Group_Windows_Minimize_Restore"));
@@ -1410,6 +1433,15 @@ void AcceleratorControllerImpl::PerformAction(
       base::RecordAction(
           base::UserMetricsAction("Accel_Minimize_Top_Window_On_Back"));
       accelerators::TopWindowMinimizeOnBack();
+      break;
+    case kTouchFingerprintSensor1:
+      accelerators::TouchFingerprintSensor(1);
+      break;
+    case kTouchFingerprintSensor2:
+      accelerators::TouchFingerprintSensor(2);
+      break;
+    case kTouchFingerprintSensor3:
+      accelerators::TouchFingerprintSensor(3);
       break;
   }
 

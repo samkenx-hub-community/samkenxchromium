@@ -107,6 +107,7 @@ namespace ash {
   ACCELERATOR_ACTION_ENTRY(ShowStylusTools)                             \
   ACCELERATOR_ACTION_ENTRY(ShowTaskManager)                             \
   ACCELERATOR_ACTION_ENTRY(StartAssistant)                              \
+  ACCELERATOR_ACTION_ENTRY(StopScreenRecording)                         \
   ACCELERATOR_ACTION_ENTRY(Suspend)                                     \
   ACCELERATOR_ACTION_ENTRY(SwapPrimaryDisplay)                          \
   /* Switch to another IME depending on the accelerator. */             \
@@ -136,12 +137,16 @@ namespace ash {
   ACCELERATOR_ACTION_ENTRY(ToggleOverview)                              \
   ACCELERATOR_ACTION_ENTRY(ToggleProjectorMarker)                       \
   ACCELERATOR_ACTION_ENTRY(ToggleResizeLockMenu)                        \
+  ACCELERATOR_ACTION_ENTRY(ToggleSnapGroupWindowsGroupAndUngroup)       \
+  ACCELERATOR_ACTION_ENTRY(ToggleSnapGroupWindowsMinimizeAndRestore)    \
   ACCELERATOR_ACTION_ENTRY(ToggleSpokenFeedback)                        \
   ACCELERATOR_ACTION_ENTRY(ToggleSystemTrayBubble)                      \
   ACCELERATOR_ACTION_ENTRY(ToggleWifi)                                  \
-  ACCELERATOR_ACTION_ENTRY(ToggleSnapGroupWindowsMinimizeAndRestore)    \
   ACCELERATOR_ACTION_ENTRY(TouchHudClear)                               \
   ACCELERATOR_ACTION_ENTRY(TouchHudModeChange)                          \
+  ACCELERATOR_ACTION_ENTRY(TouchFingerprintSensor1)                     \
+  ACCELERATOR_ACTION_ENTRY(TouchFingerprintSensor2)                     \
+  ACCELERATOR_ACTION_ENTRY(TouchFingerprintSensor3)                     \
   ACCELERATOR_ACTION_ENTRY(Unpin)                                       \
   ACCELERATOR_ACTION_ENTRY(VolumeDown)                                  \
   ACCELERATOR_ACTION_ENTRY(VolumeMute)                                  \

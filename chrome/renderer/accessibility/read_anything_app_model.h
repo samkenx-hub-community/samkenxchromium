@@ -10,6 +10,7 @@
 #include "chrome/common/accessibility/read_anything_constants.h"
 #include "services/metrics/public/cpp/ukm_source_id.h"
 #include "ui/accessibility/ax_event_generator.h"
+#include "ui/accessibility/ax_node.h"
 #include "ui/accessibility/ax_selection.h"
 
 namespace ui {
@@ -30,6 +31,9 @@ class ReadAnythingAppModel {
   void set_requires_distillation(bool value) { requires_distillation_ = value; }
   bool requires_post_process_selection() {
     return requires_post_process_selection_;
+  }
+  void set_requires_post_process_selection(bool value) {
+    requires_post_process_selection_ = value;
   }
 
   // TODO(b/1266555): Ensure there is proper test coverage for all methods.
@@ -82,6 +86,7 @@ class ReadAnythingAppModel {
   bool IsNodeIgnoredForReadAnything(ui::AXNodeID ax_node_id) const;
   bool NodeIsContentNode(ui::AXNodeID ax_node_id) const;
   void OnThemeChanged(read_anything::mojom::ReadAnythingThemePtr new_theme);
+  void OnScroll(bool on_selection, bool from_reading_mode) const;
 
   void Reset(const std::vector<ui::AXNodeID>& content_node_ids);
   bool PostProcessSelection();
@@ -150,6 +155,8 @@ class ReadAnythingAppModel {
 
   void ProcessNonGeneratedEvents(const std::vector<ui::AXEvent>& events);
   void ProcessGeneratedEvents(const ui::AXEventGenerator& event_generator);
+
+  ui::AXNode* GetParentForSelection(ui::AXNode* node);
 
   // State.
   // AXTrees of web contents in the browser’s tab strip.

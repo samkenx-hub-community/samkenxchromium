@@ -293,6 +293,19 @@ class MODULES_EXPORT AXObject : public GarbageCollected<AXObject> {
   // root of the tree.
   virtual void Init(AXObject* parent);
 
+  // TODO(chrishtr): these methods are not really const, but there are various
+  // other related methods that need const. Review/fix.
+
+  // Sets, clears or queries the has_dirty_descendants_ bit. This dirty
+  // bit controls whether the object, or a descendant, needs to be visited
+  // a tree walk to update the AX tree via
+  // AXObjectCacheImpl::UpdateTreeIfNeeded. It does not directly indicate
+  // whether children, parent or other pointers are actually out of date; there
+  // are other dirty bits such as children_dirty_ for that.
+  void SetAncestorsHaveDirtyDescendants() const;
+  void ClearHasDirtyDescendants() { has_dirty_descendants_ = false; }
+  bool HasDirtyDescendants() const { return has_dirty_descendants_; }
+
   // When the corresponding WebCore object that this AXObject
   // wraps is deleted, it must be detached.
   virtual void Detach();
@@ -1145,7 +1158,7 @@ class MODULES_EXPORT AXObject : public GarbageCollected<AXObject> {
 
   // Prints the entire AX subtree to the screen for debugging, with |this|
   // highlighted via a "*" notation.
-  void ShowAXTreeForThis();
+  void ShowAXTreeForThis() const;
 #endif
 
   // Get or create the first ancestor that's not accessibility ignored.
@@ -1260,37 +1273,13 @@ class MODULES_EXPORT AXObject : public GarbageCollected<AXObject> {
     return nullptr;
   }
 
-  // Modify or take an action on an object.
-  //
-  // These are the public interfaces, called from outside of Blink.
-  // Each one first tries to fire an Accessibility Object Model event,
-  // if applicable, and if that isn't handled, falls back on the
-  // native implementation via a virtual member function, below.
-  //
-  // For example, |RequestIncrementAction| fires the AOM event and if
-  // that isn't handled it calls |DoNativeIncrement|.
-  //
-  // These all return true if handled.
-  //
-  // Note: we're migrating to have PerformAction() be the only public
-  // interface, the others will all be private.
+  // Modify or take an action on an object. Returns true if handled.
   bool PerformAction(const ui::AXActionData&);
-  bool RequestDecrementAction();
-  bool RequestClickAction();
-  bool RequestFocusAction();
-  bool RequestIncrementAction();
-  bool RequestScrollToGlobalPointAction(const gfx::Point&);
-  bool RequestScrollToMakeVisibleAction();
+  // TODO(accessibility) Do this through PerformAction() and move to private.
   bool RequestScrollToMakeVisibleWithSubFocusAction(
       const gfx::Rect&,
       blink::mojom::blink::ScrollAlignment horizontal_scroll_alignment,
       blink::mojom::blink::ScrollAlignment vertical_scroll_alignment);
-  bool RequestSetSelectedAction(bool);
-  bool RequestSetSequentialFocusNavigationStartingPointAction();
-  bool RequestSetValueAction(const String&);
-  bool RequestShowContextMenuAction();
-  bool RequestExpandAction();
-  bool RequestCollapseAction();
 
   // These are actions, just like the actions above, and they allow us
   // to keep track of nodes that gain or lose accessibility focus, but
@@ -1394,7 +1383,8 @@ class MODULES_EXPORT AXObject : public GarbageCollected<AXObject> {
   mutable Member<AXObject> parent_;
   // Only children that are included in tree, maybe rename to children_in_tree_.
   mutable AXObjectVector children_;
-  mutable bool children_dirty_;
+  mutable bool children_dirty_ = false;
+  mutable bool has_dirty_descendants_ = false;
 
   // The final role, taking into account the ARIA role and native role.
   ax::mojom::blink::Role role_;
@@ -1536,6 +1526,20 @@ class MODULES_EXPORT AXObject : public GarbageCollected<AXObject> {
   bool ComputeIsHiddenViaStyle(const ComputedStyle*) const;
   bool ComputeIsInertViaStyle(const ComputedStyle*,
                               IgnoredReasons* = nullptr) const;
+
+  // Private action interfaces. Return bool if action is performed.
+  bool RequestDecrementAction();
+  bool RequestClickAction();
+  bool RequestFocusAction();
+  bool RequestIncrementAction();
+  bool RequestScrollToGlobalPointAction(const gfx::Point&);
+  bool RequestScrollToMakeVisibleAction();
+  bool RequestSetSelectedAction(bool);
+  bool RequestSetSequentialFocusNavigationStartingPointAction();
+  bool RequestSetValueAction(const String&);
+  bool RequestShowContextMenuAction();
+  bool RequestExpandAction();
+  bool RequestCollapseAction();
 
   // This returns true if the element associated with this AXObject is has
   // focusable style, meaning that it is visible. Note that we prefer to rely on

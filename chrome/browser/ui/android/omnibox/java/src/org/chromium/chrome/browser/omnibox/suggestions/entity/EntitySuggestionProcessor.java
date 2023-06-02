@@ -24,7 +24,6 @@ import org.chromium.components.browser_ui.util.ConversionUtils;
 import org.chromium.components.image_fetcher.ImageFetcher;
 import org.chromium.components.omnibox.AutocompleteMatch;
 import org.chromium.components.omnibox.OmniboxSuggestionType;
-import org.chromium.components.omnibox.action.OmniboxActionDelegate;
 import org.chromium.components.omnibox.suggestions.OmniboxSuggestionUiType;
 import org.chromium.ui.modelutil.PropertyModel;
 import org.chromium.url.GURL;
@@ -36,8 +35,6 @@ import java.util.Map;
 
 /** A class that handles model and view creation for the Entity suggestions. */
 public class EntitySuggestionProcessor extends BaseSuggestionViewProcessor {
-    private static final String TAG = "EntitySP";
-    private final SuggestionHost mSuggestionHost;
     private final Map<GURL, List<PropertyModel>> mPendingImageRequests;
     private final Supplier<ImageFetcher> mImageFetcherSupplier;
     // Threshold for low RAM devices. We won't be showing entity suggestion images
@@ -54,10 +51,8 @@ public class EntitySuggestionProcessor extends BaseSuggestionViewProcessor {
      * @param suggestionHost A handle to the object using the suggestions.
      */
     public EntitySuggestionProcessor(Context context, SuggestionHost suggestionHost,
-            OmniboxActionDelegate omniboxActionDelegate,
             Supplier<ImageFetcher> imageFetcherSupplier) {
-        super(context, suggestionHost, omniboxActionDelegate, null);
-        mSuggestionHost = suggestionHost;
+        super(context, suggestionHost, null);
         mPendingImageRequests = new HashMap<>();
         mImageFetcherSupplier = imageFetcherSupplier;
     }
@@ -111,7 +106,7 @@ public class EntitySuggestionProcessor extends BaseSuggestionViewProcessor {
                     for (int i = 0; i < pendingModels.size(); i++) {
                         PropertyModel pendingModel = pendingModels.get(i);
                         setSuggestionDrawableState(pendingModel,
-                                SuggestionDrawableState.Builder.forBitmap(getContext(), bitmap)
+                                SuggestionDrawableState.Builder.forBitmap(mContext, bitmap)
                                         .setUseRoundedCorners(true)
                                         .setLarge(true)
                                         .build());
@@ -145,7 +140,7 @@ public class EntitySuggestionProcessor extends BaseSuggestionViewProcessor {
         super.populateModel(suggestion, model, position);
         setSuggestionDrawableState(model,
                 SuggestionDrawableState.Builder
-                        .forDrawableRes(getContext(), R.drawable.ic_suggestion_magnifier)
+                        .forDrawableRes(mContext, R.drawable.ic_suggestion_magnifier)
                         .setAllowTint(true)
                         .build());
 

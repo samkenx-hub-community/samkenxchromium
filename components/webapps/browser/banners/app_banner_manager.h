@@ -224,6 +224,26 @@ class AppBannerManager : public content::WebContentsObserver,
   // Tracks that the IPH has been shown. Only used on Android.
   void TrackIphWasShown();
 
+  // Tracks whether the current site URL obtained from the web_contents is fully
+  // installed. The only difference from IsWebAppConsideredInstalled() is that
+  // the former considers the scope obtained from a manifest as check for if an
+  // app is already installed.
+  virtual bool IsAppFullyInstalledForSiteUrl(const GURL& site_url) const = 0;
+
+  // Tracks whether the current site URL obtained from the web_contents is not
+  // locally installed.
+  virtual bool IsAppPartiallyInstalledForSiteUrl(
+      const GURL& site_url) const = 0;
+
+  // The user has ignored the installation dialog and it went away due to
+  // another interaction (e.g. the tab was changed, page navigated, etc).
+  virtual void SaveInstallationIgnoredForMl(const GURL& manifest_id) = 0;
+  // The user has taken active action on the dialog to make it go away.
+  virtual void SaveInstallationDismissedForMl(const GURL& manifest_id) = 0;
+  virtual void SaveInstallationAcceptedForMl(const GURL& manifest_id) = 0;
+  virtual bool IsMlPromotionBlockedByHistoryGuardrail(
+      const GURL& manifest_id) = 0;
+
  protected:
   explicit AppBannerManager(content::WebContents* web_contents);
   ~AppBannerManager() override;

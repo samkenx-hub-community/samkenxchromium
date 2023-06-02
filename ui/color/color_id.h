@@ -345,6 +345,7 @@
   E_CPONLY(kColorOverlayScrollbarStrokeHoveredDark) \
   E_CPONLY(kColorOverlayScrollbarStrokeHoveredLight) \
   E_CPONLY(kColorProgressBar) \
+  E_CPONLY(kColorProgressBarBackground) \
   E_CPONLY(kColorProgressBarPaused) \
   E_CPONLY(kColorRadioButtonForegroundUnchecked) \
   E_CPONLY(kColorRadioButtonForegroundDisabled) \
@@ -359,6 +360,13 @@
   E_CPONLY(kColorScrollbarThumbInactive) \
   E_CPONLY(kColorScrollbarThumbPressed) \
   E_CPONLY(kColorScrollbarTrack) \
+  E_CPONLY(kColorSegmentedButtonBorder) \
+  E_CPONLY(kColorSegmentedButtonFocus) \
+  E_CPONLY(kColorSegmentedButtonForegroundChecked) \
+  E_CPONLY(kColorSegmentedButtonForegroundUnchecked) \
+  E_CPONLY(kColorSegmentedButtonHover) \
+  E_CPONLY(kColorSegmentedButtonRipple) \
+  E_CPONLY(kColorSegmentedButtonChecked) \
   E_CPONLY(kColorSeparator) \
   E_CPONLY(kColorShadowBase) \
   E_CPONLY(kColorShadowValueAmbientShadowElevationSixteen) \
@@ -395,15 +403,22 @@
   E_CPONLY(kColorSuggestionChipIcon) \
   E_CPONLY(kColorTextfieldBackground) \
   E_CPONLY(kColorTextfieldBackgroundDisabled) \
+  E_CPONLY(kColorTextfieldFilledBackground) \
+  E_CPONLY(kColorTextfieldFilledForegroundInvalid) \
+  E_CPONLY(kColorTextfieldFilledUnderline) \
+  E_CPONLY(kColorTextfieldFilledUnderlineFocused) \
   E_CPONLY(kColorTextfieldForeground) \
   E_CPONLY(kColorTextfieldForegroundDisabled) \
+  E_CPONLY(kColorTextfieldForegroundIcon) \
+  E_CPONLY(kColorTextfieldForegroundLabel) \
   E_CPONLY(kColorTextfieldForegroundPlaceholderInvalid) \
   E_CPONLY(kColorTextfieldForegroundPlaceholder) \
+  E_CPONLY(kColorTextfieldHover) \
   E_CPONLY(kColorTextfieldSelectionBackground) \
   E_CPONLY(kColorTextfieldSelectionForeground) \
   E_CPONLY(kColorTextfieldOutline) \
-  E_CPONLY(kColorTextfieldDisabledOutline) \
-  E_CPONLY(kColorTextfieldInvalidOutline) \
+  E_CPONLY(kColorTextfieldOutlineDisabled) \
+  E_CPONLY(kColorTextfieldOutlineInvalid) \
   E_CPONLY(kColorThrobber) \
   E_CPONLY(kColorThrobberPreconnect) \
   E_CPONLY(kColorToggleButtonHover) \

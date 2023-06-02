@@ -89,11 +89,11 @@ CommercePushNotificationClient::RegisterActionableNotifications() {
                      options:UNNotificationCategoryOptionNone] ];
 }
 
-void CommercePushNotificationClient::OnBrowserReady() {
+void CommercePushNotificationClient::OnSceneActiveForegroundBrowserReady() {
   if (!urls_delayed_for_loading_.size()) {
     return;
   }
-  Browser* browser = GetActiveBrowser();
+  Browser* browser = GetSceneLevelForegroundActiveBrowser();
   CHECK(browser);
   for (const std::string& url : urls_delayed_for_loading_) {
     UrlLoadParams params = UrlLoadParams::InNewTab(GURL(url));
@@ -113,33 +113,21 @@ bookmarks::BookmarkModel* CommercePushNotificationClient::GetBookmarkModel() {
       GetLastUsedBrowserState());
 }
 
-Browser* CommercePushNotificationClient::GetActiveBrowser() {
+Browser*
+CommercePushNotificationClient::GetSceneLevelForegroundActiveBrowser() {
   BrowserList* browser_list =
       BrowserListFactory::GetForBrowserState(GetLastUsedBrowserState());
-  // Ideally we want a foregrounded active browser, but in the event we can't
-  // find one (e.g. notification was tapped when app was closed and app is
-  // currently opening), we fallback to the foreground inactive browser.
-  Browser* fallback_scene_foreground_inactive = nullptr;
   for (Browser* browser : browser_list->AllRegularBrowsers()) {
     if (!browser->IsInactive()) {
       SceneStateBrowserAgent* scene_state_browser_agent =
           SceneStateBrowserAgent::FromBrowser(browser);
       if (scene_state_browser_agent &&
-          scene_state_browser_agent->GetSceneState()) {
-        if (scene_state_browser_agent->GetSceneState().activationLevel ==
-            SceneActivationLevelForegroundInactive) {
-          fallback_scene_foreground_inactive = browser;
-        }
-
-        if (scene_state_browser_agent->GetSceneState().activationLevel ==
-            SceneActivationLevelForegroundActive) {
-          return browser;
-        }
+          scene_state_browser_agent->GetSceneState() &&
+          scene_state_browser_agent->GetSceneState().activationLevel ==
+              SceneActivationLevelForegroundActive) {
+        return browser;
       }
     }
-  }
-  if (fallback_scene_foreground_inactive) {
-    return fallback_scene_foreground_inactive;
   }
   return nullptr;
 }
@@ -171,7 +159,7 @@ void CommercePushNotificationClient::HandleNotificationInteraction(
     // TODO(crbug.com/1403190) implement alternate Open URL handler which
     // attempts to find if a Tab with the URL already exists and switch
     // to that Tab.
-    Browser* browser = GetActiveBrowser();
+    Browser* browser = GetSceneLevelForegroundActiveBrowser();
     if (!browser) {
       urls_delayed_for_loading_.push_back(
           price_drop_notification.destination_url());

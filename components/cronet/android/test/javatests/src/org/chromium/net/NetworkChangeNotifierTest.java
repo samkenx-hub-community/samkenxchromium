@@ -7,11 +7,9 @@ package org.chromium.net;
 import static android.system.OsConstants.AF_INET6;
 import static android.system.OsConstants.SOCK_STREAM;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static com.google.common.truth.Truth.assertThat;
 
-import static org.chromium.net.CronetTestRule.assertContains;
+import static org.junit.Assert.assertTrue;
 
 import android.os.Build;
 import android.system.Os;
@@ -52,7 +50,6 @@ public class NetworkChangeNotifierTest {
     // Os and OsConstants aren't exposed until Lollipop
     public void testNetworkChangeNotifier() throws Exception {
         CronetTestFramework testFramework = mTestRule.startCronetTestFramework();
-        assertNotNull(testFramework);
 
         // Bind a listening socket to a local port. The socket won't be used to accept any
         // connections, but rather to get connection stuck waiting to connect.
@@ -101,11 +98,11 @@ public class NetworkChangeNotifierTest {
 
         // Wait for ERR_NETWORK_CHANGED
         callback.blockForDone();
-        assertNotNull(callback.mError);
         assertTrue(callback.mOnErrorCalled);
-        assertEquals(NetError.ERR_NETWORK_CHANGED,
-                ((NetworkException) callback.mError).getCronetInternalErrorCode());
-        assertContains("Exception in CronetUrlRequest: net::ERR_NETWORK_CHANGED",
-                callback.mError.getMessage());
+        assertThat(callback.mError)
+                .hasMessageThat()
+                .contains("Exception in CronetUrlRequest: net::ERR_NETWORK_CHANGED");
+        assertThat(((NetworkException) callback.mError).getCronetInternalErrorCode())
+                .isEqualTo(NetError.ERR_NETWORK_CHANGED);
     }
 }

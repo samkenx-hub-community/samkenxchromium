@@ -565,7 +565,9 @@ class TabListMediator {
                     // undo, identify the related TabIds and determine newIndex based on if any of
                     // the related ids are present in model.
                     newIndex = getIndexForTabWithRelatedTabs(tab);
-                    model.updateTabListModelIdForGroup(tab, newIndex);
+                    if (newIndex != Tab.INVALID_TAB_ID) {
+                        model.updateTabListModelIdForGroup(tab, newIndex);
+                    }
                 }
 
                 mLastSelectedTabListModelIndex = oldIndex;
@@ -1163,32 +1165,6 @@ class TabListMediator {
 
     private boolean isValidMovePosition(int position) {
         return position != TabModel.INVALID_TAB_INDEX && position < mModel.size();
-    }
-
-    /**
-     * Hide the blue border for selected tab for the Tab-to-Grid resizing stage.
-     * The selected border should re-appear in the final fading-in stage.
-     * TODO(https://crbug.com/1413213): Revist this it is very inefficient for multi-thumbnails.
-     */
-    void prepareTabSwitcherView() {
-        if (!TabUiFeatureUtilities.isTabToGtsAnimationEnabled(mContext)
-                || !mTabModelSelector.isTabStateInitialized()) {
-            return;
-        }
-
-        assert mVisible;
-        int selectedTabCount = 0;
-        int tabsCount = 0;
-        for (int i = 0; i < mModel.size(); i++) {
-            if (mModel.get(i).model.get(CARD_TYPE) != TAB) continue;
-
-            if (mModel.get(i).model.get(TabProperties.IS_SELECTED)) selectedTabCount++;
-            mModel.get(i).model.set(TabProperties.IS_SELECTED, false);
-            tabsCount += 1;
-        }
-        assert (selectedTabCount == 1 || tabsCount == 0)
-            : "There should be exactly one selected tab or no tabs at all when calling "
-              + "TabListMediator.prepareOverview()";
     }
 
     private boolean areTabsUnchanged(@Nullable List<PseudoTab> tabs) {

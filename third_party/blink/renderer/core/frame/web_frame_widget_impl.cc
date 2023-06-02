@@ -2472,7 +2472,7 @@ std::unique_ptr<cc::WebVitalMetrics> WebFrameWidgetImpl::GetWebVitalMetrics() {
 
   base::TimeTicks start = perf.NavigationStartAsMonotonicTime();
   base::TimeTicks largest_contentful_paint =
-      perf.LargestContentfulPaintAsMonotonicTimeForMetrics();
+      perf.LargestContentfulDetailsForMetrics().paint_time;
   if (largest_contentful_paint >= start) {
     metrics->largest_contentful_paint = largest_contentful_paint - start;
     metrics->has_lcp = true;
@@ -3816,6 +3816,19 @@ void WebFrameWidgetImpl::ExtendSelectionAndDelete(int32_t before,
   if (!focused_frame)
     return;
   focused_frame->ExtendSelectionAndDelete(before, after);
+}
+
+void WebFrameWidgetImpl::ExtendSelectionAndReplace(
+    uint32_t before,
+    uint32_t after,
+    const String& replacement_text) {
+  WebLocalFrame* focused_frame = FocusedWebLocalFrameInWidget();
+  if (!focused_frame) {
+    return;
+  }
+  focused_frame->ExtendSelectionAndReplace(base::checked_cast<int>(before),
+                                           base::checked_cast<int>(after),
+                                           replacement_text);
 }
 
 void WebFrameWidgetImpl::DeleteSurroundingText(int32_t before, int32_t after) {

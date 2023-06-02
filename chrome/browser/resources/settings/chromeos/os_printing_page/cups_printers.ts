@@ -19,7 +19,7 @@ import 'chrome://resources/cr_elements/action_link.css.js';
 import 'chrome://resources/polymer/v3_0/iron-flex-layout/iron-flex-layout-classes.js';
 import 'chrome://resources/polymer/v3_0/iron-icon/iron-icon.js';
 import 'chrome://resources/cr_components/localized_link/localized_link.js';
-import '../../icons.html.js';
+import '../icons.html.js';
 import './cups_edit_printer_dialog.js';
 import './cups_enterprise_printers.js';
 import './cups_printer_shared.css.js';
@@ -55,6 +55,31 @@ import {getTemplate} from './cups_printers.html.js';
 import {CupsPrinterInfo, CupsPrintersBrowserProxyImpl, CupsPrintersList, PrinterSetupResult} from './cups_printers_browser_proxy.js';
 import {CupsPrintersEntryManager} from './cups_printers_entry_manager.js';
 import {SettingsCupsAddPrinterDialogElement} from './cups_settings_add_printer_dialog.js';
+
+/**
+ * Enumeration of the user actions that can be taken on the Printer settings
+ * page.
+ * This enum is tied directly to a UMA enum defined in
+ * //tools/metrics/histograms/enums.xml, and should always reflect it (do not
+ * change one without changing the other).
+ * These values are persisted to logs. Entries should not be renumbered and
+ * numeric values should never be reused.
+ * @enum {number}
+ */
+export enum PrinterSettingsUserAction {
+  ADD_PRINTER_MANUALLY = 0,
+  SAVE_PRINTER = 1,
+  EDIT_PRINTER = 2,
+  REMOVE_PRINTER = 3,
+  CLICK_HELP_LINK = 4,
+}
+
+export function recordPrinterSettingsUserAction(
+    userAction: PrinterSettingsUserAction) {
+  chrome.metricsPrivate.recordEnumerationValue(
+      'Printing.CUPS.SettingsUserAction', userAction,
+      Object.keys(PrinterSettingsUserAction).length);
+}
 
 const SettingsCupsPrintersElementBase =
     mixinBehaviors(
@@ -429,6 +454,8 @@ class SettingsCupsPrintersElement extends SettingsCupsPrintersElementBase {
 
   private onAddPrinterClick_(): void {
     this.$.addPrinterDialog.open();
+    recordPrinterSettingsUserAction(
+        PrinterSettingsUserAction.ADD_PRINTER_MANUALLY);
   }
 
   private onAddPrinterDialogClose_(): void {

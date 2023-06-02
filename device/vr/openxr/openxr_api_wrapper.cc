@@ -42,7 +42,6 @@ namespace device {
 
 namespace {
 
-static constexpr XrSystemId kInvalidSystem = -1;
 // The primary view configuration is always enabled and active in OpenXR. We
 // currently only support the stereo view configuration.
 static constexpr XrViewConfigurationType kPrimaryViewConfiguration =
@@ -204,7 +203,7 @@ void OpenXrApiWrapper::Reset() {
   session_ = XR_NULL_HANDLE;
   blend_mode_ = XR_ENVIRONMENT_BLEND_MODE_MAX_ENUM;
   stage_bounds_ = {};
-  system_ = kInvalidSystem;
+  system_ = XR_NULL_SYSTEM_ID;
   instance_ = XR_NULL_HANDLE;
   stage_parameters_enabled_ = false;
   enabled_features_.clear();
@@ -289,7 +288,7 @@ bool OpenXrApiWrapper::HasInstance() const {
 }
 
 bool OpenXrApiWrapper::HasSystem() const {
-  return system_ != kInvalidSystem && primary_view_config_.Initialized();
+  return system_ != XR_NULL_SYSTEM_ID && primary_view_config_.Initialized();
 }
 
 bool OpenXrApiWrapper::HasBlendMode() const {
@@ -486,6 +485,11 @@ XrResult OpenXrApiWrapper::InitSession(
   enabled_features_ = enabled_features;
   graphics_binding_ = graphics_binding;
 
+  if (!graphics_binding_->Initialize(instance_, system_)) {
+    DLOG(ERROR) << __func__ << " Failed to initialize graphics binding";
+    return XR_ERROR_INITIALIZATION_FAILED;
+  }
+
   // These are the only features that use stage parameters. If none of them were
   // requested for the session, we can avoid querying this every frame.
   stage_parameters_enabled_ = base::ranges::any_of(
@@ -551,7 +555,8 @@ XrResult OpenXrApiWrapper::CreateSwapchain() {
 
   XrSwapchainCreateInfo swapchain_create_info = {XR_TYPE_SWAPCHAIN_CREATE_INFO};
   swapchain_create_info.arraySize = 1;
-  swapchain_create_info.format = graphics_binding_->GetSwapchainFormat();
+  swapchain_create_info.format =
+      graphics_binding_->GetSwapchainFormat(session_);
 
   swapchain_create_info.width = swapchain_size_.width();
   swapchain_create_info.height = swapchain_size_.height();
@@ -758,11 +763,12 @@ void OpenXrApiWrapper::CreateSharedMailboxes() {
     gpu_memory_buffer_handle.dxgi_handle.Set(shared_handle);
     gpu_memory_buffer_handle.dxgi_token = gfx::DXGIHandleToken();
     gpu_memory_buffer_handle.type = gfx::DXGI_SHARED_HANDLE;
+    gfx::Size buffer_size =
+        gfx::Size(texture2d_desc.Width, texture2d_desc.Height);
 
     std::unique_ptr<gpu::GpuMemoryBufferImplDXGI> gpu_memory_buffer =
         gpu::GpuMemoryBufferImplDXGI::CreateFromHandle(
-            std::move(gpu_memory_buffer_handle),
-            gfx::Size(texture2d_desc.Width, texture2d_desc.Height),
+            std::move(gpu_memory_buffer_handle), buffer_size,
             gfx::BufferFormat::RGBA_8888, gfx::BufferUsage::GPU_READ,
             base::DoNothing(), nullptr, nullptr);
 
@@ -772,11 +778,11 @@ void OpenXrApiWrapper::CreateSharedMailboxes() {
 
     gpu::MailboxHolder& mailbox_holder = swap_chain_info.mailbox_holder;
     mailbox_holder.mailbox = shared_image_interface->CreateSharedImage(
-        gpu_memory_buffer.get(), nullptr,
+        viz::SinglePlaneFormat::kRGBA_8888, buffer_size,
         gfx::ColorSpace(gfx::ColorSpace::PrimaryID::BT709,
                         gfx::ColorSpace::TransferID::LINEAR),
         kTopLeft_GrSurfaceOrigin, kPremul_SkAlphaType, shared_image_usage,
-        "OpenXrSwapChain");
+        "OpenXrSwapChain", gpu_memory_buffer->CloneHandle());
     mailbox_holder.sync_token = shared_image_interface->GenVerifiedSyncToken();
     mailbox_holder.texture_target = GL_TEXTURE_2D;
   }
@@ -1101,6 +1107,7 @@ XrResult OpenXrApiWrapper::LocateViews(
     case XR_REFERENCE_SPACE_TYPE_UNBOUNDED_MSFT:
     case XR_REFERENCE_SPACE_TYPE_COMBINED_EYE_VARJO:
     case XR_REFERENCE_SPACE_TYPE_MAX_ENUM:
+    case XR_REFERENCE_SPACE_TYPE_LOCAL_FLOOR_EXT:
       NOTREACHED();
   }
 

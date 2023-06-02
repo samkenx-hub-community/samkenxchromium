@@ -10,6 +10,7 @@
 #include "base/functional/bind.h"
 #include "base/memory/raw_ptr.h"
 #include "base/test/bind.h"
+#include "base/time/time.h"
 #include "chrome/browser/ash/arc/vmm/arcvm_working_set_trim_executor.h"
 #include "chrome/test/base/testing_browser_process.h"
 #include "chrome/test/base/testing_profile.h"
@@ -94,6 +95,22 @@ class ArcVmmManagerTest : public testing::Test {
 
     concierge_client_ =
         std::make_unique<TestConciergeClient>(ash::FakeCiceroneClient::Get());
+
+    trim_type_reclaim_counter_ = 0;
+    trim_type_drop_pages_counter_ = 0;
+  }
+
+  void TearDown() override {
+    profile_manager_.reset();
+    arc_service_manager_.reset();
+  }
+
+  void EnableAndConnectArcVm() {
+    auto* command_line = base::CommandLine::ForCurrentProcess();
+    command_line->InitFromArgv({"", "--enable-arcvm"});
+    if (manager_) {
+      manager_->OnConnectionReady();
+    }
   }
 
   void InitVmmManager() {
@@ -101,10 +118,23 @@ class ArcVmmManagerTest : public testing::Test {
     manager_->set_user_id_hash("test_user_hash_id");
   }
 
+  void InitAggressiveBallonResponse() {
+    vm_tools::concierge::AggressiveBalloonResponse response;
+    response.set_success(true);
+    client()->set_aggressive_balloon_response(response);
+  }
+
   void SetTrimCall(bool trim_result) {
     manager()->trim_call_ = base::BindLambdaForTesting(
-        [trim_result](ArcVmWorkingSetTrimExecutor::ResultCallback callback,
-                      ArcVmReclaimType reclaim_type, int page_limit) {
+        [trim_result, this](
+            ArcVmWorkingSetTrimExecutor::ResultCallback callback,
+            ArcVmReclaimType reclaim_type, int page_limit) {
+          if (reclaim_type == ArcVmReclaimType::kReclaimAll) {
+            trim_type_reclaim_counter_++;
+          } else if (reclaim_type ==
+                     ArcVmReclaimType::kReclaimGuestPageCaches) {
+            trim_type_drop_pages_counter_++;
+          }
           std::move(callback).Run(trim_result, "");
         });
   }
@@ -112,11 +142,17 @@ class ArcVmmManagerTest : public testing::Test {
   ArcVmmManager* manager() { return manager_; }
   TestConciergeClient* client() { return concierge_client_.get(); }
 
+  int reclaim_all_conter() { return trim_type_reclaim_counter_; }
+  int drop_pages_counter() { return trim_type_drop_pages_counter_; }
+
  protected:
   content::BrowserTaskEnvironment task_environment_{
       base::test::TaskEnvironment::TimeSource::MOCK_TIME};
 
  private:
+  int trim_type_reclaim_counter_;
+  int trim_type_drop_pages_counter_;
+
   base::test::ScopedFeatureList scoped_features_;
   TestingPrefServiceSimple local_state_;
 
@@ -130,7 +166,9 @@ class ArcVmmManagerTest : public testing::Test {
 
 TEST_F(ArcVmmManagerTest, EnableSwapWhenTrimSuccess) {
   InitVmmManager();
+  EnableAndConnectArcVm();
   SetTrimCall(true);
+  InitAggressiveBallonResponse();
 
   // Send "ENABLE".
   EXPECT_EQ(0, client()->enable_count());
@@ -144,7 +182,9 @@ TEST_F(ArcVmmManagerTest, EnableSwapWhenTrimSuccess) {
 
 TEST_F(ArcVmmManagerTest, NotEnableSwapWhenTrimFail) {
   InitVmmManager();
+  EnableAndConnectArcVm();
   SetTrimCall(false);
+  InitAggressiveBallonResponse();
 
   // Send "ENABLE".
   EXPECT_EQ(0, client()->enable_count());
@@ -158,13 +198,178 @@ TEST_F(ArcVmmManagerTest, NotEnableSwapWhenTrimFail) {
 
 TEST_F(ArcVmmManagerTest, ForceSwapSuccess) {
   InitVmmManager();
-  manager()->SetSwapState(SwapState::ENABLE_WITH_SWAPOUT);
+  EnableAndConnectArcVm();
+  SetTrimCall(true);
+  InitAggressiveBallonResponse();
+
+  manager()->SetSwapState(SwapState::FORCE_ENABLE);
   base::RunLoop().RunUntilIdle();
   // Send "FORCE_ENABLE".
   EXPECT_EQ(1, client()->force_enable_count());
   EXPECT_EQ(0, client()->enable_count());
   EXPECT_EQ(0, client()->swap_out_count());
   EXPECT_EQ(0, client()->disable_count());
+}
+
+TEST_F(ArcVmmManagerTest, NotSendSwapRequestIfArcNotReady) {
+  InitVmmManager();
+  SetTrimCall(true);
+  InitAggressiveBallonResponse();
+
+  manager()->SetSwapState(SwapState::FORCE_ENABLE);
+  base::RunLoop().RunUntilIdle();
+  // Not send "FORCE_ENABLE".
+  EXPECT_EQ(0, client()->force_enable_count());
+  EXPECT_EQ(0, client()->enable_count());
+  EXPECT_EQ(0, client()->swap_out_count());
+  EXPECT_EQ(0, client()->disable_count());
+}
+
+TEST_F(ArcVmmManagerTest, DropCachesAfterEnableSuccess) {
+  InitVmmManager();
+  EnableAndConnectArcVm();
+  SetTrimCall(true);
+  InitAggressiveBallonResponse();
+
+  manager()->SetSwapState(SwapState::FORCE_ENABLE);
+  base::RunLoop().RunUntilIdle();
+  // Send "FORCE_ENABLE".
+  EXPECT_EQ(1, client()->force_enable_count());
+  EXPECT_EQ(0, client()->enable_count());
+  EXPECT_EQ(0, client()->swap_out_count());
+  EXPECT_EQ(0, client()->disable_count());
+
+  EXPECT_EQ(1, reclaim_all_conter());
+  EXPECT_EQ(1, drop_pages_counter());
+}
+
+TEST_F(ArcVmmManagerTest, EnableSwapRequestWillEnableHeartbeat) {
+  InitVmmManager();
+  EnableAndConnectArcVm();
+  SetTrimCall(true);
+  InitAggressiveBallonResponse();
+
+  manager()->SetSwapState(SwapState::FORCE_ENABLE);
+  task_environment_.RunUntilIdle();
+  EXPECT_EQ(1, client()->force_enable_count());
+  EXPECT_EQ(0, client()->enable_count());
+  EXPECT_EQ(0, client()->swap_out_count());
+  EXPECT_EQ(0, client()->disable_count());
+
+  task_environment_.FastForwardBy(kEnabledStateHeartbeatInterval);
+  EXPECT_EQ(2, client()->force_enable_count());
+  EXPECT_EQ(0, client()->enable_count());
+  EXPECT_EQ(0, client()->swap_out_count());
+  EXPECT_EQ(0, client()->disable_count());
+  task_environment_.RunUntilIdle();
+
+  task_environment_.FastForwardBy(kEnabledStateHeartbeatInterval);
+  EXPECT_EQ(3, client()->force_enable_count());
+  EXPECT_EQ(0, client()->enable_count());
+  EXPECT_EQ(0, client()->swap_out_count());
+  EXPECT_EQ(0, client()->disable_count());
+  task_environment_.RunUntilIdle();
+
+  manager()->SetSwapState(SwapState::ENABLE);
+  task_environment_.RunUntilIdle();
+  // Send "ENABLE", should overwrite original timer.
+  EXPECT_EQ(3, client()->force_enable_count());
+  EXPECT_EQ(1, client()->enable_count());
+  EXPECT_EQ(0, client()->swap_out_count());
+  EXPECT_EQ(0, client()->disable_count());
+
+  task_environment_.FastForwardBy(kEnabledStateHeartbeatInterval);
+  EXPECT_EQ(3, client()->force_enable_count());
+  EXPECT_EQ(2, client()->enable_count());
+  EXPECT_EQ(0, client()->swap_out_count());
+  EXPECT_EQ(0, client()->disable_count());
+  task_environment_.RunUntilIdle();
+
+  task_environment_.FastForwardBy(kEnabledStateHeartbeatInterval);
+  EXPECT_EQ(3, client()->force_enable_count());
+  EXPECT_EQ(3, client()->enable_count());
+  EXPECT_EQ(0, client()->swap_out_count());
+  EXPECT_EQ(0, client()->disable_count());
+  task_environment_.RunUntilIdle();
+}
+
+TEST_F(ArcVmmManagerTest, NotResendSameStateRequestButHeartbeat) {
+  InitVmmManager();
+  EnableAndConnectArcVm();
+  SetTrimCall(true);
+  InitAggressiveBallonResponse();
+
+  manager()->SetSwapState(SwapState::ENABLE);
+  task_environment_.RunUntilIdle();
+  EXPECT_EQ(0, client()->force_enable_count());
+  EXPECT_EQ(1, client()->enable_count());
+  EXPECT_EQ(0, client()->swap_out_count());
+  EXPECT_EQ(0, client()->disable_count());
+
+  // Not resend same request, but leave to next heart beat.
+  manager()->SetSwapState(SwapState::ENABLE);
+  task_environment_.RunUntilIdle();
+  EXPECT_EQ(0, client()->force_enable_count());
+  EXPECT_EQ(1, client()->enable_count());
+  EXPECT_EQ(0, client()->swap_out_count());
+  EXPECT_EQ(0, client()->disable_count());
+
+  task_environment_.FastForwardBy(base::Seconds(1));
+  // Not resend same request, but leave to next heart beat.
+  manager()->SetSwapState(SwapState::ENABLE);
+  task_environment_.RunUntilIdle();
+  EXPECT_EQ(0, client()->force_enable_count());
+  EXPECT_EQ(1, client()->enable_count());
+  EXPECT_EQ(0, client()->swap_out_count());
+  EXPECT_EQ(0, client()->disable_count());
+
+  task_environment_.FastForwardBy(kEnabledStateHeartbeatInterval);
+  EXPECT_EQ(0, client()->force_enable_count());
+  EXPECT_EQ(2, client()->enable_count());
+  EXPECT_EQ(0, client()->swap_out_count());
+  EXPECT_EQ(0, client()->disable_count());
+  task_environment_.RunUntilIdle();
+}
+
+TEST_F(ArcVmmManagerTest, ReForceEnable) {
+  InitVmmManager();
+  EnableAndConnectArcVm();
+  SetTrimCall(true);
+  InitAggressiveBallonResponse();
+
+  manager()->SetSwapState(SwapState::FORCE_ENABLE);
+  task_environment_.RunUntilIdle();
+  EXPECT_EQ(1, client()->force_enable_count());
+  EXPECT_EQ(0, client()->enable_count());
+  EXPECT_EQ(0, client()->swap_out_count());
+  EXPECT_EQ(0, client()->disable_count());
+
+  task_environment_.FastForwardBy(base::Seconds(10));
+  // Disable.
+  manager()->SetSwapState(SwapState::DISABLE);
+  task_environment_.RunUntilIdle();
+  EXPECT_EQ(1, client()->force_enable_count());
+  EXPECT_EQ(0, client()->enable_count());
+  EXPECT_EQ(0, client()->swap_out_count());
+  EXPECT_EQ(1, client()->disable_count());
+
+  task_environment_.FastForwardBy(base::Seconds(10));
+  // Re-enable, expect re-send force_enable to concierge.
+  manager()->SetSwapState(SwapState::FORCE_ENABLE);
+  task_environment_.RunUntilIdle();
+  EXPECT_EQ(2, client()->force_enable_count());
+  EXPECT_EQ(0, client()->enable_count());
+  EXPECT_EQ(0, client()->swap_out_count());
+  EXPECT_EQ(1, client()->disable_count());
+
+  task_environment_.FastForwardBy(base::Seconds(10));
+  // Re-disable, expect re-send force_enable to concierge.
+  manager()->SetSwapState(SwapState::DISABLE);
+  task_environment_.RunUntilIdle();
+  EXPECT_EQ(2, client()->force_enable_count());
+  EXPECT_EQ(0, client()->enable_count());
+  EXPECT_EQ(0, client()->swap_out_count());
+  EXPECT_EQ(2, client()->disable_count());
 }
 
 // This test verify the weak ptr safety in scheduler.

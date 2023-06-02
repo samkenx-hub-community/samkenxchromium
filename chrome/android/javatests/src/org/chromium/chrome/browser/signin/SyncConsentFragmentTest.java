@@ -557,7 +557,7 @@ public class SyncConsentFragmentTest {
     @Test
     @LargeTest
     @DisableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
-    public void testClickingSettingsDoesNotSetFirstSetupComplete() {
+    public void testClickingSettingsDoesNotSetInitialSyncFeatureSetupComplete() {
         CoreAccountInfo accountInfo =
                 mSigninTestRule.addAccount(AccountManagerTestRule.TEST_ACCOUNT_EMAIL);
         mSyncConsentActivity = ActivityTestUtils.waitForActivity(
@@ -588,7 +588,7 @@ public class SyncConsentFragmentTest {
     @Test
     @LargeTest
     @EnableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
-    public void testClickingSettingsDoesNotSetFirstSetupCompleteWithTangibleSync() {
+    public void testClickingSettingsDoesNotSetInitialSyncFeatureSetupCompleteWithTangibleSync() {
         CoreAccountInfo accountInfo =
                 mSigninTestRule.addAccount(AccountManagerTestRule.TEST_ACCOUNT_EMAIL);
         mSyncConsentActivity = ActivityTestUtils.waitForActivity(
@@ -709,8 +709,10 @@ public class SyncConsentFragmentTest {
         onView(withId(R.id.button_primary)).check(matches(withText(R.string.signin_add_account)));
         onView(withId(R.id.button_secondary)).check(matches(withText(R.string.cancel)));
         settingsHistogram.assertExpected();
+        // As there is no account on the device, the set of selected types will be empty. Sync Setup
+        // UI in this case does not link to the types list.
         TestThreadUtils.runOnUiThreadBlocking(() -> {
-            assertEquals(ALL_CLANK_SYNCABLE_DATA_TYPES, SyncService.get().getSelectedTypes());
+            assertEquals(Set.of(), SyncService.get().getSelectedTypes());
             assertTrue(SyncService.get().hasKeepEverythingSynced());
         });
     }
@@ -984,7 +986,6 @@ public class SyncConsentFragmentTest {
     @DisableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
     public void testAutomotiveDevice_deviceLockCreated_syncAcceptedSuccessfully()
             throws IOException {
-        mAutoTestRule.setIsAutomotive(true);
         CoreAccountInfo accountInfo =
                 mSigninTestRule.addAccount(AccountManagerTestRule.TEST_ACCOUNT_EMAIL);
         mSyncConsentActivity = ActivityTestUtils.waitForActivity(
@@ -993,6 +994,7 @@ public class SyncConsentFragmentTest {
                             mChromeActivityTestRule.getActivity(),
                             SigninAccessPoint.BOOKMARK_MANAGER, accountInfo.getEmail());
                 });
+        mAutoTestRule.setIsAutomotive(true);
 
         // Should display the sync page.
         onView(withText(R.string.signin_accept_button)).check(matches(isDisplayed()));
@@ -1027,7 +1029,6 @@ public class SyncConsentFragmentTest {
     @LargeTest
     @DisableFeatures({ChromeFeatureList.TANGIBLE_SYNC})
     public void testAutomotiveDevice_deviceLockRefused_syncRefused() throws IOException {
-        mAutoTestRule.setIsAutomotive(true);
         CoreAccountInfo accountInfo =
                 mSigninTestRule.addAccount(AccountManagerTestRule.TEST_ACCOUNT_EMAIL);
         mSyncConsentActivity = ActivityTestUtils.waitForActivity(
@@ -1036,6 +1037,7 @@ public class SyncConsentFragmentTest {
                             mChromeActivityTestRule.getActivity(),
                             SigninAccessPoint.BOOKMARK_MANAGER, accountInfo.getEmail());
                 });
+        mAutoTestRule.setIsAutomotive(true);
 
         // Should display the sync page.
         onView(withText(R.string.signin_accept_button)).check(matches(isDisplayed()));

@@ -61,20 +61,21 @@ const std::string* GetAttributeValue(const base::Value::Dict& dict,
       return nullptr;
     }
     for (const auto& attribute_child : *attribute_children) {
-      const std::string* tag = attribute_child.FindStringPath("tag");
+      const auto& attribute_child_dict = attribute_child.GetDict();
+      const std::string* tag = attribute_child_dict.FindString("tag");
       if (!tag || *tag != "AttributeValue") {
         continue;
       }
 
-      const base::Value* attribute_value_children =
-          attribute_child.FindListPath(kChildrenKey);
+      const base::Value::List* attribute_value_children =
+          attribute_child_dict.FindList(kChildrenKey);
       if (!attribute_value_children) {
         continue;
       }
-      for (const auto& attribute_value_item :
-           attribute_value_children->GetList()) {
-        if (attribute_value_item.is_dict()) {
-          return attribute_value_item.FindStringPath("text");
+      for (const auto& attribute_value_item : *attribute_value_children) {
+        auto* attribute_value_dict = attribute_value_item.GetIfDict();
+        if (attribute_value_dict) {
+          return attribute_value_dict->FindString("text");
         }
       }
     }
@@ -109,7 +110,7 @@ SAMLResponseParser::SAMLResponseParser(
                              base::SequencedTaskRunner::GetCurrentDefault()),
       callback_(std::move(callback)) {
   body_consumer_watcher_.Watch(
-      body_, MOJO_HANDLE_SIGNAL_READABLE | MOJO_HANDLE_SIGNAL_PEER_CLOSED,
+      *body_, MOJO_HANDLE_SIGNAL_READABLE | MOJO_HANDLE_SIGNAL_PEER_CLOSED,
       base::BindRepeating(&SAMLResponseParser::OnBodyReady,
                           weak_ptr_factory_.GetWeakPtr()));
   body_consumer_watcher_.ArmOrNotify();
@@ -120,11 +121,11 @@ SAMLResponseParser::~SAMLResponseParser() = default;
 void SAMLResponseParser::OnBodyReady(MojoResult) {
   uint32_t num_bytes = 0;
   MojoResult result =
-      body_.ReadData(nullptr, &num_bytes, MOJO_READ_DATA_FLAG_QUERY);
+      body_->ReadData(nullptr, &num_bytes, MOJO_READ_DATA_FLAG_QUERY);
   switch (result) {
     case MOJO_RESULT_OK: {
       std::string response(num_bytes, '\0');
-      body_.ReadData(response.data(), &num_bytes, MOJO_READ_DATA_FLAG_PEEK);
+      body_->ReadData(response.data(), &num_bytes, MOJO_READ_DATA_FLAG_PEEK);
       data_decoder::DataDecoder::ParseXmlIsolated(
           response,
           data_decoder::mojom::XmlParser::WhitespaceBehavior::

@@ -250,6 +250,7 @@ public class ToolbarManager implements UrlFocusChangeListener, ThemeColorObserve
     private MenuButtonCoordinator mMenuButtonCoordinator;
     private MenuButtonCoordinator mOverviewModeMenuButtonCoordinator;
     private HomepageManager.HomepageStateListener mHomepageStateListener;
+    @Nullable
     private StatusBarColorController mStatusBarColorController;
     private final ActivityLifecycleDispatcher mActivityLifecycleDispatcher;
     private final BottomSheetController mBottomSheetController;
@@ -444,7 +445,8 @@ public class ToolbarManager implements UrlFocusChangeListener, ThemeColorObserve
             OneshotSupplier<Boolean> promoShownOneshotSupplier, WindowAndroid windowAndroid,
             Supplier<Boolean> isInOverviewModeSupplier,
             Supplier<ModalDialogManager> modalDialogManagerSupplier,
-            StatusBarColorController statusBarColorController, AppMenuDelegate appMenuDelegate,
+            @Nullable StatusBarColorController statusBarColorController,
+            AppMenuDelegate appMenuDelegate,
             ActivityLifecycleDispatcher activityLifecycleDispatcher,
             @NonNull Supplier<Tab> startSurfaceParentTabSupplier,
             @NonNull BottomSheetController bottomSheetController,
@@ -712,15 +714,6 @@ public class ToolbarManager implements UrlFocusChangeListener, ThemeColorObserve
                 maybeTriggerCacheRefreshForZeroSuggest(tab.getUrl());
             }
 
-            @Override
-            public void onPageLoadFinished(Tab tab, GURL url) {
-                // Part of scroll jank investigation http://crbug.com/1311003. Will remove
-                // TraceEvent after the investigation is complete.
-                try (TraceEvent te = TraceEvent.scoped("ToolbarManager::onPageLoadFinished")) {
-                    maybeTriggerCacheRefreshForZeroSuggest(url);
-                }
-            }
-
             /**
              * Trigger ZeroSuggest cache refresh in case user is accessing a new tab page.
              * Avoid issuing multiple concurrent server requests for the same event to
@@ -834,6 +827,7 @@ public class ToolbarManager implements UrlFocusChangeListener, ThemeColorObserve
                     Tab tab, NavigationHandle navigation) {
                 if (navigation.hasCommitted() && !navigation.isSameDocument()) {
                     mToolbar.onNavigatedToDifferentPage();
+                    maybeTriggerCacheRefreshForZeroSuggest(navigation.getUrl());
                 }
 
                 // If the load failed due to a different navigation, there is no need to reset the
@@ -946,8 +940,8 @@ public class ToolbarManager implements UrlFocusChangeListener, ThemeColorObserve
 
         mLayoutStateObserver = new LayoutStateProvider.LayoutStateObserver() {
             @Override
-            public void onStartedShowing(@LayoutType int layoutType, boolean showToolbar) {
-                updateForLayout(layoutType, showToolbar);
+            public void onStartedShowing(@LayoutType int layoutType) {
+                updateForLayout(layoutType);
             }
 
             @Override
@@ -961,12 +955,11 @@ public class ToolbarManager implements UrlFocusChangeListener, ThemeColorObserve
             }
 
             @Override
-            public void onStartedHiding(
-                    @LayoutType int layoutType, boolean showToolbar, boolean delayAnimation) {
+            public void onStartedHiding(@LayoutType int layoutType) {
                 if (layoutType == LayoutType.TAB_SWITCHER
                         || layoutType == LayoutType.START_SURFACE) {
                     mLocationBarModel.updateForNonStaticLayout(false, false);
-                    mToolbar.setTabSwitcherMode(false, showToolbar, delayAnimation);
+                    mToolbar.setTabSwitcherMode(false);
                     updateButtonStatus();
                     if (mToolbar.setForceTextureCapture(true)) {
                         mControlContainer.invalidateBitmap();
@@ -1068,9 +1061,8 @@ public class ToolbarManager implements UrlFocusChangeListener, ThemeColorObserve
     /**
      * Handle a layout change event.
      * @param layoutType The layout being switched to.
-     * @param showToolbar Whether the toolbar should be shown.
      */
-    private void updateForLayout(@LayoutType int layoutType, boolean showToolbar) {
+    private void updateForLayout(@LayoutType int layoutType) {
         if (mIsStartSurfaceRefactorEnabled) {
             mToolbar.updateStartSurfaceToolbarState(null,
                     layoutType == LayoutType.TAB_SWITCHER
@@ -1080,7 +1072,7 @@ public class ToolbarManager implements UrlFocusChangeListener, ThemeColorObserve
         if (layoutType == LayoutType.TAB_SWITCHER || layoutType == LayoutType.START_SURFACE) {
             mLocationBarModel.updateForNonStaticLayout(
                     layoutType == LayoutType.TAB_SWITCHER, layoutType == LayoutType.START_SURFACE);
-            mToolbar.setTabSwitcherMode(true, showToolbar, false);
+            mToolbar.setTabSwitcherMode(true);
             updateButtonStatus();
             if (mLocationBarModel.shouldShowLocationBarInOverviewMode()) {
                 assert mLocationBar instanceof LocationBarCoordinator;
@@ -2090,10 +2082,10 @@ public class ToolbarManager implements UrlFocusChangeListener, ThemeColorObserve
         //                it.
         if (mLayoutStateProvider.isLayoutVisible(LayoutType.TAB_SWITCHER)) {
             mControlContainer.post(mCallbackController.makeCancelable(
-                    () -> updateForLayout(LayoutType.TAB_SWITCHER, true)));
+                    () -> updateForLayout(LayoutType.TAB_SWITCHER)));
         } else if (mLayoutStateProvider.isLayoutVisible(LayoutType.START_SURFACE)) {
             mControlContainer.post(mCallbackController.makeCancelable(
-                    () -> updateForLayout(LayoutType.START_SURFACE, true)));
+                    () -> updateForLayout(LayoutType.START_SURFACE)));
         }
 
         mAppThemeColorProvider.setLayoutStateProvider(mLayoutStateProvider);

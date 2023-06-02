@@ -47,9 +47,10 @@ export class OobeScreensList extends OobeScreensListBase {
        * List of screens to display.
        * @type {!Array<ScreenItem>}
        */
-      screensList: {
+      screensList_: {
         type: Array,
         value: [],
+        notify: true,
       },
       /**
        * List of selected screens.
@@ -73,7 +74,8 @@ export class OobeScreensList extends OobeScreensListBase {
    * Initialize the list of screens.
    */
   init(screens) {
-    this.screensList = screens;
+    this.screensList_ = screens;
+    this.screensSelected = [];
   }
 
   /**
@@ -85,10 +87,14 @@ export class OobeScreensList extends OobeScreensListBase {
 
   onClick_(e) {
     const clickedScreen = e.model.screen;
-    const selected = clickedScreen.selected;
-    clickedScreen.selected = !selected;
-    e.currentTarget.setAttribute('checked', !selected);
-    if (!selected) {
+    const previousSelectedState = clickedScreen.selected;
+    const curentSelectedState = !previousSelectedState;
+    const path =
+        `screensList_.${this.screensList_.indexOf(clickedScreen)}.selected`;
+    this.set(path, curentSelectedState);
+    e.currentTarget.setAttribute('checked', curentSelectedState);
+
+    if (curentSelectedState) {
       this.selectedScreensCount++;
       this.screensSelected.push(clickedScreen.screenID);
     } else {
@@ -96,6 +102,35 @@ export class OobeScreensList extends OobeScreensListBase {
       this.screensSelected.splice(
           this.screensSelected.indexOf(clickedScreen.screenID), 1);
     }
+    this.notifyPath('screensList_');
+  }
+
+  getSubtitle_(locale, screen_subtitle, screen_id) {
+    if (screen_subtitle) {
+      // display size screen is special case as the subtitle include directly
+      // the percentage  and will be displayed directly without i18n.
+      if (screen_id === 'display-size') {
+        return screen_subtitle;
+      }
+      return this.i18nDynamic(locale, screen_subtitle);
+    }
+    return '';
+  }
+
+  isScreenDisabled(is_revisitable, is_completed) {
+    return (!is_revisitable) && is_completed;
+  }
+
+  isSyncedIconHidden(is_synced, is_completed, is_selected) {
+    return (!is_synced) || (is_selected) || (is_completed);
+  }
+
+  isScreenVisited(is_selected, is_completed) {
+    return is_completed && !is_selected;
+  }
+
+  getScreenID(screen_id) {
+    return 'cr-button-' + screen_id;
   }
 }
 

@@ -25,8 +25,10 @@
 #include "chrome/browser/ash/borealis/borealis_util.h"
 #include "chrome/browser/ui/browser_navigator.h"
 #include "chrome/browser/ui/browser_navigator_params.h"
+#include "chrome/browser/ui/views/borealis/borealis_beta_badge.h"
 #include "chrome/browser/ui/views/borealis/borealis_installer_disallowed_dialog.h"
 #include "chrome/browser/ui/views/borealis/borealis_installer_error_dialog.h"
+#include "chrome/browser/ui/views/borealis/borealis_splash_screen_view.h"
 #include "chrome/browser/ui/views/chrome_layout_provider.h"
 #include "chrome/browser/ui/views/chrome_typography.h"
 #include "chrome/grit/chrome_unscaled_resources.h"
@@ -99,7 +101,6 @@ std::u16string GetInstallationPredictionText(const base::Time& start_time,
 
 }  // namespace
 
-// Defined in chrome/browser/ash/borealis/borealis_util.h.
 void borealis::ShowBorealisInstallerView(Profile* profile) {
   borealis::BorealisService::GetForProfile(profile)->Features().IsAllowed(
       base::BindOnce(&ShowBorealisInstallerViewIfAllowed, profile));
@@ -126,9 +127,7 @@ BEGIN_METADATA(BorealisInstallerView, TitleLabel, views::Label)
 END_METADATA
 
 BorealisInstallerView::BorealisInstallerView(Profile* profile)
-    : app_name_(l10n_util::GetStringUTF16(IDS_BOREALIS_APP_NAME)),
-      profile_(profile),
-      observation_(this) {
+    : profile_(profile), observation_(this) {
   SetCanMinimize(true);
   set_draggable(true);
   set_margins(gfx::Insets::TLBR(80, 40, 40, 40));
@@ -162,6 +161,10 @@ BorealisInstallerView::BorealisInstallerView(Profile* profile)
   primary_message_label_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
   primary_message_label_->SetMaximumWidth(264);
   left_container_view->AddChildView(primary_message_label_.get());
+
+  beta_badge_ = left_container_view->AddChildView(
+      std::make_unique<views::BorealisBetaBadge>());
+  beta_badge_->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(16, 0, 0, 0));
 
   secondary_message_label_ = new views::Label(
       GetSecondaryMessage(), views::style::CONTEXT_DIALOG_BODY_TEXT,
@@ -254,6 +257,10 @@ bool BorealisInstallerView::Accept() {
   }
 
   if (state_ == State::kCompleted) {
+    // Installation starts the borealis VM, so the splash screen would normally
+    // not show, therefore we need to show it manually here. Since this is
+    // post-install we know borealis wasn't running previously.
+    borealis::ShowBorealisSplashScreenView(profile_);
     // Launch button has been clicked.
     borealis::BorealisService::GetForProfile(profile_)->AppLauncher().Launch(
         borealis::kClientAppId,
@@ -413,6 +420,9 @@ void BorealisInstallerView::OnStateUpdated() {
 
   const bool progress_bar_visible = state_ == State::kInstalling;
   progress_bar_->SetVisible(progress_bar_visible);
+
+  const bool beta_badge_visible = state_ != State::kCompleted;
+  beta_badge_->SetVisible(beta_badge_visible);
 
   DialogModelChanged();
   primary_message_label_->NotifyAccessibilityEvent(

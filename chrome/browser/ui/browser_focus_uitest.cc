@@ -54,6 +54,10 @@
 #include "third_party/blink/public/common/switches.h"
 #include "ui/base/test/ui_controls.h"
 
+#if BUILDFLAG(IS_MAC)
+#include "base/mac/mac_util.h"
+#endif
+
 namespace {
 
 using content::RenderViewHost;
@@ -311,6 +315,13 @@ IN_PROC_BROWSER_TEST_F(BrowserFocusTest, TabsRememberFocus) {
 
 // Tabs remember focus with find-in-page box.
 IN_PROC_BROWSER_TEST_F(BrowserFocusTest, TabsRememberFocusFindInPage) {
+  // TODO(https://crbug.com/1446127): Re-enable when child widget focus manager
+  // relationship is fixed.
+#if BUILDFLAG(IS_MAC)
+  if (base::mac::IsAtLeastOS13()) {
+    GTEST_SKIP() << "Broken on macOS 13: https://crbug.com/1446127";
+  }
+#endif
   ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
   const GURL url = embedded_test_server()->GetURL(kSimplePage);
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), url));
@@ -626,7 +637,7 @@ IN_PROC_BROWSER_TEST_F(BrowserFocusTest, NavigateFromOmniboxIntoNewTab) {
   edit_model_delegate->OnAutocompleteAccept(
       url2, nullptr, WindowOpenDisposition::NEW_FOREGROUND_TAB,
       ui::PAGE_TRANSITION_TYPED, AutocompleteMatchType::URL_WHAT_YOU_TYPED,
-      base::TimeTicks(), false, std::u16string(), AutocompleteMatch(),
+      base::TimeTicks(), false, false, std::u16string(), AutocompleteMatch(),
       AutocompleteMatch(), IDNA2008DeviationCharacter::kNone);
 
   // Make sure the second tab is selected.

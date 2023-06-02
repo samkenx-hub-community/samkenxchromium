@@ -113,7 +113,7 @@ class InstallFromSyncTest : public WebAppTest {
 
   InstallFromSyncCommand::Params CreateParams(AppId app_id, GURL url) {
     return InstallFromSyncCommand::Params(
-        app_id, /*manifest_id=*/absl::nullopt, url, kFallbackTitle,
+        app_id, GenerateManifestIdFromStartUrlOnly(url), url, kFallbackTitle,
         url.GetWithoutFilename(), /*theme_color=*/absl::nullopt,
         mojom::UserDisplayMode::kStandalone, /*icons=*/
         {apps::IconInfo(kFallbackIconUrl, kIconSize)});
@@ -218,6 +218,7 @@ class InstallFromSyncTest : public WebAppTest {
     blink::mojom::ManifestPtr manifest = blink::mojom::Manifest::New();
     manifest->name = kManifestName;
     manifest->start_url = url;
+    manifest->id = GenerateManifestIdFromStartUrlOnly(url);
     if (icons) {
       blink::Manifest::ImageResource primary_icon;
       primary_icon.type = u"image/png";
@@ -234,7 +235,7 @@ class InstallFromSyncTest : public WebAppTest {
     return base::UTF8ToUTF16(registrar().GetAppShortName(app_id));
   }
 
-  raw_ptr<TestWebAppUrlLoader> command_manager_url_loader_;
+  raw_ptr<TestWebAppUrlLoader, DanglingUntriaged> command_manager_url_loader_;
   std::unique_ptr<TestWebAppUrlLoader> url_loader_;
 };
 
@@ -450,7 +451,7 @@ TEST_F(InstallFromSyncTest, FallbackManifestIdMismatch) {
       .WillOnce(base::test::RunOnceCallback<1>(CreateSiteInstallInfo()));
 
   auto manifest = CreateManifest(true);
-  manifest->id = u"other_path/index.html";
+  manifest->id = kWebAppManifestStartUrl.Resolve(u"other_path/index.html");
 
   EXPECT_CALL(*data_retriever, CheckInstallabilityAndRetrieveManifest(
                                    testing::_, true,

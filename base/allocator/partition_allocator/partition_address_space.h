@@ -150,7 +150,7 @@ class PA_COMPONENT_EXPORT(PARTITION_ALLOC) PartitionAddressSpace {
     return (address & brp_pool_base_mask) == setup_.brp_pool_base_address_;
   }
 
-#if PA_CONFIG(GLUE_CORE_POOLS)
+#if BUILDFLAG(GLUE_CORE_POOLS)
   // Checks whether the address belongs to either regular or BRP pool.
   // Returns false for nullptr.
   PA_ALWAYS_INLINE static bool IsInCorePools(uintptr_t address) {
@@ -176,7 +176,7 @@ class PA_COMPONENT_EXPORT(PARTITION_ALLOC) PartitionAddressSpace {
     return RegularPoolSize() * 2;
   }
 #endif  // PA_CONFIG(DYNAMICALLY_SELECT_POOL_SIZE)
-#endif  // PA_CONFIG(GLUE_CORE_POOLS)
+#endif  // BUILDFLAG(GLUE_CORE_POOLS)
 
   PA_ALWAYS_INLINE static uintptr_t OffsetInBRPPool(uintptr_t address) {
     PA_DCHECK(IsInBRPPool(address));
@@ -314,57 +314,31 @@ class PA_COMPONENT_EXPORT(PARTITION_ALLOC) PartitionAddressSpace {
   static constexpr uintptr_t kUninitializedPoolBaseAddress =
       static_cast<uintptr_t>(-1);
 
-  struct PoolSetup {
+  struct alignas(kPartitionCachelineSize) PA_THREAD_ISOLATED_ALIGN PoolSetup {
     // Before PartitionAddressSpace::Init(), no allocation are allocated from a
     // reserved address space. Therefore, set *_pool_base_address_ initially to
     // -1, so that PartitionAddressSpace::IsIn*Pool() always returns false.
-    constexpr PoolSetup()
-        : regular_pool_base_address_(kUninitializedPoolBaseAddress),
-          brp_pool_base_address_(kUninitializedPoolBaseAddress),
-          configurable_pool_base_address_(kUninitializedPoolBaseAddress),
+    constexpr PoolSetup() = default;
+
+    // Using a struct to enforce alignment and padding
+    uintptr_t regular_pool_base_address_ = kUninitializedPoolBaseAddress;
+    uintptr_t brp_pool_base_address_ = kUninitializedPoolBaseAddress;
+    uintptr_t configurable_pool_base_address_ = kUninitializedPoolBaseAddress;
 #if BUILDFLAG(ENABLE_THREAD_ISOLATION)
-          thread_isolated_pool_base_address_(kUninitializedPoolBaseAddress),
+      uintptr_t thread_isolated_pool_base_address_ =
+          kUninitializedPoolBaseAddress;
 #endif
 #if PA_CONFIG(DYNAMICALLY_SELECT_POOL_SIZE)
-          regular_pool_base_mask_(0),
-          brp_pool_base_mask_(0),
-#if PA_CONFIG(GLUE_CORE_POOLS)
-          core_pools_base_mask_(0),
+      uintptr_t regular_pool_base_mask_ = 0;
+      uintptr_t brp_pool_base_mask_ = 0;
+#if BUILDFLAG(GLUE_CORE_POOLS)
+      uintptr_t core_pools_base_mask_ = 0;
 #endif
 #endif  // PA_CONFIG(DYNAMICALLY_SELECT_POOL_SIZE)
-          configurable_pool_base_mask_(0) {
-    }
-
-    // Using a union to enforce padding.
-    union {
-      struct {
-        uintptr_t regular_pool_base_address_;
-        uintptr_t brp_pool_base_address_;
-        uintptr_t configurable_pool_base_address_;
+      uintptr_t configurable_pool_base_mask_ = 0;
 #if BUILDFLAG(ENABLE_THREAD_ISOLATION)
-        uintptr_t thread_isolated_pool_base_address_;
+      ThreadIsolationOption thread_isolation_;
 #endif
-#if PA_CONFIG(DYNAMICALLY_SELECT_POOL_SIZE)
-        uintptr_t regular_pool_base_mask_;
-        uintptr_t brp_pool_base_mask_;
-#if PA_CONFIG(GLUE_CORE_POOLS)
-        uintptr_t core_pools_base_mask_;
-#endif
-#endif  // PA_CONFIG(DYNAMICALLY_SELECT_POOL_SIZE)
-        uintptr_t configurable_pool_base_mask_;
-#if BUILDFLAG(ENABLE_THREAD_ISOLATION)
-        ThreadIsolationOption thread_isolation_;
-#endif
-      };
-
-#if BUILDFLAG(ENABLE_THREAD_ISOLATION)
-      // With thread isolation support, we want to be able to write-protect all
-      // global metadata which requires page granularity.
-      char one_page_[SystemPageSize()];
-#else
-      char one_cacheline_[kPartitionCachelineSize];
-#endif
-    };
   };
 #if BUILDFLAG(ENABLE_THREAD_ISOLATION)
   static_assert(sizeof(PoolSetup) % SystemPageSize() == 0,
@@ -379,13 +353,7 @@ class PA_COMPONENT_EXPORT(PARTITION_ALLOC) PartitionAddressSpace {
   // These are write-once fields, frequently accessed thereafter. Make sure they
   // don't share a cacheline with other, potentially writeable data, through
   // alignment and padding.
-#if BUILDFLAG(ENABLE_THREAD_ISOLATION)
-  static_assert(PA_THREAD_ISOLATED_ALIGN_SZ >= kPartitionCachelineSize);
-  alignas(PA_THREAD_ISOLATED_ALIGN_SZ)
-#else
-  alignas(kPartitionCachelineSize)
-#endif
-      static PoolSetup setup_ PA_CONSTINIT;
+  static PoolSetup setup_ PA_CONSTINIT;
 
 #if PA_CONFIG(ENABLE_SHADOW_METADATA)
   static std::ptrdiff_t regular_pool_shadow_offset_;
@@ -446,13 +414,13 @@ PA_ALWAYS_INLINE bool IsManagedByPartitionAllocBRPPool(uintptr_t address) {
   return internal::PartitionAddressSpace::IsInBRPPool(address);
 }
 
-#if PA_CONFIG(GLUE_CORE_POOLS)
+#if BUILDFLAG(GLUE_CORE_POOLS)
 // Checks whether the address belongs to either regular or BRP pool.
 // Returns false for nullptr.
 PA_ALWAYS_INLINE bool IsManagedByPartitionAllocCorePools(uintptr_t address) {
   return internal::PartitionAddressSpace::IsInCorePools(address);
 }
-#endif  // PA_CONFIG(GLUE_CORE_POOLS)
+#endif  // BUILDFLAG(GLUE_CORE_POOLS)
 
 // Returns false for nullptr.
 PA_ALWAYS_INLINE bool IsManagedByPartitionAllocConfigurablePool(

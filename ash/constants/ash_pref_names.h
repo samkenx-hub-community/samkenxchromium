@@ -28,6 +28,7 @@ COMPONENT_EXPORT(ASH_CONSTANTS)
 extern const char kEmojiSuggestionEnabled[];
 COMPONENT_EXPORT(ASH_CONSTANTS)
 extern const char kEmojiSuggestionEnterpriseAllowed[];
+COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kChargingSoundsEnabled[];
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kAudioDevicesMute[];
 COMPONENT_EXPORT(ASH_CONSTANTS)
 extern const char kAudioDevicesGainPercent[];
@@ -467,6 +468,12 @@ extern const char kSystemTrayExpanded[];
 
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kUserCameraAllowed[];
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kUserMicrophoneAllowed[];
+COMPONENT_EXPORT(ASH_CONSTANTS)
+extern const char kUserSpeakOnMuteDetectionEnabled[];
+COMPONENT_EXPORT(ASH_CONSTANTS)
+extern const char kShouldShowSpeakOnMuteOptInNudge[];
+COMPONENT_EXPORT(ASH_CONSTANTS)
+extern const char kSpeakOnMuteOptInNudgeShownCount[];
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kUserGeolocationAllowed[];
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kDeviceGeolocationAllowed[];
 COMPONENT_EXPORT(ASH_CONSTANTS)
@@ -569,6 +576,7 @@ extern const char kFastPairEnabled[];
 COMPONENT_EXPORT(ASH_CONSTANTS)
 extern const char kUserPairedWithFastPair[];
 
+COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kAppLaunchAutomation[];
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kDeskTemplatesEnabled[];
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kPreconfiguredDeskTemplates[];
 
@@ -636,6 +644,8 @@ COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kAutozoomState[];
 
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kAutozoomNudges[];
 
+COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kCameraAppDevToolsOpen[];
+
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kRecoveryFactorBehavior[];
 
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kApnMigratedIccids[];
@@ -699,7 +709,10 @@ COMPONENT_EXPORT(ASH_CONSTANTS)
 extern const char kOwnerTapToClickEnabled[];
 
 COMPONENT_EXPORT(ASH_CONSTANTS)
-extern const char kEventRemappedToRightClick[];
+extern const char kAltEventRemappedToRightClick[];
+
+COMPONENT_EXPORT(ASH_CONSTANTS)
+extern const char kSearchEventRemappedToRightClick[];
 
 COMPONENT_EXPORT(ASH_CONSTANTS)
 extern const char kKeyEventRemappedToSixPackDelete[];
@@ -715,6 +728,12 @@ extern const char kKeyEventRemappedToSixPackPageUp[];
 
 COMPONENT_EXPORT(ASH_CONSTANTS)
 extern const char kKeyEventRemappedToSixPackPageDown[];
+
+COMPONENT_EXPORT(ASH_CONSTANTS)
+extern const char kAshLoginSessionStartedTime[];
+
+COMPONENT_EXPORT(ASH_CONSTANTS)
+extern const char kAshLoginSessionStartedIsFirstSession[];
 }  // namespace prefs
 }  // namespace ash
 

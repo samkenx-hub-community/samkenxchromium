@@ -396,12 +396,18 @@ void PredictionModelStore::PurgeInactiveModels() {
   DCHECK(local_state_);
   for (const auto& expired_model_dir :
        ModelStoreMetadataEntryUpdater::PurgeAllInactiveMetadata(local_state_)) {
-    DCHECK(!expired_model_dir.IsAbsolute());
+    // Backward compatibility: Model dirs were absolute in the earlier versions,
+    // and it was only in experiment. The latest versions use relative paths.
+    DCHECK(!expired_model_dir.IsAbsolute() ||
+           base_store_dir_.IsParent(expired_model_dir));
+    base::FilePath absolute_model_dir =
+        expired_model_dir.IsAbsolute()
+            ? expired_model_dir
+            : base_store_dir_.Append(expired_model_dir);
     // This is called at startup. So no need to schedule the deletion of the
     // model dirs, and instead can be deleted immediately.
     background_task_runner_->PostTask(
-        FROM_HERE, base::GetDeletePathRecursivelyCallback(
-                       base_store_dir_.Append(expired_model_dir)));
+        FROM_HERE, base::GetDeletePathRecursivelyCallback(absolute_model_dir));
   }
 }
 
@@ -433,6 +439,15 @@ void PredictionModelStore::OnFilePathDeleted(const std::string& path_to_delete,
   ScopedDictPrefUpdate pref_update(local_state_,
                                    prefs::localstate::kStoreFilePathsToDelete);
   pref_update->Remove(path_to_delete);
+}
+
+void PredictionModelStore::ResetForTesting() {
+  DETACH_FROM_SEQUENCE(sequence_checker_);
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  local_state_ = nullptr;
+  base_store_dir_ = base::FilePath();
+  background_task_runner_ = base::ThreadPool::CreateSequencedTaskRunner(
+      {base::MayBlock(), base::TaskPriority::BEST_EFFORT});
 }
 
 }  // namespace optimization_guide

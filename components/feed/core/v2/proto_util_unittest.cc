@@ -287,6 +287,21 @@ TEST(ProtoUtilTest, InfoCardAcknowledgementTrackingDisabled) {
       Not(Contains(feedwire::Capability::INFO_CARD_ACKNOWLEDGEMENT_TRACKING)));
 }
 
+TEST(ProtoUtilTest, FeedSignedOutViewDemotionEnablesCapability) {
+  base::test::ScopedFeatureList scoped_feature_list;
+  scoped_feature_list.InitWithFeatures({kFeedSignedOutViewDemotion}, {});
+  feedwire::FeedRequest request =
+      CreateFeedQueryRefreshRequest(
+          StreamType(StreamKind::kForYou), feedwire::FeedQuery::MANUAL_REFRESH,
+          /*request_metadata=*/{},
+          /*consistency_token=*/std::string(), SingleWebFeedEntryPoint::kOther,
+          /*doc_view_counts=*/{})
+          .feed_request();
+
+  ASSERT_THAT(request.client_capability(),
+              Contains(feedwire::Capability::ON_DEVICE_VIEW_HISTORY));
+}
+
 TEST(ProtoUtilTest, TabGroupsEnabledForReplaced) {
   RequestMetadata request_metadata;
   request_metadata.tab_group_enabled_state = TabGroupEnabledState::kReplaced;
@@ -393,10 +408,10 @@ TEST(ProtoUtilTest, WithDocIds) {
         uint64_values: 456
       }
       columns {
-        type: 4
+        type: 2
         name: "FEED_CARD_VIEW"
-        uint64_values: 1
-        uint64_values: 2
+        int64_values: 1
+        int64_values: 2
       }
     }
   }

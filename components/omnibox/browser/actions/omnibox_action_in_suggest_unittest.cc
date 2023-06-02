@@ -41,8 +41,6 @@ const char* ToString(ActionType type) {
       return "Directions";
     case omnibox::ActionInfo_ActionType_REVIEWS:
       return "Reviews";
-    case omnibox::ActionInfo_ActionType_WEBSITE:
-      return "Website";
     default:
       NOTREACHED();
   }
@@ -76,36 +74,29 @@ TEST_F(OmniboxActionInSuggestTest, CheckLabelsArePresentForKnownTypes) {
                         IDS_OMNIBOX_ACTION_IN_SUGGEST_CALL_HINT,
                         IDS_OMNIBOX_ACTION_IN_SUGGEST_CALL_CONTENTS,
                         IDS_ACC_OMNIBOX_ACTION_IN_SUGGEST_SUFFIX,
-                        IDS_ACC_OMNIBOX_ACTION_IN_SUGGEST,
+                        IDS_OMNIBOX_ACTION_IN_SUGGEST_CALL_CONTENTS,
                     },
                     {
                         omnibox::ActionInfo_ActionType_DIRECTIONS,
                         IDS_OMNIBOX_ACTION_IN_SUGGEST_DIRECTIONS_HINT,
                         IDS_OMNIBOX_ACTION_IN_SUGGEST_DIRECTIONS_CONTENTS,
                         IDS_ACC_OMNIBOX_ACTION_IN_SUGGEST_SUFFIX,
-                        IDS_ACC_OMNIBOX_ACTION_IN_SUGGEST,
+                        IDS_OMNIBOX_ACTION_IN_SUGGEST_DIRECTIONS_CONTENTS,
                     },
                     {
                         omnibox::ActionInfo_ActionType_REVIEWS,
                         IDS_OMNIBOX_ACTION_IN_SUGGEST_REVIEWS_HINT,
                         IDS_OMNIBOX_ACTION_IN_SUGGEST_REVIEWS_CONTENTS,
                         IDS_ACC_OMNIBOX_ACTION_IN_SUGGEST_SUFFIX,
-                        IDS_ACC_OMNIBOX_ACTION_IN_SUGGEST,
-                    },
-                    {
-                        omnibox::ActionInfo_ActionType_WEBSITE,
-                        IDS_OMNIBOX_ACTION_IN_SUGGEST_WEBSITE_HINT,
-                        IDS_OMNIBOX_ACTION_IN_SUGGEST_WEBSITE_CONTENTS,
-                        IDS_ACC_OMNIBOX_ACTION_IN_SUGGEST_SUFFIX,
-                        IDS_ACC_OMNIBOX_ACTION_IN_SUGGEST,
+                        IDS_OMNIBOX_ACTION_IN_SUGGEST_REVIEWS_CONTENTS,
                     }};
 
   for (const auto& test_case : test_cases) {
     ActionInfo action_info;
     action_info.set_action_type(test_case.action_type);
 
-    auto action =
-        base::MakeRefCounted<OmniboxActionInSuggest>(std::move(action_info));
+    auto action = base::MakeRefCounted<OmniboxActionInSuggest>(
+        std::move(action_info), absl::nullopt);
     EXPECT_EQ(OmniboxActionId::ACTION_IN_SUGGEST, action->ActionId())
         << "while evaluatin action " << ToString(test_case.action_type);
     EXPECT_EQ(test_case.action_type, action->Type());
@@ -130,15 +121,15 @@ TEST_F(OmniboxActionInSuggestTest, CheckLabelsArePresentForKnownTypes) {
 TEST_F(OmniboxActionInSuggestTest, ConversionFromAction) {
   const ActionType test_cases[]{omnibox::ActionInfo_ActionType_CALL,
                                 omnibox::ActionInfo_ActionType_DIRECTIONS,
-                                omnibox::ActionInfo_ActionType_REVIEWS,
-                                omnibox::ActionInfo_ActionType_WEBSITE};
+                                omnibox::ActionInfo_ActionType_REVIEWS};
 
   for (auto test_case : test_cases) {
     ActionInfo action_info;
     action_info.set_action_type(test_case);
 
     scoped_refptr<OmniboxAction> upcasted_action =
-        base::MakeRefCounted<OmniboxActionInSuggest>(std::move(action_info));
+        base::MakeRefCounted<OmniboxActionInSuggest>(std::move(action_info),
+                                                     absl::nullopt);
 
     auto* downcasted_action =
         OmniboxActionInSuggest::FromAction(upcasted_action.get());
@@ -172,8 +163,8 @@ TEST_F(OmniboxActionInSuggestTest, AllDeclaredActionTypesAreProperlyReflected) {
       action_info.set_action_type(ActionType(type));
 
       // This is a valid action type. Object MUST build.
-      auto action =
-          base::MakeRefCounted<OmniboxActionInSuggest>(std::move(action_info));
+      auto action = base::MakeRefCounted<OmniboxActionInSuggest>(
+          std::move(action_info), absl::nullopt);
       // This is a valid action type. Object MUST be able to report metrics.
       {
         base::HistogramTester histograms;
@@ -212,14 +203,14 @@ TEST_F(OmniboxActionInSuggestTest, HistogramsRecording) {
       {omnibox::ActionInfo_ActionType_CALL, UmaTypeForTest::kCall},
       {omnibox::ActionInfo_ActionType_DIRECTIONS, UmaTypeForTest::kDirections},
       {omnibox::ActionInfo_ActionType_REVIEWS, UmaTypeForTest::kReviews},
-      {omnibox::ActionInfo_ActionType_WEBSITE, UmaTypeForTest::kWebsite},
   };
 
   for (const auto& test_case : test_cases) {
     ActionInfo action_info;
     action_info.set_action_type(test_case.first);
     scoped_refptr<OmniboxAction> action =
-        base::MakeRefCounted<OmniboxActionInSuggest>(std::move(action_info));
+        base::MakeRefCounted<OmniboxActionInSuggest>(std::move(action_info),
+                                                     absl::nullopt);
 
     {
       // Just show.

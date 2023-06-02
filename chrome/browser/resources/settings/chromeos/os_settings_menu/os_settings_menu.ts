@@ -11,7 +11,7 @@ import 'chrome://resources/cr_elements/icons.html.js';
 import 'chrome://resources/polymer/v3_0/iron-collapse/iron-collapse.js';
 import 'chrome://resources/polymer/v3_0/iron-icon/iron-icon.js';
 import 'chrome://resources/polymer/v3_0/iron-selector/iron-selector.js';
-import '../../settings_shared.css.js';
+import '../settings_shared.css.js';
 import '../os_settings_icons.html.js';
 
 import {I18nMixin} from 'chrome://resources/cr_elements/i18n_mixin.js';
@@ -21,9 +21,8 @@ import {DomRepeat, PolymerElement} from 'chrome://resources/polymer/v3_0/polymer
 
 import * as routesMojom from '../mojom-webui/routes.mojom-webui.js';
 import {OsPageAvailability} from '../os_page_availability.js';
-import {routes} from '../os_settings_routes.js';
 import {RouteObserverMixin} from '../route_observer_mixin.js';
-import {Route, Router} from '../router.js';
+import {isAdvancedRoute, Route, Router} from '../router.js';
 
 import {getTemplate} from './os_settings_menu.html.js';
 
@@ -111,8 +110,7 @@ export class OsSettingsMenuElement extends OsSettingsMenuElementBase {
         Router.getInstance().getQueryParameters().get('search');
     // If the route navigated to by a search result is in the advanced
     // section, the advanced menu will expand.
-    if (urlSearchQuery && routes.ADVANCED &&
-        routes.ADVANCED.contains(newRoute)) {
+    if (urlSearchQuery && isAdvancedRoute(newRoute)) {
       this.advancedOpened = true;
     }
 
@@ -159,7 +157,7 @@ export class OsSettingsMenuElement extends OsSettingsMenuElementBase {
         label: this.i18n('multidevicePageTitle'),
       },
       {
-        pageName: 'people',
+        pageName: 'osPeople',
         path: routesMojom.PEOPLE_SECTION_PATH,
         icon: 'cr:person',
         label: this.i18n('osPeoplePageTitle'),
@@ -183,13 +181,13 @@ export class OsSettingsMenuElement extends OsSettingsMenuElementBase {
         label: this.i18n('personalizationPageTitle'),
       },
       {
-        pageName: 'search',
+        pageName: 'osSearch',
         path: routesMojom.SEARCH_AND_ASSISTANT_SECTION_PATH,
         icon: 'cr:search',
         label: this.i18n('osSearchPageTitle'),
       },
       {
-        pageName: 'privacy',
+        pageName: 'osPrivacy',
         path: routesMojom.PRIVACY_AND_SECURITY_SECTION_PATH,
         icon: 'cr:security',
         label: this.i18n('privacyPageTitle'),
@@ -201,7 +199,7 @@ export class OsSettingsMenuElement extends OsSettingsMenuElementBase {
         label: this.i18n('appsPageTitle'),
       },
       {
-        pageName: 'a11y',
+        pageName: 'osAccessibility',
         path: routesMojom.ACCESSIBILITY_SECTION_PATH,
         icon: 'os-settings:accessibility',
         label: this.i18n('a11yPageTitle'),
@@ -221,7 +219,7 @@ export class OsSettingsMenuElement extends OsSettingsMenuElementBase {
         label: this.i18n('dateTimePageTitle'),
       },
       {
-        pageName: 'languages',
+        pageName: 'osLanguages',
         path: routesMojom.LANGUAGES_AND_INPUT_SECTION_PATH,
         icon: 'os-settings:language',
         label: this.i18n('osLanguagesPageTitle'),
@@ -233,7 +231,7 @@ export class OsSettingsMenuElement extends OsSettingsMenuElementBase {
         label: this.i18n('filesPageTitle'),
       },
       {
-        pageName: 'printing',
+        pageName: 'osPrinting',
         path: routesMojom.PRINTING_SECTION_PATH,
         icon: 'os-settings:print',
         label: this.i18n('printingPageTitle'),
@@ -245,7 +243,7 @@ export class OsSettingsMenuElement extends OsSettingsMenuElementBase {
         label: this.i18n('crostiniPageTitle'),
       },
       {
-        pageName: 'reset',
+        pageName: 'osReset',
         path: routesMojom.RESET_SECTION_PATH,
         icon: 'os-settings:restore',
         label: this.i18n('resetPageTitle'),

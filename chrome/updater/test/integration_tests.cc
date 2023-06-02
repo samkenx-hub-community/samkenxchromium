@@ -100,8 +100,6 @@ class IntegrationTest : public ::testing::Test {
     ASSERT_TRUE(WaitForUpdaterExit());
     ASSERT_NO_FATAL_FAILURE(Clean());
     ASSERT_NO_FATAL_FAILURE(ExpectClean());
-    // TODO(crbug.com/1233612) - reenable the code when system tests pass.
-    // SetUpTestService();
     ASSERT_NO_FATAL_FAILURE(EnterTestMode(GURL("http://localhost:1234"),
                                           GURL("http://localhost:1235"),
                                           GURL("http://localhost:1236")));
@@ -121,6 +119,10 @@ class IntegrationTest : public ::testing::Test {
                       base::StrCat({"unix:path=", xdg_runtime_dir, "/bus"})));
     }
 #endif
+
+    // Mark the device as de-registered. This stops sending DM requests
+    // that mess up the request expectations in the mock server.
+    ASSERT_NO_FATAL_FAILURE(DMDeregisterDevice());
   }
 
   void TearDown() override {
@@ -131,13 +133,9 @@ class IntegrationTest : public ::testing::Test {
     ExpectNoCrashes();
 
     PrintLog();
-
-    // TODO(crbug.com/1159189): Use a specific test output directory
-    // because Uninstall() deletes the files under GetInstallDirectory().
     CopyLog();
 
-    // TODO(crbug.com/1233612) - reenable the code when system tests pass.
-    // TearDownTestService();
+    DMCleanup();
 
     // Updater process must not be running for `Clean()` to succeed.
     ASSERT_TRUE(WaitForUpdaterExit());
@@ -336,18 +334,6 @@ class IntegrationTest : public ::testing::Test {
     return test_commands_->WaitForUpdaterExit();
   }
 
-  void SetUpTestService() {
-#if BUILDFLAG(IS_WIN)
-    test_commands_->SetUpTestService();
-#endif  // BUILDFLAG(IS_WIN)
-  }
-
-  void TearDownTestService() {
-#if BUILDFLAG(IS_WIN)
-    test_commands_->TearDownTestService();
-#endif  // BUILDFLAG(IS_WIN)
-  }
-
   void ExpectUpdateCheckSequence(ScopedServer* test_server,
                                  const std::string& app_id,
                                  UpdateService::Priority priority,
@@ -419,6 +405,10 @@ class IntegrationTest : public ::testing::Test {
   void RunOfflineInstall(bool is_legacy_install, bool is_silent_install) {
     test_commands_->RunOfflineInstall(is_legacy_install, is_silent_install);
   }
+
+  void DMDeregisterDevice() { test_commands_->DMDeregisterDevice(); }
+
+  void DMCleanup() { test_commands_->DMCleanup(); }
 
   scoped_refptr<IntegrationTestCommands> test_commands_;
 
@@ -698,7 +688,7 @@ TEST_F(IntegrationTest, UpdateApp) {
   ASSERT_NO_FATAL_FAILURE(Uninstall());
 }
 
-#if BUILDFLAG(IS_WIN)  // TODO(crbug.com/1422385): fix for mac and linux.
+#if BUILDFLAG(IS_WIN)  // TODO(crbug.com/1422385): fix for macOS and Linux.
 TEST_F(IntegrationTest, InstallUpdaterAndApp) {
   ScopedServer test_server(test_commands_);
   const std::string kAppId("test");
@@ -887,7 +877,6 @@ TEST_F(IntegrationTest, UninstallUpdaterWhenAllAppsUninstalled) {
   ASSERT_NO_FATAL_FAILURE(InstallApp("test1"));
   ASSERT_NO_FATAL_FAILURE(ExpectInstalled());
   ASSERT_TRUE(WaitForUpdaterExit());
-  // TODO(crbug.com/1287235): The test is flaky without the following line.
   ASSERT_NO_FATAL_FAILURE(SetServerStarts(24));
   ASSERT_NO_FATAL_FAILURE(RunWake(0));
   ASSERT_TRUE(WaitForUpdaterExit());
@@ -947,9 +936,6 @@ TEST_F(IntegrationTest, UnregisterUnownedApp) {
 
 #if BUILDFLAG(CHROMIUM_BRANDING) || BUILDFLAG(GOOGLE_CHROME_BRANDING)
 #if !defined(COMPONENT_BUILD)
-// TODO(crbug.com/1097297) Enable these tests once the `Brand the updater and
-// qualification app ids` change is available on CIPD.
-#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
 TEST_F(IntegrationTest, MAYBE_SelfUpdateFromOldReal) {
   ScopedServer test_server(test_commands_);
 
@@ -1008,9 +994,6 @@ TEST_F(IntegrationTest, MAYBE_UninstallIfUnusedSelfAndOldReal) {
 
   // Expect that the updater uninstalled itself as well as the lower version.
 }
-#endif  // #if BUILDFLAG(GOOGLE_CHROME_BRANDING) TODO(crbug.com/1097297) Enable
-        // these tests once the `Brand the updater and qualification app ids`
-        // change is available on CIPD.
 
 // Tests that installing and uninstalling an old version of the updater from
 // CIPD is possible.

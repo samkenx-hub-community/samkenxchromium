@@ -176,7 +176,7 @@ void OverviewSession::Init(const WindowList& windows,
     tablet_mode_observation_.Observe(Shell::Get()->tablet_mode_controller());
     hide_windows_for_saved_desks_grid_ =
         std::make_unique<ScopedOverviewHideWindows>(
-            /*windows=*/std::vector<aura::Window*>({}), /*forced_hidden=*/true);
+            /*windows=*/std::vector<aura::Window*>{}, /*forced_hidden=*/true);
   }
 
   hide_overview_windows_ = std::make_unique<ScopedOverviewHideWindows>(
@@ -334,7 +334,7 @@ void OverviewSession::Shutdown() {
     }
     for (const auto& overview_item : overview_grid->window_list()) {
       overview_item->RestoreWindow(/*reset_transform=*/true,
-                                   was_saved_desk_library_showing);
+                                   /*animate=*/!was_saved_desk_library_showing);
     }
     remaining_items += overview_grid->size();
   }

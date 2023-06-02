@@ -64,6 +64,9 @@ constexpr char kUsername2[] = "bob";
 
 constexpr char kPassword[] = "s3cre3t";
 constexpr char kPassword2[] = "s3cre3t2";
+constexpr char kStrongPassword[] = "pmsFlsnoab4nsl#losb@skpfnsbkjb^klsnbs!cns";
+constexpr char kStrongPassword2[] = "sfdf#losb@sdf^klsnbs!cns";
+constexpr char kStrongPassword3[] = "sdfsdfwer@313QaDSdsd!cns";
 
 NSString* GetUsername() {
   return base::SysUTF8ToNSString(kUsername);
@@ -95,16 +98,16 @@ GURL GetLocalizedURL(const GURL& original) {
 
 @property(nonatomic, copy) CrURL* headerURL;
 
-@property(nonatomic, copy) NSString* dismissedWarningsButtonText;
+@property(nonatomic, assign) NSInteger dismissedWarningsCount;
 
 @end
 
 @implementation FakePasswordIssuesConsumer
 
 - (void)setPasswordIssues:(NSArray<PasswordIssueGroup*>*)passwordIssueGroups
-    dismissedWarningsButtonText:(NSString*)buttonText {
+    dismissedWarningsCount:(NSInteger)dismissedWarningsCount {
   _passwordIssueGroups = passwordIssueGroups;
-  _dismissedWarningsButtonText = buttonText;
+  _dismissedWarningsCount = dismissedWarningsCount;
   _passwordIssuesListChangedWasCalled = YES;
 }
 
@@ -293,15 +296,15 @@ TEST_F(PasswordIssuesMediatorTest, TestPasswordIssuesFilteredByWarningType) {
   // Weak.
   MakeTestPasswordIssue(kExampleCom, kUsername, kPassword, InsecureType::kWeak);
   // Reused.
-  MakeTestPasswordIssue(kExampleCom2, kUsername, kPassword,
+  MakeTestPasswordIssue(kExampleCom2, kUsername, kStrongPassword,
                         InsecureType::kReused);
-  MakeTestPasswordIssue(kExampleCom3, kUsername2, kPassword,
+  MakeTestPasswordIssue(kExampleCom3, kUsername2, kStrongPassword,
                         InsecureType::kReused);
   // Dismissed Compromised
-  MakeTestPasswordIssue(kExampleCom3, kUsername, kPassword,
+  MakeTestPasswordIssue(kExampleCom3, kUsername, kStrongPassword2,
                         InsecureType::kLeaked, /*muted=*/true);
   // Compromised.
-  MakeTestPasswordIssue(kExampleCom, kUsername2, kPassword,
+  MakeTestPasswordIssue(kExampleCom, kUsername2, kStrongPassword3,
                         InsecureType::kPhished);
   RunUntilIdle();
 
@@ -311,15 +314,14 @@ TEST_F(PasswordIssuesMediatorTest, TestPasswordIssuesFilteredByWarningType) {
   CheckIssue(/*group=*/0, /*index=*/0, /*expected_website=*/kExampleString,
              /*expected_username=*/GetUsername2());
 
-  EXPECT_NSEQ(consumer().dismissedWarningsButtonText,
-              @"Dismissed Warnings (1)");
+  EXPECT_EQ(consumer().dismissedWarningsCount, 1);
 
   // Send only weak passwords to consumer.
   CreateMediator(WarningType::kWeakPasswordsWarning);
 
   CheckIssue();
 
-  EXPECT_FALSE(consumer().dismissedWarningsButtonText);
+  EXPECT_EQ(0, consumer().dismissedWarningsCount);
 
   // Send only reused passwords to consumer.
   CreateMediator(WarningType::kReusedPasswordsWarning);
@@ -328,14 +330,14 @@ TEST_F(PasswordIssuesMediatorTest, TestPasswordIssuesFilteredByWarningType) {
   CheckIssue(/*group=*/0, /*index=*/1, /*expected_website=*/kExample3String,
              /*expected_username=*/GetUsername2());
 
-  EXPECT_FALSE(consumer().dismissedWarningsButtonText);
+  EXPECT_EQ(0, consumer().dismissedWarningsCount);
 
   // Send only dismissed passwords to consumer.
   CreateMediator(WarningType::kDismissedWarningsWarning);
 
   CheckIssue(/*group=*/0, /*index=*/0, /*expected_website=*/kExample3String);
 
-  EXPECT_FALSE(consumer().dismissedWarningsButtonText);
+  EXPECT_EQ(0, consumer().dismissedWarningsCount);
 }
 
 /// Tests the mediator sets the consumer title for compromised passwords.

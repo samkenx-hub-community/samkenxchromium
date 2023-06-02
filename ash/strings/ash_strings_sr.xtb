@@ -29,7 +29,7 @@
 <translation id="1104084341931202936">Прегледајте подешавања приступачности</translation>
 <translation id="1104621072296271835">Уређаји заједно функционишу још боље</translation>
 <translation id="1111021433905331574">Боју позадинског осветљења тастатуре можете да промените у подешавањима &gt; <ph name="APP_TITLE" /></translation>
-<translation id="1112998165730922436">Пребацивање је паузирано</translation>
+<translation id="1117719261843403176">Укључи или искључи мобилне податке. <ph name="STATE" />.</translation>
 <translation id="112308213915226829">Аутоматски сакриј полицу</translation>
 <translation id="1142002900084379065">Недавне слике</translation>
 <translation id="1148499908455722006">Отвара дијалог са информацијама за корисника <ph name="USER_NAME" /></translation>
@@ -49,6 +49,7 @@
 <translation id="1190609913194133056">Центар за обавештења</translation>
 <translation id="1190678134285018527">Уређај мора да се врати на претходну верзију</translation>
 <translation id="1195412055398077112">ивично подручје екрана</translation>
+<translation id="1195667586424773550">Превуците линк у траку за адресу картице</translation>
 <translation id="119944043368869598">Обриши све</translation>
 <translation id="1199716647557067911">Желите ли стварно да искључите приступ помоћу прекидача?</translation>
 <translation id="1201402288615127009">Даље</translation>
@@ -85,15 +86,18 @@
 <translation id="1294929383540927798">Промените подешавања обавештења на закључаном екрану</translation>
 <translation id="1301069673413256657">GSM</translation>
 <translation id="1306549533752902673">ПРЕПОРУЧЕНЕ АПЛИКАЦИЈЕ</translation>
+<translation id="1311294419381837540">Пребацујете картицу. Пребацивање можете да паузирате или зауставите у сваком тренутку.</translation>
 <translation id="1312604459020188865">Јачина сигнала <ph name="SIGNAL_STRENGTH" /></translation>
 <translation id="1316069254387866896">Увек приказуј полицу</translation>
 <translation id="132346741904777634">Камера је уклопљена у горњи леви угао Неусаглашеност са површином система.</translation>
 <translation id="1333308631814936910">Повезаних: <ph name="DISPLAY_NAME" /></translation>
 <translation id="1340378040547539434">Умањи страницу</translation>
 <translation id="1341651618736211726">Прекорачење</translation>
+<translation id="1344141078024003905">Пребацујете екран. Пребацивање екрана можете да паузирате или зауставите у сваком тренутку.</translation>
 <translation id="1346748346194534595">Удесно</translation>
 <translation id="1351937230027495976">Скупи мени</translation>
 <translation id="1360220746312242196">При претраживању странице иди на претходно подударање за претрагу</translation>
+<translation id="1360788414852622716">Профил се онемогућава. То може да потраје неколико минута.</translation>
 <translation id="1364382257761975320">Да бисте откључали Chromebook, користите отисак прста</translation>
 <translation id="1365866993922957110">Аутоматски преузимај ажурирања</translation>
 <translation id="1372545819342940910">Сачувај радну површину за касније</translation>
@@ -141,7 +145,6 @@
 <translation id="1604857178818051494">Паузирај медије</translation>
 <translation id="1610778689852195798">„Опозови радњу“</translation>
 <translation id="1611993646327628135">Укључено</translation>
-<translation id="1618835956950524778">Истакните дугме покретача на полици</translation>
 <translation id="1620510694547887537">Камера</translation>
 <translation id="1632985212731562677">Приступ помоћу прекидача може да се онемогући у одељку Подешавања &gt; Приступачност.</translation>
 <translation id="163517899691012366">Обавештења се игноришу када је укључено Не узнемиравај</translation>
@@ -183,6 +186,7 @@
 <translation id="1774796056689732716">Календар, <ph name="CURRENT_MONTH_YEAR" />, <ph name="DATE" /> је тренутно изабран.</translation>
 <translation id="1787955149152357925">Искључено</translation>
 <translation id="181103072419391116">Јачина сигнала <ph name="SIGNAL_STRENGTH" />, управља администратор</translation>
+<translation id="1815245884418711390">Укључите/искључите хотспот. Хотспот је искључен.</translation>
 <translation id="1816896987747843206">Ово омогућава приступ камери за све апликације и веб-сајтове са дозволом за камеру</translation>
 <translation id="1823280932251546115">Статусна трака, време <ph name="TIME" />,
         <ph name="BATTERY" />
@@ -196,6 +200,7 @@
 <translation id="1823873187264960516">Етернет: <ph name="ADDRESS" /></translation>
 <translation id="1824922790784036530">Укључи приступ локацији</translation>
 <translation id="1830308660060964064">Ставка <ph name="ITEM_TITLE" /> је откачена</translation>
+<translation id="183465528887726323">Повежите се на мобилне податке да бисте користили хотспот</translation>
 <translation id="1838895407229022812">Ноћно светло је искључено.</translation>
 <translation id="1854180393107901205">Заустави пребацивање</translation>
 <translation id="1862380676329487333">Ажурирај и одјави ме</translation>
@@ -241,6 +246,7 @@
 <translation id="2023558322300866873">Снимање пакета можете да зауставите у сваком тренутку</translation>
 <translation id="2034971124472263449">Ипак сачувај</translation>
 <translation id="2049240716062114887">Име радне површине је промењено у <ph name="DESK_NAME" /></translation>
+<translation id="206377500836174974">Пуно</translation>
 <translation id="2064048859448024834">Преглед камере је укључен</translation>
 <translation id="2067602449040652523">Осветљеност тастатуре</translation>
 <translation id="2075520525463668108">Укључи/искључи функцију <ph name="CAPTURE_MEDIUM" />. <ph name="CAPTURE_MEDIUM" />: <ph name="CAPTURE_STATE" /></translation>
@@ -280,6 +286,7 @@
 <translation id="2269016722240250274">Апликација користи микрофон</translation>
 <translation id="2277103315734023688">Премотај унапред</translation>
 <translation id="2282073721614284166">Отвори линк на картици</translation>
+<translation id="2284237890386182187">Укључено, ниједан уређај није повезан</translation>
 <translation id="2292698582925480719">Размера приказа</translation>
 <translation id="229397294990920565">Пренос података преко мобилног оператера се искључује...</translation>
 <translation id="2295777434187870477">Микрофон је укључен. Можете да га искључите померањем прекидача.</translation>
@@ -293,14 +300,17 @@
 <translation id="2339073806695260576">Додирните дугме писаљке на полици да бисте направили белешку и снимак екрана и да бисте користили ласерски показивач или лупу.</translation>
 <translation id="2341729377289034582">Вертикални приказ је закључан</translation>
 <translation id="2345226652884463045">Притисните Enter или тастер за претрагу + размак да бисте изабрали текст за измену.</translation>
+<translation id="2349785431103945039">Прегледајте детаље хотспота. Повежите се на мобилну мрежу да бисте користили хотспот.</translation>
 <translation id="2350794187831162545">Говор на језику <ph name="LANGUAGE" /> се сада локално обрађује и ради офлајн. Можете да промените језик диктирања у Подешавањима &gt; Приступачност.</translation>
 <translation id="2352467521400612932">Подешавања писаљке</translation>
 <translation id="2354174487190027830">Активирање мреже <ph name="NAME" /></translation>
 <translation id="2359808026110333948">Настави</translation>
 <translation id="2360398059912971776">батерија</translation>
+<translation id="2361210043495191221">Укључи или искључи WiFi. <ph name="STATE" />.</translation>
 <translation id="2367186422933365202">Не можете да се пријавите на Chromebook</translation>
 <translation id="2367972762794486313">Прикажите апликације</translation>
 <translation id="2369165858548251131">„Здраво“ на кинеском</translation>
+<translation id="2382875860893882175">Пребацивање је тренутно паузирано. Можете да наставите са пребацивањем или да зауставите пребацивање у сваком тренутку.</translation>
 <translation id="2386292613071805067">Изабери све на страници</translation>
 <translation id="2397416548179033562">Приказ Chrome менија</translation>
 <translation id="240006516586367791">Контроле медија</translation>
@@ -317,6 +327,7 @@
 <translation id="2440978926514840421">GIF је снимљен</translation>
 <translation id="2441427462554639370">Снимање је прекинуто због изузетно мало простора</translation>
 <translation id="24452542372838207">Прошири обавештење</translation>
+<translation id="2448312741937722512">Тип</translation>
 <translation id="2449089818483227734">Низак ниво батерије</translation>
 <translation id="2450205753526923158">Режим снимка екрана</translation>
 <translation id="2455994958736234930">Додај www. и .com на траку за адресу, па отвори веб-сајт</translation>
@@ -331,10 +342,12 @@
 <translation id="2514415433888497495">Заустави <ph name="CAPTURE_MEDIUM" />. <ph name="CAPTURE_MEDIUM" />: <ph name="CAPTURE_STATE" /></translation>
 <translation id="2515586267016047495">Alt</translation>
 <translation id="2526581474998477112">Откључај прозоре</translation>
+<translation id="2528111225373402384">Подешавања хотспота</translation>
 <translation id="2530896289327917474">Укључите или искључите навигацију курсором</translation>
 <translation id="2531025035050312891">спор уређај</translation>
-<translation id="2542089167727451762">Додирните слику профила</translation>
 <translation id="254900897760075745">Копирај изабрани садржај у привремену меморију</translation>
+<translation id="2549711466868162843">Унапреди осветљеност</translation>
+<translation id="2549985041256363841">Започни снимање</translation>
 <translation id="255671100581129685">Google помоћник није доступан у јавној сесији.</translation>
 <translation id="256712445991462162">монтирана лупа екрана</translation>
 <translation id="2573588302192866788">Није успело повезивање <ph name="NAME" /></translation>
@@ -382,7 +395,6 @@
 <translation id="2785499565474703580">1 уређај је повезан</translation>
 <translation id="2791421900609674576">Видећете препоруке да бисте могли да наставите тамо где сте стали.  Можете да додирнете и задржите да бисте уклонили препоруке.</translation>
 <translation id="2792498699870441125">Alt + тастер за претрагу</translation>
-<translation id="2797741504905337289">Журка на полици</translation>
 <translation id="2802938996245446490"><ph name="BUTTON_LABEL" />, изабрано је</translation>
 <translation id="2805756323405976993">Апликације</translation>
 <translation id="2814448776515246190">Делимично снимање</translation>
@@ -420,19 +432,20 @@
 <translation id="2970920913501714344">Инсталирајте апликације, додатке и теме</translation>
 <translation id="2977598380246111477">Следећи број</translation>
 <translation id="2985148236010982088">Прикажи све апликације</translation>
-<translation id="29859347674873492">Отворите помоћ у апликацији Истражите</translation>
 <translation id="2992327365391326550">Дугме за микрофон на уређају је искључено.</translation>
 <translation id="2996462380875591307">Монтирана лупа екрана је омогућена. Притисните Ctrl + тастер за претрагу + D поново да бисте је искључили.</translation>
 <translation id="3000461861112256445">Моно звук</translation>
 <translation id="3009178788565917040">Излаз</translation>
 <translation id="3009958530611748826">Изаберите фолдер за чување</translation>
 <translation id="301282384882049174">Дели администратор</translation>
+<translation id="301584155502740476">Прегледајте детаље хотспота. Хотспот је искључен.</translation>
 <translation id="3018135054368884502">Премотај медијски садржај унапред</translation>
 <translation id="3033545621352269033">Укључено</translation>
 <translation id="3033912566804961911">Комбинујте са: <ph name="DESK_NAME" /></translation>
 <translation id="3036649622769666520">Отварање датотека</translation>
 <translation id="3038571455154067151">Да бисте се пријавили, унесите приступни кôд родитеља за Family Link</translation>
 <translation id="3039939407102840004">Батерија писаљке је на <ph name="PERCENTAGE" /> посто.</translation>
+<translation id="304097922505898963">Отвори апликацију Тастерске пречице</translation>
 <translation id="3045488863354895414">Добар дан,</translation>
 <translation id="3047761520276763270">Пробајте да кажете:</translation>
 <translation id="3055162170959710888">Данас користите овај уређај већ <ph name="USED_TIME" /></translation>
@@ -487,6 +500,7 @@
 <translation id="3291862315280588024">Премештање на почетак претходне речи</translation>
 <translation id="3294437725009624529">Гост</translation>
 <translation id="3298690094479023523">Верификација PIN-а или лозинке још увек није успела. Пробајте поново.</translation>
+<translation id="3300193645498960160">Добићете обавештење ако говорите док је звук искључен. Звук остаје на уређају.</translation>
 <translation id="3307642347673023554">Прешли сте у режим лаптопа</translation>
 <translation id="3308453408813785101"><ph name="USER_EMAIL_ADDRESS" /> ће и даље моћи да се пријави касније.</translation>
 <translation id="3321628682574733415">Нетачан кôд родитеља</translation>
@@ -498,7 +512,6 @@
 <translation id="334252345105450327">Направи снимак екрана</translation>
 <translation id="334927402682780278">Изабери текст од курсора до краја реда</translation>
 <translation id="3349345708646875009">Отвори менаџер задатака</translation>
-<translation id="3351879221545518001">Тренутно пребацујете екран.</translation>
 <translation id="3354555338129305222">зашто је мој уређај спор</translation>
 <translation id="3364721542077212959">Алатке за писаљку</translation>
 <translation id="3365977133351922112">Телефон је превише далеко. Приближите га.</translation>
@@ -510,11 +523,11 @@
 <translation id="3387527074123400161">Chromium ОС</translation>
 <translation id="3400357268283240774">Додатна подешавања</translation>
 <translation id="3405101454990027959">Укључи приступ микрофону</translation>
+<translation id="3408735331120433841">Тренутно пребацујете екран.</translation>
 <translation id="3409584356742878290">Прикажи или сакриј инспектор Алатке за програмере</translation>
 <translation id="3410336247007142655">Прикажите подешавања тамне теме</translation>
 <translation id="3413817803639110246">Још увек нема шта да се види</translation>
 <translation id="3417835166382867856">Претражите картице</translation>
-<translation id="3423744722495840645">Отворите или затворите покретач</translation>
 <translation id="3428447136709161042">Прекините везу са мрежом <ph name="NETWORK_NAME" /></translation>
 <translation id="3430396595145920809">Превуците са десне стране да бисте се вратили</translation>
 <translation id="3431517721463707585">Радна површина 14</translation>
@@ -537,11 +550,12 @@
 <translation id="3510164367642747937">Истакни курсор миша</translation>
 <translation id="3513798432020909783">Налогом управља <ph name="MANAGER_EMAIL" /></translation>
 <translation id="352245152354538528">{0,plural, =1{Ажурирајте уређај у року од 1 минута}one{Ажурирајте уређај у року од # минута}few{Ажурирајте уређај у року од # минута}other{Ажурирајте уређај у року од # минута}}</translation>
+<translation id="3522979239100719575">Траже се доступни профили. То може да потраје неколико минута.</translation>
 <translation id="3526440770046466733">Отвори линк на новој картици и остани на актуелној картици</translation>
 <translation id="353086728817903341">Повезани сте са <ph name="NUM_DEVICES" /> уређаја</translation>
 <translation id="3533126039236445965">Апликације на полици</translation>
+<translation id="3539957339480430241"><ph name="DEVICE_NAME" /> хотспот</translation>
 <translation id="3542066395059568317">Видећете препоруке да бисте могли да наставите тамо где сте стали. Можете да кликнете десним тастером да бисте уклонили препоруке.</translation>
-<translation id="3546121235777416274">Фокусирај прозор слике у слици</translation>
 <translation id="3552189655002856821">WiFi је искључен</translation>
 <translation id="3554215588514239132">Прикажи или сакриј окно Алатке за програмере</translation>
 <translation id="3554637740840164787">Ставка <ph name="ITEM_TITLE" /> је закачена</translation>
@@ -570,6 +584,7 @@
 <translation id="3621202678540785336">Улаз</translation>
 <translation id="3621712662352432595">Подешавања звука</translation>
 <translation id="3626281679859535460">Осветљеност</translation>
+<translation id="3629640897379005903">Прегледајте детаље хотспота. Хотспот се онемогућава.</translation>
 <translation id="3630697955794050612">искључено</translation>
 <translation id="3631369015426612114">Дозволи обавештења из следећих извора</translation>
 <translation id="3633097874324966332">Отворите подешавања Bluetooth-а да бисте упарили уређај</translation>
@@ -661,6 +676,7 @@
 <translation id="4028481283645788203">Треба да унесете лозинку ради додатне безбедности</translation>
 <translation id="4032485810211612751"><ph name="HOURS" />:<ph name="MINUTES" />:<ph name="SECONDS" /></translation>
 <translation id="4042660782729322247">Делите екран</translation>
+<translation id="4049230407053723315">Брза подешавања</translation>
 <translation id="4057003836560082631"><ph name="INDEX" />. картица прегледача од <ph name="TOTAL_COUNT" />. <ph name="SITE_TITLE" />, <ph name="SITE_URL" /></translation>
 <translation id="4065525899979931964">{NUM_APPS,plural, =1{Иск. за апл.}one{Иск. за # апл.}few{Иск. за # апл.}other{Иск. за # апл.}}</translation>
 <translation id="4066027111132117168">Укључено, <ph name="REMAINING_TIME" /></translation>
@@ -699,9 +715,11 @@
 <translation id="4215497585250573029">Подешавања VPN-а</translation>
 <translation id="4217571870635786043">Диктирање</translation>
 <translation id="4221957499226645091"><ph name="APP_NAME" />, инсталирана апликација, паузирана</translation>
+<translation id="4231053948789591973">Пребацивање је тренутно паузирано. Можете да наставите са пребацивањем екрана или да га зауставите у сваком тренутку.</translation>
 <translation id="423685346499232137">Тренутно не можете да копирате ни налепите садржај</translation>
 <translation id="4239069858505860023">GPRS</translation>
 <translation id="4240486403425279990">Режим прегледа</translation>
+<translation id="4240756737570479726">Онемогућава се…</translation>
 <translation id="4242533952199664413">Отвори подешавања</translation>
 <translation id="4247123849143712100">Ажурирај и искључи</translation>
 <translation id="4250229828105606438">Снимак екрана</translation>
@@ -748,6 +766,7 @@
 <translation id="4449692009715125625">{NUM_NOTIFICATIONS,plural, =1{1 важно обавештење}one{# важно обавештење}few{# важна обавештења}other{# важних обавештења}}</translation>
 <translation id="4450893287417543264">Не приказуј поново</translation>
 <translation id="4451374464530248585">Тастерска пречица Alt + стрелица надоле је промењена. Да бисте користили тастер Page Down, притисните тастер <ph name="LAUNCHER_KEY_NAME" /> + стрелица надоле.</translation>
+<translation id="4453876312474547652">Привремену меморију ћете видети кад притиснете и задржите Ctrl + V. Ову пречицу можете да искључите ако онемогућите ознаку #clipboard-history-longpress у одељку chrome://flags (os://flags ако користите Lacros).</translation>
 <translation id="4455051983450390249">Прегледајте обавештења са телефона на <ph name="DEVICE_TYPE" /></translation>
 <translation id="445864333228800152">Добро вече,</translation>
 <translation id="4458688154122353284">Зауставите снимање екрана</translation>
@@ -827,6 +846,7 @@
 <translation id="4778095205580009397">Google помоћник није доступан у сесији демонстрације.</translation>
 <translation id="4789348252524569426">Инсталирање фајлова за говор није успело. Уређај треба да се ажурира. Рестартујте уређај и пробајте поново.</translation>
 <translation id="478959186716341421">Пребацује се</translation>
+<translation id="4798622944000246716">Мобилна мрежа не подржава хотспот</translation>
 <translation id="479989351350248267">search</translation>
 <translation id="4804818685124855865">Прекини везу</translation>
 <translation id="4814539958450445987">Екран за пријављивање</translation>
@@ -840,6 +860,7 @@
 <translation id="4864369630010738180">Пријављивање...</translation>
 <translation id="4864648187878336334">Радна површина 15</translation>
 <translation id="4868492592575313542">активирано</translation>
+<translation id="4871905435473761992">Прегледајте детаље хотспота. Мобилна мрежа не подржава хотспот.</translation>
 <translation id="4872237917498892622">Alt + тастер за претрагу или Shift</translation>
 <translation id="4872852897273142380">Фокусирај или истакни траку са обележивачима (ако се види)</translation>
 <translation id="4881695831933465202">Отвори</translation>
@@ -899,9 +920,11 @@
 <translation id="5104236669533825617">Прављење видео снимка екрана није успело</translation>
 <translation id="5107522548814527560">Веб</translation>
 <translation id="5111318697104479778"><ph name="DESC" />, <ph name="STRENGTH" /></translation>
+<translation id="5111930673176965299">Замагљена позадина</translation>
 <translation id="5117590920725113268">Прикажи следећи месец</translation>
 <translation id="5121628974188116412">Идите на дно странице</translation>
 <translation id="5136175204352732067">Нека друга тастатура је повезана</translation>
+<translation id="5145331109270917438">Датум измене</translation>
 <translation id="5147567197700016471">Откључано</translation>
 <translation id="5150070631291639005">Подешавања приватности</translation>
 <translation id="5155897006997040331">Брзина читања</translation>
@@ -910,6 +933,7 @@
 <translation id="5168181903108465623">Доступни су уређаји за пребацивање</translation>
 <translation id="5170568018924773124">Прикажи у директоријуму</translation>
 <translation id="5176318573511391780">Сними део екрана</translation>
+<translation id="5187627942836026988">Прегледајте детаље хотспота. Администратор је блокирао хотспот.</translation>
 <translation id="5198413532174090167"><ph name="DATE" />, <ph name="NUMBER" /> догађаја</translation>
 <translation id="5198715732953550718">Апликација <ph name="MOVED_APP_NAME" /> је комбинована са апликацијом <ph name="IN_PLACE_APP" /> да би се направио нови фолдер.</translation>
 <translation id="5206028654245650022"><ph name="APP_NAME" />, <ph name="NOTIFICATION_TITLE" />: <ph name="MESSAGE" />, <ph name="PHONE_NAME" /></translation>
@@ -1008,6 +1032,7 @@
 <translation id="5619862035903135339">Смернице администратора онемогућавају снимање екрана</translation>
 <translation id="5625955975703555628">LTE+</translation>
 <translation id="5627392655516693966">Верификација лозинке није успела. Пробајте поново.</translation>
+<translation id="5646376287012673985">Локација</translation>
 <translation id="5648021990716966815">Утикач за микрофон</translation>
 <translation id="5652575806481723716"><ph name="FOCUSED_APP_NAME" /> захтева вашу пажњу.</translation>
 <translation id="5662075790140998213">Радна површина 10</translation>
@@ -1037,7 +1062,6 @@
 <translation id="5760866832697883462">Повежите уређај <ph name="NAME" /></translation>
 <translation id="5762420912707163638">Укључите/искључите маркер. <ph name="STATE_TEXT" /> Користите додирну таблу, додирни екран или писаљку да бисте цртали на екрану.</translation>
 <translation id="576341972084747908">Преузимате опасан фајл <ph name="FILENAME" /></translation>
-<translation id="5763928712329149804">Журка на полици је искључена.</translation>
 <translation id="576453121877257266">Ноћно светло је укључено.</translation>
 <translation id="5764569119212455782">Пређи на последњи изабрани језик</translation>
 <translation id="5769373120130404283">Екран за приватност</translation>
@@ -1081,6 +1105,7 @@
 <translation id="595202126637698455">Праћење учинка је омогућено</translation>
 <translation id="5955304353782037793">app</translation>
 <translation id="5958529069007801266">Корисник под надзором</translation>
+<translation id="5961960957587052807">Светло</translation>
 <translation id="5965524703725988602">Укључите/искључите тамну тему. <ph name="STATE_TEXT" />.</translation>
 <translation id="5976112937189445008">Притисните Enter да бисте снимили прозор</translation>
 <translation id="5978382165065462689">Делите контролу над екраном преко Даљинске помоћи.</translation>
@@ -1091,6 +1116,7 @@
 <translation id="6012623610530968780"><ph name="SELECTED_PAGE" />. страница од <ph name="TOTAL_PAGE_NUM" /></translation>
 <translation id="601304062528754300">Истакните следећу ставку на полици</translation>
 <translation id="6018164090099858612">Излазак из режима са пресликавањем</translation>
+<translation id="6019566113895157499">Тастерске пречице</translation>
 <translation id="602001110135236999">Помери налево</translation>
 <translation id="6022924867608035986">Обришите текст из оквира за претрагу</translation>
 <translation id="602472752137106327">Приказујте прозоре са свих радних површина, дугме за избор је изабрано</translation>
@@ -1124,6 +1150,7 @@
 <translation id="6129953537138746214">Размак</translation>
 <translation id="6137566720514957455">Отвара налог за уклањање за корисника <ph name="USER_EMAIL_ADDRESS" /></translation>
 <translation id="6141988275892716286">Потврдите преузимање</translation>
+<translation id="6143578372829139382">Дели на YouTube-у</translation>
 <translation id="6154006699632741460">Периферни уређај није подржан</translation>
 <translation id="6156960295318603523">Подешавања језика</translation>
 <translation id="615957422585914272">Прикажи тастатуру на екрану</translation>
@@ -1184,6 +1211,8 @@
 <translation id="6452181791372256707">Одбиј</translation>
 <translation id="6453179446719226835">Језик је промењен</translation>
 <translation id="6459472438155181876">Проширивање екрана у <ph name="DISPLAY_NAME" /></translation>
+<translation id="6464094930452079790">слике</translation>
+<translation id="6469104339369989396">Укључите или искључите хотспот</translation>
 <translation id="6477681113376365978">Преузимање фајла није успело</translation>
 <translation id="6482559668224714696">Лупа за цео екран</translation>
 <translation id="6483727822843292440">Прођи кроз прозоре од најмање коришћеног прозора</translation>
@@ -1242,7 +1271,6 @@
 <translation id="6707693040195709527">Рок за промену верзије уређаја у претходну верзију је истекао</translation>
 <translation id="6710213216561001401">Претходно</translation>
 <translation id="6723839937902243910">Енергија</translation>
-<translation id="6727005317916125192">Претходни оквир</translation>
 <translation id="6727969043791803658">Повезано, ниво батерије је <ph name="BATTERY_PERCENTAGE" />%</translation>
 <translation id="6732087373923685049">камера</translation>
 <translation id="6732800389263199929">+<ph name="COUNT" /></translation>
@@ -1253,13 +1281,13 @@
 <translation id="6752912906630585008">Радна површина <ph name="REMOVED_DESK" /> је уклоњена и спојена са радном површином <ph name="RECEIVE_DESK" /></translation>
 <translation id="6753390234084146956">картице</translation>
 <translation id="6757237461819837179">Медији се не репродукују</translation>
+<translation id="6759628406555734414">Прегледајте детаље хотспота. Хотспот се омогућава.</translation>
 <translation id="6768043681523654438">меморијски простор</translation>
 <translation id="6777216307882431711">Напаја повезане уређаје са USB прикључком типа C</translation>
 <translation id="6781002679438061620">Радна површина 9</translation>
 <translation id="6782182743534150858">Радна површина 13</translation>
 <translation id="6782919488259222803">Претражи актуелну страницу</translation>
 <translation id="6786750046913594791">Затворите фолдер</translation>
-<translation id="6787839852456839824">Тастерске пречице</translation>
 <translation id="6790428901817661496">Пусти</translation>
 <translation id="679368458793552943">Увећајте када је лупа укључена</translation>
 <translation id="6801878137098616817">Недавно измењено</translation>
@@ -1277,6 +1305,7 @@
 <translation id="6857725247182211756"><ph name="SECONDS" /> сек</translation>
 <translation id="685782768769951078">{NUM_DIGITS,plural, =1{Преостала је једна цифра}one{Преостала је # цифра}few{Преостале су # цифре}other{Преостало је # цифара}}</translation>
 <translation id="6867938213751067702">Преузимање је паузирано <ph name="FILENAME" /></translation>
+<translation id="6874854809828346832">Прегледајте детаље хотспота. Хотспот је укључен.</translation>
 <translation id="6878400149835617132">Пречица је искључена</translation>
 <translation id="6878701771800702153">{NUM_APPS,plural, =1{1 апликација}one{# апликација}few{# апликације}other{# апликација}}</translation>
 <translation id="6884665277231944629">Вратите се на данас</translation>
@@ -1286,8 +1315,8 @@
 <translation id="6896758677409633944">Копирај</translation>
 <translation id="6901883536534621389">Испробајте покрете за кретање</translation>
 <translation id="6919251195245069855">Нисмо успели да препознамо паметну картицу. Пробајте поново.</translation>
+<translation id="6920245099716267363">Укључите/искључите хотспот. Хотспот је укључен, 1 уређај је повезан.</translation>
 <translation id="6931576957638141829">Сачувајте у</translation>
-<translation id="6941333068993625698">Пошаљите повратне информације</translation>
 <translation id="6942518653766415536">Мени за формат снимања</translation>
 <translation id="6945221475159498467">Изабери</translation>
 <translation id="6945922087561257829">Телефон користи мобилну мрежу. Уверите се да су телефон и Chromebook на истој WiFi мрежи, па пробајте поново. <ph name="LEARN_MORE" /></translation>
@@ -1307,7 +1336,6 @@
 <translation id="7014684956566476813">Повезани сте са уређајем под називом <ph name="DEVICE_NAME" /></translation>
 <translation id="7015766095477679451">Вратите се у <ph name="COME_BACK_TIME" />.</translation>
 <translation id="70168403932084660">Радна површина 6</translation>
-<translation id="7025325401470358758">Следећи оквир</translation>
 <translation id="7025533177575372252">Повежите <ph name="DEVICE_NAME" /> са телефоном</translation>
 <translation id="7026338066939101231">Смањење</translation>
 <translation id="7029814467594812963">Изађи из сесије</translation>
@@ -1336,7 +1364,6 @@
 <translation id="7126996685418858413">Отварано протекле недеље</translation>
 <translation id="7130207228079676353">НАЈВЕРОВАТНИЈЕ</translation>
 <translation id="7131634465328662194">Одјавићемо вас аутоматски.</translation>
-<translation id="7138316363520807689">Сачувај актуелну картицу као обележивач</translation>
 <translation id="7143207342074048698">Повезивање</translation>
 <translation id="7144942256906679589">Статус батерије</translation>
 <translation id="7165278925115064263">Alt+Shift+K</translation>
@@ -1361,7 +1388,6 @@
 <translation id="7305884605064981971">EDGE</translation>
 <translation id="7312210124139670355">Администратор ресетује eSIM. То може да потраје неколико минута.</translation>
 <translation id="7313193732017069507">Проширите камеру</translation>
-<translation id="731589979057211264">Журка на полици је укључена.</translation>
 <translation id="7340731148882810149">Мени за аутоматске кликове</translation>
 <translation id="7346909386216857016">Важи</translation>
 <translation id="7348093485538360975">Тастатура на екрану</translation>
@@ -1375,6 +1401,7 @@
 <translation id="7378203170292176219">Превуците да бисте изабрали област за снимање</translation>
 <translation id="7378594059915113390">Контроле за медије</translation>
 <translation id="7378889811480108604">Режим уштеде батерије је искључен</translation>
+<translation id="7382640522316003298">Укључите/искључите хотспот. Хотспот је укључен, уређаји (<ph name="DEVICECOUNT" />) су повезани.</translation>
 <translation id="7382680553121047388">Укључено</translation>
 <translation id="7384028040782072252">Кликните десним тастером било где да бисте променили редослед апликација</translation>
 <translation id="7386767620098596324">Укључите/искључите мрежну везу. <ph name="STATE_TEXT" />.</translation>
@@ -1425,10 +1452,10 @@
 <translation id="7579778809502851308">Снимање екрана</translation>
 <translation id="7593891976182323525">Тастер за претрагу или Shift</translation>
 <translation id="7600875258240007829">Погледајте сва обавештења</translation>
+<translation id="7601417191446344542">Желите ли да укључите аутоматски подсетник у нечујном режиму?</translation>
 <translation id="7607002721634913082">Паузирано</translation>
 <translation id="7609951632080598826">Приказ календара, <ph name="DATE" />, <ph name="TIME" /></translation>
 <translation id="7611213136657090146">Камера је поново повезана.</translation>
-<translation id="7611271430932669992">Померите фокус на искачуће прозоре и дијалоге</translation>
 <translation id="761736749114493194">Укључите уоквиривање камере. <ph name="STATE_TEXT" /></translation>
 <translation id="7624117708979618027"><ph name="TEMPERATURE_F" />° F</translation>
 <translation id="7634648064048557203">Камера је уклопљена у доњи леви угао</translation>
@@ -1481,10 +1508,10 @@
 <translation id="7860671499921112077">Превуците нагоре помоћу три прста да бисте ушли у Преглед</translation>
 <translation id="7862292329216937261">Да бисте користили уређај као гост, треба да се одјавите, па да изаберете Прегледај као гост у дну екрана.</translation>
 <translation id="7866482334467279021">укључено</translation>
-<translation id="7868900307798234037">Откључавање отискoм прста</translation>
 <translation id="7872786842639831132">Искључено</translation>
 <translation id="7875575368831396199">Изгледа да је искључен Bluetooth на уређају <ph name="DEVICE_TYPE" />. Укључите Bluetooth да бисте користили Phone Hub.</translation>
 <translation id="7877557217297072640">{0,plural, =0{Промените верзију уређаја у претходну верзију одмах}=1{Промените верзију уређаја у претходну верзију у року од 1 секунде}one{Промените верзију уређаја у претходну верзију у року од # секунде}few{Промените верзију уређаја у претходну верзију у року од # секунде}other{Промените верзију уређаја у претходну верзију у року од # секунди}}</translation>
+<translation id="7884446017008693258">Подешавања хотспота</translation>
 <translation id="7884902759927478774">Откажи превлачење картица</translation>
 <translation id="7886169021410746335">Прилагодите подешавања приватности</translation>
 <translation id="7886277072580235377">Интернет сесија ће бити обрисана када се одјавите. <ph name="LEARN_MORE" /></translation>
@@ -1521,6 +1548,7 @@
 <translation id="8001755249288974029">Изабери текст од курсора до почетка реда</translation>
 <translation id="8004512796067398576">Повећање</translation>
 <translation id="8026334261755873520">Обришите податке прегледања</translation>
+<translation id="8028993641010258682">Величина</translation>
 <translation id="8029247720646289474">Повезивање са хотспотом није успело</translation>
 <translation id="8029629653277878342">Треба да унесете PIN или лозинку ради додатне безбедности</translation>
 <translation id="8030169304546394654">Веза је прекинута</translation>
@@ -1536,6 +1564,7 @@
 <translation id="8083540854303889870">Сачувано за касније</translation>
 <translation id="8091153018031979607">Почиње у <ph name="START_TIME" /> <ph name="DAYS_ELAPSED" /></translation>
 <translation id="8091387634532529612">Аутоматска ажурирања</translation>
+<translation id="8092380135549145188">Контроле за скроловање</translation>
 <translation id="8098591350844501178">Заустави пребацивање екрана на <ph name="RECEIVER_NAME" /></translation>
 <translation id="810637681351706236">Откачите апликацију са полице</translation>
 <translation id="8113423164597455979">Укључено, све</translation>
@@ -1547,6 +1576,7 @@
 <translation id="8131740175452115882">Потврди</translation>
 <translation id="8131994907636310308">Затворите повратну поруку за сортирање</translation>
 <translation id="8132793192354020517">Успостављена је веза са <ph name="NAME" /></translation>
+<translation id="8135163608236671037">Укључите/искључите хотспот. Хотспот је укључен, али ниједан уређај није повезан.</translation>
 <translation id="8138705869659070104">Активирај после подешавања</translation>
 <translation id="813913629614996137">Покреће се…</translation>
 <translation id="8142441511840089262">Двоструки клик</translation>
@@ -1570,14 +1600,12 @@
 <translation id="8214996719228530800">Canary канал</translation>
 <translation id="8219451629189078428">Chromebook треба да остане укључен и повезан на извор напајања током тог периода. Уверите се да су каблови пуњача или адаптера исправно прикључени, и у Chromebook и у утичницу Не искључујте Chromebook.</translation>
 <translation id="8230305195727960608">Режим инверзије боја</translation>
-<translation id="8233140502441622270">Отворите апликацију Тастерске пречице</translation>
 <translation id="8236042855478648955">Време је за паузу</translation>
 <translation id="8239034820133090126">Активирај радну површину на десној страни</translation>
 <translation id="8246282815785366524">Добро дошли назад, <ph name="GIVEN_NAME" /></translation>
 <translation id="8247060538831475781"><ph name="CONNECTION_STATUS" />, јачина сигнала <ph name="SIGNAL_STRENGTH" />, батерија телефона <ph name="BATTERY_STATUS" /></translation>
 <translation id="8247998213073982446"><ph name="APP_NAME" />, апликација</translation>
 <translation id="8255234195843591763">Ресетујте ради ажурирања</translation>
-<translation id="826107067893790409">Притисните Enter да бисте откључали за <ph name="USER_EMAIL_ADDRESS" /></translation>
 <translation id="8261506727792406068">Избриши</translation>
 <translation id="8270450402312105425">{0,plural, =1{Промените верзију уређаја у претходну верзију у року од једног сата}one{Промените верзију уређаја у претходну верзију у року од # сата}few{Промените верзију уређаја у претходну верзију у року од # сата}other{Промените верзију уређаја у претходну верзију у року од # сати}}</translation>
 <translation id="8277261673056602147">Истакните текст на екрану</translation>
@@ -1591,7 +1619,6 @@
 <translation id="8345019317483336363">Прозор <ph name="WINDOW_TITLE" /> је изабран</translation>
 <translation id="8349964124165471584">Отвори линк у новом прозору</translation>
 <translation id="8351131234907093545">Направите белешку</translation>
-<translation id="8364673525741149932">Укључите/искључите Журку на полици. <ph name="STATE_TEXT" /></translation>
 <translation id="8367948981300340152"><ph name="CAPTURE_MEDIUM" /> се користи.</translation>
 <translation id="8369166482916924789">Сачувана радна површина, <ph name="SAVE_AND_RECALL_DESK_NAME" /></translation>
 <translation id="8371779926711439835">Слово унапред</translation>
@@ -1727,6 +1754,7 @@
 <translation id="8990809378771970590">Користи се <ph name="IME_NAME" /></translation>
 <translation id="8991617137207906966">Режим инверзије боја је омогућен. Поново притисните Ctrl + тастер за претрагу + H да бисте га искључили.</translation>
 <translation id="899350903320462459">Откључајте уређај помоћу ИД-а пријављивања <ph name="LOGIN_ID" /> да бисте добили обавештење</translation>
+<translation id="8993733019280019776">Да ли причате? Микрофон је искључен. Изаберите микрофон да бисте га укључили.</translation>
 <translation id="9000771174482730261">УПРАВЉАЈТЕ МЕМОРИЈСКИМ ПРОСТОРОМ</translation>
 <translation id="9005984960510803406">Отворите Crosh прозор</translation>
 <translation id="9017320285115481645">Унесите приступни кôд родитеља за Family Link.</translation>
@@ -1782,12 +1810,14 @@
 <translation id="925832987464884575">Сакријте прегледе</translation>
 <translation id="937214777182567951"><ph name="MANAGER" /> захтева да одмах ажурирате <ph name="DEVICE_TYPE" /></translation>
 <translation id="938963181863597773">Шта је у календару?</translation>
+<translation id="945383118875625837">Превуците линк на траку са обележивачима</translation>
 <translation id="945522503751344254">Пошаљи повратне информације</translation>
 <translation id="951991426597076286">Одбиј</translation>
 <translation id="953431725143473984">Желите да искључите уређај?</translation>
 <translation id="954052413789300507">Нема довољно простора за <ph name="FILENAME" />. Ослободите простор.</translation>
 <translation id="974545358917229949">Приказују се резултати (<ph name="RESULT_COUNT" />) за: <ph name="QUERY" /></translation>
 <translation id="98120814841227350">Идите на крај документа</translation>
+<translation id="987589956647469042">Мобилни подаци су укључени</translation>
 <translation id="989374776391122812">Контроле камере и звука</translation>
 <translation id="990277280839877440">Прозор <ph name="WINDOW_TITILE" /> је затворен.</translation>
 <translation id="994354411665877646"><ph name="NETWORK_NAME" />, <ph name="SUBTEXT" /></translation>

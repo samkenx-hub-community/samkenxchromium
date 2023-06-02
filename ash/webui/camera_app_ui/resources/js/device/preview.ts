@@ -342,7 +342,8 @@ export class Preview {
         this.vidPid = await deviceOperator.getVidPid(deviceId);
       }
 
-      assert(this.onPreviewExpired === null);
+      assert(
+          this.onPreviewExpired === null || this.onPreviewExpired.isSignaled());
       this.onPreviewExpired = new WaitableEvent();
       state.set(state.State.STREAMING, true);
     } catch (e) {
@@ -374,7 +375,6 @@ export class Preview {
 
     if (this.onPreviewExpired !== null) {
       this.onPreviewExpired.signal();
-      this.onPreviewExpired = null;
     }
     state.set(state.State.STREAMING, false);
   }
@@ -697,8 +697,8 @@ export class Preview {
       if (marker !== this.focusMarker) {
         return;  // Focus was cancelled.
       }
-      const aim = dom.get('#preview-focus-aim', HTMLObjectElement);
-      const clone = assertInstanceof(aim.cloneNode(true), HTMLObjectElement);
+      const aim = dom.get('#preview-focus-aim', HTMLElement);
+      const clone = assertInstanceof(aim.cloneNode(true), HTMLElement);
       clone.style.left = `${event.offsetX + this.video.offsetLeft}px`;
       clone.style.top = `${event.offsetY + this.video.offsetTop}px`;
       clone.hidden = false;
@@ -712,7 +712,7 @@ export class Preview {
    */
   private cancelFocus() {
     this.focusMarker = null;
-    const aim = dom.get('#preview-focus-aim', HTMLObjectElement);
+    const aim = dom.get('#preview-focus-aim', HTMLElement);
     aim.hidden = true;
   }
 }

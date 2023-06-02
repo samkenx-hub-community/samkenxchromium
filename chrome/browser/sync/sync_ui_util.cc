@@ -24,8 +24,8 @@
 #include "components/signin/public/identity_manager/identity_manager.h"
 #include "components/strings/grit/components_strings.h"
 #include "components/sync/base/features.h"
-#include "components/sync/driver/sync_service.h"
-#include "components/sync/driver/sync_user_settings.h"
+#include "components/sync/service/sync_service.h"
+#include "components/sync/service/sync_user_settings.h"
 #include "google_apis/gaia/gaia_urls.h"
 #include "google_apis/gaia/google_service_auth_error.h"
 #include "net/base/url_util.h"
@@ -352,17 +352,17 @@ bool ShouldShowSyncKeysMissingError(const syncer::SyncService* sync_service,
     return true;
   }
 
-  // If sync is running in transport-only mode, every type is "preferred", so
-  // IsTrustedVaultKeyRequiredForPreferredDataTypes() could return true even if
-  // the user isn't trying to sync any of the encrypted types. The check below
-  // tries to avoid showing an unexpected "You couldn't sync X" error in that
-  // case. It works fine if IsEncryptEverythingEnabled() is false, since
-  // PASSWORDS is the only one of AlwaysEncryptedUserTypes() currently
-  // supporting transport mode. Otherwise, it should really be OR-ed with other
-  // checks.
-  // TODO(crbug.com/1134090): Fix the definition of preferred types for
-  // transport mode so calling IsTrustedVaultKeyRequiredForPreferredDataTypes()
-  // is enough.
+  // On desktop transport mode, IsTrustedVaultKeyRequiredForPreferredDataTypes()
+  // returns true even if the user isn't trying to sync any of the encrypted
+  // types. The check below tries to avoid showing an unexpected "You couldn't
+  // sync X" error in that case. It works fine if IsEncryptEverythingEnabled()
+  // is false, since PASSWORDS is the only one of AlwaysEncryptedUserTypes()
+  // currently supporting transport mode. Otherwise, it should really be OR-ed
+  // with other checks.
+  // TODO(crbug.com/1447083): Once the Desktop precondition for
+  // EnablePasswordsAccountStorage becomes "PASSWORDS is a selected type", and
+  // not a PreconditionState of the controller, this function can be replaced
+  // with a single IsTrustedVaultKeyRequiredForPreferredDataTypes() check.
   //
   // WARNING: Must match CredentialModelTypeController::GetPreconditionState().
   return password_manager::features_util::IsOptedInForAccountStorage(
@@ -381,16 +381,16 @@ bool ShouldShowTrustedVaultDegradedRecoverabilityError(
     return true;
   }
 
-  // In transport-only mode, IsTrustedVaultRecoverabilityDegraded() returns true
-  // even if the user isn't trying to sync any of the encrypted types. The check
-  // below tries to avoid unnecessarily showing the error in that case. It works
-  // fine if IsEncryptEverythingEnabled() is false, since PASSWORDS is the only
-  // one of AlwaysEncryptedUserTypes() currently supporting transport mode.
+  // On desktop transport mode, IsTrustedVaultRecoverabilityDegraded() returns
+  // true even if the user isn't trying to sync any of the encrypted types. The
+  // check below tries to avoid unnecessarily showing the error in that case. It
+  // works fine if IsEncryptEverythingEnabled() is false, since PASSWORDS is the
+  // only one of AlwaysEncryptedUserTypes() currently supporting transport mode.
   // Otherwise, it should really be OR-ed with other checks.
-  // TODO(crbug.com/1134090): Fix the definition of preferred types for
-  // transport mode so calling IsTrustedVaultRecoverabilityDegraded() is enough
-  // (SyncUserSettingsImpl::IsEncryptedDatatypeEnabled() relies on the preferred
-  // types).
+  // TODO(crbug.com/1447083): Once the Desktop precondition for
+  // EnablePasswordsAccountStorage becomes "PASSWORDS is a selected type", and
+  // not a PreconditionState of the controller, this function can be replaced
+  // with a single IsTrustedVaultRecoverabilityDegraded() check.
   //
   // WARNING: Must match CredentialModelTypeController::GetPreconditionState().
   return password_manager::features_util::IsOptedInForAccountStorage(

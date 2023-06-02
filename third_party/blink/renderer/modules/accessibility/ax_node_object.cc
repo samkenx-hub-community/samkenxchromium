@@ -2295,7 +2295,11 @@ const AtomicString& AXNodeObject::EffectiveTarget() const {
   // to which target (browser context) a form would be submitted.
   const auto* anchor = DynamicTo<HTMLAnchorElement>(GetNode());
   if (anchor) {
-    return anchor->GetEffectiveTarget();
+    const AtomicString self_value("_self");
+    const AtomicString& effective_target = anchor->GetEffectiveTarget();
+    if (effective_target != self_value) {
+      return anchor->GetEffectiveTarget();
+    }
   }
   return AXObject::EffectiveTarget();
 }
@@ -3208,9 +3212,18 @@ String AXNodeObject::GetValueForControl() const {
     if (auto* select_menu = HTMLSelectMenuElement::OwnerSelectMenu(node)) {
       DCHECK(RuntimeEnabledFeatures::HTMLSelectMenuElementEnabled());
       if (HTMLOptionElement* selected = select_menu->selectedOption()) {
-        if (selected->firstChild()) {
-          return selected->textContent();
-        }
+        // TODO(accessibility) Because these <option> elements can contain
+        // anything, we need to create an AXObject for the selected option, and
+        // use ax_selected_option->ComputedName(). However, for now, the
+        // AXObject is not created because AXObject::IsRelevantSlotElement()
+        // returns false for the invisible slot parent. Also, strangely,
+        // selected->innerText()/GetInnerTextWithoutUpdate() are returning "".
+        // See the following content_browsertest:
+        // All/DumpAccessibilityTreeTest.AccessibilitySelectMenu/blink.
+        // TODO(crbug.com/1401767): DCHECK fails with synchronous serialization.
+        DCHECK(selected->firstChild())
+            << "There is a selected option but it has no DOM children.";
+        return selected->textContent();
       }
       return String();
     }
@@ -4286,7 +4299,9 @@ void AXNodeObject::AddChildrenImpl() {
   DCHECK(children_dirty_);
 
   if (!CanHaveChildren()) {
-    NOTREACHED()
+    // TODO(crbug.com/1407397): Make sure this is no longer firing then
+    // transform this block to CHECK(CanHaveChildren());
+    DUMP_WILL_BE_NOTREACHED_NORETURN()
         << "Should not reach AddChildren() if CanHaveChildren() is false.\n"
         << ToString(true, true);
     return;
@@ -4728,8 +4743,6 @@ bool AXNodeObject::OnNativeBlurAction() {
     return false;
   }
 
-  document->UpdateStyleAndLayoutTreeForNode(node);
-
   // An AXObject's node will always be of type `Element`, `Document` or
   // `Text`. If the object we're currently on is associated with the currently
   // focused element or the document object, we want to clear the focus.
@@ -4757,8 +4770,6 @@ bool AXNodeObject::OnNativeFocusAction() {
   Node* node = GetNode();
   if (!document || !node)
     return false;
-
-  document->UpdateStyleAndLayoutTreeForNode(node);
 
   if (!CanSetFocusAttribute())
     return false;

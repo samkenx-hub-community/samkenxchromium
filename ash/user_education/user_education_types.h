@@ -11,7 +11,8 @@ namespace ash {
 // help bubbles to avoid spamming the user.
 enum class HelpBubbleId {
   kMinValue,
-  kTest = kMinValue,
+  kHoldingSpaceTour = kMinValue,
+  kTest,
   kWelcomeTourExploreApp,
   kWelcomeTourHomeButton,
   kWelcomeTourSearchBox,
@@ -21,11 +22,21 @@ enum class HelpBubbleId {
   kMaxValue = kWelcomeTourStatusArea,
 };
 
+// Each value uniquely identifies a style of help bubble. Help bubbles of
+// different styles may differ both in terms of appearance as well as behavior.
+enum class HelpBubbleStyle {
+  kMinValue,
+  kDialog = kMinValue,
+  kNudge,
+  kMaxValue = kNudge,
+};
+
 // Each value uniquely identifies a ping. Used to gate creation of new pings to
 // avoid spamming the user.
 enum class PingId {
   kMinValue,
-  kTest1 = kMinValue,
+  kHoldingSpaceTour = kMinValue,
+  kTest1,
   kTest2,
   kMaxValue = kTest2,
 };

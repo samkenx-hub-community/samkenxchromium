@@ -16,7 +16,6 @@
 #include "ash/public/cpp/system_tray_client.h"
 #include "ash/public/cpp/update_types.h"
 #include "ash/session/session_controller_impl.h"
-#include "ash/shelf/shelf_party_feature_pod_controller.h"
 #include "ash/shell.h"
 #include "ash/system/accessibility/accessibility_feature_pod_controller.h"
 #include "ash/system/accessibility/unified_accessibility_detailed_view_controller.h"
@@ -30,6 +29,7 @@
 #include "ash/system/cast/cast_feature_pod_controller.h"
 #include "ash/system/cast/unified_cast_detailed_view_controller.h"
 #include "ash/system/dark_mode/dark_mode_feature_pod_controller.h"
+#include "ash/system/hotspot/hotspot_detailed_view_controller.h"
 #include "ash/system/hotspot/hotspot_feature_pod_controller.h"
 #include "ash/system/ime/ime_feature_pod_controller.h"
 #include "ash/system/ime/unified_ime_detailed_view_controller.h"
@@ -475,6 +475,12 @@ void UnifiedSystemTrayController::ShowNetworkDetailedView(bool force) {
   ShowDetailedView(std::make_unique<NetworkDetailedViewController>(this));
 }
 
+void UnifiedSystemTrayController::ShowHotspotDetailedView() {
+  DCHECK(features::IsQsRevampEnabled());
+
+  ShowDetailedView(std::make_unique<HotspotDetailedViewController>(this));
+}
+
 void UnifiedSystemTrayController::ShowBluetoothDetailedView() {
   // QSRevamp does not allow expand/collapse of the System Tray.
   if (!IsExpanded() && !features::IsQsRevampEnabled()) {
@@ -699,9 +705,6 @@ void UnifiedSystemTrayController::InitFeaturePods() {
   AddFeaturePodItem(std::make_unique<IMEFeaturePodController>(this));
   AddFeaturePodItem(std::make_unique<LocaleFeaturePodController>(this));
   AddFeaturePodItem(std::make_unique<DarkModeFeaturePodController>(this));
-  if (base::FeatureList::IsEnabled(features::kShelfParty)) {
-    AddFeaturePodItem(std::make_unique<ShelfPartyFeaturePodController>());
-  }
   if (media::ShouldEnableAutoFraming()) {
     AddFeaturePodItem(std::make_unique<AutozoomFeaturePodController>());
   }
@@ -769,11 +772,6 @@ void UnifiedSystemTrayController::InitFeatureTiles() {
   }
   create_tile(std::make_unique<VPNFeaturePodController>(this),
               feature_pod_controllers_, tiles);
-
-  if (base::FeatureList::IsEnabled(features::kShelfParty)) {
-    create_tile(std::make_unique<ShelfPartyFeaturePodController>(),
-                feature_pod_controllers_, tiles);
-  }
   create_tile(std::make_unique<PrivacyScreenFeaturePodController>(),
               feature_pod_controllers_, tiles);
 
@@ -920,12 +918,17 @@ bool UnifiedSystemTrayController::IsMessageCenterCollapseRequired() const {
     return false;
   }
 
+  if (!bubble_) {
+    return false;
+  }
+
   // Note: This calculaton should be the same as
   // UnifiedMessageCenterBubble::CalculateAvailableHeight().
-  return (bubble_ && CalculateMaxTrayBubbleHeight() -
-                             unified_view_->GetExpandedSystemTrayHeight() -
-                             kUnifiedMessageCenterBubbleSpacing <
-                         kMessageCenterCollapseThreshold);
+  auto available_height = CalculateMaxTrayBubbleHeight(
+      bubble_->GetTray()->GetBubbleWindowContainer());
+  available_height -= unified_view_->GetExpandedSystemTrayHeight();
+  available_height -= kUnifiedMessageCenterBubbleSpacing;
+  return available_height < kMessageCenterCollapseThreshold;
 }
 
 base::TimeDelta UnifiedSystemTrayController::GetAnimationDurationForReporting()

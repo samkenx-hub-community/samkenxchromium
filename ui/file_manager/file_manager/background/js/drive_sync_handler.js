@@ -523,17 +523,16 @@ export class DriveSyncHandlerImpl extends EventTarget {
     }
 
     try {
-      const entry = await util.urlToEntry(event.fileUrl);
       if (util.isInlineSyncStatusEnabled()) {
-        const ancestors = await getUniqueParents([entry]);
-        this.updateSyncStateMetadata_([entry, ...ancestors].map(
-            e => ({
-              fileUrl: e.toURL(),
-              // Flip files that failed to sync back to QUEUED.
-              syncStatus: chrome.fileManagerPrivate.SyncStatus.QUEUED,
-              progress: 0,
-            })));
+        this.updateSyncStateMetadata_([
+          {
+            fileUrl: event.fileUrl,
+            syncStatus: chrome.fileManagerPrivate.SyncStatus.QUEUED,
+            progress: 0,
+          },
+        ]);
       }
+      const entry = await util.urlToEntry(event.fileUrl);
       postError(entry.name);
     } catch (error) {
       postError('');

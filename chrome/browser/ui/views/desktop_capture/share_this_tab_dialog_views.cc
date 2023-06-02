@@ -6,6 +6,7 @@
 
 #include "base/command_line.h"
 #include "base/metrics/histogram_functions.h"
+#include "base/time/time.h"
 #include "chrome/browser/media/webrtc/desktop_media_list.h"
 #include "chrome/browser/media/webrtc/desktop_media_picker_manager.h"
 #include "chrome/browser/media/webrtc/desktop_media_picker_utils.h"
@@ -33,6 +34,8 @@
 #include "ui/views/background.h"
 #include "ui/views/border.h"
 #include "ui/views/layout/box_layout.h"
+#include "ui/views/style/typography.h"
+#include "ui/views/view_class_properties.h"
 #include "ui/views/widget/widget.h"
 
 #if defined(USE_AURA)
@@ -41,21 +44,23 @@
 
 namespace {
 
+constexpr int kTitleTopMargin = 16;
 constexpr gfx::Insets kAudioToggleInsets = gfx::Insets::VH(8, 16);
 constexpr int kAudioToggleChildSpacing = 8;
 
-void RecordUmaDismissal() {
-  RecordUma(GDMPreferCurrentTabResult::kDialogDismissed);
+void RecordUmaCancellation(base::TimeTicks dialog_open_time) {
+  RecordUma(GDMPreferCurrentTabResult::kUserCancelled, dialog_open_time);
 }
 
-void RecordUmaCancellation() {
-  RecordUma(GDMPreferCurrentTabResult::kUserCancelled);
-}
-
-void RecordUmaSelection() {
+void RecordUmaSelection(base::TimeTicks dialog_open_time) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  RecordUma(GDMPreferCurrentTabResult::kUserSelectedThisTab);
+  RecordUma(GDMPreferCurrentTabResult::kUserSelectedThisTab, dialog_open_time);
 }
+
+// The length of the initial delay during which the "Allow"-button is disabled
+// in the share-this-tab dialog.
+const base::FeatureParam<int> kShareThisTabDialogActivationDelayMs{
+    &kShareThisTabDialog, "activation_delay_ms", 500};
 
 }  // namespace
 
@@ -64,8 +69,23 @@ ShareThisTabDialogView::ShareThisTabDialogView(
     ShareThisTabDialogViews* parent)
     : web_contents_(params.web_contents->GetWeakPtr()),
       app_name_(params.app_name),
-      parent_(parent) {
+      parent_(parent),
+      auto_select_tab_(
+          base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
+              switches::kAutoSelectTabCaptureSourceByTitle)),
+      auto_select_source_(
+          base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
+              switches::kAutoSelectDesktopCaptureSource)),
+      auto_accept_this_tab_capture_(
+          base::CommandLine::ForCurrentProcess()->HasSwitch(
+              switches::kThisTabCaptureAutoAccept)),
+      auto_reject_this_tab_capture_(
+          base::CommandLine::ForCurrentProcess()->HasSwitch(
+              switches::kThisTabCaptureAutoReject)),
+      dialog_open_time_(base::TimeTicks::Now()) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+  CHECK(!auto_accept_this_tab_capture_ || !auto_reject_this_tab_capture_);
+
   SetModalType(params.modality);
   RegisterDeleteDelegateCallback(base::BindOnce(
       [](ShareThisTabDialogView* dialog) {
@@ -77,16 +97,30 @@ ShareThisTabDialogView::ShareThisTabDialogView(
       this));
 
   const ChromeLayoutProvider* const provider = ChromeLayoutProvider::Get();
+  gfx::Insets dialog_insets = provider->GetDialogInsetsForContentType(
+      views::DialogContentType::kText, views::DialogContentType::kText);
+  dialog_insets.set_top(kTitleTopMargin);
   SetLayoutManager(std::make_unique<views::BoxLayout>(
-      views::BoxLayout::Orientation::kVertical,
-      provider->GetDialogInsetsForContentType(
-          views::DialogContentType::kText, views::DialogContentType::kControl),
+      views::BoxLayout::Orientation::kVertical, dialog_insets,
       provider->GetDistanceMetric(DISTANCE_RELATED_CONTROL_VERTICAL_SMALL)));
 
-  description_label_ = AddChildView(std::make_unique<views::Label>());
-  description_label_->SetMultiLine(true);
-  description_label_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
-  description_label_->SetText(
+  views::Label* title_label = AddChildView(std::make_unique<views::Label>());
+  title_label->SetFontList(views::style::GetFont(
+      views::style::CONTEXT_DIALOG_TITLE, views::style::STYLE_PRIMARY));
+  title_label->SetAllowCharacterBreak(true);
+  title_label->SetMultiLine(true);
+  title_label->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+  title_label->SetText(
+      l10n_util::GetStringFUTF16(IDS_SHARE_THIS_TAB_DIALOG_TITLE, app_name_));
+  // TODO(crbug.com/1448008): Prevent non-initial focus of the title label.
+  title_label->SetFocusBehavior(View::FocusBehavior::ALWAYS);
+  SetInitiallyFocusedView(title_label);
+
+  views::Label* description_label =
+      AddChildView(std::make_unique<views::Label>());
+  description_label->SetMultiLine(true);
+  description_label->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+  description_label->SetText(
       l10n_util::GetStringUTF16(IDS_SHARE_THIS_TAB_DIALOG_TEXT));
 
   SetupSourceView();
@@ -95,11 +129,14 @@ ShareThisTabDialogView::ShareThisTabDialogView(
     SetupAudioToggle();
   }
 
-  activation_timer_.Start(
-      FROM_HERE,
-      base::Milliseconds(media::kShareThisTabDialogActivationDelayMs.Get()),
-      base::BindOnce(&ShareThisTabDialogView::Activate,
-                     weak_factory_.GetWeakPtr()));
+  // Use no delay in tests that auto-accepts/rejects the dialog.
+  const base::TimeDelta activation_delay =
+      (ShouldAutoAccept() || ShouldAutoReject())
+          ? base::Milliseconds(0)
+          : base::Milliseconds(kShareThisTabDialogActivationDelayMs.Get());
+  activation_timer_.Start(FROM_HERE, activation_delay,
+                          base::BindOnce(&ShareThisTabDialogView::Activate,
+                                         weak_factory_.GetWeakPtr()));
 
   // If |params.web_contents| is set and it's not a background page then the
   // picker will be shown modal to the web contents. Otherwise the picker is
@@ -124,15 +161,23 @@ ShareThisTabDialogView::ShareThisTabDialogView(
     CreateDialogWidget(this, params.context, nullptr)->Show();
   }
 
-  source_view_->SetBorder(
-      views::CreateThemedSolidBorder(1, kColorShareThisTabSourceViewBorder));
+  source_view_->SetBorder(views::CreateThemedRoundedRectBorder(
+      1, 2, kColorShareThisTabSourceViewBorder));
 
   SetButtonLabel(ui::DIALOG_BUTTON_OK,
                  l10n_util::GetStringUTF16(IDS_SHARE_THIS_TAB_DIALOG_ALLOW));
   SetButtonEnabled(ui::DIALOG_BUTTON_OK, false);
+
+  // Simply pressing ENTER without tab-key navigating to the button
+  // must not accept the dialog, or else that'd be a security issue.
+  SetDefaultButton(ui::DialogButton::DIALOG_BUTTON_NONE);
 }
 
 ShareThisTabDialogView::~ShareThisTabDialogView() = default;
+
+void ShareThisTabDialogView::RecordUmaDismissal() const {
+  RecordUma(GDMPreferCurrentTabResult::kDialogDismissed, dialog_open_time_);
+}
 
 void ShareThisTabDialogView::DetachParent() {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
@@ -145,9 +190,8 @@ gfx::Size ShareThisTabDialogView::CalculatePreferredSize() const {
   return gfx::Size(kDialogViewWidth, GetHeightForWidth(kDialogViewWidth));
 }
 
-std::u16string ShareThisTabDialogView::GetWindowTitle() const {
-  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  return l10n_util::GetStringFUTF16(IDS_SHARE_THIS_TAB_DIALOG_TITLE, app_name_);
+bool ShareThisTabDialogView::ShouldShowWindowTitle() const {
+  return false;
 }
 
 bool ShareThisTabDialogView::Accept() {
@@ -166,7 +210,7 @@ bool ShareThisTabDialogView::Accept() {
     desktop_media_id.audio_share =
         audio_toggle_button_ && audio_toggle_button_->GetIsOn();
     parent_->NotifyDialogResult(desktop_media_id);
-    RecordUmaSelection();
+    RecordUmaSelection(dialog_open_time_);
   }
 
   // Return true to close the window.
@@ -177,7 +221,7 @@ bool ShareThisTabDialogView::Cancel() {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   source_view_->StopRefreshing();
   activation_timer_.Stop();
-  RecordUmaCancellation();
+  RecordUmaCancellation(dialog_open_time_);
   return views::DialogDelegateView::Cancel();
 }
 
@@ -188,6 +232,9 @@ bool ShareThisTabDialogView::ShouldShowCloseButton() const {
 
 void ShareThisTabDialogView::SetupSourceView() {
   View* source_container = AddChildView(std::make_unique<views::View>());
+  source_container->SetProperty(views::kMarginsKey,
+                                gfx::Insets::TLBR(16, 0, 0, 0));
+
   views::BoxLayout* source_layout =
       source_container->SetLayoutManager(std::make_unique<views::BoxLayout>(
           views::BoxLayout::Orientation::kHorizontal));
@@ -201,9 +248,11 @@ void ShareThisTabDialogView::SetupSourceView() {
 
 void ShareThisTabDialogView::SetupAudioToggle() {
   View* audio_toggle_container = AddChildView(std::make_unique<views::View>());
-  // TODO(crbug.com/1444707): Create a color_id for this usage.
+  audio_toggle_container->SetProperty(views::kMarginsKey,
+                                      gfx::Insets::TLBR(8, 0, 0, 0));
   audio_toggle_container->SetBackground(
-      views::CreateSolidBackground(gfx::kGoogleGrey050));
+      views::CreateThemedRoundedRectBackground(
+          kColorShareThisTabAudioToggleBackground, 4));
 
   views::ImageView* audio_icon_view = audio_toggle_container->AddChildView(
       std::make_unique<views::ImageView>());
@@ -238,8 +287,44 @@ void ShareThisTabDialogView::SetupAudioToggle() {
 
 void ShareThisTabDialogView::Activate() {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+
   source_view_->Activate();
   SetButtonEnabled(ui::DIALOG_BUTTON_OK, true);
+
+  // In tests.
+  if (ShouldAutoAccept()) {
+    AcceptDialog();
+  } else if (ShouldAutoReject()) {
+    CancelDialog();
+  }
+}
+
+bool ShareThisTabDialogView::ShouldAutoAccept() const {
+  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+
+  if (!web_contents_) {
+    return false;
+  }
+
+  if (auto_accept_this_tab_capture_) {
+    return true;
+  }
+
+  if (!auto_select_tab_.empty() &&
+      web_contents_->GetTitle().find(base::ASCIIToUTF16(auto_select_tab_)) !=
+          std::u16string::npos) {
+    return true;
+  }
+
+  return (!auto_select_source_.empty() &&
+          web_contents_->GetTitle().find(
+              base::ASCIIToUTF16(auto_select_source_)) != std::u16string::npos);
+}
+
+bool ShareThisTabDialogView::ShouldAutoReject() const {
+  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+
+  return auto_reject_this_tab_capture_;
 }
 
 BEGIN_METADATA(ShareThisTabDialogView, views::DialogDelegateView)
@@ -252,7 +337,7 @@ ShareThisTabDialogViews::ShareThisTabDialogViews() : dialog_(nullptr) {
 ShareThisTabDialogViews::~ShareThisTabDialogViews() {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   if (dialog_) {
-    RecordUmaDismissal();
+    dialog_->RecordUmaDismissal();
     dialog_->DetachParent();
     dialog_->GetWidget()->Close();
   }

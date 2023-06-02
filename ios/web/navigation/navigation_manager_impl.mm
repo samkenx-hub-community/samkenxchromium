@@ -55,6 +55,22 @@ web::NavigationItemImpl* GetNavigationItemFromWKItem(
       navigationItem];
 }
 
+// Records metrics about session restoration `success` from `source`.
+void RecordSessionRestorationResultForSource(
+    bool success,
+    web::NavigationManagerImpl::SessionDataBlobSource source) {
+  switch (source) {
+    case web::NavigationManagerImpl::SessionDataBlobSource::kSessionCache:
+      UMA_HISTOGRAM_BOOLEAN("Session.WebStates.NativeRestoreSessionFromCache",
+                            success);
+      break;
+
+    case web::NavigationManagerImpl::SessionDataBlobSource::kSynthesized:
+      UMA_HISTOGRAM_BOOLEAN("Session.WebStates.NativeRestoreSession", success);
+      break;
+  }
+}
+
 }  // namespace
 
 namespace web {
@@ -95,12 +111,7 @@ NavigationManager::WebLoadParams& NavigationManager::WebLoadParams::operator=(
   return *this;
 }
 
-NavigationManagerImpl::NavigationManagerImpl()
-    : delegate_(nullptr),
-      browser_state_(nullptr),
-      pending_item_index_(-1),
-      last_committed_item_index_(-1),
-      web_view_cache_(this) {}
+NavigationManagerImpl::NavigationManagerImpl() = default;
 
 NavigationManagerImpl::~NavigationManagerImpl() = default;
 
@@ -110,6 +121,13 @@ void NavigationManagerImpl::SetDelegate(NavigationManagerDelegate* delegate) {
 
 void NavigationManagerImpl::SetBrowserState(BrowserState* browser_state) {
   browser_state_ = browser_state;
+}
+
+void NavigationManagerImpl::SetNativeSessionFetcher(
+    SessionDataBlobFetcher native_session_fetcher) {
+  CHECK(session_data_blob_fetchers_.empty());
+  AppendSessionDataBlobFetcher(std::move(native_session_fetcher),
+                               SessionDataBlobSource::kSessionCache);
 }
 
 void NavigationManagerImpl::OnNavigationItemCommitted() {
@@ -435,8 +453,21 @@ bool NavigationManagerImpl::RestoreNativeSession(const GURL& url) {
     return false;
   }
 
-  if (!web::GetWebClient()->RestoreSessionFromCache(GetWebState()) &&
-      !synthesized_restore_helper_.Restore(GetWebState())) {
+  // Try to load session data blob from each registered source in order,
+  // stopping at the first that is successfully loaded.
+  bool success = false;
+  for (auto& [fetcher, source] : session_data_blob_fetchers_) {
+    NSData* data = std::move(fetcher).Run();
+    if (data.length != 0) {
+      success = GetWebState()->SetSessionStateData(data);
+      RecordSessionRestorationResultForSource(success, source);
+      if (success) {
+        break;
+      }
+    }
+  }
+
+  if (!success) {
     return false;
   }
 
@@ -926,6 +957,19 @@ void NavigationManagerImpl::Restore(
   if (GetItemCount() > 0) {
     delegate_->RemoveWebView();
   }
+
+  for (size_t index = 0; index < items.size(); ++index) {
+    RewriteItemURLIfNecessary(items[index].get());
+  }
+
+  NSData* synthesized_data = SynthesizedSessionRestore(
+      last_committed_item_index, items, browser_state_->IsOffTheRecord());
+  if (synthesized_data != nil) {
+    AppendSessionDataBlobFetcher(
+        base::BindOnce([](NSData* data) { return data; }, synthesized_data),
+        SessionDataBlobSource::kSynthesized);
+  }
+
   DCHECK_EQ(0, GetItemCount());
   DCHECK_EQ(-1, pending_item_index_);
   last_committed_item_index_ = -1;
@@ -975,7 +1019,7 @@ NavigationManagerImpl::GetLastCommittedItemInCurrentOrRestoredSession() const {
     // Don't check trust level here, as at this point it's expected
     // the _documentURL and the last_commited_item URL have an origin
     // mismatch.
-    GURL document_url = GetWebState()->GetCurrentURL(/*trust_level=*/nullptr);
+    GURL document_url = delegate_->GetCurrentURL();
     if (!last_committed_web_view_item_) {
       last_committed_web_view_item_ = CreateNavigationItemWithRewriters(
           /*url=*/GURL::EmptyGURL(), Referrer(),
@@ -1033,6 +1077,13 @@ NavigationItemImpl* NavigationManagerImpl::GetNavigationItemImplAtIndex(
       index, true /* create_if_missing */);
 }
 
+void NavigationManagerImpl::AppendSessionDataBlobFetcher(
+    SessionDataBlobFetcher fetcher,
+    SessionDataBlobSource source) {
+  session_data_blob_fetchers_.push_back(
+      std::make_pair(std::move(fetcher), source));
+}
+
 void NavigationManagerImpl::RestoreItemsState(
     RestoreItemListType list_type,
     std::vector<std::unique_ptr<NavigationItem>> items_restored) {
@@ -1074,27 +1125,18 @@ void NavigationManagerImpl::RestoreItemsState(
   }
 }
 
+// This function restores session history by loading a magic local file
+// (restore_session.html) into the web view. The session history is encoded
+// in the query parameter. When loaded, restore_session.html parses the
+// session history and replays them into the web view using History API.
 void NavigationManagerImpl::UnsafeRestore(
     int last_committed_item_index,
     std::vector<std::unique_ptr<NavigationItem>> items) {
-  // This function restores session history by loading a magic local file
-  // (restore_session.html) into the web view. The session history is encoded
-  // in the query parameter. When loaded, restore_session.html parses the
-  // session history and replays them into the web view using History API.
-  for (size_t index = 0; index < items.size(); ++index) {
-    RewriteItemURLIfNecessary(items[index].get());
-  }
-
   // TODO(crbug.com/771200): Retain these original NavigationItems restored from
   // storage and associate them with new WKBackForwardListItems created after
   // history restore so information such as scroll position is restored.
-  int first_index = -1;
   GURL url;
-
-  bool off_the_record = browser_state_->IsOffTheRecord();
-  synthesized_restore_helper_.Init(last_committed_item_index, items,
-                                   off_the_record);
-
+  int first_index = -1;
   wk_navigation_util::CreateRestoreSessionUrl(last_committed_item_index, items,
                                               &url, &first_index);
   DCHECK_GE(first_index, 0);
@@ -1283,7 +1325,7 @@ bool NavigationManagerImpl::CanTrustLastCommittedItem(
 
 void NavigationManagerImpl::FinalizeSessionRestore() {
   is_restore_session_in_progress_ = false;
-  synthesized_restore_helper_.Clear();
+  session_data_blob_fetchers_.clear();
 
   for (base::OnceClosure& callback : restore_session_completion_callbacks_) {
     std::move(callback).Run();

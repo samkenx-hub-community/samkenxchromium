@@ -22,7 +22,7 @@
 #include "components/sync/base/command_line_switches.h"
 #include "components/sync/base/features.h"
 #include "components/sync/base/model_type.h"
-#include "components/sync/driver/sync_service_impl.h"
+#include "components/sync/service/sync_service_impl.h"
 #include "content/public/test/browser_test.h"
 #include "crypto/ec_private_key.h"
 
@@ -125,7 +125,7 @@ IN_PROC_BROWSER_TEST_F(LocalSyncTest, ShouldStart) {
     expected_active_data_types.Remove(syncer::TYPED_URLS);
   }
 
-  if (base::FeatureList::IsEnabled(features::kTabGroupsSaveSyncIntegration)) {
+  if (base::FeatureList::IsEnabled(syncer::kTabGroupsSaveSyncIntegration)) {
     expected_active_data_types.Put(syncer::SAVED_TAB_GROUP);
   }
 

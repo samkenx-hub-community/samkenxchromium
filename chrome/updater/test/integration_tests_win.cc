@@ -202,8 +202,7 @@ void CheckInstallation(UpdaterScope scope,
     } else {
       if (::IsUserAnAdmin()) {
         for (const wchar_t* key :
-             {kRegKeyCompanyCloudManagement, kRegKeyCompanyEnrollment,
-              UPDATER_POLICIES_KEY}) {
+             {kRegKeyCompanyCloudManagement, UPDATER_POLICIES_KEY}) {
           EXPECT_FALSE(RegKeyExists(HKEY_LOCAL_MACHINE, key));
         }
       }
@@ -276,19 +275,18 @@ void CheckInstallation(UpdaterScope scope,
     const std::wstring task_name =
         task_scheduler->FindFirstTaskName(GetTaskNamePrefix(scope));
     EXPECT_TRUE(!task_name.empty());
-    EXPECT_TRUE(task_scheduler->IsTaskRegistered(task_name.c_str()));
+    EXPECT_TRUE(task_scheduler->IsTaskRegistered(task_name));
 
     TaskScheduler::TaskInfo task_info;
-    ASSERT_TRUE(task_scheduler->GetTaskInfo(task_name.c_str(), &task_info));
+    ASSERT_TRUE(task_scheduler->GetTaskInfo(task_name, task_info));
     ASSERT_EQ(task_info.exec_actions.size(), 1u);
-    EXPECT_STREQ(
-        task_info.exec_actions[0].arguments.c_str(),
+    EXPECT_EQ(
+        task_info.exec_actions[0].arguments,
         base::StrCat({L"--wake ", IsSystemInstall(scope) ? L"--system " : L"",
                       L"--enable-logging "
                       L"--vmodule=*/components/winhttp/*=2,"
                       L"*/components/update_client/*=2,"
-                      L"*/chrome/updater/*=2"})
-            .c_str());
+                      L"*/chrome/updater/*=2"}));
 
     EXPECT_EQ(task_info.trigger_types,
               TaskScheduler::TriggerType::TRIGGER_TYPE_HOURLY |
@@ -604,7 +602,7 @@ void Clean(UpdaterScope scope) {
       base::BindRepeating(
           [](scoped_refptr<TaskScheduler> task_scheduler,
              const std::wstring& task_name) {
-            task_scheduler->DeleteTask(task_name.c_str());
+            EXPECT_TRUE(task_scheduler->DeleteTask(task_name));
           },
           task_scheduler));
 
@@ -616,9 +614,6 @@ void Clean(UpdaterScope scope) {
   absl::optional<base::FilePath> path = GetInstallDirectory(scope);
   ASSERT_TRUE(path);
   ASSERT_TRUE(base::DeletePathRecursively(*path)) << *path;
-
-  // TODO(crbug.com/1401759) - this can be removed after the crbug is closed.
-  VLOG(0) << __func__ << " end.";
 }
 
 void EnterTestMode(const GURL& update_url,
@@ -667,13 +662,11 @@ void Uninstall(UpdaterScope scope) {
 
   // Uninstallation involves a race with the uninstall.cmd script and the
   // process exit. Sleep to allow the script to complete its work.
-  // TODO(crbug.com/1217765): Figure out a way to replace this.
   SleepFor(base::Seconds(5));
   ASSERT_EQ(0, exit_code);
 }
 
 void SetActive(UpdaterScope /*scope*/, const std::string& id) {
-  // TODO(crbug.com/1159498): Standardize registry access.
   base::win::RegKey key;
   ASSERT_EQ(key.Create(HKEY_CURRENT_USER, GetAppClientStateKey(id).c_str(),
                        Wow6432(KEY_WRITE)),
@@ -682,7 +675,6 @@ void SetActive(UpdaterScope /*scope*/, const std::string& id) {
 }
 
 void ExpectActive(UpdaterScope /*scope*/, const std::string& id) {
-  // TODO(crbug.com/1159498): Standardize registry access.
   base::win::RegKey key;
   ASSERT_EQ(key.Open(HKEY_CURRENT_USER, GetAppClientStateKey(id).c_str(),
                      Wow6432(KEY_READ)),
@@ -693,7 +685,6 @@ void ExpectActive(UpdaterScope /*scope*/, const std::string& id) {
 }
 
 void ExpectNotActive(UpdaterScope /*scope*/, const std::string& id) {
-  // TODO(crbug.com/1159498): Standardize registry access.
   base::win::RegKey key;
   if (key.Open(HKEY_CURRENT_USER, GetAppClientStateKey(id).c_str(),
                Wow6432(KEY_READ)) == ERROR_SUCCESS) {
@@ -707,8 +698,8 @@ void ExpectNotActive(UpdaterScope /*scope*/, const std::string& id) {
 // the prefs lock.
 bool WaitForUpdaterExit(UpdaterScope /*scope*/) {
   return WaitFor(
-      base::BindRepeating([]() { return !IsUpdaterRunning(); }),
-      base::BindLambdaForTesting([]() {
+      base::BindRepeating([] { return !IsUpdaterRunning(); }),
+      base::BindLambdaForTesting([] {
         VLOG(0) << "Still waiting for updater to exit. "
                 << test::PrintProcesses(GetExecutableRelativePath().value());
       }));
@@ -1097,11 +1088,6 @@ HRESULT DoUpdate(UpdaterScope scope,
         break;
     }
 
-    // TODO(crbug.com/1245992): Remove this logging once the code is test
-    // flakiness is eliminated and no further debugging is needed.
-    LOG(ERROR) << base::StringPrintf(L"[State: %d][%ls]%ls", state_value,
-                                     state_description.c_str(),
-                                     extra_data.c_str());
     base::PlatformThread::Sleep(base::Seconds(1));
   }
 
@@ -1373,20 +1359,6 @@ int RunVPythonCommand(const base::CommandLine& command_line) {
   return exit_code;
 }
 
-void RunTestServiceCommand(const std::string& sub_command) {
-  base::FilePath path(base::CommandLine::ForCurrentProcess()->GetProgram());
-  path = path.DirName();
-  path = MakeAbsoluteFilePath(path);
-  path = path.Append(FILE_PATH_LITERAL("test_service"))
-             .Append(FILE_PATH_LITERAL("updater_test_service_control.py"));
-  EXPECT_TRUE(base::PathExists(path));
-
-  base::CommandLine command(path);
-  command.AppendArg(sub_command);
-
-  EXPECT_EQ(RunVPythonCommand(command), 0);
-}
-
 void InvokeTestServiceFunction(const std::string& function_name,
                                const base::Value::Dict& arguments) {
   std::string arguments_json_string;
@@ -1566,7 +1538,7 @@ void SetupFakeLegacyUpdater(UpdaterScope scope) {
        {base::StrCat({task_name_prefix, L"Core"}),
         base::StrCat({task_name_prefix, L"UA"})}) {
     ASSERT_TRUE(task_scheduler->RegisterTask(
-        task_name.c_str(), task_name.c_str(),
+        task_name, task_name,
         base::CommandLine::FromString(L"C:\\temp\\temp.exe"),
         TaskScheduler::TriggerType::TRIGGER_TYPE_HOURLY, false));
   }
@@ -1728,7 +1700,7 @@ void InstallApp(UpdaterScope scope, const std::string& app_id) {
 void UninstallApp(UpdaterScope scope, const std::string& app_id) {
   base::win::RegKey key;
   ASSERT_EQ(
-      key.Open(UpdaterScopeToHKeyRoot(scope), CLIENTS_KEY, Wow6432(KEY_WRITE)),
+      key.Open(UpdaterScopeToHKeyRoot(scope), CLIENTS_KEY, Wow6432(DELETE)),
       ERROR_SUCCESS);
   ASSERT_EQ(key.DeleteKey(base::SysUTF8ToWide(app_id).c_str()), ERROR_SUCCESS);
 }
@@ -1852,7 +1824,7 @@ void RunOfflineInstall(UpdaterScope scope,
     // Dismiss the installation completion dialog, then wait for the process
     // exit.
     EXPECT_TRUE(WaitFor(
-        base::BindRepeating([]() {
+        base::BindRepeating([] {
           // Enumerate the top-level dialogs to find the setup dialog.
           WindowEnumerator(
               ::GetDesktopWindow(), base::BindRepeating([](HWND hwnd) {
@@ -1883,7 +1855,7 @@ void RunOfflineInstall(UpdaterScope scope,
           return !IsUpdaterRunning();
         }),
         base::BindLambdaForTesting(
-            []() { VLOG(0) << "Still waiting for the process exit."; })));
+            [] { VLOG(0) << "Still waiting for the process exit."; })));
   }
 
   // Updater should have written "pv".
@@ -1911,6 +1883,10 @@ void RunOfflineInstall(UpdaterScope scope,
   }
 
   EXPECT_TRUE(DeleteRegKey(root, app_client_state_key));
+}
+
+base::CommandLine MakeElevated(base::CommandLine command_line) {
+  return command_line;
 }
 
 }  // namespace updater::test

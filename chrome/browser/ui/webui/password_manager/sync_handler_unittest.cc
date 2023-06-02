@@ -10,7 +10,7 @@
 #include "chrome/browser/sync/sync_service_factory.h"
 #include "chrome/test/base/chrome_render_view_host_test_harness.h"
 #include "chrome/test/base/testing_browser_process.h"
-#include "components/sync/driver/sync_service_utils.h"
+#include "components/sync/service/sync_service_utils.h"
 #include "components/sync/test/mock_sync_service.h"
 #include "content/public/test/test_web_ui.h"
 
@@ -115,7 +115,7 @@ class SyncHandlerTest : public ChromeRenderViewHostTestHarness {
   content::TestWebUI web_ui_;
   std::unique_ptr<IdentityTestEnvironmentProfileAdaptor>
       identity_test_env_adaptor_;
-  raw_ptr<MockSyncService> mock_sync_service_;
+  raw_ptr<MockSyncService, DanglingUntriaged> mock_sync_service_;
   raw_ptr<SyncHandler> handler_;
 };
 

@@ -31,6 +31,7 @@
 #include "components/autofill/core/browser/data_model/autofill_structured_address_utils.h"
 #include "components/autofill/core/browser/data_model/contact_info.h"
 #include "components/autofill/core/browser/data_model/phone_number.h"
+#include "components/autofill/core/browser/field_types.h"
 #include "components/autofill/core/browser/geo/address_i18n.h"
 #include "components/autofill/core/browser/geo/autofill_country.h"
 #include "components/autofill/core/browser/geo/phone_number_i18n.h"
@@ -246,8 +247,6 @@ AutofillProfile& AutofillProfile::operator=(const AutofillProfile& profile) {
   if (this == &profile)
     return *this;
 
-  set_disallow_settings_visible_updates(
-      profile.disallow_settings_visible_updates());
   set_use_count(profile.use_count());
   set_use_date(profile.use_date());
   set_previous_use_date(profile.previous_use_date());
@@ -420,6 +419,8 @@ int AutofillProfile::Compare(const AutofillProfile& profile) const {
       ADDRESS_HOME_SORTING_CODE,
       ADDRESS_HOME_COUNTRY,
       ADDRESS_HOME_LANDMARK,
+      ADDRESS_HOME_BETWEEN_STREETS,
+      ADDRESS_HOME_ADMIN_LEVEL2,
       ADDRESS_HOME_HOUSE_NUMBER,
       ADDRESS_HOME_STREET_NAME,
       ADDRESS_HOME_DEPENDENT_STREET_NAME,
@@ -1011,9 +1012,7 @@ FormGroup* AutofillProfile::MutableFormGroupForType(const AutofillType& type) {
 }
 
 bool AutofillProfile::EqualsSansGuid(const AutofillProfile& profile) const {
-  return disallow_settings_visible_updates() ==
-             profile.disallow_settings_visible_updates() &&
-         language_code() == profile.language_code() &&
+  return language_code() == profile.language_code() &&
          profile_label() == profile.profile_label() &&
          source() == profile.source() && Compare(profile) == 0;
 }
@@ -1064,6 +1063,8 @@ std::ostream& operator<<(std::ostream& os, const AutofillProfile& profile) {
       ADDRESS_HOME_ZIP,
       ADDRESS_HOME_SORTING_CODE,
       ADDRESS_HOME_COUNTRY,
+      ADDRESS_HOME_LANDMARK,
+      ADDRESS_HOME_BETWEEN_STREETS,
       PHONE_HOME_WHOLE_NUMBER};
 
   base::ranges::for_each(field_types_to_print, print_values_lambda);

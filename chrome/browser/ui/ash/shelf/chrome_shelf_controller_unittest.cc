@@ -37,7 +37,6 @@
 #include "ash/public/cpp/window_properties.h"
 #include "ash/shelf/shelf_application_menu_model.h"
 #include "ash/webui/system_apps/public/system_web_app_type.h"
-#include "base/auto_reset.h"
 #include "base/check.h"
 #include "base/check_op.h"
 #include "base/command_line.h"
@@ -153,11 +152,11 @@
 #include "components/services/app_service/public/cpp/instance_registry.h"
 #include "components/services/app_service/public/cpp/types_util.h"
 #include "components/sync/base/model_type.h"
-#include "components/sync/driver/sync_service.h"
-#include "components/sync/driver/sync_user_settings.h"
 #include "components/sync/model/sync_change.h"
 #include "components/sync/protocol/app_list_specifics.pb.h"
 #include "components/sync/protocol/entity_specifics.pb.h"
+#include "components/sync/service/sync_service.h"
+#include "components/sync/service/sync_user_settings.h"
 #include "components/sync/test/fake_sync_change_processor.h"
 #include "components/sync/test/test_sync_service.h"
 #include "components/sync_preferences/pref_model_associator.h"
@@ -1394,7 +1393,10 @@ class ChromeShelfControllerLacrosTest : public ChromeShelfControllerTestBase {
 class ChromeShelfControllerLacrosPrimaryTest
     : public ChromeShelfControllerLacrosTest {
  public:
-  ChromeShelfControllerLacrosPrimaryTest() = default;
+  ChromeShelfControllerLacrosPrimaryTest() {
+    scoped_feature_list_.InitWithFeatures(
+        {ash::features::kLacrosSupport, ash::features::kLacrosPrimary}, {});
+  }
   ChromeShelfControllerLacrosPrimaryTest(
       const ChromeShelfControllerLacrosPrimaryTest&) = delete;
   ChromeShelfControllerLacrosPrimaryTest& operator=(
@@ -1440,11 +1442,11 @@ class ChromeShelfControllerLacrosPrimaryTest
   apps::AppServiceProxy* proxy() { return proxy_; }
 
  private:
-  base::AutoReset<absl::optional<bool>> set_lacros_primary_ =
-      crosapi::browser_util::SetLacrosPrimaryBrowserForTest(true);
   raw_ptr<StandaloneBrowserExtensionAppShelfItemController, ExperimentalAsh>
       chrome_app_shelf_item_ = nullptr;
   raw_ptr<apps::AppServiceProxy, ExperimentalAsh> proxy_ = nullptr;
+
+  base::test::ScopedFeatureList scoped_feature_list_;
 };
 
 // A V1 windowed application.

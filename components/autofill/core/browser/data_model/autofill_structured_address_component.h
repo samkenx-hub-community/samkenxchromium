@@ -398,8 +398,8 @@ class AddressComponent {
 
   // Method to parse |value_| into the values of |subcomponents_|. The
   // purpose of this method is to cover special cases. This method returns true
-  // on success and is allowed to fail. On failure, the |subcomponents_| are not
-  // altered.
+  // on success and is allowed to fail. On failure, the |subcomponents_| are
+  // not altered.
   virtual bool ParseValueAndAssignSubcomponentsByMethod();
 
   // This method parses |value_| to assign values to the subcomponents.
@@ -408,7 +408,8 @@ class AddressComponent {
   virtual void ParseValueAndAssignSubcomponentsByFallbackMethod();
 
   // This method is used to set the value given by a type different than the
-  // storage type. It must implement the conversion logic specific to each type.
+  // storage type. It must implement the conversion logic specific to each
+  // type.
   virtual void SetValueForOtherSupportedType(ServerFieldType field_type,
                                              const std::u16string& value,
                                              const VerificationStatus& status);
@@ -418,13 +419,6 @@ class AddressComponent {
   // specific to each type.
   virtual std::u16string GetValueForOtherSupportedType(
       ServerFieldType field_type) const;
-
-  // This method is used to retrieve the value for a supported field type
-  // different from the storage type, and rewrites it for comparison with
-  // `other`. It must implement the conversion logic specific to each type.
-  virtual std::u16string GetValueForComparisonForOtherSupportedType(
-      ServerFieldType field_type,
-      const AddressComponent& other) const;
 
   // Clears all parsed and formatted values.
   void ClearAllParsedAndFormattedValues();
@@ -465,7 +459,15 @@ class AddressComponent {
   // the normalized value.
   // |other| represents the component we are comparing with and is required
   // for consistent rewriting rules.
+  std::u16string GetValueForComparison(const AddressComponent& other) const;
+
+  // Formats `value` to be used for comparison.
+  // In the default implementation this is `value` normalized but this function
+  // can be overridden in subclasses to apply further operations on `value`.
+  // `other` represents the component we are comparing with and is required
+  // for consistent rewriting rules.
   virtual std::u16string GetValueForComparison(
+      const std::u16string& value,
       const AddressComponent& other) const;
 
   // Returns true if the merging of two token identical values should give
@@ -508,7 +510,11 @@ class AddressComponent {
   // In cases where the tree has been initially completed, there might still be
   // nodes that are empty (e.g. a new leaf or internal node got recently
   // introduced). Gap filling addresses all those cases.
-  // TODO(crbug.com/1440168) Include also parsing as a strategy for gap filling.
+  // The overall strategy is: For every empty node, try building its value by
+  // parsing its parent. If that's not possible (e.g. info can't be parsed), use
+  // formatting rules to build a value from its children. Note that this process
+  // respects non-empty nodes and the information growth invariant (i.e child
+  // information is always contained on their ancestors).
   void FillTreeGaps();
 
   // Determines a value from the subcomponents by using the
@@ -528,8 +534,28 @@ class AddressComponent {
   // of the subcomponents. Returns true on success and is allowed to fail.
   bool ParseValueAndAssignSubcomponentsByRegularExpressions();
 
-  // This method verifies that the `value` is compatible with all the node's
-  // anestors.
+  // This method uses regular expressions acquired by
+  // |GetParseRegularExpressionsByRelevance| to parse |value_| into the values
+  // of the subcomponents that are empty, components with non-empty values
+  // remain unchanged. If parsing is not successful, the function does not
+  // perform any modifications. Returns true if parsing was successful.
+  void TryParseValueAndAssignSubcomponentsRespectingSetValues();
+
+  // Parses |value| by using |parse_expressions| and assigns values to empty
+  // subcomponents only. The value assigned to each subcomponent is compatible
+  // with the information growth invariant (i.e child information is always
+  // contained on their ancestors). If parsing is not successful, the function
+  // does not perform any modifications. Returns true if parsing was successful.
+  bool ParseValueAndAssignSubcomponentsRespectingSetValues(
+      const std::u16string& value,
+      const re2::RE2* parse_expression);
+
+  // This method verifies that the `value` is token compatible with this node
+  // and all the node's descendants.
+  bool IsValueCompatibleWithDescendants(const std::u16string& value) const;
+
+  // This method verifies that the `value` is token compatible with this node
+  // and all the node's ancestors.
   bool IsValueCompatibleWithAncestors(const std::u16string& value) const;
 
   // The unstructured value of this component.

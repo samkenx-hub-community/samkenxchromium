@@ -19,7 +19,6 @@
 #include "base/allocator/partition_allocator/partition_alloc_base/no_destructor.h"
 #include "base/allocator/partition_allocator/partition_alloc_base/numerics/checked_math.h"
 #include "base/allocator/partition_allocator/partition_alloc_base/numerics/safe_conversions.h"
-#include "base/allocator/partition_allocator/partition_alloc_base/threading/platform_thread.h"
 #include "base/allocator/partition_allocator/partition_alloc_buildflags.h"
 #include "base/allocator/partition_allocator/partition_alloc_check.h"
 #include "base/allocator/partition_allocator/partition_alloc_constants.h"
@@ -27,7 +26,6 @@
 #include "base/allocator/partition_allocator/partition_stats.h"
 #include "base/allocator/partition_allocator/shim/allocator_shim_internals.h"
 #include "base/memory/nonscannable_memory.h"
-#include "base/threading/platform_thread.h"
 #include "build/build_config.h"
 #include "build/chromecast_buildflags.h"
 
@@ -157,15 +155,17 @@ class MainPartitionConstructor {
         // and only one is supported at a time.
         partition_alloc::PartitionOptions::ThreadCache::kDisabled;
 #endif  // BUILDFLAG(USE_PARTITION_ALLOC_AS_MALLOC)
-    auto* new_root = new (buffer) partition_alloc::ThreadSafePartitionRoot({
-        partition_alloc::PartitionOptions::AlignedAlloc::kAllowed,
-        thread_cache,
-        partition_alloc::PartitionOptions::Quarantine::kAllowed,
-        partition_alloc::PartitionOptions::Cookie::kAllowed,
-        partition_alloc::PartitionOptions::BackupRefPtr::kDisabled,
-        partition_alloc::PartitionOptions::BackupRefPtrZapping::kDisabled,
-        partition_alloc::PartitionOptions::UseConfigurablePool::kNo,
-    });
+    auto* new_root = new (buffer) partition_alloc::ThreadSafePartitionRoot(
+        partition_alloc::PartitionOptions{
+            .aligned_alloc =
+                partition_alloc::PartitionOptions::AlignedAlloc::kAllowed,
+            .thread_cache = thread_cache,
+            .quarantine =
+                partition_alloc::PartitionOptions::Quarantine::kAllowed,
+            .cookie = partition_alloc::PartitionOptions::Cookie::kAllowed,
+            .backup_ref_ptr =
+                partition_alloc::PartitionOptions::BackupRefPtr::kDisabled,
+        });
 
     return new_root;
   }
@@ -546,10 +546,11 @@ void EnablePartitionAllocMemoryReclaimer() {
 
 void ConfigurePartitions(
     EnableBrp enable_brp,
-    EnableBrpZapping enable_brp_zapping,
     EnableBrpPartitionMemoryReclaimer enable_brp_memory_reclaimer,
+    EnableMemoryTagging enable_memory_tagging,
     SplitMainPartition split_main_partition,
     UseDedicatedAlignedPartition use_dedicated_aligned_partition,
+    size_t ref_count_size,
     AlternateBucketDistribution use_alternate_bucket_distribution) {
   // BRP cannot be enabled without splitting the main partition. Furthermore, in
   // the "before allocation" mode, it can't be enabled without further splitting
@@ -595,21 +596,26 @@ void ConfigurePartitions(
   // shouldn't bite us here. Mentioning just in case we move this code earlier.
   static partition_alloc::internal::base::NoDestructor<
       partition_alloc::ThreadSafePartitionRoot>
-      new_main_partition(partition_alloc::PartitionOptions(
-          !use_dedicated_aligned_partition
-              ? partition_alloc::PartitionOptions::AlignedAlloc::kAllowed
-              : partition_alloc::PartitionOptions::AlignedAlloc::kDisallowed,
-          partition_alloc::PartitionOptions::ThreadCache::kDisabled,
-          partition_alloc::PartitionOptions::Quarantine::kAllowed,
-          partition_alloc::PartitionOptions::Cookie::kAllowed,
-          enable_brp
-              ? partition_alloc::PartitionOptions::BackupRefPtr::kEnabled
-              : partition_alloc::PartitionOptions::BackupRefPtr::kDisabled,
-          enable_brp_zapping
-              ? partition_alloc::PartitionOptions::BackupRefPtrZapping::kEnabled
-              : partition_alloc::PartitionOptions::BackupRefPtrZapping::
-                    kDisabled,
-          partition_alloc::PartitionOptions::UseConfigurablePool::kNo));
+      new_main_partition(partition_alloc::PartitionOptions{
+          .aligned_alloc =
+              !use_dedicated_aligned_partition
+                  ? partition_alloc::PartitionOptions::AlignedAlloc::kAllowed
+                  : partition_alloc::PartitionOptions::AlignedAlloc::
+                        kDisallowed,
+          .thread_cache =
+              partition_alloc::PartitionOptions::ThreadCache::kDisabled,
+          .quarantine = partition_alloc::PartitionOptions::Quarantine::kAllowed,
+          .cookie = partition_alloc::PartitionOptions::Cookie::kAllowed,
+          .backup_ref_ptr =
+              enable_brp
+                  ? partition_alloc::PartitionOptions::BackupRefPtr::kEnabled
+                  : partition_alloc::PartitionOptions::BackupRefPtr::kDisabled,
+          .ref_count_size = ref_count_size,
+          .memory_tagging =
+              enable_memory_tagging
+                  ? partition_alloc::PartitionOptions::MemoryTagging::kEnabled
+                  : partition_alloc::PartitionOptions::MemoryTagging::
+                        kDisabled});
   partition_alloc::ThreadSafePartitionRoot* new_root = new_main_partition.get();
 
   partition_alloc::ThreadSafePartitionRoot* new_aligned_root;
@@ -619,13 +625,15 @@ void ConfigurePartitions(
     static partition_alloc::internal::base::NoDestructor<
         partition_alloc::ThreadSafePartitionRoot>
         new_aligned_partition(partition_alloc::PartitionOptions{
-            partition_alloc::PartitionOptions::AlignedAlloc::kAllowed,
-            partition_alloc::PartitionOptions::ThreadCache::kDisabled,
-            partition_alloc::PartitionOptions::Quarantine::kAllowed,
-            partition_alloc::PartitionOptions::Cookie::kAllowed,
-            partition_alloc::PartitionOptions::BackupRefPtr::kDisabled,
-            partition_alloc::PartitionOptions::BackupRefPtrZapping::kDisabled,
-            partition_alloc::PartitionOptions::UseConfigurablePool::kNo,
+            .aligned_alloc =
+                partition_alloc::PartitionOptions::AlignedAlloc::kAllowed,
+            .thread_cache =
+                partition_alloc::PartitionOptions::ThreadCache::kDisabled,
+            .quarantine =
+                partition_alloc::PartitionOptions::Quarantine::kAllowed,
+            .cookie = partition_alloc::PartitionOptions::Cookie::kAllowed,
+            .backup_ref_ptr =
+                partition_alloc::PartitionOptions::BackupRefPtr::kDisabled,
         });
     new_aligned_root = new_aligned_partition.get();
   } else {
@@ -671,10 +679,18 @@ void ConfigurePartitions(
   }
 }
 
+// No synchronization provided: `PartitionRoot.flags` is only written
+// to in `PartitionRoot::Init()`.
+uint32_t GetMainPartitionRootExtrasSize() {
+#if PA_CONFIG(EXTRAS_REQUIRED)
+  return g_root.Get()->flags.extras_size;
+#else
+  return 0;
+#endif  // PA_CONFIG(EXTRAS_REQUIRED)
+}
+
 #if BUILDFLAG(USE_STARSCAN)
 void EnablePCScan(partition_alloc::internal::PCScan::InitConfig config) {
-  partition_alloc::internal::base::PlatformThread::SetThreadNameHook(
-      &::base::PlatformThread::SetName);
   partition_alloc::internal::PCScan::Initialize(config);
 
   partition_alloc::internal::PCScan::RegisterScannableRoot(Allocator());

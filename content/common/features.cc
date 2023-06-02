@@ -7,28 +7,9 @@
 #include "base/feature_list.h"
 #include "base/metrics/field_trial_params.h"
 
-#if BUILDFLAG(IS_ANDROID)
-#include "cc/slim/features.h"  // nogncheck
-#include "ui/gfx/android/android_surface_control_compat.h"
-#endif
-
 namespace content {
 
 // Please keep features in alphabetical order.
-
-#if BUILDFLAG(IS_ANDROID)
-BASE_FEATURE(kAndroidSurfaceControlMagnifier,
-             "AndroidSurfaceControlMagnifier",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-bool IsAndroidSurfaceControlMagnifierEnabled() {
-  static bool enabled =
-      gfx::SurfaceControl::SupportsSurfacelessControl() &&
-      features::IsSlimCompositorEnabled() &&
-      base::FeatureList::IsEnabled(kAndroidSurfaceControlMagnifier);
-  return enabled;
-}
-#endif  // BUILDFLAG(IS_ANDROID)
 
 BASE_FEATURE(kNavigationUpdatesChildViewsVisibility,
              "NavigationUpdatesChildViewsVisibility",
@@ -48,38 +29,11 @@ BASE_FEATURE(kEnsureAllowBindingsIsAlwaysForWebUI,
              "EnsureAllowBindingsIsAlwaysForWebUI",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-BASE_FEATURE(kQueueNavigationsWhileWaitingForCommit,
-             "QueueNavigationsWhileWaitingForCommit",
+#if BUILDFLAG(IS_WIN)
+BASE_FEATURE(kGpuInfoCollectionSeparatePrefetch,
+             "GpuInfoCollectionSeparatePrefetch",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-static constexpr base::FeatureParam<NavigationQueueingFeatureLevel>::Option
-    kNavigationQueueingFeatureLevels[] = {
-        {NavigationQueueingFeatureLevel::kNone, "none"},
-        {NavigationQueueingFeatureLevel::kAvoidRedundantCancellations,
-         "avoid-redundant"},
-        {NavigationQueueingFeatureLevel::kFull, "full"}};
-const base::FeatureParam<NavigationQueueingFeatureLevel>
-    kNavigationQueueingFeatureLevelParam{
-        &kQueueNavigationsWhileWaitingForCommit, "level",
-        NavigationQueueingFeatureLevel::kAvoidRedundantCancellations,
-        &kNavigationQueueingFeatureLevels};
-
-NavigationQueueingFeatureLevel GetNavigationQueueingFeatureLevel() {
-  if (base::FeatureList::IsEnabled(kQueueNavigationsWhileWaitingForCommit)) {
-    return kNavigationQueueingFeatureLevelParam.Get();
-  }
-  return NavigationQueueingFeatureLevel::kNone;
-}
-
-bool ShouldAvoidRedundantNavigationCancellations() {
-  return GetNavigationQueueingFeatureLevel() >=
-         NavigationQueueingFeatureLevel::kAvoidRedundantCancellations;
-}
-
-bool ShouldQueueNavigationsWhenPendingCommitRFHExists() {
-  return GetNavigationQueueingFeatureLevel() ==
-         NavigationQueueingFeatureLevel::kFull;
-}
+#endif
 
 BASE_FEATURE(kRestrictCanAccessDataForOriginToUIThread,
              "RestrictCanAccessDataForOriginToUIThread",

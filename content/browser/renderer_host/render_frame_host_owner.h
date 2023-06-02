@@ -10,6 +10,7 @@
 
 #include "build/build_config.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
+#include "services/network/public/cpp/attribution_reporting_runtime_features.h"
 #include "services/network/public/mojom/referrer_policy.mojom-forward.h"
 #include "third_party/blink/public/mojom/frame/user_activation_update_types.mojom-forward.h"
 #include "third_party/blink/public/mojom/loader/referrer.mojom-forward.h"
@@ -25,10 +26,6 @@ namespace net {
 class IsolationInfo;
 }  // namespace net
 
-namespace network {
-struct AttributionReportingRuntimeFeatures;
-}  // namespace network
-
 namespace url {
 class Origin;
 }  // namespace url
@@ -40,7 +37,6 @@ class NavigationRequest;
 class Navigator;
 class RenderFrameHostManager;
 class RenderFrameHostImpl;
-class SubresourceWebBundleNavigationInfo;
 
 // An interface for RenderFrameHostImpl to communicate with FrameTreeNode owning
 // it (e.g. to initiate or cancel a navigation in the frame).
@@ -114,8 +110,6 @@ class RenderFrameHostOwner {
       const std::vector<GURL>& redirects,
       const GURL& original_url,
       std::unique_ptr<CrossOriginEmbedderPolicyReporter> coep_reporter,
-      std::unique_ptr<SubresourceWebBundleNavigationInfo>
-          subresource_web_bundle_navigation_info,
       int http_response_code) = 0;
 
   // Cancels the navigation owned by the FrameTreeNode.

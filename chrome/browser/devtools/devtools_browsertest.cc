@@ -188,14 +188,26 @@ void DispatchOnTestSuiteSkipCheck(DevToolsWindow* window,
     script << (i ? "," : "") << '\"' << args_array[i] << '\"';
   }
   script << "])";
-  EXPECT_EQ("[OK]", content::EvalJs(wc, script.str(),
-                                    content::EXECUTE_SCRIPT_USE_MANUAL_REPLY));
+
+  content::DOMMessageQueue message_queue;
+  EXPECT_TRUE(content::ExecJs(wc, script.str()));
+
+  std::string result;
+  EXPECT_TRUE(message_queue.WaitForMessage(&result));
+
+  EXPECT_EQ("\"[OK]\"", result);
 }
 
 void LoadLegacyFilesInFrontend(DevToolsWindow* window) {
   WebContents* wc = DevToolsWindowTesting::Get(window)->main_web_contents();
-  ASSERT_EQ("[OK]", content::EvalJs(wc, "uiTests.setupLegacyFilesForTest();",
-                                    content::EXECUTE_SCRIPT_USE_MANUAL_REPLY));
+  content::DOMMessageQueue message_queue;
+  EXPECT_TRUE(content::ExecJs(wc, "uiTests.setupLegacyFilesForTest();",
+                              content::EXECUTE_SCRIPT_NO_RESOLVE_PROMISES));
+
+  std::string result;
+  EXPECT_TRUE(message_queue.WaitForMessage(&result));
+
+  ASSERT_EQ("\"[OK]\"", result);
 }
 
 template <typename... T>
@@ -2048,7 +2060,7 @@ class BrowserAutofillManagerTestDelegateDevtoolsImpl
 
 // Disabled. Failing on MacOS MSAN. See https://crbug.com/849129.
 // Also failing on Linux. See https://crbug.com/1187693.
-#if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+#if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS_LACROS)
 #define MAYBE_TestDispatchKeyEventShowsAutoFill \
   DISABLED_TestDispatchKeyEventShowsAutoFill
 #else
@@ -2135,7 +2147,7 @@ IN_PROC_BROWSER_TEST_F(DevToolsTest, TestToolboxLoadedUndocked) {
   ASSERT_TRUE(toolbox_web_contents());
   DevToolsWindow* on_self =
       DevToolsWindowTesting::OpenDevToolsWindowSync(main_web_contents(), false);
-  ASSERT_FALSE(DevToolsWindowTesting::Get(on_self)->toolbox_web_contents());
+  EXPECT_FALSE(DevToolsWindowTesting::Get(on_self)->toolbox_web_contents());
   DevToolsWindowTesting::CloseDevToolsWindowSync(on_self);
   CloseDevToolsWindow();
 }
@@ -2144,10 +2156,10 @@ IN_PROC_BROWSER_TEST_F(DevToolsTest, TestToolboxLoadedUndocked) {
 // TODO(crbug.com/1320168): Re-enable this test
 IN_PROC_BROWSER_TEST_F(DevToolsTest, DISABLED_TestToolboxNotLoadedDocked) {
   OpenDevToolsWindow(kDebuggerTestPage, true);
-  ASSERT_FALSE(toolbox_web_contents());
+  EXPECT_FALSE(toolbox_web_contents());
   DevToolsWindow* on_self =
       DevToolsWindowTesting::OpenDevToolsWindowSync(main_web_contents(), false);
-  ASSERT_FALSE(DevToolsWindowTesting::Get(on_self)->toolbox_web_contents());
+  EXPECT_FALSE(DevToolsWindowTesting::Get(on_self)->toolbox_web_contents());
   DevToolsWindowTesting::CloseDevToolsWindowSync(on_self);
   CloseDevToolsWindow();
 }
@@ -2337,7 +2349,7 @@ IN_PROC_BROWSER_TEST_F(DevToolsAgentHostTest, TestAgentHostReleased) {
       << "DevToolsAgentHost cannot be found by id";
   browser()->tab_strip_model()->CloseWebContentsAt(0,
                                                    TabCloseTypes::CLOSE_NONE);
-  ASSERT_FALSE(DevToolsAgentHost::GetForId(agent_id).get())
+  EXPECT_FALSE(DevToolsAgentHost::GetForId(agent_id).get())
       << "DevToolsAgentHost is not released when the tab is closed";
 }
 
@@ -2375,7 +2387,7 @@ IN_PROC_BROWSER_TEST_F(DevToolsTest, PolicyDisallowed) {
       browser()->tab_strip_model()->GetWebContentsAt(0);
   DevToolsWindow::OpenDevToolsWindow(web_contents);
   auto agent_host = GetOrCreateDevToolsHostForWebContents(web_contents);
-  ASSERT_FALSE(DevToolsWindow::FindDevToolsWindow(agent_host.get()));
+  EXPECT_FALSE(DevToolsWindow::FindDevToolsWindow(agent_host.get()));
 }
 
 IN_PROC_BROWSER_TEST_F(DevToolsTest, PolicyDisallowedCloseConnection) {
@@ -2387,7 +2399,7 @@ IN_PROC_BROWSER_TEST_F(DevToolsTest, PolicyDisallowedCloseConnection) {
 
   // Policy change must close the connection
   DisallowDevTools(browser());
-  ASSERT_FALSE(DevToolsWindow::FindDevToolsWindow(agent_host.get()));
+  EXPECT_FALSE(DevToolsWindow::FindDevToolsWindow(agent_host.get()));
 }
 
 using ManifestLocation = extensions::mojom::ManifestLocation;
@@ -2440,7 +2452,7 @@ IN_PROC_BROWSER_TEST_F(DevToolsDisallowedForForceInstalledExtensionsPolicyTest,
 
   DevToolsWindow::OpenDevToolsWindow(web_contents);
   auto agent_host = GetOrCreateDevToolsHostForWebContents(web_contents);
-  ASSERT_FALSE(DevToolsWindow::FindDevToolsWindow(agent_host.get()));
+  EXPECT_FALSE(DevToolsWindow::FindDevToolsWindow(agent_host.get()));
 }
 
 IN_PROC_BROWSER_TEST_F(DevToolsDisallowedForForceInstalledExtensionsPolicyTest,
@@ -2453,7 +2465,7 @@ IN_PROC_BROWSER_TEST_F(DevToolsDisallowedForForceInstalledExtensionsPolicyTest,
 
   DevToolsWindow::OpenDevToolsWindow(web_contents);
   auto agent_host = GetOrCreateDevToolsHostForWebContents(web_contents);
-  ASSERT_FALSE(DevToolsWindow::FindDevToolsWindow(agent_host.get()));
+  EXPECT_FALSE(DevToolsWindow::FindDevToolsWindow(agent_host.get()));
 }
 
 IN_PROC_BROWSER_TEST_F(DevToolsDisallowedForForceInstalledExtensionsPolicyTest,
@@ -2482,7 +2494,7 @@ IN_PROC_BROWSER_TEST_F(DevToolsDisallowedForForceInstalledExtensionsPolicyTest,
   // Policy change must close the connection with the policy installed
   // extension.
   DisallowDevToolsForForceInstalledExtenions(browser());
-  ASSERT_FALSE(DevToolsWindow::FindDevToolsWindow(agent_host.get()));
+  EXPECT_FALSE(DevToolsWindow::FindDevToolsWindow(agent_host.get()));
 }
 
 IN_PROC_BROWSER_TEST_F(DevToolsDisallowedForForceInstalledExtensionsPolicyTest,
@@ -2503,7 +2515,7 @@ IN_PROC_BROWSER_TEST_F(DevToolsDisallowedForForceInstalledExtensionsPolicyTest,
   // Navigating to extension page should close DevTools.
   ASSERT_TRUE(ui_test_utils::NavigateToURL(
       browser(), GURL("chrome-extension://" + extension_id + "/options.html")));
-  ASSERT_FALSE(DevToolsWindow::FindDevToolsWindow(agent_host.get()));
+  EXPECT_FALSE(DevToolsWindow::FindDevToolsWindow(agent_host.get()));
 }
 
 IN_PROC_BROWSER_TEST_F(DevToolsDisallowedForForceInstalledExtensionsPolicyTest,
@@ -2683,16 +2695,9 @@ class MockWebUIProvider
 // This tests checks that window is correctly initialized when DevTools is
 // opened while navigation through history with forward and back actions.
 // (crbug.com/627407)
-#if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_CHROMEOS_LACROS)
-// Flaky on MAC and lacros https://crbug.com/1443360
-#define MAYBE_TestWindowInitializedOnNavigateBack \
-  DISABLED_TestWindowInitializedOnNavigateBack
-#else
-#define MAYBE_TestWindowInitializedOnNavigateBack \
-  TestWindowInitializedOnNavigateBack
-#endif
+// TODO(https://crbug.com/1443360): Deflake and re-enable this test.
 IN_PROC_BROWSER_TEST_F(DevToolsTest,
-                       MAYBE_TestWindowInitializedOnNavigateBack) {
+                       DISABLED_TestWindowInitializedOnNavigateBack) {
   TestChromeWebUIControllerFactory test_factory;
   content::ScopedWebUIControllerFactoryRegistration factory_registration(
       &test_factory);
@@ -2914,7 +2919,7 @@ IN_PROC_BROWSER_TEST_F(DevToolsTabTargetTest, InspectElement) {
 }
 
 IN_PROC_BROWSER_TEST_F(DevToolsTest, ExistsForWebContentsAfterClosing) {
-  ASSERT_FALSE(content::DevToolsAgentHost::HasFor(GetInspectedTab()));
+  EXPECT_FALSE(content::DevToolsAgentHost::HasFor(GetInspectedTab()));
 
   // Simulate opening devtools for the current tab.
   OpenDevToolsWindow(kDebuggerTestPage, true);

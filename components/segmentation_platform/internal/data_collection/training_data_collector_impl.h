@@ -52,10 +52,10 @@ class TrainingDataCollectorImpl : public TrainingDataCollector,
   TrainingRequestId OnDecisionTime(proto::SegmentId id,
                                    scoped_refptr<InputContext> input_context,
                                    DecisionType type) override;
-
-  void OnObservationTrigger(const absl::optional<ImmediaCollectionParam>& param,
-                            TrainingRequestId request_id,
-                            const proto::SegmentInfo& segment_info) override;
+  void CollectTrainingData(SegmentId segment_id,
+                           TrainingRequestId request_id,
+                           const TrainingLabels& param,
+                           SuccessCallback callback) override;
 
   // HistogramSignalHandler::Observer implementation.
   void OnHistogramSignalUpdated(const std::string& histogram_name,
@@ -68,14 +68,24 @@ class TrainingDataCollectorImpl : public TrainingDataCollector,
  private:
   struct TrainingTimings;
 
+  // Called when a relevant uma histogram is recorded, when a time delay
+  // trigger is hit or data collection is manually triggered, retrieve input
+  // training data from storage, collect output training data and upload all
+  // training data.
+  void OnObservationTrigger(
+      const absl::optional<ImmediateCollectionParam>& param,
+      TrainingRequestId request_id,
+      const proto::SegmentInfo& segment_info,
+      SuccessCallback callback);
+
   void OnGetSegmentsInfoList(DefaultModelManager::SegmentInfoList segment_list);
 
   void ReportForSegmentsInfoList(
-      const absl::optional<ImmediaCollectionParam>& param,
+      const absl::optional<ImmediateCollectionParam>& param,
       std::unique_ptr<SegmentInfoDatabase::SegmentInfoList> segments);
 
   void OnUmaUpdatedReportForSegmentInfo(
-      const absl::optional<ImmediaCollectionParam>& param,
+      const absl::optional<ImmediateCollectionParam>& param,
       absl::optional<proto::SegmentInfo> segment);
 
   void OnGetSegmentInfoAtDecisionTime(
@@ -94,23 +104,25 @@ class TrainingDataCollectorImpl : public TrainingDataCollector,
       const ModelProvider::Response& output_tensors);
 
   void OnGetStoredTrainingData(
-      const absl::optional<ImmediaCollectionParam>& param,
+      const absl::optional<ImmediateCollectionParam>& param,
       const proto::SegmentInfo& segment_info,
+      SuccessCallback callback,
       absl::optional<proto::TrainingData> input);
 
   void OnGetOutputsOnObservationTrigger(
-      const absl::optional<ImmediaCollectionParam>& param,
+      const absl::optional<ImmediateCollectionParam>& param,
       const proto::SegmentInfo& segment_info,
       const ModelProvider::Request& cached_input_tensors,
       bool has_error,
       const ModelProvider::Request& input_tensors,
       const ModelProvider::Response& output_tensors);
 
-  void OnGetTrainingTensors(const absl::optional<ImmediaCollectionParam>& param,
-                            const proto::SegmentInfo& segment_info,
-                            bool has_error,
-                            const ModelProvider::Request& input_tensors,
-                            const ModelProvider::Response& output_tensors);
+  void OnGetTrainingTensors(
+      const absl::optional<ImmediateCollectionParam>& param,
+      const proto::SegmentInfo& segment_info,
+      bool has_error,
+      const ModelProvider::Request& input_tensors,
+      const ModelProvider::Response& output_tensors);
 
   // Returns whether training data can be reported through UKM. If
   // |include_output| is false, only input data will be checked to see if they
@@ -129,25 +141,26 @@ class TrainingDataCollectorImpl : public TrainingDataCollector,
                         const proto::SegmentInfo& segment_info,
                         proto::TrainingData& training_data);
 
-  const raw_ptr<SegmentInfoDatabase> segment_info_database_;
+  const raw_ptr<SegmentInfoDatabase, DanglingUntriaged> segment_info_database_;
   const raw_ptr<processing::FeatureListQueryProcessor>
       feature_list_query_processor_;
   const raw_ptr<HistogramSignalHandler> histogram_signal_handler_;
   const raw_ptr<UserActionSignalHandler> user_action_signal_handler_;
-  const raw_ptr<SignalStorageConfig> signal_storage_config_;
-  const raw_ptr<const ConfigHolder> config_holder_;
+  const raw_ptr<SignalStorageConfig, DanglingUntriaged> signal_storage_config_;
+  const raw_ptr<const ConfigHolder, DanglingUntriaged> config_holder_;
   const raw_ptr<base::Clock> clock_;
 
   // Helper class to read/write results to the prefs.
   std::unique_ptr<SegmentationResultPrefs> result_prefs_;
 
-  const raw_ptr<CachedResultProvider> cached_result_provider_;
+  const raw_ptr<CachedResultProvider, DanglingUntriaged>
+      cached_result_provider_;
 
   // Cache class to temporarily store training data in the observation period.
   std::unique_ptr<TrainingDataCache> training_cache_;
 
   // Class to get segment info from default models.
-  const raw_ptr<DefaultModelManager> default_model_manager_;
+  const raw_ptr<DefaultModelManager, DanglingUntriaged> default_model_manager_;
 
   // Hash of histograms for immediate training data collection. When any
   // histogram hash contained in the map is recorded, a UKM message is reported

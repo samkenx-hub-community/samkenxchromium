@@ -211,7 +211,6 @@ void ExpectLegacyAppCommandWebSucceeds(UpdaterScope scope,
                                        const base::Value::List& parameters,
                                        int expected_exit_code);
 void ExpectLegacyPolicyStatusSucceeds(UpdaterScope scope);
-void RunTestServiceCommand(const std::string& sub_command);
 
 // Calls a function defined in test/service/win/rpc_client.py.
 // Entries of the `arguments` dictionary should be the function's parameter
@@ -282,6 +281,12 @@ void UninstallApp(UpdaterScope scope, const std::string& app_id);
 void RunOfflineInstall(UpdaterScope scope,
                        bool is_legacy_install,
                        bool is_silent_install);
+
+base::CommandLine MakeElevated(base::CommandLine command_line);
+
+void DMDeregisterDevice(UpdaterScope scope);
+void DMCleanup(UpdaterScope scope);
+
 }  // namespace updater::test
 
 #endif  // CHROME_UPDATER_TEST_INTEGRATION_TESTS_IMPL_H_

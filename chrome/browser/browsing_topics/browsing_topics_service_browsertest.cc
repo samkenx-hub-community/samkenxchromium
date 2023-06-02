@@ -59,7 +59,6 @@ constexpr base::Time kTime1 =
 constexpr base::Time kTime2 =
     base::Time::FromDeltaSinceWindowsEpoch(base::Days(2));
 
-constexpr size_t kTaxonomySize = 349;
 constexpr int kTaxonomyVersion = 1;
 constexpr int64_t kModelVersion = 2;
 constexpr size_t kPaddedTopTopicsStartIndex = 5;
@@ -72,17 +71,14 @@ constexpr char kExpectedApiResult[] =
     "\"configVersion\":\"chrome.1\",\"modelVersion\":\"2\","
     "\"taxonomyVersion\":\"1\",\"topic\":10,\"version\":\"chrome.1:1:2\"};]";
 
+constexpr char kExpectedHeaderValueForEmptyTopics[] =
+    "();p=P0000000000000000000000000000000";
+
 constexpr char kExpectedHeaderValueForSiteA[] =
-    "1;version=\"chrome.1:1:2\";config_version=\"chrome.1\";model_version="
-    "\"2\";taxonomy_version=\"1\", "
-    "10;version=\"chrome.1:1:2\";config_version=\"chrome.1\";model_version="
-    "\"2\";taxonomy_version=\"1\"";
+    "(1 10);v=chrome.1:1:2, ();p=P00000000";
 
 constexpr char kExpectedHeaderValueForSiteB[] =
-    "1;version=\"chrome.1:1:2\";config_version=\"chrome.1\";model_version="
-    "\"2\";taxonomy_version=\"1\", "
-    "7;version=\"chrome.1:1:2\";config_version=\"chrome.1\";model_version="
-    "\"2\";taxonomy_version=\"1\"";
+    "(1 7);v=chrome.1:1:2, ();p=P000000000";
 
 static constexpr char kBrowsingTopicsApiActionTypeHistogramId[] =
     "BrowsingTopics.ApiActionType";
@@ -99,8 +95,8 @@ EpochTopics CreateTestEpochTopics(
   }
 
   return EpochTopics(std::move(top_topics_and_observing_domains),
-                     kPaddedTopTopicsStartIndex, kTaxonomySize,
-                     kTaxonomyVersion, kModelVersion, calculation_time);
+                     kPaddedTopTopicsStartIndex, kTaxonomyVersion,
+                     kModelVersion, calculation_time);
 }
 
 class PortalActivationWaiter : public content::WebContentsObserver {
@@ -1333,7 +1329,7 @@ IN_PROC_BROWSER_TEST_F(
   // Expect an empty header value as "b.test" did not observe the candidate
   // topics.
   EXPECT_TRUE(topics_header_value);
-  EXPECT_TRUE(topics_header_value->empty());
+  EXPECT_EQ(topics_header_value, kExpectedHeaderValueForEmptyTopics);
 
   // No observation should have been recorded in addition to the pre-existing
   // one, as the response did not have the `Observe-Browsing-Topics: ?1` header.
@@ -1633,7 +1629,7 @@ IN_PROC_BROWSER_TEST_F(BrowsingTopicsBrowserTest,
 
     // An empty topics header value was sent, because "c.test" did not observe
     // the candidate topics.
-    EXPECT_TRUE(topics_header_value->empty());
+    EXPECT_EQ(topics_header_value, kExpectedHeaderValueForEmptyTopics);
   }
 
   // Two new observations should have been recorded in addition to the
@@ -1733,7 +1729,7 @@ IN_PROC_BROWSER_TEST_F(
 
     // An empty topics header value was sent, as "c.test" did not observe the
     // candidate topics.
-    EXPECT_TRUE(topics_header_value->empty());
+    EXPECT_EQ(topics_header_value, kExpectedHeaderValueForEmptyTopics);
   }
 
   // A new observation should have been recorded in addition to the pre-existing
@@ -2318,7 +2314,7 @@ IN_PROC_BROWSER_TEST_F(BrowsingTopicsBrowserTest,
 
     // An empty topics header value was sent, because "c.test" did not observe
     // the candidate topics.
-    EXPECT_TRUE(topics_header_value->empty());
+    EXPECT_EQ(topics_header_value, kExpectedHeaderValueForEmptyTopics);
   }
 
   // Two new observations should have been recorded in addition to the

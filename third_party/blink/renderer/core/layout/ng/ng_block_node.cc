@@ -872,10 +872,10 @@ void NGBlockNode::FinishLayout(LayoutBlockFlow* block_flow,
     input.border_padding_for_replaced =
         physical_fragment.Borders() + physical_fragment.Padding();
     box_->ComputeAndSetBlockDirectionMargins(box_->ContainingBlock());
-    if (box_->NeedsLayout())
-      box_->LayoutIfNeeded();
-    else
-      box_->ForceLayout();
+    if (!box_->NeedsLayout()) {
+      box_->SetSelfNeedsLayoutForAvailableSpace(true);
+    }
+    box_->LayoutIfNeeded();
   }
 
   // If we miss the cache for one result (fragment), we need to clear the
@@ -970,7 +970,7 @@ MinMaxSizesResult NGBlockNode::ComputeMinMaxSizes(
   if (!is_in_perform_layout &&
       (IsGrid() ||
        (IsFlexibleBox() && Style().ResolvedIsColumnFlexDirection() &&
-        RuntimeEnabledFeatures::NewFlexboxSizingEnabled()))) {
+        RuntimeEnabledFeatures::LayoutFlexNewColumnAlgorithmEnabled()))) {
     const NGFragmentGeometry fragment_geometry =
         CalculateInitialFragmentGeometry(constraint_space, *this,
                                          /* break_token */ nullptr,
@@ -1663,7 +1663,7 @@ void NGBlockNode::CopyFragmentItemsToLayoutBox(
         if (UNLIKELY(layout_box->HasSelfPaintingLayer()))
           layout_box->Layer()->SetNeedsVisualOverflowRecalc();
 #if DCHECK_IS_ON()
-        layout_box->InvalidateVisualOverflow();
+        layout_box->InvalidateVisualOverflowForDCheck();
 #endif
         continue;
       }
@@ -1680,14 +1680,14 @@ void NGBlockNode::CopyFragmentItemsToLayoutBox(
 }
 
 bool NGBlockNode::IsInlineFormattingContextRoot(
-    NGLayoutInputNode* first_child_out) const {
+    NGInlineNode* first_child_out) const {
   if (const auto* block = DynamicTo<LayoutBlockFlow>(box_.Get())) {
     if (!AreNGBlockFlowChildrenInline(block))
       return false;
     NGLayoutInputNode first_child = FirstChild();
     if (first_child.IsInline()) {
       if (first_child_out)
-        *first_child_out = first_child;
+        *first_child_out = To<NGInlineNode>(first_child);
       return true;
     }
   }

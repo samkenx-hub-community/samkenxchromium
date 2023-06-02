@@ -91,6 +91,7 @@
 #include "components/metrics/structured/neutrino_logging_util.h"
 #include "components/prefs/pref_service.h"
 #include "components/session_manager/core/session_manager.h"
+#include "components/session_manager/session_manager_types.h"
 #include "components/user_manager/user.h"
 #include "components/user_manager/user_manager.h"
 #include "content/public/browser/web_contents.h"
@@ -277,7 +278,13 @@ void ShowLoginWizardFinish(
   // display host to be created.
   DCHECK(session_manager::SessionManager::Get());
   DCHECK(LoginDisplayHost::default_host());
-  WallpaperControllerClientImpl::Get()->SetInitialWallpaper();
+  // Postpone loading wallpaper if the booting animation might be played.
+  if (!features::IsOobeSimonEnabled() ||
+      session_manager::SessionManager::Get()->session_state() !=
+          session_manager::SessionState::OOBE) {
+    WallpaperControllerClientImpl::Get()->SetInitialWallpaper();
+  }
+
   // TODO(crbug.com/1105387): Part of initial screen logic.
   MaybeShowDeviceDisabledScreen();
 }
@@ -560,14 +567,17 @@ void LoginDisplayHostWebUI::StartWizard(OobeScreenId first_screen) {
     auto* welcome_screen = GetWizardController()->GetScreen<WelcomeScreen>();
     const bool should_show =
         wizard_controller_->current_screen() == welcome_screen;
-    if (!should_show) {
-      return;
+    if (should_show) {
+      ash::Shell::Get()
+          ->booting_animation_controller()
+          ->ShowAnimationWithEndCallback(base::BindOnce(
+              &LoginDisplayHostWebUI::OnViewsBootingAnimationPlayed,
+              weak_factory_.GetWeakPtr()));
     }
-    ash::Shell::Get()
-        ->booting_animation_controller()
-        ->ShowAnimationWithEndCallback(
-            base::BindOnce(&LoginDisplayHostWebUI::BootingAnimationFinished,
-                           weak_factory_.GetWeakPtr()));
+    // Show the underlying OOBE WebUI and wallpaper so they are ready once
+    // animation has finished playing.
+    login_window_->Show();
+    WallpaperControllerClientImpl::Get()->SetInitialWallpaper();
   }
 }
 
@@ -693,8 +703,7 @@ void LoginDisplayHostWebUI::OnDisplayMetricsChanged(
   }
 
   if (GetOobeUI()) {
-    GetOobeUI()->GetCoreOobeView()->UpdateClientAreaSize(
-        primary_display.size());
+    GetOobeUI()->GetCoreOobe()->UpdateClientAreaSize(primary_display.size());
     if (changed_metrics & DISPLAY_METRIC_PRIMARY)
       GetOobeUI()->OnDisplayConfigurationChanged();
   }
@@ -705,13 +714,22 @@ void LoginDisplayHostWebUI::OnShowWebUITimeout() {
   ShowWebUI();
 }
 
-void LoginDisplayHostWebUI::BootingAnimationFinished() {
+void LoginDisplayHostWebUI::OnViewsBootingAnimationPlayed() {
+  booting_animation_finished_playing_ = true;
+  if (webui_ready_to_take_over_) {
+    // This function is called by the AnimationObserver which can't destroy the
+    // animation on its own so we need to post a task to do so.
+    content::GetUIThreadTaskRunner({})->PostTask(
+        FROM_HERE,
+        base::BindOnce(&LoginDisplayHostWebUI::FinishBootingAnimation,
+                       weak_factory_.GetWeakPtr()));
+  }
+}
+
+void LoginDisplayHostWebUI::FinishBootingAnimation() {
   CHECK(features::IsOobeSimonEnabled());
-  content::GetUIThreadTaskRunner({})->PostTask(
-      FROM_HERE,
-      base::BindOnce(
-          &BootingAnimationController::Finish,
-          ash::Shell::Get()->booting_animation_controller()->GetWeakPtr()));
+  ash::Shell::Get()->booting_animation_controller()->Finish();
+  GetOobeUI()->GetCoreOobe()->TriggerDown();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -761,12 +779,23 @@ void LoginDisplayHostWebUI::OnCurrentScreenChanged(OobeScreenId current_screen,
     LOG(WARNING) << "LoginDisplayHostWebUI::OnCurrentScreenChanged() "
                     "NotifyLoginOrLockScreenVisible";
 
-    // Notify that the OOBE page is ready and the first screen is shown.
-    session_manager::SessionManager::Get()->NotifyLoginOrLockScreenVisible();
+    // Notify that the OOBE page is ready and the first screen is shown. It
+    // might happen that front-end part isn't fully initialized yet (when
+    // `OobeLazyLoading` is enabled), so wait for it to happen before notifying.
+    GetOobeUI()->IsJSReady(base::BindOnce(
+        &session_manager::SessionManager::NotifyLoginOrLockScreenVisible,
+        base::Unretained(session_manager::SessionManager::Get())));
   } else {
     // TODO(crbug.com/1305245) - Remove once the issue is fixed.
     LOG(WARNING) << "LoginDisplayHostWebUI::OnCurrentScreenChanged() Not "
                     "notifying LoginOrLockScreenVisible.";
+  }
+}
+
+void LoginDisplayHostWebUI::OnBackdropLoaded() {
+  webui_ready_to_take_over_ = true;
+  if (booting_animation_finished_playing_) {
+    FinishBootingAnimation();
   }
 }
 
@@ -783,7 +812,7 @@ bool LoginDisplayHostWebUI::HandleAccelerator(LoginAcceleratorAction action) {
     if (!GetOobeUI()) {
       return false;
     }
-    GetOobeUI()->GetCoreOobeView()->ToggleSystemInfo();
+    GetOobeUI()->GetCoreOobe()->ToggleSystemInfo();
     return true;
   }
 
@@ -823,7 +852,9 @@ void LoginDisplayHostWebUI::LoadURL(const GURL& url) {
   // Subscribe to crash events.
   content::WebContentsObserver::Observe(login_view_->GetWebContents());
   login_view_->LoadURL(url);
-  login_window_->Show();
+  if (!ash::features::IsOobeSimonEnabled()) {
+    login_window_->Show();
+  }
   CHECK(GetOobeUI());
   GetOobeUI()->AddObserver(this);
 }
@@ -1137,6 +1168,11 @@ void ShowLoginWizard(OobeScreenId first_screen) {
     // interrupted auto start enrollment flow because enrollment screen does
     // not handle flaky network. See http://crbug.com/332572
     display_host->StartWizard(WelcomeView::kScreenId);
+    // Make sure we load an initial wallpaper here. If the booting animation
+    // might be played it will be covered by the StartWizard call.
+    if (!ash::features::IsOobeSimonEnabled()) {
+      WallpaperControllerClientImpl::Get()->SetInitialWallpaper();
+    }
     return;
   }
 

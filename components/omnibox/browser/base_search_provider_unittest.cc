@@ -14,6 +14,7 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/test/task_environment.h"
+#include "components/omnibox/browser/actions/omnibox_action_in_suggest.h"
 #include "components/omnibox/browser/autocomplete_match.h"
 #include "components/omnibox/browser/autocomplete_match_type.h"
 #include "components/omnibox/browser/autocomplete_scheme_classifier.h"
@@ -502,5 +503,86 @@ TEST_P(BaseSearchProviderTest, CreateOnDeviceSearchSuggestion) {
                               : AutocompleteMatchType::SEARCH_SUGGEST);
     ASSERT_EQ(match.suggest_type,
               is_tail_suggestion ? omnibox::TYPE_TAIL : omnibox::TYPE_QUERY);
+  }
+}
+
+TEST_P(BaseSearchProviderTest, CreateActionInSuggest_BuildActionURL) {
+  using omnibox::ActionInfo;
+  // Correlation between ActionType and UMA-recorded bucket.
+  struct {
+    const char* test_name;
+    const char* base_url;
+    const char* action_url;
+    std::vector<std::pair<const char*, const char*>> search_params;
+    // query params order is not guaranteed to be the same across all platforms
+    // or even across multiple runs. the vector below captures possible
+    // variants.
+    std::vector<const char*> expect_query_params;
+  } test_cases[]{
+      // clang-format off
+    // Cases explicitly not meant to produce any changes.
+    { "no change: no supplied url, no search params",
+      "https://www.google.com",
+      // ActionInfo action_uri and search_params:
+      "", {}, {}},
+
+    { "no change: supplied url, no search params",
+      "https://www.google.com",
+      // ActionInfo action_uri and search_params:
+      "https://maps.google.com", {}, {}},
+
+    // Cases meant to generate new URL:
+    // - action_uri has to be empty,
+    // - search_params have to be non-empty.
+    { "generate: single query param",
+      "https://g.co",
+      // ActionInfo action_uri and search_params:
+      "", {{"a", "3"}}, {"a=3"}},
+
+    { "generate: multiple query params",
+      "https://g.co:119/search?q=a#f",
+      // ActionInfo action_uri and search_params:
+      "", {{"a", "3"}, {"A", "7"}},
+        {"A=7&a=3", "a=3&A=7"}},
+      // clang-format on
+  };
+
+  for (const auto& test_case : test_cases) {
+    ActionInfo action_info;
+    action_info.set_action_uri(test_case.action_url);
+    for (const auto& param : test_case.search_params) {
+      action_info.mutable_search_parameters()->insert(
+          {param.first, param.second});
+    }
+
+    TemplateURLRef::SearchTermsArgs search_terms_args;
+    search_terms_args.additional_query_params = "never=used&shouldnt=be";
+    SearchTermsData search_terms_data;
+    TemplateURLData template_url_data;
+    template_url_data.SetURL(test_case.base_url);
+    auto template_url = std::make_unique<TemplateURL>(template_url_data);
+
+    auto action = BaseSearchProvider::CreateActionInSuggest(
+        std::move(action_info), template_url->url_ref(), search_terms_args,
+        search_terms_data);
+
+    auto* action_in_suggest = OmniboxActionInSuggest::FromAction(action.get());
+
+    // order of elements in ProtobufMap is not guaranteed, and in fact changes,
+    // even within the same platform. Instead of trying to decompose the params
+    // just check the params against variants that we specified in the
+    // expect_query_params.
+    EXPECT_EQ(action_in_suggest->search_terms_args.has_value(),
+              !test_case.expect_query_params.empty())
+        << "while evaluating case `" << test_case.test_name << '`';
+
+    bool found_matching_param_sequence = test_case.expect_query_params.empty();
+    for (auto* param_sequence : test_case.expect_query_params) {
+      found_matching_param_sequence |=
+          action_in_suggest->search_terms_args->additional_query_params ==
+          param_sequence;
+    }
+    EXPECT_TRUE(found_matching_param_sequence)
+        << "while evaluating case `" << test_case.test_name << '`';
   }
 }

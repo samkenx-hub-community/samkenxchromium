@@ -422,7 +422,7 @@ void ContentBrowserClientImpl::LogWebFeatureForCurrentPage(
 }
 
 std::string ContentBrowserClientImpl::GetProduct() {
-  return version_info::GetProductNameAndVersionForUserAgent();
+  return std::string(version_info::GetProductNameAndVersionForUserAgent());
 }
 
 std::string ContentBrowserClientImpl::GetUserAgent() {
@@ -1053,7 +1053,6 @@ void ContentBrowserClientImpl::AppendExtraCommandLineSwitches(
     // Please keep this in alphabetical order.
     static const char* const kSwitchNames[] = {
         embedder_support::kOriginTrialDisabledFeatures,
-        embedder_support::kOriginTrialDisabledTokens,
         embedder_support::kOriginTrialPublicKey,
     };
     command_line->CopySwitchesFrom(browser_command_line, kSwitchNames,
@@ -1095,7 +1094,8 @@ bool ContentBrowserClientImpl::WillCreateURLLoaderFactory(
         header_client,
     bool* bypass_redirect_checks,
     bool* disable_secure_dns,
-    network::mojom::URLLoaderFactoryOverridePtr* factory_override) {
+    network::mojom::URLLoaderFactoryOverridePtr* factory_override,
+    scoped_refptr<base::SequencedTaskRunner> navigation_response_task_runner) {
   // The navigation API intercepting API only supports main frame navigations.
   if (type != URLLoaderFactoryType::kNavigation || frame->GetParent())
     return false;

@@ -12,7 +12,9 @@
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/browser/ash/arc/input_overlay/actions/action.h"
 #include "chrome/browser/ash/arc/input_overlay/touch_id_manager.h"
+#include "chrome/browser/ash/arc/input_overlay/touch_injector.h"
 #include "chrome/browser/ash/arc/input_overlay/ui/action_label.h"
+#include "chrome/browser/ash/arc/input_overlay/ui/ui_utils.h"
 #include "chrome/browser/ash/arc/input_overlay/util.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "ui/events/keycodes/dom/dom_code.h"
@@ -75,7 +77,6 @@ class ActionMove::ActionMoveMouseView : public ActionView {
   }
   void OnBindingToKeyboard() override { NOTIMPLEMENTED(); }
   void OnBindingToMouse(std::string mouse_action) override { NOTIMPLEMENTED(); }
-  void OnMenuEntryPressed() override { NOTIMPLEMENTED(); }
   void AddTouchPoint() override { NOTIMPLEMENTED(); }
   void MayUpdateLabelPosition(bool moving) override {}
 
@@ -158,15 +159,11 @@ class ActionMove::ActionMoveKeyView : public ActionView {
   void SetDisplayMode(const DisplayMode mode,
                       ActionLabel* editing_label = nullptr) override {
     ActionView::SetDisplayMode(mode, editing_label);
-    if (menu_entry_) {
-      menu_entry_->SetVisible(false);
-    }
   }
 
   // TODO(cuicuiruan): implement for post MVP once the design is ready.
   void OnBindingToKeyboard() override { NOTIMPLEMENTED(); }
   void OnBindingToMouse(std::string mouse_action) override { NOTIMPLEMENTED(); }
-  void OnMenuEntryPressed() override { NOTIMPLEMENTED(); }
   void AddTouchPoint() override { ActionView::AddTouchPoint(ActionType::MOVE); }
   void MayUpdateLabelPosition(bool moving) override {}
 

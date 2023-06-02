@@ -29,7 +29,7 @@
 #include "components/password_manager/core/browser/webauthn_credentials_delegate.h"
 #include "components/profile_metrics/browser_profile_type.h"
 #include "components/safe_browsing/buildflags.h"
-#include "components/sync/driver/sync_service.h"
+#include "components/sync/service/sync_service.h"
 #include "net/cert/cert_status_flags.h"
 #include "services/metrics/public/cpp/ukm_recorder.h"
 
@@ -201,10 +201,12 @@ class PasswordManagerClient {
       ErrorMessageFlowType flow_type,
       password_manager::PasswordStoreBackendErrorType error_type);
 
-  // Instructs the client to show the Touch To Fill UI.
-  virtual void ShowTouchToFill(
+  // Instructs the client to show a keyboard replacing surface UI (e.g.
+  // TouchToFill).
+  virtual void ShowKeyboardReplacingSurface(
       PasswordManagerDriver* driver,
-      autofill::mojom::SubmissionReadinessState submission_readiness);
+      autofill::mojom::SubmissionReadinessState submission_readiness,
+      bool is_webauthn_form);
 #endif
 
   // Returns a pointer to a DeviceAuthenticator. Might be null if

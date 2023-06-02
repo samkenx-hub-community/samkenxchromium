@@ -81,8 +81,10 @@ BASE_DECLARE_FEATURE(kSkipUndecryptablePasswords);
 BASE_DECLARE_FEATURE(kPasskeyManagementUsingAccountSettingsAndroid);
 BASE_DECLARE_FEATURE(kPasswordEditDialogWithDetails);
 BASE_DECLARE_FEATURE(kPasswordGenerationBottomSheet);
+BASE_DECLARE_FEATURE(kPasswordSuggestionBottomSheetV2);
 BASE_DECLARE_FEATURE(kUnifiedCredentialManagerDryRun);
 BASE_DECLARE_FEATURE(kUnifiedPasswordManagerAndroid);
+BASE_DECLARE_FEATURE(kUnifiedPasswordManagerLocalPasswordsAndroid);
 BASE_DECLARE_FEATURE(kUnifiedPasswordManagerLocalPasswordsMigrationWarning);
 BASE_DECLARE_FEATURE(kUnifiedPasswordManagerSyncUsingAndroidBackendOnly);
 BASE_DECLARE_FEATURE(kUnifiedPasswordManagerAndroidBranding);
@@ -91,9 +93,46 @@ BASE_DECLARE_FEATURE(kPasswordsInCredMan);
 #endif
 BASE_DECLARE_FEATURE(kUsernameFirstFlowFallbackCrowdsourcing);
 BASE_DECLARE_FEATURE(kUsernameFirstFlowHonorAutocomplete);
-BASE_DECLARE_FEATURE(kPasswordGenerationPreviewOnHover);
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)  // Desktop
+BASE_DECLARE_FEATURE(kPasswordManagerPasskeys);
+#endif
 
 // All features parameters are in alphabetical order.
+
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)  // Desktop
+// This enum supports enabling specific arms of the
+// `kPasswordGenerationExperiment` (go/strong-passwords-desktop).
+// Keep the order consistent with
+// `kPasswordGenerationExperimentVariationOption` below and with
+// `kPasswordGenerationExperimentVariations` in about_flags.cc.
+enum class PasswordGenerationVariation {
+  // Adjusts the language focusing on recommendation and security messaging.
+  kTrustedAdvice = 1,
+  // Adjusts the language making the suggestion softer and more guiding.
+  kSafetyFirst = 2,
+  // Adjusts the language adding a more persuasive and reassuring tone.
+  kTrySomethingNew = 3,
+  // Adjusts the language focusing on the convenience of use.
+  kConvenience = 4,
+  // Adjusts the language of the help text pointing out the benefits.
+  kCrossDevice = 5,
+};
+
+inline constexpr base::FeatureParam<PasswordGenerationVariation>::Option
+    kPasswordGenerationExperimentVariationOption[] = {
+        {PasswordGenerationVariation::kTrustedAdvice, "trusted_advice"},
+        {PasswordGenerationVariation::kSafetyFirst, "safety_first"},
+        {PasswordGenerationVariation::kTrySomethingNew, "try_something_new"},
+        {PasswordGenerationVariation::kConvenience, "convenience"},
+        {PasswordGenerationVariation::kCrossDevice, "cross_device"},
+};
+
+inline constexpr base::FeatureParam<PasswordGenerationVariation>
+    kPasswordGenerationExperimentVariationParam{
+        &kPasswordGenerationExperiment, "password_generation_variation",
+        PasswordGenerationVariation::kTrustedAdvice,
+        &kPasswordGenerationExperimentVariationOption};
+#endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
 
 // If true, then password strength indicator will display a minimized state for
 // passwords with more than 5 characters as long as they are weak. Otherwise,
@@ -103,28 +142,6 @@ inline constexpr base::FeatureParam<bool>
         &kPasswordStrengthIndicator, "strength_indicator_minimized", false};
 
 #if BUILDFLAG(IS_ANDROID)
-extern const base::FeatureParam<int> kMigrationVersion;
-
-// Current version of the GMS Core API errors lists. Users save this value on
-// eviction due to error and will only be re-enrolled to the experiment if the
-// configured version is greater than the saved one.
-inline constexpr base::FeatureParam<int> kGmsApiErrorListVersion = {
-    &kUnifiedPasswordManagerAndroid, "api_error_list_version", 1};
-
-// Current list of the GMS Core API error codes that should be ignored and not
-// result in user eviction.
-// Errors to ignore: AUTH_ERROR_RESOLVABLE, AUTH_ERROR_UNRESOLVABLE
-inline constexpr base::FeatureParam<std::string> kIgnoredGmsApiErrors = {
-    &kUnifiedPasswordManagerAndroid, "ignored_api_errors", "11005,11006"};
-
-// Current list of the GMS Core API error codes considered retriable.
-// User could still be evicted if retries do not resolve the error.
-// Retriable errors: NETWORK_ERROR, API_NOT_CONNECTED,
-// CONNECTION_SUSPENDED_DURING_CALL, RECONNECTION_TIMED_OUT,
-// BACKEND_GENERIC
-inline constexpr base::FeatureParam<std::string> kRetriableGmsApiErrors = {
-    &kUnifiedPasswordManagerAndroid, "retriable_api_errors",
-    "7,17,20,22,11009"};
 
 inline constexpr base::FeatureParam<UpmExperimentVariation>::Option
     kUpmExperimentVariationOption[] = {
@@ -173,10 +190,6 @@ bool UsesUnifiedPasswordManagerBranding();
 // that requires migrating existing credentials. Independent of
 // whether only non-syncable data needs to be migrated or full credentials.
 bool RequiresMigrationForUnifiedPasswordManager();
-
-// Returns true if the unified password manager feature is active and in a stage
-// that uses the unified storage for passwords that remain local on the device.
-bool ManagesLocalPasswordsInUnifiedPasswordManager();
 #endif  // IS_ANDROID
 
 #if BUILDFLAG(IS_IOS)

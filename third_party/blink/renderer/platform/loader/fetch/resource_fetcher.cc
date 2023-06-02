@@ -145,6 +145,7 @@ const std::string ResourceTypeName(ResourceType type) {
     RESOURCE_TYPE_NAME(Manifest)          // 12
     RESOURCE_TYPE_NAME(SpeculationRules)  // 13
     RESOURCE_TYPE_NAME(Mock)              // 14
+    RESOURCE_TYPE_NAME(Dictionary)        // 15
   }
 }
 
@@ -173,6 +174,7 @@ ResourceLoadPriority TypeToPriority(ResourceType type) {
       return ResourceLoadPriority::kLow;
     case ResourceType::kLinkPrefetch:
     case ResourceType::kSpeculationRules:
+    case ResourceType::kDictionary:
       return ResourceLoadPriority::kVeryLow;
   }
 
@@ -396,6 +398,8 @@ mojom::blink::RequestContextType ResourceFetcher::DetermineRequestContext(
       return mojom::blink::RequestContextType::SUBRESOURCE;
     case ResourceType::kSpeculationRules:
       return mojom::blink::RequestContextType::SUBRESOURCE;
+    case ResourceType::kDictionary:
+      return mojom::blink::RequestContextType::SUBRESOURCE;
   }
   NOTREACHED();
   return mojom::blink::RequestContextType::SUBRESOURCE;
@@ -427,6 +431,7 @@ network::mojom::RequestDestination ResourceFetcher::DetermineRequestDestination(
     case ResourceType::kRaw:
     case ResourceType::kLinkPrefetch:
     case ResourceType::kMock:
+    case ResourceType::kDictionary:
       return network::mojom::RequestDestination::kEmpty;
   }
   NOTREACHED();
@@ -791,6 +796,7 @@ void ResourceFetcher::DidLoadResourceFromMemoryCache(
     if (!resource_timing_report_timer_.IsActive())
       resource_timing_report_timer_.StartOneShot(base::TimeDelta(), FROM_HERE);
   }
+  resource->SetIsLoadedFromMemoryCache();
 }
 
 Resource* ResourceFetcher::CreateResourceForStaticData(
@@ -929,11 +935,6 @@ void ResourceFetcher::UpdateMemoryCacheStats(
     RecordResourceHistogram("Preload.", factory.GetType(), policy);
   } else {
     RecordResourceHistogram("", factory.GetType(), policy);
-
-    // Log metrics to evaluate effectiveness of the memory cache if it was
-    // partitioned by the top-frame site.
-    if (same_top_frame_site_resource_cached)
-      RecordResourceHistogram("PerTopFrameSite.", factory.GetType(), policy);
   }
 
   // Aims to count Resource only referenced from MemoryCache (i.e. what would be
@@ -1089,7 +1090,8 @@ absl::optional<ResourceRequestBlockedReason> ResourceFetcher::PrepareRequest(
     // Add the "Sec-Purpose: prefetch;prerender" header to requests issued from
     // prerendered pages. Add "Purpose: prefetch" as well for compatibility
     // concerns (See https://github.com/WICG/nav-speculation/issues/133).
-    resource_request.SetHttpHeaderField("Sec-Purpose", "prefetch;prerender");
+    resource_request.SetHttpHeaderField(http_names::kSecPurpose,
+                                        AtomicString("prefetch;prerender"));
     resource_request.SetPurposeHeader("prefetch");
   }
 
@@ -1473,7 +1475,7 @@ void ResourceFetcher::InitializeRevalidation(
     if (revalidating_request.GetCacheMode() ==
         mojom::blink::FetchCacheMode::kValidateCache) {
       revalidating_request.SetHttpHeaderField(http_names::kCacheControl,
-                                              "max-age=0");
+                                              AtomicString("max-age=0"));
     }
   }
   if (!last_modified.empty()) {
@@ -2240,7 +2242,7 @@ void ResourceFetcher::HandleLoaderFinish(Resource* resource,
           network::mojom::FetchResponseType::kOpaque &&
       resource->GetResponse().HasRangeRequested() &&
       !resource->GetResourceRequest().HttpHeaderFields().Contains(
-          net::HttpRequestHeaders::kRange)) {
+          http_names::kRange)) {
     RemovePreload(resource);
   }
 
@@ -2723,7 +2725,8 @@ void ResourceFetcher::PopulateAndAddResourceTimingInfo(
     if (!response.NetworkAccessed() &&
         (!response.WasFetchedViaServiceWorker() ||
          response.IsServiceWorkerPassThrough())) {
-      initiator_type = "early-hints";
+      initiator_type = AtomicString("early-hints");
+      resource->SetIsPreloadedByEarlyHints();
     }
   }
 
@@ -2972,6 +2975,13 @@ void ResourceFetcher::UpdateServiceWorkerSubresourceMetrics(
         metrics.mock_handled |= true;
       } else {
         metrics.mock_fallback |= true;
+      }
+      break;
+    case ResourceType::kDictionary:  // 14
+      if (handled_by_serviceworker) {
+        metrics.dictionary_handled |= true;
+      } else {
+        metrics.dictionary_fallback |= true;
       }
       break;
   }

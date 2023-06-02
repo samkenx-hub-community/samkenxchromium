@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {assertEquals, assertFalse, assertTrue} from 'chrome://webui-test/chromeos/chai_assert.js';
+import {assertEquals, assertFalse, assertNotEquals, assertTrue} from 'chrome://webui-test/chromeos/chai_assert.js';
 
+import {MockVolumeManager} from '../../background/js/mock_volume_manager.js';
 import {createChild} from '../../common/js/dom_utils.js';
 import {FakeEntryImpl} from '../../common/js/files_app_entry_types.js';
 import {str, util} from '../../common/js/util.js';
@@ -20,6 +21,7 @@ import {EmptyFolderController} from './empty_folder_controller.js';
 import {FileListModel} from './file_list_model.js';
 import {MockMetadataModel} from './metadata/mock_metadata.js';
 import {createFakeDirectoryModel} from './mock_directory_model.js';
+import {ProvidersModel} from './providers_model.js';
 
 /**
  * @type {!HTMLElement}
@@ -30,6 +32,11 @@ let element;
  * @type {!DirectoryModel}
  */
 let directoryModel;
+
+/**
+ * @type {!ProvidersModel}
+ */
+let providersModel;
 
 /**
  * @type {!FileListModel}
@@ -60,12 +67,13 @@ export function setUp() {
   fileListModel = new FileListModel(new MockMetadataModel({}));
   directoryModel.getFileList = () => fileListModel;
   directoryModel.isSearching = () => false;
+  providersModel = new ProvidersModel(new MockVolumeManager());
   recentEntry = new FakeEntryImpl(
       'Recent', VolumeManagerCommon.RootType.RECENT,
       chrome.fileManagerPrivate.SourceRestriction.ANY_SOURCE,
       chrome.fileManagerPrivate.FileCategory.ALL);
-  emptyFolderController =
-      new EmptyFolderController(element, directoryModel, recentEntry);
+  emptyFolderController = new EmptyFolderController(
+      element, directoryModel, providersModel, recentEntry);
 }
 
 /**
@@ -204,9 +212,8 @@ export function testShownForODFS() {
   emptyFolderController.onScanFailed_(event);
 
   assertFalse(element.hidden);
-  const text = emptyFolderController.label_.innerText;
-  // TODO(b/254586358): use the i18n version of this string.
-  assertTrue(text.includes('You\'ve been logged out'));
+  const signInLink = emptyFolderController.label_.querySelector('.sign-in');
+  assertNotEquals(signInLink, null);
 }
 
 /**

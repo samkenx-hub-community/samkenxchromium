@@ -37,6 +37,10 @@
 #include "components/signin/public/identity_manager/identity_test_environment.h"
 #include "content/public/test/browser_test.h"
 
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+#include "chrome/browser/enterprise/connectors/analysis/fake_content_analysis_sdk_manager.h"  // nogncheck
+#endif
+
 using extensions::SafeBrowsingPrivateEventRouter;
 using safe_browsing::BinaryUploadService;
 using safe_browsing::CloudBinaryUploadService;
@@ -102,8 +106,7 @@ class FakeBinaryUploadService : public CloudBinaryUploadService {
 
   void SetExpectedFinalAction(
       const std::string& request_token,
-      enterprise_connectors::ContentAnalysisAcknowledgement::FinalAction
-          final_action) {
+      ContentAnalysisAcknowledgement::FinalAction final_action) {
     request_tokens_to_final_actions_[request_token] = final_action;
   }
 
@@ -328,12 +331,10 @@ class ContentAnalysisDelegateBrowserTestBase
         machine_scope_ ? kBrowserDMToken : kProfileDMToken);
 #endif
     if (machine_scope_) {
-      enterprise_connectors::RealtimeReportingClientFactory::GetForProfile(
-          browser()->profile())
+      RealtimeReportingClientFactory::GetForProfile(browser()->profile())
           ->SetBrowserCloudPolicyClientForTesting(client_.get());
     } else {
-      enterprise_connectors::RealtimeReportingClientFactory::GetForProfile(
-          browser()->profile())
+      RealtimeReportingClientFactory::GetForProfile(browser()->profile())
 #if BUILDFLAG(IS_CHROMEOS_ASH)
           ->SetBrowserCloudPolicyClientForTesting(client_.get());
 #else
@@ -344,8 +345,7 @@ class ContentAnalysisDelegateBrowserTestBase
         std::make_unique<signin::IdentityTestEnvironment>();
     identity_test_environment_->MakePrimaryAccountAvailable(
         kUserName, signin::ConsentLevel::kSync);
-    extensions::SafeBrowsingPrivateEventRouterFactory::GetForProfile(
-        browser()->profile())
+    RealtimeReportingClientFactory::GetForProfile(browser()->profile())
         ->SetIdentityManagerForTesting(
             identity_test_environment_->identity_manager());
   }
@@ -375,6 +375,12 @@ class ContentAnalysisDelegateBrowserTestBase
   }
 
  private:
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+  // This installs a fake SDK manager that creates fake SDK clients when
+  // its GetClient() method is called. This is needed so that calls to
+  // ContentAnalysisSdkManager::Get()->GetClient() do not fail.
+  FakeContentAnalysisSdkManager sdk_manager_;
+#endif
   std::unique_ptr<policy::MockCloudPolicyClient> client_;
   std::unique_ptr<signin::IdentityTestEnvironment> identity_test_environment_;
   base::ScopedTempDir temp_dir_;

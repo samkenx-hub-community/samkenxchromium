@@ -20,7 +20,6 @@
 #include "chrome/browser/ash/app_restore/full_restore_service_factory.h"
 #include "chrome/browser/ash/apps/apk_web_app_service_factory.h"
 #include "chrome/browser/ash/arc/session/arc_service_launcher.h"
-#include "chrome/browser/ash/authpolicy/authpolicy_credentials_manager.h"
 #include "chrome/browser/ash/bluetooth/debug_logs_manager_factory.h"
 #include "chrome/browser/ash/borealis/borealis_service_factory.h"
 #include "chrome/browser/ash/bruschetta/bruschetta_service_factory.h"
@@ -49,6 +48,7 @@
 #include "chrome/browser/ash/file_system_provider/service_factory.h"
 #include "chrome/browser/ash/fileapi/file_change_service_factory.h"
 #include "chrome/browser/ash/fileapi/recent_model_factory.h"
+#include "chrome/browser/ash/floating_workspace/floating_workspace_service_factory.h"
 #include "chrome/browser/ash/guest_os/guest_os_mime_types_service_factory.h"
 #include "chrome/browser/ash/guest_os/guest_os_registry_service_factory.h"
 #include "chrome/browser/ash/guest_os/guest_os_session_tracker_factory.h"
@@ -104,6 +104,7 @@
 #include "chrome/browser/speech/cros_speech_recognition_service_factory.h"
 #include "chrome/browser/speech/extension_api/tts_engine_extension_observer_chromeos.h"
 #include "chrome/browser/ui/ash/calendar/calendar_keyed_service_factory.h"
+#include "chrome/browser/ui/ash/desks/admin_template_service_factory.h"
 #include "chrome/browser/ui/ash/glanceables/glanceables_keyed_service_factory.h"
 #include "chrome/browser/ui/ash/global_media_controls/cast_media_notification_producer_keyed_service_factory.h"
 #include "chrome/browser/ui/ash/holding_space/holding_space_keyed_service_factory.h"
@@ -126,6 +127,7 @@ void EnsureBrowserContextKeyedServiceFactoriesBuilt() {
   apps::ArcAppsFactory::GetInstance();
   arc::ArcServiceLauncher::EnsureFactoriesBuilt();
   ash::AccountManagerPolicyControllerFactory::GetInstance();
+  ash::AdminTemplateServiceFactory::GetInstance();
   ash::ApkWebAppServiceFactory::GetInstance();
   ash::ArcKioskAppServiceFactory::GetInstance();
   ash::AuthErrorObserverFactory::GetInstance();
@@ -157,7 +159,6 @@ void EnsureBrowserContextKeyedServiceFactoriesBuilt() {
   ash::quick_unlock::QuickUnlockFactory::GetInstance();
   ash::settings::OsSettingsHatsManagerFactory::GetInstance();
   ash::settings::OsSettingsManagerFactory::GetInstance();
-  AuthPolicyCredentialsManagerFactory::GetInstance();
   ax::AccessibilityServiceRouterFactory::EnsureFactoryBuilt();
   bluetooth::DebugLogsManagerFactory::GetInstance();
   borealis::BorealisServiceFactory::GetInstance();
@@ -193,6 +194,7 @@ void EnsureBrowserContextKeyedServiceFactoriesBuilt() {
   file_manager::EventRouterFactory::GetInstance();
   file_manager::VolumeManagerFactory::GetInstance();
   file_system_provider::ServiceFactory::GetInstance();
+  FloatingWorkspaceServiceFactory::GetInstance();
   full_restore::FullRestoreServiceFactory::GetInstance();
   GlanceablesKeyedServiceFactory::GetInstance();
   guest_os::GuestOsMimeTypesServiceFactory::GetInstance();

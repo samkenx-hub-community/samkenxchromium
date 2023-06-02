@@ -88,7 +88,7 @@ void UninstallWebAppWithDialogFromStartupSwitch(const AppId& app_id,
   std::unique_ptr<ScopedKeepAlive> scoped_keep_alive =
       std::make_unique<ScopedKeepAlive>(KeepAliveOrigin::WEB_APP_UNINSTALL,
                                         KeepAliveRestartOption::DISABLED);
-  if (provider->install_finalizer().CanUserUninstallWebApp(app_id)) {
+  if (provider->registrar_unsafe().CanUserUninstallWebApp(app_id)) {
     WebAppUiManagerImpl::Get(provider)->dialog_manager().UninstallWebApp(
         app_id, webapps::WebappUninstallSource::kOsSettings,
         gfx::kNullNativeWindow,
@@ -334,7 +334,9 @@ void WebAppUiManagerImpl::TriggerInstallDialog(
     content::WebContents* web_contents) {
   web_app::CreateWebAppFromManifest(
       web_contents, /*bypass_service_worker_check=*/true,
-      webapps::WebappInstallSource::INTERNAL_DEFAULT, base::DoNothing());
+      // TODO(issuetracker.google.com/283034487): Consider passing in the
+      // install source from the caller.
+      webapps::WebappInstallSource::OMNIBOX_INSTALL_ICON, base::DoNothing());
 }
 
 void WebAppUiManagerImpl::OnBrowserAdded(Browser* browser) {

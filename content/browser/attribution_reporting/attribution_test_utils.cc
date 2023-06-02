@@ -14,6 +14,7 @@
 #include "base/check.h"
 #include "base/functional/callback.h"
 #include "base/functional/callback_helpers.h"
+#include "base/functional/function_ref.h"
 #include "base/run_loop.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/test/bind.h"
@@ -28,6 +29,7 @@
 #include "components/attribution_reporting/suitable_origin.h"
 #include "components/attribution_reporting/test_utils.h"
 #include "components/attribution_reporting/trigger_registration.h"
+#include "content/browser/attribution_reporting/attribution_config.h"
 #include "content/browser/attribution_reporting/attribution_manager.h"
 #include "content/browser/attribution_reporting/attribution_observer.h"
 #include "content/browser/attribution_reporting/attribution_reporting.mojom.h"
@@ -38,8 +40,10 @@
 #include "content/public/browser/attribution_data_model.h"
 #include "net/base/net_errors.h"
 #include "net/base/schemeful_site.h"
+#include "net/http/structured_headers.h"
 #include "services/network/public/cpp/trigger_verification.h"
 #include "services/network/public/cpp/trigger_verification_test_utils.h"
+#include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/abseil-cpp/absl/numeric/int128.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "url/gurl.h"
@@ -82,6 +86,13 @@ absl::optional<base::Time> GetReportWindowTimeForTesting(
     return absl::nullopt;
   }
   return source_time + *declared_window;
+}
+
+AttributionConfig::RateLimitConfig RateLimitWith(
+    base::FunctionRef<void(AttributionConfig::RateLimitConfig&)> f) {
+  AttributionConfig::RateLimitConfig limit;
+  f(limit);
+  return limit;
 }
 
 // Builds an impression with default values. This is done as a builder because
@@ -918,8 +929,10 @@ std::ostream& operator<<(std::ostream& out, SendResult::Status status) {
       return out << "kFailure";
     case SendResult::Status::kDropped:
       return out << "kDropped";
-    case SendResult::Status::kFailedToAssemble:
-      return out << "kFailedToAssemble";
+    case SendResult::Status::kAssemblyFailure:
+      return out << "kAssemblyFailure";
+    case SendResult::Status::kTransientAssemblyFailure:
+      return out << "kTransientAssemblyFailure";
   }
 }
 
@@ -1169,6 +1182,73 @@ std::ostream& operator<<(std::ostream& out, const OsRegistration& r) {
   return out << "{registration_url=" << r.registration_url
              << ",top_level_origin=" << r.top_level_origin
              << ",type=" << r.GetType() << "}";
+}
+
+namespace {
+
+void CheckAttributionReportingHeader(
+    const std::string& header,
+    const std::vector<std::string>& required_keys,
+    const std::vector<std::string>& prohibited_keys) {
+  auto dict = net::structured_headers::ParseDictionary(header);
+  EXPECT_TRUE(dict.has_value());
+  if (!dict.has_value()) {
+    return;
+  }
+
+  for (const auto& key : required_keys) {
+    EXPECT_TRUE(dict->contains(key)) << key;
+  }
+
+  for (const auto& key : prohibited_keys) {
+    EXPECT_FALSE(dict->contains(key)) << key;
+  }
+}
+
+}  // namespace
+
+void ExpectValidAttributionReportingEligibleHeaderForEventBeacon(
+    const std::string& header) {
+  CheckAttributionReportingHeader(
+      header,
+      /*required_keys=*/{"event-source"},
+      /*prohibited_keys=*/{"navigation-source", "trigger"});
+}
+
+void ExpectValidAttributionReportingEligibleHeaderForImg(
+    const std::string& header) {
+  CheckAttributionReportingHeader(header,
+                                  /*required_keys=*/{"event-source", "trigger"},
+                                  /*prohibited_keys=*/{"navigation-source"});
+}
+
+void ExpectValidAttributionReportingEligibleHeaderForNavigation(
+    const std::string& header) {
+  CheckAttributionReportingHeader(
+      header,
+      /*required_keys=*/{"navigation-source"},
+      /*prohibited_keys=*/{"event-source", "trigger"});
+}
+
+void ExpectValidAttributionReportingSupportHeader(const std::string& header,
+                                                  bool web_expected,
+                                                  bool os_expected) {
+  std::vector<std::string> required_keys;
+  std::vector<std::string> prohibited_keys;
+
+  if (web_expected) {
+    required_keys.emplace_back("web");
+  } else {
+    prohibited_keys.emplace_back("web");
+  }
+
+  if (os_expected) {
+    required_keys.emplace_back("os");
+  } else {
+    prohibited_keys.emplace_back("os");
+  }
+
+  CheckAttributionReportingHeader(header, required_keys, prohibited_keys);
 }
 
 }  // namespace content

@@ -23,19 +23,16 @@ constexpr int kPreviewWidth = 320;
 constexpr int kPreviewHeight = 240;
 constexpr int kPadding = 8;
 constexpr int kFaviconWidth = 16;
-constexpr int kFaviconHeight = kFaviconWidth;
 constexpr int kFaviconTabTitleRowHeight = 20;
 
 // Derived UI measurements
-constexpr int kFaviconExtraPadding =
-    (kFaviconTabTitleRowHeight - kFaviconHeight) / 2;
 constexpr gfx::Rect kPreviewRect(kPadding,
                                  kPadding,
                                  kPreviewWidth,
                                  kPreviewHeight);
+// TODO(crbug.com/1447461): Align favicon height properly with label.
 constexpr gfx::Rect kFaviconRect(kPadding,
-                                 kPreviewRect.bottom() + kPadding +
-                                     kFaviconExtraPadding,
+                                 kPreviewRect.bottom() + kPadding,
                                  kFaviconWidth,
                                  kFaviconTabTitleRowHeight);
 constexpr gfx::Rect kTabTitleMaxRect(kFaviconRect.right() + kPadding,
@@ -75,19 +72,14 @@ ShareThisTabSourceView::ShareThisTabSourceView(
           {base::MayBlock(), base::TaskPriority::USER_VISIBLE})) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   CHECK(web_contents_);
-  View* throbber_container = AddChildView(std::make_unique<views::View>());
-  views::BoxLayout* throbber_layout =
-      throbber_container->SetLayoutManager(std::make_unique<views::BoxLayout>(
-          views::BoxLayout::Orientation::kHorizontal));
-  throbber_layout->set_main_axis_alignment(
-      views::BoxLayout::MainAxisAlignment::kCenter);
-  throbber_layout->set_cross_axis_alignment(
-      views::BoxLayout::CrossAxisAlignment::kCenter);
-  // TODO(crbug.com/1428878): Use distances from LayoutProvider
-  throbber_container->SetBoundsRect(kPreviewRect);
-  throbber_container->SetCanProcessEventsWithinSubtree(false);
-  throbber_ =
-      throbber_container->AddChildView(std::make_unique<views::Throbber>());
+
+  constexpr int kThrobberRadius = 14;
+  constexpr gfx::Rect kThrobberRect(
+      kPadding + kPreviewWidth / 2 - kThrobberRadius,
+      kPadding + kPreviewHeight / 2 - kThrobberRadius, 2 * kThrobberRadius,
+      2 * kThrobberRadius);
+  throbber_ = AddChildView(std::make_unique<views::Throbber>());
+  throbber_->SetBoundsRect(kThrobberRect);
   throbber_->Start();
 
   image_view_ = AddChildView(std::make_unique<views::ImageView>());

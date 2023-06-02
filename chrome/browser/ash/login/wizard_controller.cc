@@ -51,7 +51,6 @@
 #include "chrome/browser/ash/login/login_wizard.h"
 #include "chrome/browser/ash/login/oobe_screen.h"
 #include "chrome/browser/ash/login/quick_unlock/quick_unlock_utils.h"
-#include "chrome/browser/ash/login/screens/active_directory_password_change_screen.h"
 #include "chrome/browser/ash/login/screens/app_downloading_screen.h"
 #include "chrome/browser/ash/login/screens/arc_vm_data_migration_screen.h"
 #include "chrome/browser/ash/login/screens/assistant_optin_flow_screen.h"
@@ -93,6 +92,7 @@
 #include "chrome/browser/ash/login/screens/offline_login_screen.h"
 #include "chrome/browser/ash/login/screens/packaged_license_screen.h"
 #include "chrome/browser/ash/login/screens/pin_setup_screen.h"
+#include "chrome/browser/ash/login/screens/quick_start_screen.h"
 #include "chrome/browser/ash/login/screens/recommend_apps_screen.h"
 #include "chrome/browser/ash/login/screens/recovery_eligibility_screen.h"
 #include "chrome/browser/ash/login/screens/reset_screen.h"
@@ -131,7 +131,6 @@
 #include "chrome/browser/policy/profile_policy_connector.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_manager.h"
-#include "chrome/browser/ui/webui/ash/login/active_directory_password_change_screen_handler.h"
 #include "chrome/browser/ui/webui/ash/login/app_downloading_screen_handler.h"
 #include "chrome/browser/ui/webui/ash/login/app_launch_splash_screen_handler.h"
 #include "chrome/browser/ui/webui/ash/login/arc_vm_data_migration_screen_handler.h"
@@ -201,6 +200,7 @@
 #include "chromeos/ash/components/dbus/session_manager/session_manager_client.h"
 #include "chromeos/ash/components/dbus/update_engine/update_engine_client.h"
 #include "chromeos/ash/components/geolocation/simple_geolocation_provider.h"
+#include "chromeos/ash/components/language_packs/language_pack_manager.h"
 #include "chromeos/ash/components/network/network_state.h"
 #include "chromeos/ash/components/network/network_state_handler.h"
 #include "chromeos/ash/components/settings/cros_settings_names.h"
@@ -268,7 +268,9 @@ const StaticOobeScreenId kResumablePostLoginScreens[] = {
     MultiDeviceSetupScreenView::kScreenId,
     ConsolidatedConsentScreenView::kScreenId,
     ThemeSelectionScreenView::kScreenId,
-};
+    ChoobeScreenView::kScreenId,
+    DisplaySizeScreenView::kScreenId,
+    TouchpadScrollScreenView::kScreenId};
 
 const StaticOobeScreenId kScreensWithHiddenStatusArea[] = {
     EnableAdbSideloadingScreenView::kScreenId,
@@ -280,6 +282,10 @@ const StaticOobeScreenId kScreensWithHiddenStatusArea[] = {
     WrongHWIDScreenView::kScreenId,
     LocalStateErrorScreenView::kScreenId,
 };
+
+std::string GetApplicationLocale() {
+  return g_browser_process->GetApplicationLocale();
+}
 
 bool IsResumableOobeScreen(OobeScreenId screen_id) {
   for (const auto& resumable_screen : kResumableOobeScreens) {
@@ -360,13 +366,6 @@ OobeUI* GetOobeUI() {
   return host ? host->GetOobeUI() : nullptr;
 }
 
-scoped_refptr<network::SharedURLLoaderFactory>&
-GetSharedURLLoaderFactoryForTesting() {
-  static base::NoDestructor<scoped_refptr<network::SharedURLLoaderFactory>>
-      loader;
-  return *loader;
-}
-
 OobeScreenId PrefToScreenId(const std::string& pref_value) {
   if (pref_value == kLegacyUpdateScreenName) {
     return UpdateView::kScreenId;
@@ -379,6 +378,11 @@ bool IsGaiaPageDefaultsToSAML() {
   bool authentication_behavior_set = CrosSettings::Get()->GetInteger(
       kLoginAuthenticationBehavior, &authentication_behavior);
   return authentication_behavior_set && authentication_behavior;
+}
+
+bool IsContextNeededForScreen(OobeScreenId screen_id) {
+  return screen_id == SamlConfirmPasswordView::kScreenId ||
+         screen_id == CryptohomeRecoveryScreenView::kScreenId;
 }
 
 }  // namespace
@@ -404,7 +408,9 @@ PrefService* WizardController::local_state_for_testing_ = nullptr;
 
 WizardController::WizardController(WizardContext* wizard_context)
     : screen_manager_(std::make_unique<ScreenManager>()),
-      wizard_context_(wizard_context) {
+      wizard_context_(wizard_context),
+      shared_url_loader_factory_(
+          g_browser_process->shared_url_loader_factory()) {
   wizard_context_->skip_post_login_screens_for_tests =
       switches::ShouldSkipOobePostLogin();
   AccessibilityManager* accessibility_manager = AccessibilityManager::Get();
@@ -578,8 +584,7 @@ void WizardController::SetCurrentScreenForTesting(BaseScreen* screen) {
 
 void WizardController::SetSharedURLLoaderFactoryForTesting(
     scoped_refptr<network::SharedURLLoaderFactory> factory) {
-  auto& testing_factory = GetSharedURLLoaderFactoryForTesting();
-  testing_factory = std::move(factory);
+  shared_url_loader_factory_ = factory;
 }
 
 std::vector<std::pair<OobeScreenId, std::unique_ptr<BaseScreen>>>
@@ -789,13 +794,6 @@ WizardController::CreateScreens() {
     append(std::move(gaia_password_change_screen));
   }
 
-  append(std::make_unique<ActiveDirectoryPasswordChangeScreen>(
-      oobe_ui->GetView<ActiveDirectoryPasswordChangeScreenHandler>()
-          ->AsWeakPtr(),
-      base::BindRepeating(
-          &WizardController::OnActiveDirectoryPasswordChangeScreenExit,
-          weak_factory_.GetWeakPtr())));
-
   append(std::make_unique<FamilyLinkNoticeScreen>(
       oobe_ui->GetView<FamilyLinkNoticeScreenHandler>()->AsWeakPtr(),
       base::BindRepeating(&WizardController::OnFamilyLinkNoticeScreenExit,
@@ -928,12 +926,12 @@ void WizardController::ShowSignInFatalErrorScreen(
 void WizardController::OnSignInFatalErrorScreenExit() {
   OnScreenExit(SignInFatalErrorView::kScreenId, kDefaultExitReason);
   if (base::Contains(previous_screens_, current_screen_) &&
-      previous_screens_[current_screen_]->screen_id() ==
-          SamlConfirmPasswordView::kScreenId) {
+      IsContextNeededForScreen(
+          previous_screens_[current_screen_]->screen_id())) {
     // If the last screen user have visited before reaching SignInFatalError
-    // screen was SamlConfirmPassword screen we should not go back there because
-    // the context is lost at this point. We should go to the Gaia screen
-    // instead.
+    // screen was a screen that needs user context, we should not go back there
+    // because the context is lost at this point. We should go to the Gaia
+    // screen instead.
     previous_screens_[current_screen_] = GetScreen(GaiaView::kScreenId);
     GetScreen<GaiaScreen>()->LoadOnline(EmptyAccountId());
   }
@@ -1170,12 +1168,6 @@ void WizardController::ShowAuthenticationSetupScreen() {
   }
 }
 
-void WizardController::ShowActiveDirectoryPasswordChangeScreen(
-    const std::string& username) {
-  GetScreen<ActiveDirectoryPasswordChangeScreen>()->SetUsername(username);
-  AdvanceToScreen(ActiveDirectoryPasswordChangeView::kScreenId);
-}
-
 void WizardController::ShowLacrosDataMigrationScreen() {
   SetCurrentScreen(GetScreen(LacrosDataMigrationScreenView::kScreenId));
 }
@@ -1199,12 +1191,6 @@ void WizardController::ShowCryptohomeRecoveryScreen(
   SetCurrentScreen(GetScreen(CryptohomeRecoveryScreenView::kScreenId));
 }
 
-void WizardController::OnActiveDirectoryPasswordChangeScreenExit() {
-  OnScreenExit(ActiveDirectoryPasswordChangeView::kScreenId,
-               kDefaultExitReason);
-  ShowLoginScreen();
-}
-
 void WizardController::OnUserCreationScreenExit(
     UserCreationScreen::Result result) {
   OnScreenExit(UserCreationView::kScreenId,
@@ -1217,6 +1203,12 @@ void WizardController::OnUserCreationScreenExit(
       } else {
         AdvanceToSigninScreen();
       }
+      break;
+    case UserCreationScreen::Result::CONTINUE_QUICK_START_FLOW:
+      CHECK(wizard_context_->quick_start_enabled &&
+            wizard_context_->quick_start_setup_ongoing);
+      GetScreen<QuickStartScreen>()->AttemptGoogleAccountTransfer();
+      AdvanceToScreen(QuickStartView::kScreenId);
       break;
     case UserCreationScreen::Result::CHILD_SIGNIN:
       GetScreen<GaiaScreen>()->LoadOnlineForChildSignin();
@@ -1268,7 +1260,7 @@ void WizardController::OnGaiaScreenExit(GaiaScreen::Result result) {
           }
         }
       } else {
-        // TODO: delete this part after removing the feature flag
+        // TODO: delete this part after removing the feature flag (b:282728089)
         if (result == GaiaScreen::Result::BACK &&
             wizard_context_->is_user_creation_enabled) {
           // `Result::BACK` is only triggered when pressing back button. It goes
@@ -1572,6 +1564,7 @@ void WizardController::OnChoobeScreenExit(ChoobeScreen::Result result) {
       ShowTouchpadScrollScreen();
       break;
     case ChoobeScreen::Result::SKIPPED:
+      choobe_flow_controller_->OnChoobeFlowExit();
       choobe_flow_controller_.reset();
       ShowMarketingOptInScreen();
       break;
@@ -1602,9 +1595,17 @@ void WizardController::OnDisplaySizeScreenExit(
   switch (result) {
     case DisplaySizeScreen::Result::kNotApplicable:
     case DisplaySizeScreen::Result::kNext:
-      choobe_flow_controller_.reset();
-      ShowMarketingOptInScreen();
-      break;
+      if (wizard_context_->return_to_choobe_screen) {
+        wizard_context_->return_to_choobe_screen = false;
+        ShowChoobeScreen();
+      } else {
+        if (choobe_flow_controller_) {
+          choobe_flow_controller_->OnChoobeFlowExit();
+          choobe_flow_controller_.reset();
+        }
+        ShowMarketingOptInScreen();
+        break;
+      }
   }
 }
 
@@ -1682,6 +1683,16 @@ void WizardController::OnWelcomeScreenExit(WelcomeScreen::Result result) {
 }
 
 void WizardController::OnQuickStartScreenExit(QuickStartScreen::Result result) {
+  OnScreenExit(QuickStartView::kScreenId,
+               QuickStartScreen::GetResultString(result));
+  switch (result) {
+    case QuickStartScreen::Result::CANCEL:
+      ShowWelcomeScreen();
+      return;
+    case QuickStartScreen::Result::WIFI_CONNECTED:
+      ShowNetworkScreen();
+      return;
+  }
 }
 
 // The network screen is part of 3 different flows:
@@ -1761,6 +1772,13 @@ void WizardController::OnUpdateScreenExit(UpdateScreen::Result result) {
 }
 
 void WizardController::OnUpdateCompleted() {
+  // Install language packs based on the user selected language.
+  if (ash::features::IsLanguagePacksInOobeEnabled()) {
+    const std::string locale = GetApplicationLocale();
+    language_packs::LanguagePackManager::GetInstance()->UpdatePacksForOobe(
+        locale);
+  }
+
   if (demo_setup_controller_) {
     ShowConsolidatedConsentScreen();
     return;
@@ -2223,11 +2241,9 @@ void WizardController::StartTimezoneResolve() {
     return;
   }
 
-  auto& testing_factory = GetSharedURLLoaderFactoryForTesting();
   geolocation_provider_ = std::make_unique<SimpleGeolocationProvider>(
       g_browser_process->platform_part()->GetTimezoneResolverManager(),
-      testing_factory ? testing_factory
-                      : g_browser_process->shared_url_loader_factory(),
+      shared_url_loader_factory_,
       SimpleGeolocationProvider::DefaultGeolocationProviderURL());
   geolocation_provider_->RequestGeolocation(
       base::Seconds(kResolveTimeZoneTimeoutSeconds),
@@ -2241,7 +2257,6 @@ void WizardController::PerformPostNetworkScreenActions() {
   StartNetworkTimezoneResolve();
   DelayNetworkCall(ServicesCustomizationDocument::GetInstance()
                        ->EnsureCustomizationAppliedClosure());
-
   GetAutoEnrollmentController()->Start();
 }
 
@@ -2478,9 +2493,14 @@ void WizardController::AdvanceToScreen(OobeScreenId screen_id) {
     ShowTouchpadScrollScreen();
   } else if (screen_id == GaiaInfoScreenView::kScreenId) {
     ShowGaiaInfoScreen();
+  } else if (screen_id == DrivePinningScreenView::kScreenId) {
+    ShowDrivePinningScreen();
+  } else if (screen_id == DisplaySizeScreenView::kScreenId) {
+    ShowDisplaySizeScreen();
+  } else if (screen_id == ChoobeScreenView::kScreenId) {
+    ShowChoobeScreen();
   } else if (screen_id == TpmErrorView::kScreenId ||
              screen_id == GaiaPasswordChangedView::kScreenId ||
-             screen_id == ActiveDirectoryPasswordChangeView::kScreenId ||
              screen_id == FamilyLinkNoticeView::kScreenId ||
              screen_id == GaiaView::kScreenId ||
              screen_id == UserCreationView::kScreenId ||
@@ -2495,7 +2515,8 @@ void WizardController::AdvanceToScreen(OobeScreenId screen_id) {
              screen_id == SmartPrivacyProtectionView::kScreenId ||
              screen_id == ThemeSelectionScreenView::kScreenId ||
              screen_id == SamlConfirmPasswordView::kScreenId ||
-             screen_id == LocalStateErrorScreenView::kScreenId) {
+             screen_id == LocalStateErrorScreenView::kScreenId ||
+             screen_id == QuickStartView::kScreenId) {
     SetCurrentScreen(GetScreen(screen_id));
   } else {
     NOTREACHED();
@@ -2718,11 +2739,8 @@ void WizardController::OnTimezoneResolved(
 
 TimeZoneProvider* WizardController::GetTimezoneProvider() {
   if (!timezone_provider_) {
-    auto& testing_factory = GetSharedURLLoaderFactoryForTesting();
     timezone_provider_ = std::make_unique<TimeZoneProvider>(
-        testing_factory ? testing_factory
-                        : g_browser_process->shared_url_loader_factory(),
-        DefaultTimezoneProviderURL());
+        shared_url_loader_factory_, DefaultTimezoneProviderURL());
   }
   return timezone_provider_.get();
 }
@@ -2821,7 +2839,8 @@ policy::AutoEnrollmentController*
 WizardController::GetAutoEnrollmentController() {
   if (!auto_enrollment_controller_) {
     auto_enrollment_controller_ =
-        std::make_unique<policy::AutoEnrollmentController>();
+        std::make_unique<policy::AutoEnrollmentController>(
+            shared_url_loader_factory_);
   }
   return auto_enrollment_controller_.get();
 }

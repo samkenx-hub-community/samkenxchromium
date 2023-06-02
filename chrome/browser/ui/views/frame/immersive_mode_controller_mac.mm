@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <AppKit/AppKit.h>
-
 #include "chrome/browser/ui/views/frame/immersive_mode_controller_mac.h"
+
+#include <AppKit/AppKit.h>
 
 #include <vector>
 
@@ -130,8 +130,11 @@ class ImmersiveModeControllerMac : public ImmersiveModeController,
 
   // Used as a convenience to access
   // NativeWidgetMacNSWindowHost::GetNSWindowMojo().
-  raw_ptr<remote_cocoa::mojom::NativeWidgetNSWindow> ns_window_mojo_ =
-      nullptr;  // weak
+  // Dangling in ImmersiveModeControllerMacBrowserTest.ToggleFullscreen.
+  // Dangling when executing DownloadBubbleInteractiveUiTest.* (with Mac
+  // immersive mode enabled).
+  raw_ptr<remote_cocoa::mojom::NativeWidgetNSWindow, DanglingUntriaged>
+      ns_window_mojo_ = nullptr;  // weak
 
   // Used to hold the widget id for the tab hosting widget. This will be passed
   // to the remote_cocoa immersive mode controller where the tab strip will be
@@ -205,8 +208,7 @@ void ImmersiveModeControllerMac::SetEnabled(bool enabled) {
                                .GetNativeNSWindow()
                                .contentView;
     browser_view_->overlay_widget()->SetNativeWindowProperty(
-        views::NativeWidgetMacNSWindowHost::kImmersiveContentNSView,
-        content_view);
+        views::NativeWidgetMacNSWindowHost::kMovedContentNSView, content_view);
 
     // Move the appropriate children from the browser widget to the overlay
     // widget. Make sure to call `Show()` on the overlay widget before enabling
@@ -263,7 +265,7 @@ void ImmersiveModeControllerMac::SetEnabled(bool enabled) {
     browser_view_->overlay_widget()->Hide();
     ns_window_mojo_->DisableImmersiveFullscreen();
     browser_view_->overlay_widget()->SetNativeWindowProperty(
-        views::NativeWidgetMacNSWindowHost::kImmersiveContentNSView, nullptr);
+        views::NativeWidgetMacNSWindowHost::kMovedContentNSView, nullptr);
 
     // Remove the root FocusTraversable.
     browser_view_->GetWidget()->SetFocusTraversableParent(nullptr);
@@ -432,6 +434,9 @@ class ImmersiveModeTabbedControllerMac : public ImmersiveModeControllerMac {
 };
 
 void ImmersiveModeTabbedControllerMac::SetEnabled(bool enabled) {
+  if (enabled == IsEnabled()) {
+    return;
+  }
   BrowserView* browser_view = ImmersiveModeControllerMac::browser_view();
   if (enabled) {
     tab_container_observation_.Observe(browser_view->tab_overlay_view());
@@ -441,18 +446,6 @@ void ImmersiveModeTabbedControllerMac::SetEnabled(bool enabled) {
                               browser_view->frame()->GetFrameView())
                               ->GetTopInset(false);
 
-    // TODO(https://crbug.com/1414521): The |tab_overlay_widget()| draws
-    // underneath the traffic lights via an NSTitlebarViewController with
-    // NSLayoutAttributeTrailing layout. In order to propagate all mouse and
-    // keyboard events from AppKit back to Views the |tab_overlay_widget()|
-    // needs to be placed at the same location on screen as the
-    // NSTitlebarViewController. 0,0 is the correct location for the input to
-    // line up with the view, however this causes mouse actions to not make it
-    // to the traffic lights. For now the |tab_overlay_widget()| has been
-    // ordered behind the AppKit fullscreen window which hosts the traffic
-    // lights. This allows for interaction with the traffic lights and tab strip
-    // but child widgets of |tab_overlay_widget()| appear underneath the
-    // toolbar. Find a solution.
     browser_view->tab_overlay_widget()->SetBounds(
         gfx::Rect(0, 0, browser_view->top_container()->size().width(),
                   tab_widget_height_));

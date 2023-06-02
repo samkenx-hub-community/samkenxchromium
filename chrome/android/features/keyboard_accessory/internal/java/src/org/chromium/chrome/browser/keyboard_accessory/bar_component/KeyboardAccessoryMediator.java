@@ -145,25 +145,25 @@ class KeyboardAccessoryMediator
      * @return True iff the suggestion should be displayed.
      */
     private boolean shouldShowSuggestion(AutofillSuggestion suggestion) {
-        switch (suggestion.getSuggestionId()) {
-            case PopupItemId.ITEM_ID_INSECURE_CONTEXT_PAYMENT_DISABLED_MESSAGE:
+        switch (suggestion.getPopupItemId()) {
+            case PopupItemId.INSECURE_CONTEXT_PAYMENT_DISABLED_MESSAGE:
                 // The insecure context warning has a replacement in the fallback sheet.
-            case PopupItemId.ITEM_ID_SEPARATOR:
-            case PopupItemId.ITEM_ID_CLEAR_FORM:
-            case PopupItemId.ITEM_ID_CREDIT_CARD_SIGNIN_PROMO:
-            case PopupItemId.ITEM_ID_ALL_SAVED_PASSWORDS_ENTRY:
-            case PopupItemId.ITEM_ID_GENERATE_PASSWORD_ENTRY:
-            case PopupItemId.ITEM_ID_SHOW_ACCOUNT_CARDS:
-            case PopupItemId.ITEM_ID_AUTOFILL_OPTIONS:
+            case PopupItemId.SEPARATOR:
+            case PopupItemId.CLEAR_FORM:
+            case PopupItemId.CREDIT_CARD_SIGNIN_PROMO:
+            case PopupItemId.ALL_SAVED_PASSWORDS_ENTRY:
+            case PopupItemId.GENERATE_PASSWORD_ENTRY:
+            case PopupItemId.SHOW_ACCOUNT_CARDS:
+            case PopupItemId.AUTOFILL_OPTIONS:
                 return false;
-            case PopupItemId.ITEM_ID_AUTOCOMPLETE_ENTRY:
-            case PopupItemId.ITEM_ID_PASSWORD_ENTRY:
-            case PopupItemId.ITEM_ID_DATALIST_ENTRY:
-            case PopupItemId.ITEM_ID_SCAN_CREDIT_CARD:
-            case PopupItemId.ITEM_ID_TITLE:
-            case PopupItemId.ITEM_ID_USERNAME_ENTRY:
-            case PopupItemId.ITEM_ID_ACCOUNT_STORAGE_PASSWORD_ENTRY:
-            case PopupItemId.ITEM_ID_ACCOUNT_STORAGE_USERNAME_ENTRY:
+            case PopupItemId.AUTOCOMPLETE_ENTRY:
+            case PopupItemId.PASSWORD_ENTRY:
+            case PopupItemId.DATALIST_ENTRY:
+            case PopupItemId.SCAN_CREDIT_CARD:
+            case PopupItemId.TITLE:
+            case PopupItemId.USERNAME_ENTRY:
+            case PopupItemId.ACCOUNT_STORAGE_PASSWORD_ENTRY:
+            case PopupItemId.ACCOUNT_STORAGE_USERNAME_ENTRY:
                 return true;
         }
         return true; // If it's not a special id, show the regular suggestion!
@@ -352,15 +352,15 @@ class KeyboardAccessoryMediator
     }
 
     private static boolean containsPasswordInfo(AutofillSuggestion suggestion) {
-        return suggestion.getSuggestionId() == PopupItemId.ITEM_ID_USERNAME_ENTRY
-                || suggestion.getSuggestionId() == PopupItemId.ITEM_ID_PASSWORD_ENTRY;
+        return suggestion.getPopupItemId() == PopupItemId.USERNAME_ENTRY
+                || suggestion.getPopupItemId() == PopupItemId.PASSWORD_ENTRY;
     }
 
     private static boolean containsCreditCardInfo(AutofillSuggestion suggestion) {
-        return suggestion.getSuggestionId() > 0 && (suggestion.getSuggestionId() & 0xFFFF0000) != 0;
+        return suggestion.getPopupItemId() == PopupItemId.CREDIT_CARD_ENTRY;
     }
 
     private static boolean containsAddressInfo(AutofillSuggestion suggestion) {
-        return suggestion.getSuggestionId() > 0 && (suggestion.getSuggestionId() & 0x0000FFFF) != 0;
+        return suggestion.getPopupItemId() == PopupItemId.ADDRESS_ENTRY;
     }
 }

@@ -296,14 +296,6 @@ class IntegrationTestCommandsSystem : public IntegrationTestCommands {
     RunCommand("run_uninstall_cmd_line");
   }
 
-  void SetUpTestService() const override {
-    updater::test::RunTestServiceCommand("setup");
-  }
-
-  void TearDownTestService() const override {
-    updater::test::RunTestServiceCommand("teardown");
-  }
-
   void RunHandoff(const std::string& app_id) const override {
     RunCommand("run_handoff", {Param("app_id", app_id)});
   }
@@ -369,6 +361,9 @@ class IntegrationTestCommandsSystem : public IntegrationTestCommands {
                {Param("legacy_install", is_legacy_install ? "true" : "false"),
                 Param("silent", is_silent_install ? "true" : "false")});
   }
+
+  void DMDeregisterDevice() override { RunCommand("dm_deregister_device"); }
+  void DMCleanup() override { RunCommand("dm_cleanup"); }
 
  private:
   ~IntegrationTestCommandsSystem() override = default;

@@ -4,8 +4,9 @@
 
 package org.chromium.net;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.truth.Truth.assertWithMessage;
+
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -378,14 +379,15 @@ public class PkpTest {
      * Asserts that the response from the server contains an PKP error.
      */
     private void assertErrorResponse() {
-        assertNotNull("Expected an error", mListener.mError);
+        assertWithMessage("Expected an error").that(mListener.mError).isNotNull();
         int errorCode = ((NetworkException) mListener.mError).getCronetInternalErrorCode();
         Set<Integer> expectedErrors = new HashSet<>();
         expectedErrors.add(NetError.ERR_CONNECTION_REFUSED);
         expectedErrors.add(NetError.ERR_SSL_PINNED_KEY_NOT_IN_CERT_CHAIN);
-        assertTrue(String.format("Incorrect error code. Expected one of %s but received %s",
-                           expectedErrors, errorCode),
-                expectedErrors.contains(errorCode));
+        assertWithMessage(String.format("Incorrect error code. Expected one of %s but received %s",
+                                  expectedErrors, errorCode))
+                .that(expectedErrors)
+                .contains(errorCode);
     }
 
     /**
@@ -396,8 +398,10 @@ public class PkpTest {
             fail("Did not expect an error but got error code "
                     + ((NetworkException) mListener.mError).getCronetInternalErrorCode());
         }
-        assertNotNull("Expected non-null response from the server", mListener.mResponseInfo);
-        assertEquals(200, mListener.mResponseInfo.getHttpStatusCode());
+        assertWithMessage("Expected non-null response from the server")
+                .that(mListener.mResponseInfo)
+                .isNotNull();
+        assertThat(mListener.mResponseInfo.getHttpStatusCode()).isEqualTo(200);
     }
 
     private void createCronetEngineBuilder(boolean bypassPinningForLocalAnchors, boolean knownRoot)

@@ -135,9 +135,8 @@ class AttributionInteropParser {
     ParseInt(dict, "max_sources_per_origin", config.max_sources_per_origin,
              required);
 
-    ParseInt(dict, "max_destinations_per_source_site_reporting_origin",
-             config.max_destinations_per_source_site_reporting_origin,
-             required);
+    ParseInt(dict, "max_destinations_per_source_site_reporting_site",
+             config.max_destinations_per_source_site_reporting_site, required);
 
     int rate_limit_time_window;
     if (ParseInt(dict, "rate_limit_time_window", rate_limit_time_window,
@@ -152,6 +151,9 @@ class AttributionInteropParser {
                config.rate_limit.max_attribution_reporting_origins, required);
     ParseInt64(dict, "rate_limit_max_attributions",
                config.rate_limit.max_attributions, required);
+    ParseInt(dict, "rate_limit_max_reporting_origins_per_source_reporting_site",
+             config.rate_limit.max_reporting_origins_per_source_reporting_site,
+             required);
 
     ParseInt(dict, "max_event_level_reports_per_destination",
              config.event_level_limit.max_reports_per_destination, required);

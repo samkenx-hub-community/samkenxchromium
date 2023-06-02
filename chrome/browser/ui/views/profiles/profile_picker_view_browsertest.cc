@@ -91,8 +91,8 @@
 #include "components/signin/public/identity_manager/identity_test_utils.h"
 #include "components/signin/public/identity_manager/primary_account_mutator.h"
 #include "components/sync/base/pref_names.h"
-#include "components/sync/driver/sync_service.h"
-#include "components/sync/driver/sync_user_settings.h"
+#include "components/sync/service/sync_service.h"
+#include "components/sync/service/sync_user_settings.h"
 #include "components/sync/test/test_sync_service.h"
 #include "components/user_education/test/feature_promo_test_util.h"
 #include "content/public/browser/web_contents.h"
@@ -523,7 +523,7 @@ class ProfilePickerCreationFlowBrowserTest : public ProfilePickerTestBase {
       crosapi::AccountManagerMojoService* mojo_service =
           MaybeGetAshAccountManagerMojoServiceForTests();
       DCHECK(mojo_service);
-      mojo_service->OnAccountAdditionFinishedForTesting(
+      mojo_service->OnAccountUpsertionFinishedForTesting(
           account_manager::AccountUpsertionResult::FromAccount(
               {kAccountKey, email}));
       fake_ui->CloseDialog();
@@ -1452,11 +1452,17 @@ IN_PROC_BROWSER_TEST_F(ProfilePickerCreationFlowBrowserTest,
   EXPECT_EQ(new_browser->profile()->GetPath(), other_path);
   WaitForPickerClosed();
 
+// TODO(crbug.com/1447955): This check fails in version skew test. Instead of
+// filtering out tests on version skew bots, just disable the part of test for
+// now. Re-enable this check for Lacros once crrev.com/c/4542121 is in Ash
+// stable.
+#if !BUILDFLAG(IS_CHROMEOS_LACROS)
   histogram_tester.ExpectTotalCount(
       "ProfilePicker.FirstProfileTime.FirstWebContentsNonEmptyPaint", 1);
   histogram_tester.ExpectUniqueSample(
       "ProfilePicker.FirstProfileTime.FirstWebContentsFinishReason",
       metrics::StartupProfilingFinishReason::kDone, 1);
+#endif
 }
 
 // TODO(crbug.com/1289326) Test is flaky on Linux CFI, Linux dbg, Mac ASan

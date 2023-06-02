@@ -13,7 +13,6 @@
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/notreached.h"
-#include "base/test/scoped_feature_list.h"
 #include "chrome/browser/flags/android/chrome_feature_list.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_android.h"
@@ -23,9 +22,9 @@
 #include "chrome/browser/supervised_user/supervised_user_service_factory.h"
 #include "chrome/test/test_support_jni_headers/FamilyInfoFeedbackSourceTestBridge_jni.h"
 #include "components/signin/public/identity_manager/identity_test_environment.h"
-#include "components/supervised_user/core/browser/kids_external_fetcher.h"
 #include "components/supervised_user/core/browser/proto/families_common.pb.h"
 #include "components/supervised_user/core/browser/proto/kidschromemanagement_messages.pb.h"
+#include "components/supervised_user/core/browser/proto_fetcher.h"
 #include "components/supervised_user/core/browser/supervised_user_service.h"
 #include "components/supervised_user/core/browser/supervised_user_url_filter.h"
 #include "content/public/test/browser_task_environment.h"
@@ -138,9 +137,6 @@ class FamilyInfoFeedbackSourceForChildFilterBehaviorTest
 // Tests that the parental control sites value for a child user is recorded.
 TEST_P(FamilyInfoFeedbackSourceForChildFilterBehaviorTest,
        GetChildFilteringBehaviour) {
-  base::test::ScopedFeatureList scoped_list{
-      chrome::android::kReportParentalControlSitesChild};
-
   CoreAccountInfo primary_account =
       identity_test_env()->MakePrimaryAccountAvailable(
           kTestEmail, signin::ConsentLevel::kSignin);
@@ -234,7 +230,7 @@ class FamilyInfoFeedbackSourceTest
   void OnGetFamilyMembersFailure(
       base::WeakPtr<FamilyInfoFeedbackSource> feedback_source) {
     feedback_source->OnFailure(
-        KidsExternalFetcherStatus::GoogleServiceAuthError(
+        supervised_user::ProtoFetcherStatus::GoogleServiceAuthError(
             GoogleServiceAuthError(
                 GoogleServiceAuthError::State::INVALID_GAIA_CREDENTIALS)));
   }

@@ -337,12 +337,13 @@ ScriptTimingInfo* AnimationFrameTimingMonitor::MaybeAddScript(
 
   script_timing_info->SetSourceLocation(pending_script_info_->source_location);
   if (pending_script_info_->class_like_name) {
-    script_timing_info->SetClassLikeName(pending_script_info_->class_like_name);
+    script_timing_info->SetClassLikeName(
+        AtomicString(pending_script_info_->class_like_name));
   }
 
   if (pending_script_info_->property_like_name) {
     script_timing_info->SetPropertyLikeName(
-        pending_script_info_->property_like_name);
+        AtomicString(pending_script_info_->property_like_name));
   }
 
   script_timing_info->SetPauseDuration(pending_script_info_->pause_duration);
@@ -389,14 +390,15 @@ void AnimationFrameTimingMonitor::OnMicrotasksCompleted(
 
 void AnimationFrameTimingMonitor::WillHandlePromise(
     ExecutionContext* context,
+    ScriptState* script_state,
     bool resolving,
     const char* class_like_name,
     const char* property_like_name) {
   // Make sure we only monitor top-level promise resolvers that are outside the
   // update-the-rendering phase (promise resolvers directly handled from a
   // posted task).
-  if (!context->IsWindow() || pending_script_info_ ||
-      state_ != State::kProcessingTask) {
+  if (!context->IsWindow() || !script_state->World().IsMainWorld() ||
+      pending_script_info_ || state_ != State::kProcessingTask) {
     return;
   }
 
@@ -581,6 +583,14 @@ ScriptTimingInfo::ScriptSourceLocation CaptureScriptSourceLocation(
   return ScriptTimingInfo::ScriptSourceLocation();
 }
 
+bool IsCallbackFromMainWorld(v8::MaybeLocal<v8::Value> callback) {
+  v8::Local<v8::Value> function;
+  v8::Local<v8::Context> context;
+  return callback.ToLocal(&function) && function->IsFunction() &&
+         function.As<v8::Function>()->GetCreationContext().ToLocal(&context) &&
+         ScriptState::From(context)->World().IsMainWorld();
+}
+
 }  // namespace
 
 void AnimationFrameTimingMonitor::Will(
@@ -594,7 +604,11 @@ void AnimationFrameTimingMonitor::Will(
   }
 
   if (!probe_data.context->IsWindow() ||
-      !client_.ShouldReportLongAnimationFrameTiming()) {
+      !client_.ShouldReportLongAnimationFrameTiming() ||
+      (probe_data.callback &&
+       probe_data.callback->GetWorld().IsIsolatedWorld()) ||
+      (!probe_data.function.IsEmpty() &&
+       !IsCallbackFromMainWorld(probe_data.function))) {
     return;
   }
 
@@ -620,7 +634,7 @@ void AnimationFrameTimingMonitor::Did(const probe::InvokeCallback& probe_data) {
     return;
   }
 
-  info->SetPropertyLikeName(probe_data.name);
+  info->SetPropertyLikeName(AtomicString(probe_data.name));
 }
 
 void AnimationFrameTimingMonitor::Will(
@@ -630,8 +644,13 @@ void AnimationFrameTimingMonitor::Will(
     return;
   }
 
+  v8::HandleScope handle_scope(probe_data.context->GetIsolate());
   if (!probe_data.context->IsWindow() ||
-      !client_.ShouldReportLongAnimationFrameTiming()) {
+      !client_.ShouldReportLongAnimationFrameTiming() || !probe_data.listener ||
+      !probe_data.listener->IsJSBasedEventListener() ||
+      !IsCallbackFromMainWorld(
+          To<JSBasedEventListener>(probe_data.listener)
+              ->GetListenerObject(*probe_data.event_target))) {
     return;
   }
   pending_script_info_ =

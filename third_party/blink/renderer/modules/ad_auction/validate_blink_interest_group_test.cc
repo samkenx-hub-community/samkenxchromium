@@ -259,16 +259,16 @@ TEST_F(ValidateBlinkInterestGroupTest,
 TEST_F(ValidateBlinkInterestGroupTest, RejectedUrls) {
   // Strings when each field has a bad URL, copied from cc file.
   const char kBadBiddingUrlError[] =
-      "biddingUrl must have the same origin as the InterestGroup owner "
+      "biddingLogicURL must have the same origin as the InterestGroup owner "
       "and have no fragment identifier or embedded credentials.";
   const char kBadBiddingWasmHelperUrlError[] =
-      "biddingWasmHelperUrl must have the same origin as the InterestGroup "
+      "biddingWasmHelperURL must have the same origin as the InterestGroup "
       "owner and have no fragment identifier or embedded credentials.";
   const char kBadUpdateUrlError[] =
-      "updateUrl must have the same origin as the InterestGroup owner "
+      "updateURL must have the same origin as the InterestGroup owner "
       "and have no fragment identifier or embedded credentials.";
   const char kBadTrustedBiddingSignalsUrlError[] =
-      "trustedBiddingSignalsUrl must have the same origin as the "
+      "trustedBiddingSignalsURL must have the same origin as the "
       "InterestGroup owner and have no query string, fragment identifier "
       "or embedded credentials.";
 
@@ -317,7 +317,7 @@ TEST_F(ValidateBlinkInterestGroupTest, RejectedUrls) {
         CreateMinimalInterestGroup();
     blink_interest_group->bidding_url = rejected_url;
     ExpectInterestGroupIsNotValid(
-        blink_interest_group, /*expected_error_field_name=*/"biddingUrl",
+        blink_interest_group, /*expected_error_field_name=*/"biddingLogicURL",
         /*expected_error_field_value=*/rejected_url.GetString().Utf8(),
         /*expected_error=*/kBadBiddingUrlError);
 
@@ -326,7 +326,7 @@ TEST_F(ValidateBlinkInterestGroupTest, RejectedUrls) {
     blink_interest_group->bidding_wasm_helper_url = rejected_url;
     ExpectInterestGroupIsNotValid(
         blink_interest_group,
-        /*expected_error_field_name=*/"biddingWasmHelperUrl",
+        /*expected_error_field_name=*/"biddingWasmHelperURL",
         /*expected_error_field_value=*/rejected_url.GetString().Utf8(),
         /*expected_error=*/kBadBiddingWasmHelperUrlError);
 
@@ -334,7 +334,7 @@ TEST_F(ValidateBlinkInterestGroupTest, RejectedUrls) {
     blink_interest_group = CreateMinimalInterestGroup();
     blink_interest_group->update_url = rejected_url;
     ExpectInterestGroupIsNotValid(
-        blink_interest_group, /*expected_error_field_name=*/"updateUrl",
+        blink_interest_group, /*expected_error_field_name=*/"updateURL",
         /*expected_error_field_value=*/rejected_url.GetString().Utf8(),
         /*expected_error=*/kBadUpdateUrlError);
 
@@ -343,7 +343,7 @@ TEST_F(ValidateBlinkInterestGroupTest, RejectedUrls) {
     blink_interest_group->trusted_bidding_signals_url = rejected_url;
     ExpectInterestGroupIsNotValid(
         blink_interest_group,
-        /*expected_error_field_name=*/"trustedBiddingSignalsUrl",
+        /*expected_error_field_name=*/"trustedBiddingSignalsURL",
         /*expected_error_field_value=*/rejected_url.GetString().Utf8(),
         /*expected_error=*/kBadTrustedBiddingSignalsUrlError);
   }
@@ -355,7 +355,7 @@ TEST_F(ValidateBlinkInterestGroupTest, RejectedUrls) {
   blink_interest_group->trusted_bidding_signals_url = rejected_url;
   ExpectInterestGroupIsNotValid(
       blink_interest_group,
-      /*expected_error_field_name=*/"trustedBiddingSignalsUrl",
+      /*expected_error_field_name=*/"trustedBiddingSignalsURL",
       /*expected_error_field_value=*/rejected_url.GetString().Utf8(),
       /*expected_error=*/kBadTrustedBiddingSignalsUrlError);
 }
@@ -363,7 +363,7 @@ TEST_F(ValidateBlinkInterestGroupTest, RejectedUrls) {
 // Tests valid and invalid ad render URLs.
 TEST_F(ValidateBlinkInterestGroupTest, AdRenderUrlValidation) {
   const char kBadAdUrlError[] =
-      "renderUrls must be HTTPS and have no embedded credentials.";
+      "renderURLs must be HTTPS and have no embedded credentials.";
 
   const struct {
     bool expect_allowed;
@@ -409,7 +409,7 @@ TEST_F(ValidateBlinkInterestGroupTest, AdRenderUrlValidation) {
     } else {
       ExpectInterestGroupIsNotValid(
           blink_interest_group,
-          /*expected_error_field_name=*/"ads[0].renderUrl",
+          /*expected_error_field_name=*/"ads[0].renderURL",
           /*expected_error_field_value=*/test_case_url.GetString().Utf8(),
           /*expected_error=*/kBadAdUrlError);
     }
@@ -425,7 +425,7 @@ TEST_F(ValidateBlinkInterestGroupTest, AdRenderUrlValidation) {
     } else {
       ExpectInterestGroupIsNotValid(
           blink_interest_group,
-          /*expected_error_field_name=*/"ads[1].renderUrl",
+          /*expected_error_field_name=*/"ads[1].renderURL",
           /*expected_error_field_value=*/test_case_url.GetString().Utf8(),
           /*expected_error=*/kBadAdUrlError);
     }
@@ -435,7 +435,7 @@ TEST_F(ValidateBlinkInterestGroupTest, AdRenderUrlValidation) {
 // Tests valid and invalid ad render URLs.
 TEST_F(ValidateBlinkInterestGroupTest, AdComponentRenderUrlValidation) {
   const char kBadAdUrlError[] =
-      "renderUrls must be HTTPS and have no embedded credentials.";
+      "renderURLs must be HTTPS and have no embedded credentials.";
 
   const struct {
     bool expect_allowed;
@@ -483,7 +483,7 @@ TEST_F(ValidateBlinkInterestGroupTest, AdComponentRenderUrlValidation) {
     } else {
       ExpectInterestGroupIsNotValid(
           blink_interest_group,
-          /*expected_error_field_name=*/"adComponents[0].renderUrl",
+          /*expected_error_field_name=*/"adComponents[0].renderURL",
           /*expected_error_field_value=*/test_case_url.GetString().Utf8(),
           /*expected_error=*/kBadAdUrlError);
     }
@@ -501,7 +501,7 @@ TEST_F(ValidateBlinkInterestGroupTest, AdComponentRenderUrlValidation) {
     } else {
       ExpectInterestGroupIsNotValid(
           blink_interest_group,
-          /*expected_error_field_name=*/"adComponents[1].renderUrl",
+          /*expected_error_field_name=*/"adComponents[1].renderURL",
           /*expected_error_field_value=*/test_case_url.GetString().Utf8(),
           /*expected_error=*/kBadAdUrlError);
     }
@@ -520,7 +520,7 @@ TEST_F(ValidateBlinkInterestGroupTest, MalformedUrl) {
 
   // First, check against mojom::blink::InterestGroup.
   constexpr char kBadAdUrlError[] =
-      "renderUrls must be HTTPS and have no embedded credentials.";
+      "renderURLs must be HTTPS and have no embedded credentials.";
   mojom::blink::InterestGroupPtr blink_interest_group =
       mojom::blink::InterestGroup::New();
   blink_interest_group->owner = kOrigin;
@@ -532,7 +532,7 @@ TEST_F(ValidateBlinkInterestGroupTest, MalformedUrl) {
   String error;
   EXPECT_FALSE(ValidateBlinkInterestGroup(
       *blink_interest_group, error_field_name, error_field_value, error));
-  EXPECT_EQ(error_field_name, String::FromUTF8("ads[0].renderUrl"));
+  EXPECT_EQ(error_field_name, String::FromUTF8("ads[0].renderURL"));
   // The invalid ^ gets escaped.
   EXPECT_EQ(error_field_value, String::FromUTF8("https://invalid%5E/"));
   EXPECT_EQ(error, String::FromUTF8(kBadAdUrlError));

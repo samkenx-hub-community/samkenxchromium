@@ -5,6 +5,7 @@
 package org.chromium.chrome.browser.bookmarks;
 
 import android.content.Context;
+import android.content.res.ColorStateList;
 import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
@@ -14,6 +15,7 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import androidx.annotation.ColorInt;
 import androidx.annotation.Nullable;
 
 import org.chromium.chrome.R;
@@ -23,6 +25,7 @@ import org.chromium.components.browser_ui.widget.RoundedCornerOutlineProvider;
 /**
  * Common logic for improved bookmark and folder rows.
  */
+// TODO(crbug.com/1448907): Create coordinator for this view.
 public class ImprovedBookmarkFolderView extends FrameLayout {
     private final RoundedCornerOutlineProvider mPrimaryImageOutline;
     private final RoundedCornerOutlineProvider mSecondaryImageOutline;
@@ -34,6 +37,7 @@ public class ImprovedBookmarkFolderView extends FrameLayout {
 
     private ImageView mPrimaryImage;
     private View mNoImagePlaceholder;
+    private ImageView mStartIcon;
     private ViewGroup mSecondaryImageContainer;
     private ImageView mSecondaryImage;
 
@@ -87,11 +91,11 @@ public class ImprovedBookmarkFolderView extends FrameLayout {
         mPrimaryImage.setOutlineProvider(mPrimaryImageOutline);
         mPrimaryImage.setClipToOutline(true);
 
-        mNoImagePlaceholder = findViewById(R.id.no_image_background);
+        mNoImagePlaceholder = findViewById(R.id.no_image_placeholder_background);
         mNoImagePlaceholder.setOutlineProvider(mPrimaryImageOutline);
         mNoImagePlaceholder.setClipToOutline(true);
-        mNoImagePlaceholder.setBackgroundColor(
-                ChromeColors.getSurfaceColor(getContext(), R.dimen.default_elevation_1));
+
+        mStartIcon = findViewById(R.id.no_image_placeholder_image);
 
         mSecondaryImage = findViewById(R.id.secondary_image);
         mSecondaryImage.setOutlineProvider(mSecondaryImageOutline);
@@ -132,7 +136,20 @@ public class ImprovedBookmarkFolderView extends FrameLayout {
         mChildCount = findViewById(R.id.child_count_text);
     }
 
-    void setDrawables(@Nullable Drawable primaryDrawable, @Nullable Drawable secondaryDrawable) {
+    void setStartIconDrawable(Drawable drawable) {
+        mStartIcon.setImageDrawable(drawable);
+    }
+
+    void setStartIconTint(ColorStateList tint) {
+        mStartIcon.setImageTintList(tint);
+    }
+
+    void setStartAreaBackgroundColor(@ColorInt int color) {
+        mNoImagePlaceholder.setBackgroundColor(color);
+    }
+
+    void setStartImageDrawables(
+            @Nullable Drawable primaryDrawable, @Nullable Drawable secondaryDrawable) {
         mNoImagePlaceholder.setVisibility(View.GONE);
         mPrimaryImage.setVisibility(View.GONE);
         mSecondaryImageContainer.setVisibility(View.GONE);

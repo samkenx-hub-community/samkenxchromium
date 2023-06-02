@@ -13,12 +13,12 @@
 #import "components/password_manager/ios/password_manager_java_script_feature.h"
 #import "components/password_manager/ios/shared_password_controller.h"
 #import "components/prefs/pref_service.h"
-#import "ios/chrome/browser/autofill/bottom_sheet/bottom_sheet_tab_helper.h"
+#import "ios/chrome/browser/autofill/bottom_sheet/autofill_bottom_sheet_tab_helper.h"
 #import "ios/chrome/browser/autofill/form_input_suggestions_provider.h"
 #import "ios/chrome/browser/autofill/form_suggestion_tab_helper.h"
 #import "ios/chrome/browser/autofill/manual_fill/passwords_fetcher.h"
 #import "ios/chrome/browser/default_browser/utils.h"
-#import "ios/chrome/browser/prefs/pref_names.h"
+#import "ios/chrome/browser/shared/model/prefs/pref_names.h"
 #import "ios/chrome/browser/shared/model/web_state_list/active_web_state_observation_forwarder.h"
 #import "ios/chrome/browser/shared/model/web_state_list/web_state_list.h"
 #import "ios/chrome/browser/shared/model/web_state_list/web_state_list_observer_bridge.h"
@@ -129,7 +129,7 @@ using ReauthenticationEvent::kSuccess;
     // Create and register the observers.
     _observer = std::make_unique<web::WebStateObserverBridge>(self);
     _forwarder = std::make_unique<ActiveWebStateObservationForwarder>(
-        webStateList, _observer.get());
+        _webStateList, _observer.get());
 
     if (activeWebState) {
       FormSuggestionTabHelper* tabHelper =
@@ -154,7 +154,7 @@ using ReauthenticationEvent::kSuccess;
           initWithProfilePasswordStore:_profilePasswordStore
                   accountPasswordStore:_accountPasswordStore
                               delegate:self
-                                   URL:_URL];
+                                   URL:url::Origin::Create(_URL).GetURL()];
     }
   }
   return self;
@@ -205,6 +205,11 @@ using ReauthenticationEvent::kSuccess;
                                 exitReason);
 }
 
+- (void)setCredentialsForTesting:
+    (std::vector<password_manager::CredentialUIEntry>)credentials {
+  _credentials = credentials;
+}
+
 #pragma mark - Accessors
 
 - (void)setConsumer:(id<PasswordSuggestionBottomSheetConsumer>)consumer {
@@ -240,12 +245,7 @@ using ReauthenticationEvent::kSuccess;
   if ([_reauthenticationModule canAttemptReauth]) {
     __weak __typeof(self) weakSelf = self;
     auto completionHandler = ^(ReauthenticationResult result) {
-      if (result != ReauthenticationResult::kFailure) {
-        [self logReauthEvent:kSuccess];
-        [weakSelf selectSuggestion:suggestion];
-      } else {
-        [self logReauthEvent:kFailure];
-      }
+      [weakSelf selectSuggestion:suggestion reauthenticationResult:result];
     };
 
     NSString* reason = l10n_util::GetNSString(IDS_IOS_AUTOFILL_REAUTH_REASON);
@@ -267,10 +267,14 @@ using ReauthenticationEvent::kSuccess;
     web::WebState* activeWebState = _webStateList->GetActiveWebState();
     password_manager::PasswordManagerJavaScriptFeature* feature =
         password_manager::PasswordManagerJavaScriptFeature::GetInstance();
-    web::WebFrame* frame =
-        feature->GetWebFramesManager(activeWebState)->GetFrameWithId(_frameId);
-    BottomSheetTabHelper::FromWebState(activeWebState)
-        ->DetachListenersAndRefocus(frame);
+    web::WebFramesManager* framesManager =
+        feature->GetWebFramesManager(activeWebState);
+    if (framesManager) {
+      web::WebFrame* frame = framesManager->GetFrameWithId(_frameId);
+      AutofillBottomSheetTabHelper::FromWebState(activeWebState)
+          ->DetachListenersAndRefocus(frame);
+      [self disconnect];
+    }
   }
 }
 
@@ -291,7 +295,7 @@ using ReauthenticationEvent::kSuccess;
   }
 }
 
-#pragma mark - WebStateListObserver
+#pragma mark - WebStateListObserving
 
 - (void)webStateList:(WebStateList*)webStateList
     didReplaceWebState:(web::WebState*)oldWebState
@@ -310,6 +314,15 @@ using ReauthenticationEvent::kSuccess;
                     atIndex:(int)atIndex
                      reason:(ActiveWebStateChangeReason)reason {
   DCHECK_EQ(_webStateList, webStateList);
+  [self disableRefocus];
+  [self.consumer dismiss];
+}
+
+- (void)webStateListDestroyed:(WebStateList*)webStateList {
+  DCHECK_EQ(webStateList, _webStateList);
+  _forwarder = nullptr;
+  _observer = nullptr;
+  _webStateList = nullptr;
   [self disableRefocus];
   [self.consumer dismiss];
 }
@@ -351,6 +364,19 @@ using ReauthenticationEvent::kSuccess;
 - (void)selectSuggestion:(FormSuggestion*)suggestion {
   LogLikelyInterestedDefaultBrowserUserActivity(DefaultPromoTypeStaySafe);
   [self.suggestionsProvider didSelectSuggestion:suggestion];
+  [self disconnect];
+}
+
+// Perform suggestion selection based on the reauthentication result.
+- (void)selectSuggestion:(FormSuggestion*)suggestion
+    reauthenticationResult:(ReauthenticationResult)result {
+  if (result != ReauthenticationResult::kFailure) {
+    [self logReauthEvent:kSuccess];
+    [self selectSuggestion:suggestion];
+  } else {
+    [self logReauthEvent:kFailure];
+    [self disconnect];
+  }
 }
 
 // Returns the default favicon attributes after making sure they are
@@ -372,7 +398,7 @@ using ReauthenticationEvent::kSuccess;
         _prefService->GetInteger(prefs::kIosPasswordBottomSheetDismissCount) +
         1;
     CHECK(newDismissCount <=
-          BottomSheetTabHelper::PasswordBottomSheetMaxDismissCount());
+          AutofillBottomSheetTabHelper::kPasswordBottomSheetMaxDismissCount);
     _prefService->SetInteger(prefs::kIosPasswordBottomSheetDismissCount,
                              newDismissCount);
   }

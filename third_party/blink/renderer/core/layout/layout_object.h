@@ -759,7 +759,7 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
     NOT_DESTROYED();
     if (Element* element = DynamicTo<Element>(GetNode())) {
       return StyleRef().StyleType() == kPseudoIdViewTransition ||
-             StyleRef().IsInTopLayer(*element);
+             StyleRef().IsRenderedInTopLayer(*element);
     }
     return false;
   }
@@ -1955,6 +1955,9 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
   // is closed shadow hidden from |base|.
   Element* OffsetParent(const Element* base = nullptr) const;
 
+  // Inclusive of |this|, exclusive of |below|.
+  const LayoutBoxModelObject* FindFirstStickyContainer(LayoutBox* below) const;
+
   // Mark this object needing to re-run |CollectInlines()|. Ancestors may be
   // marked too if needed.
   void SetNeedsCollectInlines();
@@ -2209,6 +2212,10 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
 
   virtual RecalcLayoutOverflowResult RecalcLayoutOverflow();
 
+  // Invalidate visual overflow, using a method that varies based
+  // the object type and state of layout.
+  void InvalidateVisualOverflow();
+
   // Recalculates visual overflow for this object and non-self-painting
   // PaintLayer descendants.
   virtual void RecalcVisualOverflow();
@@ -2216,7 +2223,7 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
 #if DCHECK_IS_ON()
   // Enables DCHECK to ensure that the visual overflow for |this| is computed.
   // The actual invalidation is maintained in |PaintLayer|.
-  void InvalidateVisualOverflow();
+  void InvalidateVisualOverflowForDCheck();
 #endif
 
   // Subclasses must reimplement this method to compute the size and position
@@ -2263,13 +2270,6 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
     NOT_DESTROYED();
     if (NeedsLayout())
       UpdateLayout();
-  }
-
-  void ForceLayout();
-  void ForceLayoutWithPaintInvalidation() {
-    NOT_DESTROYED();
-    SetShouldDoFullPaintInvalidation();
-    ForceLayout();
   }
 
   // Used for element state updates that cannot be fixed with a paint
@@ -3697,12 +3697,6 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
       bool ignore_scroll_offset) const;
   PhysicalOffset OffsetFromScrollableContainer(const LayoutObject*,
                                                bool ignore_scroll_offset) const;
-
-  void NotifyDisplayLockDidLayoutChildren() {
-    NOT_DESTROYED();
-    if (auto* context = GetDisplayLockContext())
-      context->DidLayoutChildren();
-  }
 
   bool BackgroundIsKnownToBeObscured() const {
     NOT_DESTROYED();

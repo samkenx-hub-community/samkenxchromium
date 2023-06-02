@@ -13,7 +13,6 @@
 @protocol BookmarksEditorMediatorDelegate;
 class ChromeBrowserState;
 class PrefService;
-class SyncSetupService;
 
 namespace bookmarks {
 class BookmarkModel;
@@ -28,7 +27,7 @@ class SyncService;
 @interface BookmarksEditorMediator : NSObject <BookmarksEditorMutator>
 
 // BookmarkNode to edit.
-@property(nonatomic, assign) const bookmarks::BookmarkNode* bookmark;
+@property(nonatomic, readonly) const bookmarks::BookmarkNode* bookmark;
 // Parent of `_bookmark` if the user tap on "save".
 @property(nonatomic, assign) const bookmarks::BookmarkNode* folder;
 // Delegate to change the view displayed.
@@ -49,7 +48,6 @@ class SyncService;
             accountBookmarkModel:(bookmarks::BookmarkModel*)accountBookmarkModel
                     bookmarkNode:(const bookmarks::BookmarkNode*)bookmarkNode
                            prefs:(PrefService*)prefs
-                syncSetupService:(SyncSetupService*)syncSetupService
                      syncService:(syncer::SyncService*)syncService
                     browserState:(ChromeBrowserState*)browserState
     NS_DESIGNATED_INITIALIZER;

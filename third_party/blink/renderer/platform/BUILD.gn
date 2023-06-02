@@ -409,6 +409,7 @@ component("platform") {
     "bindings/callback_method_retriever.cc",
     "bindings/callback_method_retriever.h",
     "bindings/cross_thread_copier.h",
+    "bindings/custom_wrappable.cc",
     "bindings/custom_wrappable.h",
     "bindings/dictionary_base.cc",
     "bindings/dictionary_base.h",
@@ -469,7 +470,6 @@ component("platform") {
     "bindings/v8_binding.cc",
     "bindings/v8_binding.h",
     "bindings/v8_binding_macros.h",
-    "bindings/v8_cross_origin_callback_info.h",
     "bindings/v8_cross_origin_property_support.cc",
     "bindings/v8_cross_origin_property_support.h",
     "bindings/v8_dom_activity_logger.cc",
@@ -676,6 +676,8 @@ component("platform") {
     "fonts/opentype/variable_axes_names.h",
     "fonts/orientation_iterator.cc",
     "fonts/orientation_iterator.h",
+    "fonts/palette_interpolation.cc",
+    "fonts/palette_interpolation.h",
     "fonts/resolved_font_features.h",
     "fonts/script_run_iterator.cc",
     "fonts/script_run_iterator.h",
@@ -841,6 +843,7 @@ component("platform") {
     "graphics/compositor_mutator_client.cc",
     "graphics/compositor_mutator_client.h",
     "graphics/cpu/arm/webgl_image_conversion_neon.h",
+    "graphics/cpu/loongarch64/webgl_image_conversion_lsx.h",
     "graphics/cpu/mips/webgl_image_conversion_msa.h",
     "graphics/cpu/x86/webgl_image_conversion_sse.h",
     "graphics/crossfade_generated_image.cc",
@@ -1579,6 +1582,13 @@ component("platform") {
     }
   }
 
+  if (current_cpu == "loong64") {
+    cflags = [
+      "-mlsx",
+      "-flax-vector-conversions",
+    ]
+  }
+
   if (is_apple) {
     configs += [ "//build/config/compiler:enable_arc" ]
   }
@@ -1622,8 +1632,6 @@ component("platform") {
     sources += [
       "fonts/win/dwrite_font_format_support.cc",
       "fonts/win/dwrite_font_format_support.h",
-      "fonts/win/fallback_family_style_cache_win.cc",
-      "fonts/win/fallback_family_style_cache_win.h",
       "fonts/win/font_cache_skia_win.cc",
       "fonts/win/font_fallback_win.cc",
       "fonts/win/font_fallback_win.h",
@@ -1731,7 +1739,7 @@ component("platform") {
   ]
 
   if (is_android) {
-    deps += [ "//third_party/android_ndk:cpu_features" ]
+    deps += [ "//third_party/cpu_features:ndk_compat" ]
     sources += [
       "theme/web_theme_engine_android.cc",
       "theme/web_theme_engine_android.h",
@@ -2044,6 +2052,7 @@ source_set("blink_platform_unittests_sources") {
     "fonts/opentype/open_type_vertical_data_test.cc",
     "fonts/opentype/variable_axes_names_test.cc",
     "fonts/orientation_iterator_test.cc",
+    "fonts/palette_interpolation_test.cc",
     "fonts/script_run_iterator_test.cc",
     "fonts/shaping/caching_word_shaper_test.cc",
     "fonts/shaping/font_features_test.cc",
@@ -2164,7 +2173,6 @@ source_set("blink_platform_unittests_sources") {
     "peerconnection/rtc_encoded_audio_stream_transformer_test.cc",
     "peerconnection/rtc_encoded_video_stream_transformer_test.cc",
     "peerconnection/rtc_rtp_source_test.cc",
-    "peerconnection/rtc_stats_test.cc",
     "peerconnection/rtc_video_decoder_adapter_test.cc",
     "peerconnection/rtc_video_decoder_factory_test.cc",
     "peerconnection/rtc_video_decoder_stream_adapter_test.cc",
@@ -2237,10 +2245,7 @@ source_set("blink_platform_unittests_sources") {
   if (is_android) {
     sources += [ "fonts/android/font_cache_android_test.cc" ]
   } else if (is_win) {
-    sources += [
-      "fonts/win/fallback_lru_cache_win_test.cc",
-      "text/locale_win_test.cc",
-    ]
+    sources += [ "text/locale_win_test.cc" ]
   } else if (is_mac) {
     sources += [
       "fonts/mac/font_matcher_mac_test.mm",

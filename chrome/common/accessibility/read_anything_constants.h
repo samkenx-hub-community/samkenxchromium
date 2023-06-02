@@ -20,6 +20,7 @@ extern const char kColorHistogramName[];
 extern const char kFontNameHistogramName[];
 extern const char kFontScaleHistogramName[];
 extern const char kSettingsChangeHistogramName[];
+extern const char kScrollEventHistogramName[];
 
 extern const std::set<std::string> GetNonSelectableUrls();
 
@@ -42,9 +43,9 @@ const int kMinimumComboboxWidth = 110;
 
 const int kButtonPadding = 2;
 const int kIconSize = 16;
+const int kFontSizeIconSize = kIconSize + kInternalInsets;
 const int kColorsIconSize = 24;
 const int kSpacingIconSize = 20;
-const int kMenuLabelFontSizePx = 15;
 
 // Font size in em
 const double kReadAnythingDefaultFontScale = 1;
@@ -62,6 +63,17 @@ enum class ReadAnythingSettingsChange {
   kLineHeightChange = 3,
   kLetterSpacingChange = 4,
   kMaxValue = kLetterSpacingChange,
+};
+
+// Enum for logging how a scroll occurs.
+// These values are persisted to logs. Entries should not be renumbered and
+// numeric values should never be reused.
+enum class ReadAnythingScrollEvent {
+  kSelectedSidePanel = 0,
+  kSelectedMainPanel = 1,
+  kScrolledSidePanel = 2,
+  kScrolledMainPanel = 3,
+  kMaxValue = kScrolledMainPanel,
 };
 
 }  // namespace

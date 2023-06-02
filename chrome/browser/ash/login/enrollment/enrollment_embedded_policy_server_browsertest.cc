@@ -881,6 +881,7 @@ IN_PROC_BROWSER_TEST_F(AutoEnrollmentEmbeddedPolicyServer, DeviceDisabled) {
 
 // Attestation enrollment.
 IN_PROC_BROWSER_TEST_F(AutoEnrollmentEmbeddedPolicyServer, Attestation) {
+  WaitForOobeUI();
   policy_server_.SetUpdateDeviceAttributesPermission(true);
 
   AllowlistSimpleChallengeSigningKey();
@@ -891,7 +892,8 @@ IN_PROC_BROWSER_TEST_F(AutoEnrollmentEmbeddedPolicyServer, Attestation) {
           RESTORE_MODE_REENROLLMENT_ZERO_TOUCH,
       test::kTestDomain));
 
-  host()->StartWizard(AutoEnrollmentCheckScreenView::kScreenId);
+  WizardController::default_controller()->AdvanceToScreen(
+      AutoEnrollmentCheckScreenView::kScreenId);
 
   enrollment_ui_.WaitForStep(test::ui::kEnrollmentStepSuccess);
   EXPECT_TRUE(StartupUtils::IsDeviceRegistered());
@@ -914,7 +916,7 @@ IN_PROC_BROWSER_TEST_F(AutoEnrollmentEmbeddedPolicyServer, TestCaptivePortal) {
 IN_PROC_BROWSER_TEST_F(AutoEnrollmentNoStateKeys, FREExplicitlyRequired) {
   SetFRERequiredKey("1");
   host()->StartWizard(AutoEnrollmentCheckScreenView::kScreenId);
-  OobeScreenWaiter(AutoEnrollmentCheckScreenView::kScreenId).Wait();
+  WaitForOobeUI();
 
   OobeScreenWaiter(ErrorScreenView::kScreenId).Wait();
   test::OobeJS().ExpectHiddenPath({"error-message", "error-guest-signin"});
@@ -927,7 +929,7 @@ IN_PROC_BROWSER_TEST_F(AutoEnrollmentNoStateKeys,
                        FREExplicitlyRequiredInvalid) {
   SetFRERequiredKey("anything");
   host()->StartWizard(AutoEnrollmentCheckScreenView::kScreenId);
-  OobeScreenWaiter(AutoEnrollmentCheckScreenView::kScreenId).Wait();
+  WaitForOobeUI();
 
   OobeScreenWaiter(ErrorScreenView::kScreenId).Wait();
   test::OobeJS().ExpectHiddenPath({"error-message", "error-guest-signin"});

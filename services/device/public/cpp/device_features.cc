@@ -17,7 +17,7 @@ BASE_FEATURE(kWinrtGeolocationImplementation,
              "WinrtGeolocationImplementation",
              base::FEATURE_DISABLED_BY_DEFAULT);
 // Enables usage of the CoreLocation API for LocationProvider instead of
-// NetworkLocationProvider for macOS.
+// NetworkLocationProvider for macOS or iOS.
 BASE_FEATURE(kMacCoreLocationBackend,
              "MacCoreLocationBackend",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -25,6 +25,10 @@ BASE_FEATURE(kMacCoreLocationBackend,
 // can be useful in situations where new WiFi data is needed frequently.
 BASE_FEATURE(kCrOSGeolocationReducedWifiPollingInterval,
              "ReducedWifiPollingInterval",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+// Enable serial communication for SPP devices.
+BASE_FEATURE(kEnableBluetoothSerialPortProfileInSerialApi,
+             "EnableBluetoothSerialPortProfileInSerialApi",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 }  // namespace features

@@ -4,6 +4,7 @@
 
 import("//ios/build/config.gni")
 import("//ios/web/public/js_messaging/optimize_js.gni")
+import("//ios/web/public/js_messaging/optimize_ts.gni")
 import("//testing/test.gni")
 import("//tools/grit/grit_rule.gni")
 
@@ -31,9 +32,7 @@ source_set("web") {
     ":core",
     ":message_js",
     ":navigation_resources",
-    ":plugin_placeholder_js",
     ":resources",
-    ":share_workaround_js",
     ":threads",
     "//base",
     "//components/leveldb_proto",
@@ -621,7 +620,6 @@ test("ios_web_inttests") {
     "navigation/history_state_operations_inttest.mm",
     "navigation/meta_tag_inttest.mm",
     "navigation/window_location_inttest.mm",
-    "plugin_placeholder_inttest.mm",
     "public/test/http_server_inttest.mm",
     "test/run_all_unittests.cc",
     "url_loader_inttest.mm",
@@ -639,20 +637,6 @@ test("ios_web_inttests") {
   assert_no_deps = ios_assert_no_deps
 }
 
-optimize_js("plugin_placeholder_js") {
-  visibility = [ ":web" ]
-
-  primary_script = "web_state/js/resources/plugin_placeholder.js"
-  sources = [ "web_state/js/resources/plugin_placeholder.js" ]
-}
-
-optimize_js("share_workaround_js") {
-  visibility = [ ":web" ]
-
-  primary_script = "web_state/js/resources/share_workaround.js"
-  sources = [ "web_state/js/resources/share_workaround.js" ]
-}
-
 optimize_js("common_js") {
   visibility = [ ":web" ]
 
@@ -660,11 +644,16 @@ optimize_js("common_js") {
   sources = [ "web_state/js/resources/common.js" ]
 }
 
-optimize_js("message_js") {
+optimize_ts("message_js") {
   visibility = [ ":web" ]
 
-  primary_script = "js_messaging/resources/message.js"
-  sources = [ "js_messaging/resources/message.js" ]
+  sources = [ "js_messaging/resources/message.ts" ]
+
+  deps = [
+    "//ios/web/public/js_messaging:frame_id",
+    "//ios/web/public/js_messaging:gcrweb",
+    "//ios/web/public/js_messaging:util_scripts",
+  ]
 }
 
 bundle_data("navigation_resources") {

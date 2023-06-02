@@ -181,9 +181,18 @@ apps::Permissions CreatePermissions(
   apps::Permissions permissions;
   for (const auto& [arc_permission_type, arc_permission_state] :
        arc_permissions) {
+    apps::TriState value = arc_permission_state->granted
+                               ? apps::TriState::kAllow
+                               : apps::TriState::kBlock;
+    // Permissions in the one-time state will ask for permission again the next
+    // time they are used.
+    if (arc_permission_state->one_time) {
+      value = apps::TriState::kAsk;
+    }
+
     permissions.push_back(std::make_unique<apps::Permission>(
         GetPermissionType(arc_permission_type),
-        std::make_unique<apps::PermissionValue>(arc_permission_state->granted),
+        std::make_unique<apps::PermissionValue>(value),
         arc_permission_state->managed, arc_permission_state->details));
   }
   return permissions;
@@ -983,8 +992,15 @@ void ArcApps::OpenNativeSettings(const std::string& app_id) {
                << ". App is not found.";
     return;
   }
-  arc::ShowPackageInfo(app_info->package_name,
-                       arc::mojom::ShowPackageInfoPage::MAIN,
+  if (app_info->package_name.empty()) {
+    LOG(ERROR) << "Cannot open native settings for " << app_id
+               << ". Package name is empty.";
+    return;
+  }
+  const auto page = arc::IsReadOnlyPermissionsEnabled()
+                        ? arc::mojom::ShowPackageInfoPage::MANAGE_PERMISSIONS
+                        : arc::mojom::ShowPackageInfoPage::MAIN;
+  arc::ShowPackageInfo(app_info->package_name, page,
                        display::Screen::GetScreen()->GetPrimaryDisplay().id());
 }
 

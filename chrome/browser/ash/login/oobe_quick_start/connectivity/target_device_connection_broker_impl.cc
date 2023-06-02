@@ -10,7 +10,6 @@
 #include "base/base64.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
-#include "base/functional/callback_helpers.h"
 #include "base/logging.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
@@ -300,6 +299,10 @@ base::Value::Dict TargetDeviceConnectionBrokerImpl::GetPrepareForUpdateInfo() {
   return prepare_for_update_info;
 }
 
+std::string TargetDeviceConnectionBrokerImpl::GetSessionIdDisplayCode() {
+  return random_session_id_.GetDisplayCode();
+}
+
 void TargetDeviceConnectionBrokerImpl::FetchPersistedSessionContext() {
   PrefService* prefs = g_browser_process->local_state();
   CHECK(prefs->GetBoolean(prefs::kShouldResumeQuickStartAfterReboot));
@@ -475,6 +478,13 @@ void TargetDeviceConnectionBrokerImpl::OnStopNearbyConnectionsAdvertising(
 void TargetDeviceConnectionBrokerImpl::OnIncomingConnectionInitiated(
     const std::string& endpoint_id,
     const std::vector<uint8_t>& endpoint_info) {
+  if (is_resume_after_update_) {
+    QS_LOG(INFO) << "Skipped manual verification and will attempt an "
+                    "\"automatic handshake\": endpoint_id="
+                 << endpoint_id;
+    return;
+  }
+
   QS_LOG(INFO) << "Incoming Nearby Connection Initiated: endpoint_id="
                << endpoint_id
                << " use_pin_authentication=" << use_pin_authentication_;
@@ -502,15 +512,14 @@ void TargetDeviceConnectionBrokerImpl::OnIncomingConnectionAccepted(
 
   // TODO(b/234655072): Handle Connection Closed in the Connection Broker
   connection_ = connection_factory_->Create(
-      nearby_connection, BuildConnectionSessionContext(),
-      std::move(quick_start_decoder_),
+      nearby_connection, BuildConnectionSessionContext(), quick_start_decoder_,
       base::BindOnce(&TargetDeviceConnectionBrokerImpl::OnConnectionClosed,
                      weak_ptr_factory_.GetWeakPtr()),
       base::BindOnce(
           &TargetDeviceConnectionBrokerImpl::OnConnectionAuthenticated,
           weak_ptr_factory_.GetWeakPtr()));
 
-  if (use_pin_authentication_) {
+  if (use_pin_authentication_ && !is_resume_after_update_) {
     QS_LOG(INFO) << "Pin authentication completed!";
     connection_->MarkConnectionAuthenticated();
   } else {
@@ -518,10 +527,23 @@ void TargetDeviceConnectionBrokerImpl::OnIncomingConnectionAccepted(
     absl::optional<std::string> auth_token =
         nearby_connections_manager_->GetAuthenticationToken(endpoint_id);
     CHECK(auth_token);
-    // TODO(b/234655072): Handle the handshake callback once the handshake is
-    // fully implemented.
-    connection_->InitiateHandshake(*auth_token, base::DoNothing());
+    connection_->InitiateHandshake(
+        *auth_token,
+        base::BindOnce(&TargetDeviceConnectionBrokerImpl::OnHandshakeCompleted,
+                       weak_ptr_factory_.GetWeakPtr()));
   }
+}
+
+void TargetDeviceConnectionBrokerImpl::OnHandshakeCompleted(bool success) {
+  CHECK(connection_);
+  if (!success) {
+    QS_LOG(ERROR) << "Handshake failed! Dropping the connection.";
+    connection_->Close(ConnectionClosedReason::kAuthenticationFailed);
+    return;
+  }
+
+  QS_LOG(INFO) << "Handshake succeeded!";
+  connection_->MarkConnectionAuthenticated();
 }
 
 const Connection::SessionContext

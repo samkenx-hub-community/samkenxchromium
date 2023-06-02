@@ -24,7 +24,6 @@ import org.chromium.components.omnibox.AnswerType;
 import org.chromium.components.omnibox.AutocompleteMatch;
 import org.chromium.components.omnibox.OmniboxSuggestionType;
 import org.chromium.components.omnibox.SuggestionAnswer;
-import org.chromium.components.omnibox.action.OmniboxActionDelegate;
 import org.chromium.components.omnibox.suggestions.OmniboxSuggestionUiType;
 import org.chromium.ui.modelutil.PropertyModel;
 
@@ -40,7 +39,6 @@ public class AnswerSuggestionProcessor extends BaseSuggestionViewProcessor {
     private static final String COLOR_REVERSAL_COUNTRY_LIST = "ja-JP,ko-KR,zh-CN,zh-TW";
 
     private final Map<String, List<PropertyModel>> mPendingAnswerRequestUrls;
-    private final SuggestionHost mSuggestionHost;
     private final UrlBarEditingTextStateProvider mUrlBarEditingTextProvider;
     private final Supplier<ImageFetcher> mImageFetcherSupplier;
     private boolean mOmniBoxAnswerColorReversal;
@@ -50,11 +48,9 @@ public class AnswerSuggestionProcessor extends BaseSuggestionViewProcessor {
      * @param suggestionHost A handle to the object using the suggestions.
      */
     public AnswerSuggestionProcessor(Context context, SuggestionHost suggestionHost,
-            OmniboxActionDelegate omniboxActionDelegate,
             UrlBarEditingTextStateProvider editingTextProvider,
             Supplier<ImageFetcher> imageFetcherSupplier) {
-        super(context, suggestionHost, omniboxActionDelegate, null);
-        mSuggestionHost = suggestionHost;
+        super(context, suggestionHost, null);
         mPendingAnswerRequestUrls = new HashMap<>();
         mUrlBarEditingTextProvider = editingTextProvider;
         mImageFetcherSupplier = imageFetcherSupplier;
@@ -129,7 +125,7 @@ public class AnswerSuggestionProcessor extends BaseSuggestionViewProcessor {
                     for (int i = 0; i < currentModels.size(); i++) {
                         PropertyModel currentModel = currentModels.get(i);
                         setSuggestionDrawableState(currentModel,
-                                SuggestionDrawableState.Builder.forBitmap(getContext(), bitmap)
+                                SuggestionDrawableState.Builder.forBitmap(mContext, bitmap)
                                         .setLarge(true)
                                         .build());
                     }
@@ -145,7 +141,7 @@ public class AnswerSuggestionProcessor extends BaseSuggestionViewProcessor {
         int answerType = suggestion.getAnswer() == null ? AnswerType.INVALID
                                                         : suggestion.getAnswer().getType();
         boolean suggestionTextColorReversal = checkColorReversalRequired(answerType);
-        AnswerText[] details = AnswerTextNewLayout.from(getContext(), suggestion,
+        AnswerText[] details = AnswerTextNewLayout.from(mContext, suggestion,
                 mUrlBarEditingTextProvider.getTextWithoutAutocomplete(),
                 suggestionTextColorReversal);
 
@@ -162,7 +158,7 @@ public class AnswerSuggestionProcessor extends BaseSuggestionViewProcessor {
 
         setSuggestionDrawableState(model,
                 SuggestionDrawableState.Builder
-                        .forDrawableRes(getContext(), getSuggestionIcon(suggestion))
+                        .forDrawableRes(mContext, getSuggestionIcon(suggestion))
                         .setLarge(true)
                         .build());
 

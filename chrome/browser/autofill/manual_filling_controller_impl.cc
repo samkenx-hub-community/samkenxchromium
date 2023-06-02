@@ -395,6 +395,7 @@ bool ManualFillingControllerImpl::ShouldShowAccessory() const {
     // If there are suggestions, show on usual form fields.
     case FocusedFieldType::kFillablePasswordField:
     case FocusedFieldType::kFillableUsernameField:
+    case FocusedFieldType::kFillableWebauthnTaggedField:
     case FocusedFieldType::kFillableNonSearchField:
       return !available_sources_.empty();
 
@@ -427,8 +428,11 @@ void ManualFillingControllerImpl::UpdateVisibility() {
       }
       if (source == FillingSource::AUTOFILL)
         continue;  // Autofill suggestions have no sheet.
-      absl::optional<AccessorySheetData> sheet =
-          GetControllerForFillingSource(source)->GetSheetData();
+      AccessoryController* controller = GetControllerForFillingSource(source);
+      if (!controller) {
+        continue;  // Most-likely, the controller was cleaned up already.
+      }
+      absl::optional<AccessorySheetData> sheet = controller->GetSheetData();
       if (sheet.has_value())
         view_->OnItemsAvailable(std::move(sheet.value()));
     }
@@ -497,16 +501,13 @@ AccessoryController* ManualFillingControllerImpl::GetControllerForAction(
     case AccessoryAction::USE_OTHER_PASSWORD:
     case AccessoryAction::GENERATE_PASSWORD_AUTOMATIC:
     case AccessoryAction::TOGGLE_SAVE_PASSWORDS:
+    case AccessoryAction::CREDMAN_CONDITIONAL_UI_REENTRY:
       return pwd_controller_.get();
     case AccessoryAction::MANAGE_ADDRESSES:
       return address_controller_.get();
     case AccessoryAction::MANAGE_CREDIT_CARDS:
       return cc_controller_.get();
     case AccessoryAction::AUTOFILL_SUGGESTION:
-    case AccessoryAction::CREDMAN_CONDITIONAL_UI_REENTRY:
-      // TODO(crbug/1444418): Implement.
-      NOTIMPLEMENTED();
-      ABSL_FALLTHROUGH_INTENDED;
     case AccessoryAction::COUNT:
       NOTREACHED() << "Controller not defined for action: "
                    << static_cast<int>(action);

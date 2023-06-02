@@ -968,7 +968,6 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerVotingBrowserTest,
 
   // Enter a password and save it.
   PasswordsNavigationObserver first_observer(WebContents());
-  BubbleObserver prompt_observer(WebContents());
   std::string fill_and_submit =
       "document.getElementById('other_info').value = 'stuff';"
       "document.getElementById('username_field').value = 'my_username';"
@@ -977,8 +976,14 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerVotingBrowserTest,
   ASSERT_TRUE(content::ExecJs(WebContents(), fill_and_submit));
 
   ASSERT_TRUE(first_observer.Wait());
-  EXPECT_TRUE(prompt_observer.IsSavePromptShownAutomatically());
-  prompt_observer.AcceptSavePrompt();
+  {
+    base::HistogramTester histograms;
+    BubbleObserver prompt_observer(WebContents());
+    EXPECT_TRUE(prompt_observer.IsSavePromptShownAutomatically());
+    prompt_observer.AcceptSavePrompt();
+    // One vote on saving a password.
+    histograms.ExpectUniqueSample("Autofill.UploadEvent", 1, 1);
+  }
 
   // Now navigate to a login form that has similar HTML markup.
   NavigateToFile("/password/password_form.html");
@@ -996,23 +1001,14 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerVotingBrowserTest,
   BubbleObserver second_prompt_observer(WebContents());
   std::string submit_form =
       "document.getElementById('input_submit_button').click()";
-  ASSERT_TRUE(content::ExecJs(WebContents(), submit_form));
-  ASSERT_TRUE(second_observer.Wait());
+  {
+    base::HistogramTester histograms;
+    ASSERT_TRUE(content::ExecJs(WebContents(), submit_form));
+    ASSERT_TRUE(second_observer.Wait());
+    // One vote for credential reuse, one vote for first time login.
+    histograms.ExpectUniqueSample("Autofill.UploadEvent", 1, 2);
+  }
   EXPECT_FALSE(second_prompt_observer.IsSavePromptShownAutomatically());
-
-  // Verify that we sent two pings to Autofill. One vote for of PASSWORD for
-  // the current form, and one vote for ACCOUNT_CREATION_PASSWORD on the
-  // original form since it has more than 2 text input fields and was used for
-  // the first time on a different form.
-  base::HistogramBase* upload_histogram =
-      base::StatisticsRecorder::FindHistogram(
-          "PasswordGeneration.UploadStarted");
-  ASSERT_TRUE(upload_histogram);
-  std::unique_ptr<base::HistogramSamples> snapshot =
-      upload_histogram->SnapshotSamples();
-  EXPECT_EQ(0, snapshot->GetCount(0 /* failure */));
-  EXPECT_EQ(2, snapshot->GetCount(1 /* success */));
-
   autofill::test::ReenableSystemServices();
 }
 
@@ -1520,7 +1516,7 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTest, SlowPageFill) {
       embedded_test_server()->GetURL("/password/infinite_password_form.html");
   ui_test_utils::NavigateToURLWithDisposition(
       browser(), url, WindowOpenDisposition::CURRENT_TAB,
-      ui_test_utils::BROWSER_TEST_NONE);
+      ui_test_utils::BROWSER_TEST_NO_WAIT);
 
   // Wait for autofill.
   BubbleObserver bubble_observer(WebContents());
@@ -4217,7 +4213,7 @@ class MockPrerenderPasswordManagerDriver
 #if BUILDFLAG(IS_ANDROID)
   MOCK_METHOD(void,
               ShowKeyboardReplacingSurface,
-              (autofill::mojom::SubmissionReadinessState),
+              (autofill::mojom::SubmissionReadinessState, bool),
               (override));
 #endif
   MOCK_METHOD(void,
@@ -4291,7 +4287,8 @@ class MockPrerenderPasswordManagerDriver
     ON_CALL(*this, ShowKeyboardReplacingSurface)
         .WillByDefault([this](autofill::mojom::SubmissionReadinessState
                                   submission_readiness) {
-          impl_->ShowKeyboardReplacingSurface(submission_readiness);
+          impl_->ShowKeyboardReplacingSurface(submission_readiness,
+                                              /*is_webauthn=*/false);
         });
 #endif
     ON_CALL(*this, CheckSafeBrowsingReputation)

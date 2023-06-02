@@ -14,6 +14,7 @@
 
 #include "base/containers/flat_set.h"
 #include "base/values.h"
+#include "base/version.h"
 #include "chrome/browser/web_applications/mojom/user_display_mode.mojom.h"
 #include "chrome/browser/web_applications/scope_extension_info.h"
 #include "chrome/browser/web_applications/web_app_id.h"
@@ -185,7 +186,11 @@ struct WebAppInstallInfo {
       const GURL& document_url,
       const WebAppInstallInfo& other);
 
+  // TODO(b/280862254): Remove this constructor to force users to use specify
+  // the manifest_id.
   WebAppInstallInfo();
+
+  explicit WebAppInstallInfo(const web_app::ManifestId& manifest_id);
 
   // Deleted to prevent accidental copying. Use Clone() to deep copy explicitly.
   WebAppInstallInfo& operator=(const WebAppInstallInfo&) = delete;
@@ -200,7 +205,10 @@ struct WebAppInstallInfo {
   WebAppInstallInfo Clone() const;
 
   // Id specified in the manifest.
-  absl::optional<std::string> manifest_id;
+  // TODO(b/280862254): After the manifest id constructor is required, this can
+  // be guaranteed to be valid & non-empty.
+  // https://www.w3.org/TR/appmanifest/#id-member
+  web_app::ManifestId manifest_id;
 
   // Title of the application.
   std::u16string title;
@@ -362,6 +370,9 @@ struct WebAppInstallInfo {
   // Note that list is not meant to be an exhaustive enumeration of all possible
   // policy_ids but rather just a supplement for tricky cases.
   std::vector<std::string> additional_policy_ids;
+
+  // Used to specify the version of an Isolated Web App that is being installed.
+  base::Version isolated_web_app_version;
 
  private:
   // Used this method in Clone() method. Use Clone() to deep copy explicitly.

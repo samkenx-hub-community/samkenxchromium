@@ -28,6 +28,7 @@
 #include "chrome/browser/history/history_tab_helper.h"
 #include "chrome/browser/metrics/chrome_metrics_service_accessor.h"
 #include "chrome/browser/password_manager/account_password_store_factory.h"
+#include "chrome/browser/password_manager/android/cred_man_controller.h"
 #include "chrome/browser/password_manager/chrome_webauthn_credentials_delegate.h"
 #include "chrome/browser/password_manager/chrome_webauthn_credentials_delegate_factory.h"
 #include "chrome/browser/password_manager/field_info_manager_factory.h"
@@ -89,8 +90,8 @@
 #include "components/signin/public/base/signin_metrics.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
 #include "components/site_isolation/site_isolation_policy.h"
-#include "components/sync/driver/sync_service.h"
-#include "components/sync/driver/sync_user_settings.h"
+#include "components/sync/service/sync_service.h"
+#include "components/sync/service/sync_user_settings.h"
 #include "components/translate/core/browser/translate_manager.h"
 #include "components/version_info/version_info.h"
 #include "content/public/browser/back_forward_cache.h"
@@ -132,6 +133,7 @@
 #include "chrome/browser/password_manager/android/credential_leak_controller_android.h"
 #include "chrome/browser/password_manager/android/password_accessory_controller.h"
 #include "chrome/browser/password_manager/android/password_accessory_controller_impl.h"
+#include "chrome/browser/password_manager/android/password_checkup_launcher_helper_impl.h"
 #include "chrome/browser/password_manager/android/password_generation_controller.h"
 #include "chrome/browser/password_manager/android/password_manager_launcher_android.h"
 #include "chrome/browser/password_manager/android/password_manager_ui_util_android.h"
@@ -341,6 +343,8 @@ void ChromePasswordManagerClient::FocusedInputChanged(
 #if BUILDFLAG(IS_ANDROID)
   ManualFillingController::GetOrCreate(web_contents())
       ->NotifyFocusedInputChanged(focused_field_id, focused_field_type);
+  GetOrCreatePasswordAccessory()->UpdateCredManReentryUi(focused_field_type);
+
   password_manager::ContentPasswordManagerDriver* content_driver =
       static_cast<password_manager::ContentPasswordManagerDriver*>(driver);
   if (!ShouldAcceptFocusEvent(web_contents(), content_driver,
@@ -404,9 +408,13 @@ void ChromePasswordManagerClient::ShowPasswordManagerErrorMessage(
   }
 }
 
-void ChromePasswordManagerClient::ShowTouchToFill(
-    PasswordManagerDriver* driver,
-    autofill::mojom::SubmissionReadinessState submission_readiness) {
+void ChromePasswordManagerClient::ShowKeyboardReplacingSurface(
+    password_manager::PasswordManagerDriver* driver,
+    autofill::mojom::SubmissionReadinessState submission_readiness,
+    bool is_webauthn_form) {
+  if (GetOrCreateCredManController()->Show(driver, is_webauthn_form)) {
+    return;
+  }
   auto* webauthn_delegate = GetWebAuthnCredentialsDelegateForDriver(driver);
   std::vector<password_manager::PasskeyCredential> passkeys;
   if (webauthn_delegate && webauthn_delegate->GetPasskeys().has_value()) {
@@ -597,6 +605,7 @@ void ChromePasswordManagerClient::NotifyUserCredentialsWereLeaked(
       password_manager::GetLeakDialogType(leak_type));
   (new CredentialLeakControllerAndroid(
        leak_type, url, username, web_contents()->GetTopLevelNativeWindow(),
+       std::make_unique<PasswordCheckupLauncherHelperImpl>(),
        std::move(metrics_recorder)))
       ->ShowDialog();
 #else   // !BUILDFLAG(IS_ANDROID)
@@ -1240,6 +1249,15 @@ ChromePasswordManagerClient::GetOrCreateTouchToFillController() {
   }
   return touch_to_fill_controller_.get();
 }
+
+password_manager::CredManController*
+ChromePasswordManagerClient::GetOrCreateCredManController() {
+  if (!cred_man_controller_) {
+    cred_man_controller_ =
+        std::make_unique<password_manager::CredManController>(this);
+  }
+  return cred_man_controller_.get();
+}
 #endif  // BUILDFLAG(IS_ANDROID)
 
 ChromePasswordManagerClient::ChromePasswordManagerClient(
@@ -1368,6 +1386,13 @@ void ChromePasswordManagerClient::HideFillingUI() {
       PasswordGenerationController::GetIfExisting(web_contents());
   if (generation_controller) {
     generation_controller->HideBottomSheetIfNeeded();
+  }
+  if (touch_to_fill_controller_) {
+    touch_to_fill_controller_->Reset();
+  }
+
+  if (cred_man_controller_) {
+    cred_man_controller_.reset();
   }
 #endif  // BUILDFLAG(IS_ANDROID)
 }

@@ -4,13 +4,12 @@
 
 package org.chromium.net;
 
-import static org.junit.Assert.assertEquals;
+import static com.google.common.truth.Truth.assertThat;
+
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import static org.chromium.net.CronetTestRule.assertContains;
 import static org.chromium.net.CronetTestRule.getContext;
 import static org.chromium.net.CronetTestRule.getTestStorage;
 
@@ -107,8 +106,8 @@ public class ExperimentalOptionsTest {
         UrlRequest urlRequest = builder.build();
         urlRequest.start();
         callback.blockForDone();
-        assertEquals(200, callback.mResponseInfo.getHttpStatusCode());
-        assertEquals("GET", callback.mResponseAsString);
+        assertThat(callback.mResponseInfo.getHttpStatusCode()).isEqualTo(200);
+        assertThat(callback.mResponseAsString).isEqualTo("GET");
         cronetEngine.stopNetLog();
         assertFileContainsString(logfile, "HostResolverRules");
         assertTrue(logfile.delete());
@@ -157,8 +156,8 @@ public class ExperimentalOptionsTest {
         UrlRequest urlRequest = builder.build();
         urlRequest.start();
         callback.blockForDone();
-        assertEquals(200, callback.mResponseInfo.getHttpStatusCode());
-        assertEquals("GET", callback.mResponseAsString);
+        assertThat(callback.mResponseInfo.getHttpStatusCode()).isEqualTo(200);
+        assertThat(callback.mResponseAsString).isEqualTo("GET");
 
         assertFileContainsString(file, "CLIENT_HANDSHAKE_TRAFFIC_SECRET");
         assertTrue(file.delete());
@@ -245,8 +244,8 @@ public class ExperimentalOptionsTest {
         UrlRequest urlRequest = builder.build();
         urlRequest.start();
         callback.blockForDone();
-        assertNull(callback.mError);
-        assertEquals(200, callback.mResponseInfo.getHttpStatusCode());
+        assertThat(callback.mError).isNull();
+        assertThat(callback.mResponseInfo.getHttpStatusCode()).isEqualTo(200);
 
         // Shut down the context, persisting contents to disk, and build a new one.
         context.shutdown();
@@ -259,8 +258,8 @@ public class ExperimentalOptionsTest {
         urlRequest = builder.build();
         urlRequest.start();
         callback.blockForDone();
-        assertNull(callback.mError);
-        assertEquals(200, callback.mResponseInfo.getHttpStatusCode());
+        assertThat(callback.mError).isNull();
+        assertThat(callback.mResponseInfo.getHttpStatusCode()).isEqualTo(200);
         context.shutdown();
     }
 
@@ -275,7 +274,7 @@ public class ExperimentalOptionsTest {
             CronetEngine cronetEngine = mBuilder.build();
             fail("Setting invalid JSON should have thrown an exception.");
         } catch (IllegalArgumentException e) {
-            assertTrue(e.getMessage().contains("Experimental options parsing failed"));
+            assertThat(e).hasMessageThat().contains("Experimental options parsing failed");
         }
     }
 
@@ -297,8 +296,8 @@ public class ExperimentalOptionsTest {
         BidirectionalStream stream = builder.build();
         stream.start();
         callback.blockForDone();
-        assertEquals(200, callback.mResponseInfo.getHttpStatusCode());
-        assertEquals("GET", callback.mResponseAsString);
+        assertThat(callback.mResponseInfo.getHttpStatusCode()).isEqualTo(200);
+        assertThat(callback.mResponseAsString).isEqualTo("GET");
         cronetEngine.shutdown();
     }
 
@@ -327,10 +326,11 @@ public class ExperimentalOptionsTest {
         callback.blockForDone();
         assertTrue(stream.isDone());
         assertTrue(callback.mOnErrorCalled);
-        assertContains("Exception in BidirectionalStream: net::ERR_HTTP2_PING_FAILED",
-                callback.mError.getMessage());
-        assertEquals(NetError.ERR_HTTP2_PING_FAILED,
-                ((NetworkException) callback.mError).getCronetInternalErrorCode());
+        assertThat(callback.mError)
+                .hasMessageThat()
+                .contains("Exception in BidirectionalStream: net::ERR_HTTP2_PING_FAILED");
+        assertThat(((NetworkException) callback.mError).getCronetInternalErrorCode())
+                .isEqualTo(NetError.ERR_HTTP2_PING_FAILED);
         cronetEngine.shutdown();
     }
 
@@ -345,7 +345,7 @@ public class ExperimentalOptionsTest {
                 ConnectionMigrationOptions.builder().enableDefaultNetworkMigration(true));
         mBuilder.build();
 
-        assertNull(mockBuilderImpl.mConnectionMigrationOptions);
+        assertThat(mockBuilderImpl.mConnectionMigrationOptions).isNull();
         assertJsonEquals(EXPECTED_CONNECTION_MIGRATION_ENABLED_STRING,
                 mockBuilderImpl.mEffectiveExperimentalOptions);
     }
@@ -362,7 +362,7 @@ public class ExperimentalOptionsTest {
         mBuilder.build();
 
         assertTrue(mockBuilderImpl.mConnectionMigrationOptions.getEnableDefaultNetworkMigration());
-        assertNull(mockBuilderImpl.mEffectiveExperimentalOptions);
+        assertThat(mockBuilderImpl.mEffectiveExperimentalOptions).isNull();
     }
 
     @Test
@@ -379,7 +379,7 @@ public class ExperimentalOptionsTest {
                 "{\"QUIC\": {\"migrate_sessions_on_network_change_v2\": false}}");
         mBuilder.build();
 
-        assertNull(mockBuilderImpl.mConnectionMigrationOptions);
+        assertThat(mockBuilderImpl.mConnectionMigrationOptions).isNull();
         assertJsonEquals(EXPECTED_CONNECTION_MIGRATION_ENABLED_STRING,
                 mockBuilderImpl.mEffectiveExperimentalOptions);
     }
@@ -395,7 +395,7 @@ public class ExperimentalOptionsTest {
                 ConnectionMigrationOptions.builder().allowNonDefaultNetworkUsage(true));
         mBuilder.build();
 
-        assertNull(mockBuilderImpl.mConnectionMigrationOptions);
+        assertThat(mockBuilderImpl.mConnectionMigrationOptions).isNull();
         assertJsonEquals("{\"QUIC\":{}}", mockBuilderImpl.mEffectiveExperimentalOptions);
     }
 
@@ -410,7 +410,7 @@ public class ExperimentalOptionsTest {
                 ConnectionMigrationOptions.builder().enablePathDegradationMigration(true));
         mBuilder.build();
 
-        assertNull(mockBuilderImpl.mConnectionMigrationOptions);
+        assertThat(mockBuilderImpl.mConnectionMigrationOptions).isNull();
         assertJsonEquals("{\"QUIC\":{\"allow_port_migration\":true}}",
                 mockBuilderImpl.mEffectiveExperimentalOptions);
     }
@@ -427,7 +427,7 @@ public class ExperimentalOptionsTest {
                                                        .allowNonDefaultNetworkUsage(true));
         mBuilder.build();
 
-        assertNull(mockBuilderImpl.mConnectionMigrationOptions);
+        assertThat(mockBuilderImpl.mConnectionMigrationOptions).isNull();
         assertJsonEquals("{\"QUIC\":{\"migrate_sessions_early_v2\":true}}",
                 mockBuilderImpl.mEffectiveExperimentalOptions);
     }
@@ -444,7 +444,7 @@ public class ExperimentalOptionsTest {
                                                        .allowNonDefaultNetworkUsage(false));
         mBuilder.build();
 
-        assertNull(mockBuilderImpl.mConnectionMigrationOptions);
+        assertThat(mockBuilderImpl.mConnectionMigrationOptions).isNull();
         assertJsonEquals(
                 "{\"QUIC\":{\"migrate_sessions_early_v2\":false,\"allow_port_migration\":true}}",
                 mockBuilderImpl.mEffectiveExperimentalOptions);
@@ -465,9 +465,9 @@ public class ExperimentalOptionsTest {
             mBuilder.build();
             fail();
         } catch (IllegalArgumentException expected) {
-            assertTrue(expected.getMessage().contains(
+            assertThat(expected).hasMessageThat().contains(
                     "Unable to turn on non-default network usage without path degradation"
-                    + " migration"));
+                    + " migration");
         }
     }
 
@@ -679,7 +679,7 @@ public class ExperimentalOptionsTest {
 
     private static void assertJsonEquals(JSONObject expected, JSONObject actual)
             throws JSONException {
-        assertEquals(jsonKeys(expected), jsonKeys(actual));
+        assertThat(jsonKeys(actual)).isEqualTo(jsonKeys(expected));
 
         for (String key : jsonKeys(expected)) {
             Object expectedValue = expected.get(key);
@@ -695,7 +695,7 @@ public class ExperimentalOptionsTest {
                             + actualValue + "]");
                 }
             } else {
-                assertEquals(expectedValue, actualValue);
+                assertThat(actualValue).isEqualTo(expectedValue);
             }
         }
     }

@@ -39,7 +39,10 @@ enum class EndRecordingReason {
   kProjectorTranscriptionError,
   kLowDriveFsQuota,
   kVideoEncoderReconfigurationFailure,
-  kMaxValue = kVideoEncoderReconfigurationFailure,
+  kKeyboardShortcut,
+  kGameDashboardStopRecordingButton,
+  kGameToolbarStopRecordingButton,
+  kMaxValue = kGameToolbarStopRecordingButton,
 };
 
 // Enumeration of capture bar buttons that can be pressed while in capture mode.
@@ -138,7 +141,7 @@ void RecordCaptureModeConfiguration(CaptureModeType type,
                                     CaptureModeSource source,
                                     RecordingType recording_type,
                                     bool audio_on,
-                                    CaptureModeBehavior* behavior);
+                                    const CaptureModeBehavior* behavior);
 
 // Records the percent ratio between the area of the user selected region to be
 // recorded as GIF to the area of the entire screen.
@@ -149,12 +152,14 @@ void RecordCaptureModeEntryType(CaptureModeEntryType entry_type);
 
 // Records the duration of a recording taken by capture mode.
 void RecordCaptureModeRecordingDuration(base::TimeDelta recording_duration,
-                                        CaptureModeBehavior* behavior,
+                                        const CaptureModeBehavior* behavior,
                                         bool is_gif);
 
 // Records the given video file `size_in_kb`. The used histogram will depend on
 // whether this video file was GIF or WebM.
-void RecordVideoFileSizeKB(bool is_gif, int size_in_kb);
+void RecordVideoFileSizeKB(bool is_gif,
+                           const CaptureModeBehavior* behavior,
+                           int size_in_kb);
 
 // Records if the user has switched modes during a capture session.
 void RecordCaptureModeSwitchesFromInitialMode(bool switched);
@@ -164,8 +169,9 @@ void RecordCaptureModeSwitchesFromInitialMode(bool switched);
 // as a region. The count is recorded and reset when a user performs a capture.
 // The count is just reset when a user selects a new region or the user switches
 // capture sources.
-void RecordNumberOfCaptureRegionAdjustments(int num_adjustments,
-                                            CaptureModeBehavior* behavior);
+void RecordNumberOfCaptureRegionAdjustments(
+    int num_adjustments,
+    const CaptureModeBehavior* behavior);
 
 // Records the number of times a user consecutively screenshots. Only records a
 // sample if `num_consecutive_screenshots` is greater than 1.
@@ -183,7 +189,8 @@ void RecordNumberOfScreenshotsTakenInLastWeek(
 void RecordScreenshotNotificationQuickAction(CaptureQuickAction action);
 
 // Records the location where screen capture is saved.
-void RecordSaveToLocation(CaptureModeSaveToLocation save_location);
+void RecordSaveToLocation(CaptureModeSaveToLocation save_location,
+                          const CaptureModeBehavior* behavior);
 
 // Records the `reason` for which the capture folder is switched to default
 // downloads folder.
@@ -197,7 +204,7 @@ GetConfiguration(CaptureModeType type,
                  RecordingType recording_type);
 // Records how often recording starts with a camera on.
 void RecordRecordingStartsWithCamera(bool starts_with_camera,
-                                     CaptureModeBehavior* behavior);
+                                     const CaptureModeBehavior* behavior);
 
 // Records the number of camera disconnections during recording.
 void RecordCameraDisconnectionsDuringRecordings(int num_camera_disconnections);
@@ -218,13 +225,13 @@ void RecordCameraPositionOnStart(CameraPreviewSnapPosition camera_position);
 
 // Records how often recording starts with demo tools feature enabled.
 void RecordRecordingStartsWithDemoTools(bool demo_tools_enabled,
-                                        CaptureModeBehavior* behavior);
+                                        const CaptureModeBehavior* behavior);
 
 // Prepends the common prefix to the `root_word` and optionally inserts the
 // client's metric component (as specified by the given `behavior`) or appends
 // the ui mode suffix to build the full histogram name.
 ASH_EXPORT std::string BuildHistogramName(const char* const root_word,
-                                          CaptureModeBehavior* behavior,
+                                          const CaptureModeBehavior* behavior,
                                           bool append_ui_mode_suffix);
 
 }  // namespace ash

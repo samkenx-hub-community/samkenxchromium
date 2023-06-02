@@ -84,7 +84,7 @@ void RecordCaptureModeConfiguration(CaptureModeType type,
                                     CaptureModeSource source,
                                     RecordingType recording_type,
                                     bool audio_on,
-                                    CaptureModeBehavior* behavior) {
+                                    const CaptureModeBehavior* behavior) {
   std::string configuration_histogram_name =
       BuildHistogramName(kCaptureConfigurationHistogramRootWord, behavior,
                          /*append_ui_mode_suffix=*/true);
@@ -115,7 +115,7 @@ void RecordCaptureModeEntryType(CaptureModeEntryType entry_type) {
 }
 
 void RecordCaptureModeRecordingDuration(base::TimeDelta recording_duration,
-                                        CaptureModeBehavior* behavior,
+                                        const CaptureModeBehavior* behavior,
                                         bool is_gif) {
   RecordCaptureModeRecordingDurationInternal(
       BuildHistogramName(!behavior->ShouldGifBeSupported() || !is_gif
@@ -126,7 +126,9 @@ void RecordCaptureModeRecordingDuration(base::TimeDelta recording_duration,
       recording_duration);
 }
 
-void RecordVideoFileSizeKB(bool is_gif, int size_in_kb) {
+void RecordVideoFileSizeKB(bool is_gif,
+                           const CaptureModeBehavior* behavior,
+                           int size_in_kb) {
   if (!Shell::HasInstance()) {
     // This function can be called asynchronously after the `Shell` instance had
     // already been destroyed.
@@ -141,7 +143,7 @@ void RecordVideoFileSizeKB(bool is_gif, int size_in_kb) {
   base::UmaHistogramMemoryKB(
       BuildHistogramName(is_gif ? kGifRecordingFileSizeRootWord
                                 : kScreenRecordingFileSizeRootWord,
-                         /*behavior=*/nullptr, /*append_ui_mode_suffix=*/true),
+                         behavior, /*append_ui_mode_suffix=*/true),
       size_in_kb);
 }
 
@@ -152,8 +154,9 @@ void RecordCaptureModeSwitchesFromInitialMode(bool switched) {
       switched);
 }
 
-void RecordNumberOfCaptureRegionAdjustments(int num_adjustments,
-                                            CaptureModeBehavior* behavior) {
+void RecordNumberOfCaptureRegionAdjustments(
+    int num_adjustments,
+    const CaptureModeBehavior* behavior) {
   base::UmaHistogramCounts100(
       BuildHistogramName(kCaptureRegionAdjustmentHistogramRootWord, behavior,
                          /*append_ui_mode_suffix=*/true),
@@ -192,9 +195,15 @@ void RecordScreenshotNotificationQuickAction(CaptureQuickAction action) {
       action);
 }
 
-void RecordSaveToLocation(CaptureModeSaveToLocation save_location) {
+void RecordSaveToLocation(CaptureModeSaveToLocation save_location,
+                          const CaptureModeBehavior* behavior) {
+  // Save-to location metrics should not be recorded for the
+  // projector-inititated capture mode session.
+  const CaptureModeBehavior* modified_behavior =
+      behavior->behavior_type() == BehaviorType::kProjector ? nullptr
+                                                            : behavior;
   base::UmaHistogramEnumeration(
-      BuildHistogramName(kSaveToLocationHistogramRootWord, /*behavior=*/nullptr,
+      BuildHistogramName(kSaveToLocationHistogramRootWord, modified_behavior,
                          /*append_ui_mode_suffix=*/true),
       save_location);
 }
@@ -232,7 +241,7 @@ CaptureModeConfiguration GetConfiguration(CaptureModeType type,
 }
 
 void RecordRecordingStartsWithCamera(bool starts_with_camera,
-                                     CaptureModeBehavior* behavior) {
+                                     const CaptureModeBehavior* behavior) {
   base::UmaHistogramBoolean(
       BuildHistogramName(kRecordingStartsWithCameraRootWord, behavior,
                          /*append_ui_mode_suffix=*/true),
@@ -280,7 +289,7 @@ void RecordCameraPositionOnStart(CameraPreviewSnapPosition camera_position) {
 }
 
 void RecordRecordingStartsWithDemoTools(bool demo_tools_enabled,
-                                        CaptureModeBehavior* behavior) {
+                                        const CaptureModeBehavior* behavior) {
   base::UmaHistogramBoolean(
       BuildHistogramName(kDemoToolsEnabledOnRecordingStartRootWord, behavior,
                          /*append_ui_mode_suffix=*/true),
@@ -288,7 +297,7 @@ void RecordRecordingStartsWithDemoTools(bool demo_tools_enabled,
 }
 
 std::string BuildHistogramName(const char* const root_word,
-                               CaptureModeBehavior* behavior,
+                               const CaptureModeBehavior* behavior,
                                bool append_ui_mode_suffix) {
   std::string histogram_name(kCaptureModeMetricCommonPrefix);
   if (behavior) {

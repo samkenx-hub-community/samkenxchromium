@@ -10,14 +10,12 @@ a CL, triggers Clang Upload try bots, and tells what to do next"""
 from __future__ import print_function
 
 import argparse
-import fnmatch
 import itertools
 import os
 import re
-import shutil
 import subprocess
 import sys
-import urllib3
+import urllib.request
 
 from build import (CheckoutGitRepo, GetCommitDescription, LLVM_DIR,
                    LLVM_GIT_URL, RunCommand)
@@ -28,7 +26,7 @@ sys.path.append(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..',
                  'rust'))
 
-from build_rust import RUST_GIT_URL, RUST_SRC_DIR
+from build_rust import (RUST_GIT_URL, RUST_SRC_DIR)
 
 # Path constants.
 THIS_DIR = os.path.dirname(__file__)
@@ -37,6 +35,10 @@ CLANG_UPDATE_PY_PATH = os.path.join(THIS_DIR, 'update.py')
 RUST_UPDATE_PY_PATH = os.path.join(THIS_DIR, '..', '..', 'rust',
                                    'update_rust.py')
 BUILD_RUST_PY_PATH = os.path.join(THIS_DIR, '..', '..', 'rust', 'build_rust.py')
+GNRT_STDLIB_PY_PATH = os.path.join(THIS_DIR, '..', '..', 'rust',
+                                   'gnrt_stdlib.py')
+RUST_STDLIB_RULES_GN_PATH = os.path.join(CHROMIUM_DIR, 'build', 'rust', 'std',
+                                         'rules', 'BUILD.gn')
 
 # Constants for finding HEAD.
 CLANG_URL = 'https://api.github.com/repos/llvm/llvm-project/git/refs/heads/main'
@@ -44,11 +46,13 @@ RUST_URL = 'https://api.github.com/repos/rust-lang/rust/git/refs/heads/master'
 HEAD_SHA_REGEX = b'"sha":"([^"]+)"'
 
 # Bots where we build Clang + Rust.
-BOTS = [
+BUILD_CLANG_BOTS = [
     'linux_upload_clang',
     'mac_upload_clang',
     'mac_upload_clang_arm',
     'win_upload_clang',
+]
+BUILD_RUST_BOTS = [
     'linux_upload_rust',
     'mac_upload_rust',
     'mac_upload_rust_arm',
@@ -85,12 +89,10 @@ RUST_BOTS = \
 Cq-Include-Trybots: chromium/try:android-rust-arm64-dbg
 Cq-Include-Trybots: chromium/try:android-rust-arm64-rel
 Cq-Include-Trybots: chromium/try:linux-rust-x64-dbg
-Cq-Include-Trybots: chromium/try:linux-rust-x64-rel'''
-
-# These do not pass yet:
-#Cq-Include-Trybots: chromium/try:mac-rust-x64-rel
-#Cq-Include-Trybots: chromium/try:win-rust-x64-dbg
-#Cq-Include-Trybots: chromium/try:win-rust-x64-rel
+Cq-Include-Trybots: chromium/try:linux-rust-x64-rel
+Cq-Include-Trybots: chromium/try:mac-rust-x64-dbg
+Cq-Include-Trybots: chromium/try:win-rust-x64-dbg
+Cq-Include-Trybots: chromium/try:win-rust-x64-rel'''
 
 is_win = sys.platform.startswith('win32')
 
@@ -139,12 +141,9 @@ class ClangVersion:
 
 
 def GetLatestGitHash(url):
-  http = urllib3.PoolManager(cert_reqs="CERT_REQUIRED")
-  resp = http.request('GET', url)
-  if resp.status != 200:
-    raise RuntimeError(f'Unable to download {url}: status {resp.status}')
-  m = re.search(HEAD_SHA_REGEX, resp.data)
-  return m.group(1).decode('utf-8')
+  with urllib.request.urlopen(url) as response:
+    m = re.search(HEAD_SHA_REGEX, response.read())
+    return m.group(1).decode('utf-8')
 
 
 def PatchClangRevision(new_version: ClangVersion) -> ClangVersion:
@@ -300,28 +299,36 @@ def main():
     print('Cannot set both --skip-clang and --skip-rust.')
     sys.exit(1)
 
-  if args.clang_git_hash:
-    clang_git_hash = args.clang_git_hash
+  if args.skip_clang:
+    clang_version = '-skipped-'
   else:
-    clang_git_hash = GetLatestGitHash(CLANG_URL)
+    if args.clang_git_hash:
+      clang_git_hash = args.clang_git_hash
+    else:
+      clang_git_hash = GetLatestGitHash(CLANG_URL)
+    # To `GetCommitDescription()`, we need a checkout. On success, the
+    # CheckoutLLVM() makes `LLVM_DIR` be the current working directory, so that
+    # we can GetCommitDescription() without changing directory.
+    CheckoutGitRepo("LLVM", LLVM_GIT_URL, clang_git_hash, LLVM_DIR)
+    clang_version = ClangVersion(GetCommitDescription(clang_git_hash),
+                                 args.clang_sub_revision)
+    os.chdir(CHROMIUM_DIR)
 
-  # To `GetCommitDescription()`, we need a checkout. On success, the
-  # CheckoutLLVM() makes `LLVM_DIR` be the current working directory, so that
-  # we can GetCommitDescription() without changing directory.
-  CheckoutGitRepo("LLVM", LLVM_GIT_URL, clang_git_hash, LLVM_DIR)
-  clang_version = ClangVersion(GetCommitDescription(clang_git_hash),
-                               args.clang_sub_revision)
-  os.chdir(CHROMIUM_DIR)
-
-  if args.rust_git_hash:
-    rust_git_hash = args.rust_git_hash
+  if args.skip_rust:
+    rust_version = '-skipped-'
   else:
-    rust_git_hash = GetLatestGitHash(RUST_URL)
-  CheckoutGitRepo("Rust", RUST_GIT_URL, rust_git_hash, RUST_SRC_DIR)
-  rust_version = RustVersion(rust_git_hash, args.rust_sub_revision)
-  os.chdir(CHROMIUM_DIR)
+    if args.rust_git_hash:
+      rust_git_hash = args.rust_git_hash
+    else:
+      rust_git_hash = GetLatestGitHash(RUST_URL)
+    CheckoutGitRepo("Rust", RUST_GIT_URL, rust_git_hash, RUST_SRC_DIR)
+    rust_version = RustVersion(rust_git_hash, args.rust_sub_revision)
+    os.chdir(CHROMIUM_DIR)
 
-  print((f'Making a patch for Clang {clang_version} and Rust {rust_version}'))
+    # Build and run gnrt to update the stdlib GN rules.
+    RunCommand([GNRT_STDLIB_PY_PATH, '--rust-src-dir', RUST_SRC_DIR])
+
+  print(f'Making a patch for Clang {clang_version} and Rust {rust_version}')
 
   branch_name = f'clang-{clang_version}_rust-{rust_version}'
   Git('checkout', 'origin/main', '-b', branch_name, no_run=args.no_git)
@@ -376,15 +383,24 @@ def main():
   Git('add',
       CLANG_UPDATE_PY_PATH,
       RUST_UPDATE_PY_PATH,
+      RUST_STDLIB_RULES_GN_PATH,
       no_run=args.no_git)
   Git('commit', '-m', commit_message, no_run=args.no_git)
   Git('cl', 'upload', '-f', '--bypass-hooks', no_run=args.no_git)
-  Git('cl',
-      'try',
-      '-B',
-      "chromium/try",
-      *itertools.chain(*[['-b', bot] for bot in BOTS]),
-      no_run=args.no_git)
+  if not args.skip_clang:
+    Git('cl',
+        'try',
+        '-B',
+        "chromium/try",
+        *itertools.chain(*[['-b', bot] for bot in BUILD_CLANG_BOTS]),
+        no_run=args.no_git)
+  if not args.skip_rust:
+    Git('cl',
+        'try',
+        '-B',
+        "chromium/try",
+        *itertools.chain(*[['-b', bot] for bot in BUILD_RUST_BOTS]),
+        no_run=args.no_git)
 
   print('Please, wait until the try bots succeeded '
         'and then push the binaries to goma.')

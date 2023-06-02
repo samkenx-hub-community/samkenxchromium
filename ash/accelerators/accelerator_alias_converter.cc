@@ -42,11 +42,20 @@ absl::optional<ui::KeyboardDevice> GetPriorityExternalKeyboard() {
   absl::optional<ui::KeyboardDevice> priority_keyboard;
   for (const ui::KeyboardDevice& keyboard :
        ui::DeviceDataManager::GetInstance()->GetKeyboardDevices()) {
+    // If the input device settings controlled does not recognize the device as
+    // a keyboard, skip it.
+    if (features::IsInputDeviceSettingsSplitEnabled() &&
+        Shell::Get()->input_device_settings_controller()->GetKeyboardSettings(
+            keyboard.id) == nullptr) {
+      continue;
+    }
+
     const auto device_type =
         Shell::Get()->keyboard_capability()->GetDeviceType(keyboard);
     switch (device_type) {
       case DeviceType::kDeviceUnknown:
       case DeviceType::kDeviceInternalKeyboard:
+      case DeviceType::kDeviceInternalRevenKeyboard:
         break;
       case DeviceType::kDeviceExternalChromeOsKeyboard:
       case DeviceType::kDeviceExternalAppleKeyboard:
@@ -66,11 +75,20 @@ absl::optional<ui::KeyboardDevice> GetPriorityExternalKeyboard() {
 absl::optional<ui::KeyboardDevice> GetInternalKeyboard() {
   for (const ui::KeyboardDevice& keyboard :
        ui::DeviceDataManager::GetInstance()->GetKeyboardDevices()) {
+    // If the input device settings controlled does not recognize the device as
+    // a keyboard, skip it.
+    if (features::IsInputDeviceSettingsSplitEnabled() &&
+        Shell::Get()->input_device_settings_controller()->GetKeyboardSettings(
+            keyboard.id) == nullptr) {
+      continue;
+    }
+
     const auto device_type =
         Shell::Get()->keyboard_capability()->GetDeviceType(keyboard);
     switch (device_type) {
       case DeviceType::kDeviceUnknown:
       case DeviceType::kDeviceInternalKeyboard:
+      case DeviceType::kDeviceInternalRevenKeyboard:
         return keyboard;
       case DeviceType::kDeviceExternalChromeOsKeyboard:
       case DeviceType::kDeviceExternalAppleKeyboard:
@@ -109,6 +127,7 @@ bool ShouldAlwaysShowWithExternalKeyboard(ui::TopRowActionKey action_key) {
     case ui::TopRowActionKey::kKeyboardBacklightToggle:
     case ui::TopRowActionKey::kKeyboardBacklightDown:
     case ui::TopRowActionKey::kKeyboardBacklightUp:
+    case ui::TopRowActionKey::kPrivacyScreenToggle:
     case ui::TopRowActionKey::kAllApplications:
     case ui::TopRowActionKey::kDictation:
       return false;
@@ -445,9 +464,12 @@ AcceleratorAliasConverter::FilterAliasBySupportedKeys(
   }
 
   for (const auto& accelerator : accelerators) {
+    // TODO(dpad): Handle privacy screen correctly. This can be simplified once
+    // drallion devices are properly handled in `KeyboardCapability`.
     if (auto action_key = ui::KeyboardCapability::ConvertToTopRowActionKey(
             accelerator.key_code());
-        action_key.has_value()) {
+        action_key.has_value() &&
+        action_key != ui::TopRowActionKey::kPrivacyScreenToggle) {
       // Accelerator should only be seen if the priority or internal keyboard
       // have the key OR if there is an external keyboard and the `action_key`
       // should always been shown when there is an external keyboard.

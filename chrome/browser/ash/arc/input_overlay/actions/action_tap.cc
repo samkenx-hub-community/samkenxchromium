@@ -9,7 +9,9 @@
 #include "chrome/browser/ash/arc/input_overlay/actions/input_element.h"
 #include "chrome/browser/ash/arc/input_overlay/constants.h"
 #include "chrome/browser/ash/arc/input_overlay/touch_id_manager.h"
+#include "chrome/browser/ash/arc/input_overlay/touch_injector.h"
 #include "chrome/browser/ash/arc/input_overlay/ui/action_label.h"
+#include "chrome/browser/ash/arc/input_overlay/ui/ui_utils.h"
 #include "chrome/browser/ash/arc/input_overlay/util.h"
 #include "ui/aura/window.h"
 #include "ui/events/base_event_utils.h"
@@ -120,15 +122,6 @@ class ActionTap::ActionTapView : public ActionView {
         InputElement::CreateActionTapMouseElement(mouse_action);
     ChangeInputBinding(action_, /*action_label=*/nullptr,
                        std::move(input_element));
-  }
-
-  void OnMenuEntryPressed() override {
-    display_overlay_controller_->AddActionEditMenu(this, ActionType::TAP);
-    DCHECK(menu_entry_);
-    if (!menu_entry_) {
-      return;
-    }
-    menu_entry_->RequestFocus();
   }
 
   void AddTouchPoint() override {

@@ -58,30 +58,38 @@ constexpr size_t kMaxAcceleratorsAllowed = 5;
 // times in the frontend. GetHiddenAcceleratorMap() is used to collect such
 // accelerators and hide them from display.
 const HiddenAcceleratorMap& GetHiddenAcceleratorMap() {
-  static auto hiddenAcceleratorMap = base::NoDestructor<HiddenAcceleratorMap>(
-      {{AcceleratorAction::kToggleAppList,
-        {ui::Accelerator(ui::VKEY_BROWSER_SEARCH, ui::EF_SHIFT_DOWN,
-                         ui::Accelerator::KeyState::PRESSED),
-         ui::Accelerator(ui::VKEY_LWIN, ui::EF_SHIFT_DOWN,
-                         ui::Accelerator::KeyState::RELEASED)}},
-       {AcceleratorAction::kShowShortcutViewer,
-        {ui::Accelerator(ui::VKEY_F14, ui::EF_NONE,
-                         ui::Accelerator::KeyState::PRESSED),
-         ui::Accelerator(
-             ui::VKEY_OEM_2,
-             ui::EF_SHIFT_DOWN | ui::EF_CONTROL_DOWN | ui::EF_ALT_DOWN,
-             ui::Accelerator::KeyState::PRESSED)}},
-       {AcceleratorAction::kOpenGetHelp,
-        {ui::Accelerator(ui::VKEY_OEM_2,
-                         ui::EF_SHIFT_DOWN | ui::EF_CONTROL_DOWN,
-                         ui::Accelerator::KeyState::PRESSED)}},
-       {AcceleratorAction::kToggleFullscreen,
-        {ui::Accelerator(ui::VKEY_ZOOM, ui::EF_SHIFT_DOWN,
-                         ui::Accelerator::KeyState::PRESSED)}},
-       {AcceleratorAction::kSwitchToLastUsedIme,
-        {ui::Accelerator(ui::VKEY_SPACE, ui::EF_CONTROL_DOWN,
-                         ui::Accelerator::KeyState::RELEASED)}}});
-  return *hiddenAcceleratorMap;
+  static const auto kHiddenAcceleratorMap =
+      base::NoDestructor<HiddenAcceleratorMap>({
+          {AcceleratorAction::kToggleAppList,
+           {ui::Accelerator(ui::VKEY_BROWSER_SEARCH, ui::EF_SHIFT_DOWN,
+                            ui::Accelerator::KeyState::PRESSED),
+            ui::Accelerator(ui::VKEY_LWIN, ui::EF_SHIFT_DOWN,
+                            ui::Accelerator::KeyState::RELEASED)}},
+          {AcceleratorAction::kShowShortcutViewer,
+           {ui::Accelerator(ui::VKEY_F14, ui::EF_NONE,
+                            ui::Accelerator::KeyState::PRESSED),
+            ui::Accelerator(
+                ui::VKEY_OEM_2,
+                ui::EF_SHIFT_DOWN | ui::EF_CONTROL_DOWN | ui::EF_ALT_DOWN,
+                ui::Accelerator::KeyState::PRESSED)}},
+          {AcceleratorAction::kOpenGetHelp,
+           {ui::Accelerator(ui::VKEY_OEM_2,
+                            ui::EF_SHIFT_DOWN | ui::EF_CONTROL_DOWN,
+                            ui::Accelerator::KeyState::PRESSED)}},
+          {AcceleratorAction::kToggleFullscreen,
+           {ui::Accelerator(ui::VKEY_ZOOM, ui::EF_SHIFT_DOWN,
+                            ui::Accelerator::KeyState::PRESSED)}},
+          {AcceleratorAction::kSwitchToLastUsedIme,
+           {ui::Accelerator(ui::VKEY_SPACE, ui::EF_CONTROL_DOWN,
+                            ui::Accelerator::KeyState::RELEASED)}},
+          {AcceleratorAction::kMediaPause,
+           {ui::Accelerator(ui::VKEY_PAUSE, ui::EF_NONE,
+                            ui::Accelerator::KeyState::PRESSED)}},
+          {AcceleratorAction::kMediaPlay,
+           {ui::Accelerator(ui::VKEY_PLAY, ui::EF_NONE,
+                            ui::Accelerator::KeyState::PRESSED)}},
+      });
+  return *kHiddenAcceleratorMap;
 }
 
 constexpr int kCustomizationModifierMask =
@@ -296,6 +304,19 @@ std::string GetUuid(mojom::AcceleratorSource source,
                        base::NumberToString(action)});
 }
 
+// Returns true if the given `details` should be excluded from the view, since
+// certain shortcuts can be associated with a disabled feature behind a flag,
+// or specific device property.
+bool ShouldExcludeItem(const AcceleratorLayoutDetails& details) {
+  switch (details.action_id) {
+    case kToggleSnapGroupWindowsGroupAndUngroup:
+    case kToggleSnapGroupWindowsMinimizeAndRestore:
+      return !features::IsSnapGroupEnabled();
+  }
+
+  return false;
+}
+
 }  // namespace
 
 namespace shortcut_ui {
@@ -331,6 +352,9 @@ AcceleratorConfigurationProvider::AcceleratorConfigurationProvider()
   // data that provides additional details for the app for styling.
   // Also create a cached shortcut description lookup.
   for (const auto& layout_details : kAcceleratorLayouts) {
+    if (ShouldExcludeItem(layout_details)) {
+      continue;
+    }
     layout_infos_.push_back(LayoutInfoToMojom(layout_details));
     accelerator_layout_lookup_[GetUuid(
         layout_details.source, layout_details.action_id)] = layout_details;
@@ -377,7 +401,7 @@ void AcceleratorConfigurationProvider::IsMutable(
 void AcceleratorConfigurationProvider::HasLauncherButton(
     HasLauncherButtonCallback callback) {
   std::move(callback).Run(
-      Shell::Get()->keyboard_capability()->HasLauncherButton());
+      Shell::Get()->keyboard_capability()->HasLauncherButtonOnAnyKeyboard());
 }
 
 void AcceleratorConfigurationProvider::GetAccelerators(
@@ -486,11 +510,17 @@ void AcceleratorConfigurationProvider::AddAccelerator(
     return;
   }
 
-  // Only allow a maximum of five accelerators per action.
-  const size_t accelerator_count =
-      ash_accelerator_configuration_->GetAcceleratorsForAction(action_id)
-          .size();
-  if (accelerator_count >= kMaxAcceleratorsAllowed) {
+  // Only allow a maximum of `kMaxAcceleratorsAllowed` per action.
+  const auto& ash_accelerators_mapping =
+      cached_configuration_.find(mojom::AcceleratorSource::kAsh);
+  CHECK(ash_accelerators_mapping != cached_configuration_.end());
+
+  const auto found_accelerator_infos =
+      ash_accelerators_mapping->second.find(action_id);
+  // Check that there is less than `kMaxAcceleratorsAllowed` accelerator infos
+  // in the cached accelerator configuration mapping for `action_id`.
+  if (found_accelerator_infos != ash_accelerators_mapping->second.end() &&
+      found_accelerator_infos->second.size() >= kMaxAcceleratorsAllowed) {
     result_data->result = AcceleratorConfigResult::kMaximumAcceleratorsReached;
     std::move(callback).Run(std::move(result_data));
     return;
@@ -545,12 +575,15 @@ void AcceleratorConfigurationProvider::ReplaceAccelerator(
 
   AcceleratorResultDataPtr result_data = AcceleratorResultData::New();
 
-  absl::optional<AcceleratorConfigResult> validated_source_action_result =
+  absl::optional<AcceleratorConfigResult> error_result =
       ValidateSourceAndAction(source, action_id,
                               ash_accelerator_configuration_);
+  if (!error_result.has_value()) {
+    error_result = ValidateAccelerator(new_accelerator);
+  }
 
-  if (validated_source_action_result.has_value()) {
-    result_data->result = *validated_source_action_result;
+  if (error_result.has_value()) {
+    result_data->result = *error_result;
     std::move(callback).Run(std::move(result_data));
     return;
   }
@@ -664,6 +697,9 @@ void AcceleratorConfigurationProvider::NotifyAcceleratorsUpdated() {
   for (auto& observer : accelerators_updated_observers_) {
     observer.OnAcceleratorsUpdated(mojo::Clone(config_map));
   }
+
+  // Store a cached copy of the configuration map.
+  cached_configuration_ = mojo::Clone(config_map);
 }
 
 void AcceleratorConfigurationProvider::CreateAndAppendAliasedAccelerators(
@@ -680,7 +716,7 @@ void AcceleratorConfigurationProvider::CreateAndAppendAliasedAccelerators(
 
   // Return early if there are no alias accelerators (Because certain keys are
   // unavailable), accelerator will be suppressed/disabled and its state will be
-  // kDisabledByUnavailableKeys.
+  // `kDisabledByUnavailableKeys`.
   if (accelerator_aliases.empty()) {
     output.push_back(CreateStandardAcceleratorInfo(
         accelerator, locked, GetAcceleratorType(accelerator),
@@ -843,7 +879,8 @@ void AcceleratorConfigurationProvider::PopulateAshAcceleratorConfig(
       accelerator_config_output[mojom::AcceleratorSource::kAsh];
 
   for (const auto& layout_info : kAcceleratorLayouts) {
-    if (layout_info.source != mojom::AcceleratorSource::kAsh) {
+    if (layout_info.source != mojom::AcceleratorSource::kAsh ||
+        ShouldExcludeItem(layout_info)) {
       // Only ash accelerators can have dynamically modified properties.
       // Note that ambient accelerators cannot be in kAsh.
       continue;

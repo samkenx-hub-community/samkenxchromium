@@ -7,7 +7,7 @@
  * subscription.
  */
 
-import '../../settings_shared.css.js';
+import '../settings_shared.css.js';
 
 import {MojoConnectivityProvider} from 'chrome://resources/ash/common/connectivity/mojo_connectivity_provider.js';
 import {PasspointServiceInterface, PasspointSubscription} from 'chrome://resources/ash/common/connectivity/passpoint.mojom-webui.js';
@@ -190,7 +190,7 @@ export class SettingsPasspointSubpageElement extends PasspointListenerMixin
         this.shadowRoot!.querySelector<HTMLDialogElement>('#removalDialog'));
   }
 
-  private onForgetTap_(): void {
+  private onForgetClick_(): void {
     this.showForgetDialog_ = true;
   }
 

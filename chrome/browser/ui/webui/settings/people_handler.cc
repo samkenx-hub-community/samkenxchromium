@@ -54,8 +54,8 @@
 #include "components/strings/grit/components_strings.h"
 #include "components/sync/base/passphrase_enums.h"
 #include "components/sync/base/user_selectable_type.h"
-#include "components/sync/driver/sync_service_utils.h"
-#include "components/sync/driver/sync_user_settings.h"
+#include "components/sync/service/sync_service_utils.h"
+#include "components/sync/service/sync_user_settings.h"
 #include "components/unified_consent/unified_consent_metrics.h"
 #include "content/public/browser/render_view_host.h"
 #include "content/public/browser/web_contents.h"
@@ -923,10 +923,6 @@ base::Value::Dict PeopleHandler::GetSyncStatusDictionary() const {
   auto* identity_manager = IdentityManagerFactory::GetForProfile(profile_);
   DCHECK(identity_manager);
 
-  // TODO(crbug.com/1369982): |domain| is used to show the profile deletion
-  // dialog on turn off sync. This is no longer needed since users are allowed
-  // to turn off sync. Enterprise team to decide whether to show the delete
-  // profile dialog on signout.
   if (identity_manager->HasPrimaryAccount(signin::ConsentLevel::kSignin)) {
     CoreAccountInfo primary_account_info =
         identity_manager->GetPrimaryAccountInfo(signin::ConsentLevel::kSignin);
@@ -1099,7 +1095,7 @@ void PeopleHandler::MarkFirstSetupComplete() {
 
   // We're done configuring, so notify SyncService that it is OK to start
   // syncing.
-  service->GetUserSettings()->SetFirstSetupComplete(
+  service->GetUserSettings()->SetInitialSyncFeatureSetupComplete(
       syncer::SyncFirstSetupCompleteSource::ADVANCED_FLOW_CONFIRM);
   FireWebUIListener("sync-settings-saved");
 }

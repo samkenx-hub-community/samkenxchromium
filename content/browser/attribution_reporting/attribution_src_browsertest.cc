@@ -566,9 +566,9 @@ IN_PROC_BROWSER_TEST_F(AttributionSrcBrowserTest,
                      JsReplace("createAttributionSrcImg($1);", register_url)));
 
   register_response1->WaitForRequest();
-  ASSERT_EQ(register_response1->http_request()->headers.at(
-                "Attribution-Reporting-Eligible"),
-            "event-source, trigger");
+  ExpectValidAttributionReportingEligibleHeaderForImg(
+      register_response1->http_request()->headers.at(
+          "Attribution-Reporting-Eligible"));
   ASSERT_FALSE(base::Contains(register_response1->http_request()->headers,
                               "Attribution-Reporting-Support"));
 
@@ -580,9 +580,9 @@ IN_PROC_BROWSER_TEST_F(AttributionSrcBrowserTest,
 
   // Ensure that redirect requests also contain the header.
   register_response2->WaitForRequest();
-  ASSERT_EQ(register_response2->http_request()->headers.at(
-                "Attribution-Reporting-Eligible"),
-            "event-source, trigger");
+  ExpectValidAttributionReportingEligibleHeaderForImg(
+      register_response2->http_request()->headers.at(
+          "Attribution-Reporting-Eligible"));
   ASSERT_FALSE(base::Contains(register_response2->http_request()->headers,
                               "Attribution-Reporting-Support"));
 }
@@ -710,7 +710,7 @@ IN_PROC_BROWSER_TEST_P(AttributionSrcBasicTriggerBrowserTest,
           attribution_reporting::AggregatableValues(),
           ::aggregation_service::mojom::AggregationCoordinator::kDefault,
           attribution_reporting::mojom::SourceRegistrationTimeConfig::
-              kInclude))));
+              kExclude))));
 }
 
 IN_PROC_BROWSER_TEST_F(AttributionSrcBrowserTest,
@@ -1104,11 +1104,13 @@ IN_PROC_BROWSER_TEST_F(AttributionSrcFencedFrameBrowserTest,
       root_rfh->GetPage().fenced_frame_urls_map();
   auto fenced_frame_urn =
       test::AddAndVerifyFencedFrameURL(&url_mapping, fenced_frame_url);
-  RenderFrameHost* fenced_frame_host = fenced_frame_helper_->CreateFencedFrame(
-      root_rfh, GURL(url::kAboutBlankURL), net::OK,
-      blink::FencedFrame::DeprecatedFencedFrameMode::kOpaqueAds);
 
-  TestFrameNavigationObserver observer(fenced_frame_host);
+  RenderFrameHostWrapper fenced_frame_host(
+      fenced_frame_helper_->CreateFencedFrame(
+          root_rfh, GURL(url::kAboutBlankURL), net::OK,
+          blink::FencedFrame::DeprecatedFencedFrameMode::kOpaqueAds));
+
+  TestFrameNavigationObserver observer(fenced_frame_host.get());
 
   EXPECT_TRUE(ExecJs(root_rfh, JsReplace("document.querySelector('fencedframe')"
                                          ".config = new FencedFrameConfig($1);",
@@ -1116,8 +1118,17 @@ IN_PROC_BROWSER_TEST_F(AttributionSrcFencedFrameBrowserTest,
 
   observer.Wait();
 
-  ASSERT_NE(fenced_frame_host, nullptr);
-  EXPECT_TRUE(fenced_frame_host->IsFencedFrameRoot());
+  if (content::WillSameSiteNavigationsChangeRenderFrameHosts()) {
+    EXPECT_TRUE(fenced_frame_host.WaitUntilRenderFrameDeleted());
+  } else {
+    ASSERT_NE(fenced_frame_host.get(), nullptr);
+  }
+
+  RenderFrameHostWrapper fenced_frame_host2(
+      content::test::FencedFrameTestHelper::GetMostRecentlyAddedFencedFrame(
+          root_rfh));
+
+  EXPECT_TRUE(fenced_frame_host2->IsFencedFrameRoot());
 
   std::unique_ptr<MockDataHost> data_host;
   base::RunLoop loop;
@@ -1131,7 +1142,7 @@ IN_PROC_BROWSER_TEST_F(AttributionSrcFencedFrameBrowserTest,
           });
 
   EXPECT_TRUE(ExecJs(
-      fenced_frame_host,
+      fenced_frame_host2.get(),
       JsReplace(
           "createAttributionSrcImg($1);",
           https_server()->GetURL("c.test", "/register_source_headers.html"))));
@@ -1192,9 +1203,9 @@ IN_PROC_BROWSER_TEST_F(AttributionSrcCrossAppWebRuntimeDisabledBrowserTest,
                      JsReplace("createAttributionSrcImg($1);", register_url)));
 
   register_response1->WaitForRequest();
-  ASSERT_EQ(register_response1->http_request()->headers.at(
-                "Attribution-Reporting-Eligible"),
-            "event-source, trigger");
+  ExpectValidAttributionReportingEligibleHeaderForImg(
+      register_response1->http_request()->headers.at(
+          "Attribution-Reporting-Eligible"));
   ASSERT_FALSE(base::Contains(register_response1->http_request()->headers,
                               "Attribution-Reporting-Support"));
 
@@ -1207,9 +1218,9 @@ IN_PROC_BROWSER_TEST_F(AttributionSrcCrossAppWebRuntimeDisabledBrowserTest,
   // Ensure that redirect requests also don't contain the
   // Attribution-Reporting-Support header.
   register_response2->WaitForRequest();
-  ASSERT_EQ(register_response2->http_request()->headers.at(
-                "Attribution-Reporting-Eligible"),
-            "event-source, trigger");
+  ExpectValidAttributionReportingEligibleHeaderForImg(
+      register_response2->http_request()->headers.at(
+          "Attribution-Reporting-Eligible"));
   ASSERT_FALSE(base::Contains(register_response2->http_request()->headers,
                               "Attribution-Reporting-Support"));
 }
@@ -1258,9 +1269,11 @@ IN_PROC_BROWSER_TEST_F(AttributionSrcCrossAppWebEnabledBrowserTest,
                      JsReplace("createAttributionSrcImg($1);", register_url)));
 
   register_response1->WaitForRequest();
-  ASSERT_EQ(register_response1->http_request()->headers.at(
-                "Attribution-Reporting-Support"),
-            "web");
+  ExpectValidAttributionReportingSupportHeader(
+      register_response1->http_request()->headers.at(
+          "Attribution-Reporting-Support"),
+      /*web_expected=*/true,
+      /*os_expected=*/false);
 
   auto http_response = std::make_unique<net::test_server::BasicHttpResponse>();
   http_response->set_code(net::HTTP_MOVED_PERMANENTLY);
@@ -1270,9 +1283,11 @@ IN_PROC_BROWSER_TEST_F(AttributionSrcCrossAppWebEnabledBrowserTest,
 
   // Ensure that redirect requests also contain the headers.
   register_response2->WaitForRequest();
-  ASSERT_EQ(register_response2->http_request()->headers.at(
-                "Attribution-Reporting-Support"),
-            "web");
+  ExpectValidAttributionReportingSupportHeader(
+      register_response2->http_request()->headers.at(
+          "Attribution-Reporting-Support"),
+      /*web_expected=*/true,
+      /*os_expected=*/false);
 }
 
 class AttributionSrcCrossAppWebEnabledSubresourceBrowserTest
@@ -1326,9 +1341,11 @@ IN_PROC_BROWSER_TEST_P(AttributionSrcCrossAppWebEnabledSubresourceBrowserTest,
   ASSERT_TRUE(ExecJs(web_contents(), JsReplace(js_template, register_url)));
 
   register_response1->WaitForRequest();
-  ASSERT_EQ(register_response1->http_request()->headers.at(
-                "Attribution-Reporting-Support"),
-            "os, web");
+  ExpectValidAttributionReportingSupportHeader(
+      register_response1->http_request()->headers.at(
+          "Attribution-Reporting-Support"),
+      /*web_expected=*/true,
+      /*os_expected=*/true);
 
   auto http_response = std::make_unique<net::test_server::BasicHttpResponse>();
   http_response->set_code(net::HTTP_MOVED_PERMANENTLY);
@@ -1338,9 +1355,11 @@ IN_PROC_BROWSER_TEST_P(AttributionSrcCrossAppWebEnabledSubresourceBrowserTest,
 
   // Ensure that redirect requests also contain the header.
   register_response2->WaitForRequest();
-  ASSERT_EQ(register_response2->http_request()->headers.at(
-                "Attribution-Reporting-Support"),
-            "os, web");
+  ExpectValidAttributionReportingSupportHeader(
+      register_response2->http_request()->headers.at(
+          "Attribution-Reporting-Support"),
+      /*web_expected=*/true,
+      /*os_expected=*/true);
 }
 
 IN_PROC_BROWSER_TEST_F(
@@ -1376,9 +1395,11 @@ IN_PROC_BROWSER_TEST_F(
                      JsReplace("createAttributionSrcImg($1);", register_url)));
 
   register_response1->WaitForRequest();
-  ASSERT_EQ(register_response1->http_request()->headers.at(
-                "Attribution-Reporting-Support"),
-            "os, web");
+  ExpectValidAttributionReportingSupportHeader(
+      register_response1->http_request()->headers.at(
+          "Attribution-Reporting-Support"),
+      /*web_expected=*/true,
+      /*os_expected=*/true);
 
   auto http_response = std::make_unique<net::test_server::BasicHttpResponse>();
   http_response->set_code(net::HTTP_MOVED_PERMANENTLY);
@@ -1388,16 +1409,18 @@ IN_PROC_BROWSER_TEST_F(
 
   // Ensure that redirect requests also contain the header.
   register_response2->WaitForRequest();
-  ASSERT_EQ(register_response2->http_request()->headers.at(
-                "Attribution-Reporting-Support"),
-            "os, web");
+  ExpectValidAttributionReportingSupportHeader(
+      register_response2->http_request()->headers.at(
+          "Attribution-Reporting-Support"),
+      /*web_expected=*/true,
+      /*os_expected=*/true);
 }
 
 struct OsRegistrationTestCase {
   const char* name;
   const char* header;
-  std::vector<GURL> expected_os_sources;
-  std::vector<GURL> expected_os_triggers;
+  std::vector<std::vector<GURL>> expected_os_sources;
+  std::vector<std::vector<GURL>> expected_os_triggers;
 };
 
 class AttributionSrcCrossAppWebEnabledOsRegistrationBrowserTest
@@ -1413,8 +1436,10 @@ INSTANTIATE_TEST_SUITE_P(
             .header = "Attribution-Reporting-Register-OS-Source",
             .expected_os_sources =
                 {
-                    GURL("https://r1.test/x"),
-                    GURL("https://r2.test/y"),
+                    {
+                        GURL("https://r1.test/x"),
+                        GURL("https://r2.test/y"),
+                    },
                 },
         },
         OsRegistrationTestCase{
@@ -1422,8 +1447,10 @@ INSTANTIATE_TEST_SUITE_P(
             .header = "Attribution-Reporting-Register-OS-Trigger",
             .expected_os_triggers =
                 {
-                    GURL("https://r1.test/x"),
-                    GURL("https://r2.test/y"),
+                    {
+                        GURL("https://r1.test/x"),
+                        GURL("https://r2.test/y"),
+                    },
                 },
         }),
     [](const auto& info) { return info.param.name; });  // test name generator

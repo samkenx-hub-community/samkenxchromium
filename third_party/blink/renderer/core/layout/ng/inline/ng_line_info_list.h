@@ -40,11 +40,22 @@ class NGLineInfoList {
   // If empty, this will hit `DCHECK`.
   const NGLineInfo& Back() const { return (*this)[Size() - 1]; }
 
+  void Shrink(wtf_size_t size) {
+    DCHECK_LT(size, size_);
+    size_ = size;
+  }
   void Clear() { size_ = start_index_ = 0; }
+
   NGLineInfo& Append() {
     DCHECK_LT(size_, kCapacity);
     ++size_;
     return Back();
+  }
+
+  void RemoveFront() {
+    DCHECK_GT(size_, 0u);
+    --size_;
+    start_index_ = (start_index_ + 1) % kCapacity;
   }
 
   // Get the cached `NGLineInfo` for the `break_token`, remove it from this
@@ -59,11 +70,6 @@ class NGLineInfoList {
   NGLineInfo& UnusedInstance() {
     DCHECK(IsEmpty());
     return line_infos_[0];
-  }
-  void RemoveFront() {
-    DCHECK_GT(size_, 0u);
-    --size_;
-    start_index_ = (start_index_ + 1) % kCapacity;
   }
 
   wtf_size_t size_ = 0;

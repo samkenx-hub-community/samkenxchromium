@@ -13,6 +13,7 @@
 #include "base/trace_event/trace_event.h"
 #include "build/build_config.h"
 #include "build/chromeos_buildflags.h"
+#include "chrome/browser/3pcd_heuristics/opener_heuristic_tab_helper.h"
 #include "chrome/browser/bookmarks/bookmark_model_factory.h"
 #include "chrome/browser/breadcrumbs/breadcrumb_manager_tab_helper.h"
 #include "chrome/browser/browser_process.h"
@@ -53,6 +54,7 @@
 #include "chrome/browser/page_info/page_info_features.h"
 #include "chrome/browser/page_load_metrics/page_load_metrics_initialize.h"
 #include "chrome/browser/password_manager/chrome_password_manager_client.h"
+#include "chrome/browser/performance_manager/public/user_tuning/user_performance_tuning_manager.h"
 #include "chrome/browser/permissions/one_time_permissions_tracker_helper.h"
 #include "chrome/browser/permissions/unused_site_permissions_service_factory.h"
 #include "chrome/browser/predictors/loading_predictor_factory.h"
@@ -144,6 +146,7 @@
 #include "components/ukm/content/source_url_recorder.h"
 #include "components/user_notes/user_notes_features.h"
 #include "components/webapps/browser/installable/installable_manager.h"
+#include "components/webapps/browser/installable/ml_installability_promoter.h"
 #include "content/public/browser/web_contents.h"
 #include "extensions/buildflags/buildflags.h"
 #include "media/base/media_switches.h"
@@ -358,6 +361,7 @@ void TabHelpers::AttachTabHelpers(WebContents* web_contents) {
   HistoryClustersTabHelper::CreateForWebContents(web_contents);
   HttpsOnlyModeTabHelper::CreateForWebContents(web_contents);
   webapps::InstallableManager::CreateForWebContents(web_contents);
+  webapps::MLInstallabilityPromoter::CreateForWebContents(web_contents);
   login_detection::LoginDetectionTabHelper::MaybeCreateForWebContents(
       web_contents);
   if (MediaEngagementService::IsEnabled())
@@ -369,6 +373,7 @@ void TabHelpers::AttachTabHelpers(WebContents* web_contents) {
   MixedContentSettingsTabHelper::CreateForWebContents(web_contents);
   NavigationMetricsRecorder::CreateForWebContents(web_contents);
   NavigationPredictorPreconnectClient::CreateForWebContents(web_contents);
+  OpenerHeuristicTabHelper::CreateForWebContents(web_contents);
   if (optimization_guide::features::IsOptimizationHintsEnabled())
     OptimizationGuideWebContentsObserver::CreateForWebContents(web_contents);
   optimization_guide::PageContentAnnotationsService*
@@ -497,10 +502,13 @@ void TabHelpers::AttachTabHelpers(WebContents* web_contents) {
   SearchTabHelper::CreateForWebContents(web_contents);
   TabDialogs::CreateForWebContents(web_contents);
   HighEfficiencyChipTabHelper::CreateForWebContents(web_contents);
-  if (base::FeatureList::IsEnabled(features::kTabHoverCardImages) ||
-      base::FeatureList::IsEnabled(features::kWebUITabStrip)) {
-    ThumbnailTabHelper::CreateForWebContents(web_contents);
+  if (base::FeatureList::IsEnabled(
+          performance_manager::features::kMemoryUsageInHovercards)) {
+    performance_manager::user_tuning::UserPerformanceTuningManager::
+        ResourceUsageTabHelper::CreateForWebContents(web_contents);
   }
+  ThumbnailTabHelper::CreateForWebContents(web_contents);
+
   web_modal::WebContentsModalDialogManager::CreateForWebContents(web_contents);
   if (OmniboxFieldTrial::IsZeroSuggestPrefetchingEnabled()) {
     ZeroSuggestPrefetchTabHelper::CreateForWebContents(web_contents);

@@ -56,6 +56,8 @@ class QuickAnswersView : public views::View {
       base::WeakPtr<QuickAnswersUiController> controller);
 
   // views::View:
+  void RequestFocus() override;
+  bool HasFocus() const override;
   void OnFocus() override;
   void OnThemeChanged() override;
   views::FocusTraversable* GetPaneFocusTraversable() override;
@@ -74,6 +76,8 @@ class QuickAnswersView : public views::View {
 
   ui::ImageModel GetIconImageModelForTesting();
 
+  gfx::Rect GetAnchorViewBounds() { return anchor_view_bounds_; }
+
  private:
   void InitLayout();
   void AddContentView();
@@ -83,7 +87,7 @@ class QuickAnswersView : public views::View {
       View* container);
   void AddAssistantIcon();
   void AddGoogleIcon();
-  void AddResultTypeIcon();
+  void AddDefaultResultTypeIcon();
   int GetBoundsWidth();
   int GetLabelWidth();
   void ResetContentView();
@@ -116,7 +120,7 @@ class QuickAnswersView : public views::View {
   raw_ptr<views::ImageButton> dogfood_feedback_button_ = nullptr;
   raw_ptr<views::ImageButton> settings_button_ = nullptr;
   raw_ptr<views::ImageButton> phonetics_audio_button_ = nullptr;
-  raw_ptr<views::ImageView> vector_icon_ = nullptr;
+  raw_ptr<views::ImageView> result_type_icon_ = nullptr;
 
   // Invisible web view to play phonetics audio for definition results.
   raw_ptr<views::WebView> phonetics_audio_web_view_ = nullptr;

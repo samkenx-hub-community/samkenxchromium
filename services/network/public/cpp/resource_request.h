@@ -161,6 +161,7 @@ struct COMPONENT_EXPORT(NETWORK_CPP_BASE) ResourceRequest {
   bool keepalive = false;
   bool browsing_topics = false;
   bool ad_auction_headers = false;
+  bool shared_storage_writable = false;
   bool has_user_gesture = false;
   bool enable_load_timing = false;
   bool enable_upload_progress = false;
@@ -201,6 +202,7 @@ struct COMPONENT_EXPORT(NETWORK_CPP_BASE) ResourceRequest {
       mojom::AttributionReportingEligibility::kUnset;
   network::AttributionReportingRuntimeFeatures
       attribution_reporting_runtime_features;
+  bool shared_dictionary_writer_enabled = false;
 };
 
 // This does not accept |kDefault| referrer policy.

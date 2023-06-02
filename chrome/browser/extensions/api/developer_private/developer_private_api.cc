@@ -30,7 +30,6 @@
 #include "chrome/browser/devtools/devtools_window.h"
 #include "chrome/browser/extensions/api/developer_private/entry_picker.h"
 #include "chrome/browser/extensions/api/developer_private/extension_info_generator.h"
-#include "chrome/browser/extensions/api/developer_private/show_permissions_dialog_helper.h"
 #include "chrome/browser/extensions/chrome_zipfile_installer.h"
 #include "chrome/browser/extensions/crx_installer.h"
 #include "chrome/browser/extensions/devtools_util.h"
@@ -61,6 +60,7 @@
 #include "chrome/common/url_constants.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/policy/core/common/policy_pref_names.h"
+#include "components/supervised_user/core/common/buildflags.h"
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/notification_details.h"
@@ -97,6 +97,7 @@
 #include "extensions/browser/warning_service.h"
 #include "extensions/browser/warning_service_factory.h"
 #include "extensions/browser/zipfile_installer.h"
+#include "extensions/common/extension_features.h"
 #include "extensions/common/extension_set.h"
 #include "extensions/common/feature_switch.h"
 #include "extensions/common/features/feature_developer_mode_only.h"
@@ -1157,6 +1158,11 @@ DeveloperPrivateUpdateExtensionConfigurationFunction::Run() {
         .SetShowAccessRequestsInToolbar(
             extension->id(), *update.show_access_requests_in_toolbar);
   }
+  if (update.acknowledge_safety_check_warning) {
+    ExtensionPrefs::Get(browser_context())
+        ->SetBooleanPref(extension->id(), kPrefAcknowledgeSafetyCheckWarning,
+                         *update.acknowledge_safety_check_warning);
+  }
 
   return RespondNow(NoArguments());
 }
@@ -1258,37 +1264,6 @@ void DeveloperPrivateReloadFunction::ClearObservers() {
   error_reporter_observation_.Reset();
 
   Release();  // Balanced in Run().
-}
-
-DeveloperPrivateShowPermissionsDialogFunction::
-DeveloperPrivateShowPermissionsDialogFunction() {}
-
-DeveloperPrivateShowPermissionsDialogFunction::
-~DeveloperPrivateShowPermissionsDialogFunction() {}
-
-ExtensionFunction::ResponseAction
-DeveloperPrivateShowPermissionsDialogFunction::Run() {
-  absl::optional<developer::ShowPermissionsDialog::Params> params =
-      developer::ShowPermissionsDialog::Params::Create(args());
-  EXTENSION_FUNCTION_VALIDATE(params);
-
-  const Extension* target_extension = GetExtensionById(params->extension_id);
-  if (!target_extension)
-    return RespondNow(Error(kNoSuchExtensionError));
-
-  content::WebContents* web_contents = GetSenderWebContents();
-  if (!web_contents)
-    return RespondNow(Error(kCouldNotFindWebContentsError));
-
-  ShowPermissionsDialogHelper::Show(
-      browser_context(), web_contents, target_extension,
-      base::BindOnce(&DeveloperPrivateShowPermissionsDialogFunction::Finish,
-                     this));
-  return RespondLater();
-}
-
-void DeveloperPrivateShowPermissionsDialogFunction::Finish() {
-  Respond(NoArguments());
 }
 
 DeveloperPrivateLoadUnpackedFunction::DeveloperPrivateLoadUnpackedFunction() {}
@@ -1427,9 +1402,18 @@ DeveloperPrivateInstallDroppedFileFunction::Run() {
 
   ExtensionService* service = GetExtensionService(browser_context());
   if (path.MatchesExtension(FILE_PATH_LITERAL(".zip"))) {
-    ZipFileInstaller::Create(GetExtensionFileTaskRunner(),
-                             MakeRegisterInExtensionServiceCallback(service))
-        ->LoadFromZipFile(path);
+    if (base::FeatureList::IsEnabled(
+            extensions_features::kExtensionsZipFileInstalledInProfileDir)) {
+      ZipFileInstaller::Create(GetExtensionFileTaskRunner(),
+                               MakeRegisterInExtensionServiceCallback(service))
+          ->InstallZipFileToUnpackedExtensionsDir(
+              path, service->unpacked_install_directory());
+    } else {
+      ZipFileInstaller::Create(GetExtensionFileTaskRunner(),
+                               MakeRegisterInExtensionServiceCallback(service))
+          ->InstallZipFileToTempDir(path);
+    }
+
   } else {
     auto prompt = std::make_unique<ExtensionInstallPrompt>(web_contents);
     scoped_refptr<CrxInstaller> crx_installer =

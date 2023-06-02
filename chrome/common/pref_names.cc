@@ -21,10 +21,6 @@ namespace prefs {
 // *************** PROFILE PREFS ***************
 // These are attached to the user profile
 
-// A bool pref that keeps whether the child status for this profile was already
-// successfully checked via ChildAccountService.
-const char kChildAccountStatusKnown[] = "child_account_status_known";
-
 // A string property indicating whether default apps should be installed
 // in this profile.  Use the value "install" to enable defaults apps, or
 // "noinstall" to disable them.  This property is usually set in the
@@ -1133,6 +1129,18 @@ const char kHatsOsSettingsSearchSurveyCycleEndTs[] =
 // Search survey.
 const char kHatsOsSettingsSearchSurveyIsSelected[] =
     "hats_os_settings_search_is_selected";
+
+// A dictionary storing the string representation of
+// chromeos::settings::mojom::Setting IDs for the unique OS Settings changed.
+// Implicitly stores the total count of the unique OS Settings changed by each
+// user per device.
+// Key:string = the int equivalent of the Settings enum
+//      chromeos::settings::mojom::Setting casted to string. Need to cast to
+//      string since the keys in a dictionary can only be strings.
+// Value:int = constant number 1. It signifies whether that particular Settings
+//      has been used by the user during the device's lifetime.
+const char kTotalUniqueOsSettingsChanged[] =
+    "settings.total_unique_os_settings_changed";
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 
 #if BUILDFLAG(IS_CHROMEOS)
@@ -1298,9 +1306,7 @@ const char kShowUpdatePromotionInfoBar[] =
     "browser.show_update_promotion_info_bar";
 #endif
 
-// TODO(crbug.com/1052397): Revisit the macro expression once build flag switch
-// of lacros-chrome is complete.
-#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS_LACROS)
+#if BUILDFLAG(IS_LINUX)
 // Boolean that is false if we should show window manager decorations.  If
 // true, we draw a custom chrome frame (thicker title bar and blue border).
 const char kUseCustomChromeFrame[] = "browser.custom_chrome_frame";
@@ -1660,6 +1666,11 @@ const char kQuietNotificationPermissionPromoWasShown[] =
     "profile.content_settings.quiet_permission_ui_promo.was_shown."
     "notifications";
 
+// Boolean indicating whether support for Data URLs in SVGUseElement should be
+// removed.
+const char kDataUrlInSvgUseEnabled[] =
+    "profile.content_settings.data_url_in_svg_use_enabled";
+
 // Boolean indicating if JS dialogs triggered from a different origin iframe
 // should be blocked. Has no effect if
 // "SuppressDifferentOriginSubframeJSDialogs" feature is disabled.
@@ -1683,6 +1694,9 @@ const char kSidePanelHorizontalAlignment[] = "side_panel.is_right_aligned";
 // a button in the toolbar.
 const char kSidePanelCompanionEntryPinnedToToolbar[] =
     "side_panel.companion_pinned_to_toolbar";
+// Corresponds to the enterprise policy.
+const char kGoogleSearchSidePanelEnabled[] =
+    "side_panel.google_search_side_panel_enabled";
 #endif
 
 // Number of minutes of inactivity before running actions from
@@ -1851,9 +1865,6 @@ const char kDefaultTasksBySuffix[] = "filebrowser.tasks.default_by_suffix";
 // DefaultHandlersForFileExtensions policy.
 const char kDefaultHandlersForFileExtensions[] =
     "filebrowser.default_handlers_for_file_extensions";
-
-// Whether the office files setup flow has ever been completed by the user.
-const char kOfficeSetupComplete[] = "filebrowser.office.setup_complete";
 
 // Whether we should always move office files to Google Drive without prompting
 // the user first.
@@ -2140,6 +2151,9 @@ const char kWebAppsExtensionIDs[] = "web_apps.extension_ids";
 // Dictionary that stores IPH state not scoped to a particular app.
 const char kWebAppsAppAgnosticIphState[] = "web_apps.app_agnostic_iph_state";
 
+// Dictionary that stores ML state not scoped to a particular app.
+const char kWebAppsAppAgnosticMlState[] = "web_apps.app_agnostic_ml_state";
+
 // A string representing the last version of Chrome preinstalled web apps were
 // synchronised for.
 const char kWebAppsLastPreinstallSynchronizeVersion[] =
@@ -2330,6 +2344,12 @@ const char kEncryptedClientHelloEnabled[] = "ssl.ech_enabled";
 // If false, disallow insecure hashes for use in  TLS Handshakes.
 const char kInsecureHashesInTLSHandshakesEnabled[] =
     "ssl.insecure_hash_enabled";
+
+// If true, checks the X.509 keyUsage extension in TLS 1.2 for RSA
+// certificates that chain to a local trust anchor. If false, the checks are
+// disabled.
+const char kRSAKeyUsageForLocalAnchorsEnabled[] =
+    "ssl.rsa_key_usage_for_local_anchors_enabled";
 
 // Boolean that specifies whether the built-in asynchronous DNS client is used.
 const char kBuiltInDnsClientEnabled[] = "async_dns.enabled";
@@ -3540,6 +3560,10 @@ const char kDesktopSharingHubEnabled[] =
 // Pref name for the last major version where the What's New page was
 // successfully shown.
 const char kLastWhatsNewVersion[] = "browser.last_whats_new_version";
+// Pref name for the whether whats new refresh page has been shown
+// successfully.
+const char kHasShownRefreshWhatsNew[] =
+    "browser.has_shown_refresh_2023_whats_new";
 // A boolean indicating whether the Lens Region search feature should be enabled
 // if supported.
 const char kLensRegionSearchEnabled[] = "policy.lens_region_search_enabled";
@@ -3659,5 +3683,8 @@ const char kHttpAllowlist[] = "https_upgrades.policy.http_allowlist";
 // Whether the HTTPS Upgrades feature is enabled or disabled by the
 // `HttpsUpgradesEnabled` enterprise policy.
 const char kHttpsUpgradesEnabled[] = "https_upgrades.policy.upgrades_enabled";
+
+// Whether the hovercard image previews is enabled
+const char kHoverCardImagesEnabled[] = "browser.hovercard_images_enabled";
 
 }  // namespace prefs

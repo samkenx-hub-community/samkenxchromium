@@ -8,7 +8,6 @@ import * as dom from './dom.js';
 import {I18nString} from './i18n_string.js';
 import * as loadTimeData from './models/load_time_data.js';
 import * as state from './state.js';
-import * as tooltip from './tooltip.js';
 import {AspectRatioSet, Facing, FpsRange, Resolution} from './type.js';
 
 /**
@@ -141,6 +140,9 @@ export function getKeyboardShortcut(event: KeyboardEvent): KeyboardShortcut {
 }
 
 function isSupportedKeyboardKey(key: string): key is KeyboardKey {
+  // This is to workaround current TypeScript limitation on Set.has.
+  // See https://github.com/microsoft/TypeScript/issues/26255
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
   return KEYBOARD_KEY_SET.has(key as KeyboardKey);
 }
 
@@ -185,11 +187,10 @@ export function setupI18nElements(rootElement: DocumentFragment|Element): void {
     element.setAttribute(
         'tooltip-false', getMessage(element, 'i18n-tooltip-false'));
   }
-  for (const element of getElements('i18n-aria')) {
-    setAriaLabel(element, 'i18n-aria');
-  }
-  for (const element of tooltip.setup(getElements('i18n-label'))) {
-    setAriaLabel(element, 'i18n-label');
+  for (const attribute of ['i18n-aria', 'i18n-label']) {
+    for (const element of getElements(attribute)) {
+      setAriaLabel(element, attribute);
+    }
   }
 }
 
@@ -357,6 +358,9 @@ export function checkEnumVariant<T extends string>(
       !Object.values<string>(enumType).includes(value)) {
     return null;
   }
+  // The value is already checked that it's a member of the enum above, so it's
+  // safe to cast it to the enum.
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
   return value as T;
 }
 
@@ -511,4 +515,28 @@ export class FpsObserver {
   stop(): void {
     this.videoElement.cancelVideoFrameCallback(this.callbackId);
   }
+}
+
+/**
+ * Returns whether a FileSystemHandle is FileSystemFileHandle.
+ *
+ * This is needed since the type FileSystemHandle isn't a discriminated union
+ * now.
+ * See https://github.com/microsoft/TypeScript-DOM-lib-generator/issues/1494.
+ */
+export function isFileSystemFileHandle(handle: FileSystemHandle):
+    handle is FileSystemFileHandle {
+  return handle.kind === 'file';
+}
+
+/**
+ * Returns whether a FileSystemHandle is FileSystemDirectoryHandle.
+ *
+ * This is needed since the type FileSystemHandle isn't a discriminated union
+ * now.
+ * See https://github.com/microsoft/TypeScript-DOM-lib-generator/issues/1494.
+ */
+export function isFileSystemDirectoryHandle(handle: FileSystemHandle):
+    handle is FileSystemDirectoryHandle {
+  return handle.kind === 'directory';
 }

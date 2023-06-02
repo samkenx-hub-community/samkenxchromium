@@ -14,6 +14,7 @@
 #include "base/check.h"
 #include "base/check_op.h"
 #include "base/memory/raw_ptr.h"
+#include "build/build_config.h"
 
 namespace base {
 
@@ -158,44 +159,20 @@ class EnumSet {
 
   ~EnumSet() = default;
 
-  static constexpr uint64_t single_val_bitstring(E val) {
-    const uint64_t bitstring = 1;
-    const size_t shift_amount = ToIndex(val);
-    CHECK_LT(shift_amount, sizeof(bitstring) * 8);
-    return bitstring << shift_amount;
-  }
-
-  // TODO(crbug/1444105): Deprecated. Use std::initializer_list version below.
-  // Remove once there are no usages.
-  template <class... T>
-  static constexpr uint64_t bitstring(T... values) {
-    uint64_t converted[] = {single_val_bitstring(values)...};
-    uint64_t result = 0;
-    for (uint64_t e : converted)
-      result |= e;
-    return result;
-  }
-
-  // TODO(crbug/1444105): Deprecated. Use std::initializer_list version below.
-  // Remove once there are no usages.
-  template <class... T>
-  constexpr EnumSet(E head, T... tail)
-      : EnumSet(EnumBitSet(bitstring(head, tail...))) {}
-
-  static constexpr uint64_t bitstring(const std::initializer_list<E>& values) {
-    uint64_t result = 0;
-    for (E value : values) {
-      result |= single_val_bitstring(value);
-    }
-    return result;
-  }
-
   constexpr EnumSet(std::initializer_list<E> values)
       : EnumSet(EnumBitSet(bitstring(values))) {}
 
   // Returns an EnumSet with all possible values.
   static constexpr EnumSet All() {
-    return EnumSet(EnumBitSet((1ULL << kValueCount) - 1));
+    if (kValueCount == 0) {
+      return EnumSet();
+    }
+    // Since `1 << kValueCount` may trigger shift-count-overflow warning if
+    // the `kValueCount` is 64, instead of returning `(1 << kValueCount) - 1`,
+    // the bitmask will be constructed from two parts: the most significant bits
+    // and the remaining.
+    uint64_t mask = 1ULL << (kValueCount - 1);
+    return EnumSet(EnumBitSet(mask - 1 + mask));
   }
 
   // Returns an EnumSet with all the values from start to end, inclusive.
@@ -321,6 +298,21 @@ class EnumSet {
                                                              EnumSet set2);
   friend EnumSet Difference<E, MinEnumValue, MaxEnumValue>(EnumSet set1,
                                                            EnumSet set2);
+
+  static constexpr uint64_t bitstring(const std::initializer_list<E>& values) {
+    uint64_t result = 0;
+    for (E value : values) {
+      result |= single_val_bitstring(value);
+    }
+    return result;
+  }
+
+  static constexpr uint64_t single_val_bitstring(E val) {
+    const uint64_t bitstring = 1;
+    const size_t shift_amount = ToIndex(val);
+    CHECK_LT(shift_amount, sizeof(bitstring) * 8);
+    return bitstring << shift_amount;
+  }
 
   // A bitset can't be constexpr constructed if it has size > 64, since the
   // constexpr constructor uses a uint64_t. If your EnumSet has > 64 values, you

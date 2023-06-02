@@ -481,11 +481,13 @@ absl::optional<AppId> WebAppRegistrar::FindInstalledAppWithUrlInScope(
   for (const AppId& app_id : GetAppIds()) {
     // TODO(crbug.com/910016): Treat shortcuts as PWAs.
     bool app_is_shortcut = IsShortcutApp(app_id);
-    if (app_is_shortcut && !best_app_is_shortcut)
+    if (app_is_shortcut && !best_app_is_shortcut) {
       continue;
+    }
 
-    if (!IsLocallyInstalled(app_id))
+    if (!IsLocallyInstalled(app_id)) {
       continue;
+    }
 
     if (window_only &&
         GetAppEffectiveDisplayMode(app_id) == DisplayMode::kBrowser) {
@@ -503,6 +505,26 @@ absl::optional<AppId> WebAppRegistrar::FindInstalledAppWithUrlInScope(
   }
 
   return best_app_id;
+}
+
+bool WebAppRegistrar::IsNonLocallyInstalledAppWithUrlInScope(
+    const GURL& url) const {
+  std::string scope_str = url.spec();
+
+  for (const auto& app_id : GetAppIds()) {
+    std::string app_scope = GetAppScope(app_id).spec();
+    CHECK(!app_scope.empty());
+
+    if (!base::StartsWith(scope_str, app_scope, base::CompareCase::SENSITIVE)) {
+      continue;
+    }
+
+    if (!IsLocallyInstalled(app_id)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 bool WebAppRegistrar::IsShortcutApp(const AppId& app_id) const {
@@ -546,12 +568,9 @@ DisplayMode WebAppRegistrar::GetEffectiveDisplayModeFromManifest(
   return GetAppDisplayMode(app_id);
 }
 
-std::string WebAppRegistrar::GetComputedUnhashedAppId(
-    const AppId& app_id) const {
+GURL WebAppRegistrar::GetComputedManifestId(const AppId& app_id) const {
   auto* web_app = GetAppById(app_id);
-  return web_app ? GenerateAppIdUnhashed(web_app->manifest_id(),
-                                         web_app->start_url())
-                 : std::string();
+  return web_app ? web_app->manifest_id() : GURL();
 }
 
 bool WebAppRegistrar::IsTabbedWindowModeEnabled(const AppId& app_id) const {
@@ -800,6 +819,11 @@ bool WebAppRegistrar::WasInstalledBySubApp(const AppId& app_id) const {
   return web_app && web_app->IsSubAppInstalledApp();
 }
 
+bool WebAppRegistrar::CanUserUninstallWebApp(const AppId& app_id) const {
+  const WebApp* web_app = GetAppById(app_id);
+  return web_app && web_app->CanUserUninstallWebApp();
+}
+
 bool WebAppRegistrar::IsAllowedLaunchProtocol(
     const AppId& app_id,
     const std::string& protocol_scheme) const {
@@ -887,8 +911,14 @@ WebAppRegistrar::GetIsolatedWebAppStoragePartitionConfigs(
     return {};
   }
 
-  // TODO(crbug.com/1311065): Include Controlled Frame StoragePartitions.
-  return {url_info->storage_partition_config(profile_)};
+  std::vector<content::StoragePartitionConfig> partitions = {
+      url_info->storage_partition_config(profile_)};
+  for (const std::string& partition :
+       isolated_web_app->isolation_data()->controlled_frame_partitions) {
+    partitions.push_back(url_info->GetStoragePartitionConfigForControlledFrame(
+        profile_, partition, /*in_memory=*/false));
+  }
+  return partitions;
 }
 
 std::string WebAppRegistrar::GetAppShortName(const AppId& app_id) const {
@@ -946,10 +976,9 @@ const GURL& WebAppRegistrar::GetAppStartUrl(const AppId& app_id) const {
   return web_app ? web_app->start_url() : GURL::EmptyGURL();
 }
 
-absl::optional<std::string> WebAppRegistrar::GetAppManifestId(
-    const AppId& app_id) const {
+ManifestId WebAppRegistrar::GetAppManifestId(const AppId& app_id) const {
   auto* web_app = GetAppById(app_id);
-  return web_app ? web_app->manifest_id() : absl::nullopt;
+  return web_app ? web_app->manifest_id() : ManifestId();
 }
 
 const std::string* WebAppRegistrar::GetAppLaunchQueryParams(
@@ -1156,6 +1185,18 @@ std::vector<AppId> WebAppRegistrar::GetAllSubAppIds(
   }
 
   return sub_app_ids;
+}
+
+base::flat_map<AppId, AppId> WebAppRegistrar::GetSubAppToParentMap() const {
+  base::flat_map<AppId, AppId> parent_app_ids;
+
+  for (const WebApp& app : GetApps()) {
+    if (app.parent_app_id().has_value()) {
+      parent_app_ids[app.app_id()] = *app.parent_app_id();
+    }
+  }
+
+  return parent_app_ids;
 }
 
 ValueWithPolicy<RunOnOsLoginMode> WebAppRegistrar::GetAppRunOnOsLoginMode(

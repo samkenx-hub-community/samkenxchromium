@@ -4,45 +4,69 @@
 
 #include "ash/system/toast/anchored_nudge.h"
 
+#include <algorithm>
+
 #include "ash/public/cpp/shelf_types.h"
 #include "ash/style/system_toast_style.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback.h"
+#include "ui/aura/window.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
+#include "ui/events/event.h"
+#include "ui/gfx/native_widget_types.h"
 #include "ui/views/bubble/bubble_border.h"
 #include "ui/views/bubble/bubble_dialog_delegate_view.h"
+#include "ui/views/bubble/bubble_frame_view.h"
 #include "ui/views/layout/flex_layout.h"
+#include "ui/views/widget/widget.h"
 
 namespace ash {
 
-namespace {
-
-views::BubbleBorder::Arrow GetArrowAlignmentFromShelf(
-    ShelfAlignment alignment) {
-  switch (alignment) {
-    case ash::ShelfAlignment::kBottom:
-    case ash::ShelfAlignment::kBottomLocked:
-      return views::BubbleBorder::BOTTOM_CENTER;
-    case ash::ShelfAlignment::kLeft:
-      return views::BubbleBorder::LEFT_CENTER;
-    case ash::ShelfAlignment::kRight:
-      return views::BubbleBorder::RIGHT_CENTER;
-  }
-}
-
-}  // namespace
-
-AnchoredNudge::AnchoredNudge(AnchoredNudgeData nudge_data)
-    : views::BubbleDialogDelegateView(nudge_data.anchor,
+///////////////////////////////////////////////////////////////////////////////
+//  AnchoredNudge
+AnchoredNudge::AnchoredNudge(const AnchoredNudgeData& nudge_data)
+    : views::BubbleDialogDelegateView(nudge_data.anchor_view,
                                       nudge_data.arrow,
-                                      views::BubbleBorder::NO_SHADOW) {
+                                      views::BubbleBorder::NO_SHADOW),
+      id_(nudge_data.id),
+      nudge_click_callback_(std::move(nudge_data.nudge_click_callback)),
+      nudge_dismiss_callback_(std::move(nudge_data.nudge_dimiss_callback)) {
   SetButtons(ui::DIALOG_BUTTON_NONE);
   set_color(SK_ColorTRANSPARENT);
   set_margins(gfx::Insets());
+  set_close_on_deactivate(false);
   SetLayoutManager(std::make_unique<views::FlexLayout>());
   toast_contents_view_ = AddChildView(std::make_unique<SystemToastStyle>(
       nudge_data.dismiss_callback, nudge_data.text, nudge_data.dismiss_text));
+  // TODO(b/283159669): Will use `SystemToastStyle` with a second button
+  // temporarily for M116, migrate to `DialogStyle` once implemented.
+  if (nudge_data.second_button_text != std::u16string()) {
+    toast_contents_view_->AddSecondButton(nudge_data.second_button_callback,
+                                          nudge_data.second_button_text);
+  }
 }
 
-AnchoredNudge::~AnchoredNudge() = default;
+AnchoredNudge::~AnchoredNudge() {
+  if (!nudge_dismiss_callback_.is_null()) {
+    std::move(nudge_dismiss_callback_).Run();
+  }
+}
+
+const std::u16string& AnchoredNudge::GetText() {
+  CHECK(toast_contents_view_);
+  CHECK(toast_contents_view_->label());
+  return toast_contents_view_->label()->GetText();
+}
+
+views::LabelButton* AnchoredNudge::GetDismissButton() {
+  CHECK(toast_contents_view_);
+  return toast_contents_view_->dismiss_button();
+}
+
+views::LabelButton* AnchoredNudge::GetSecondButton() {
+  CHECK(toast_contents_view_);
+  return toast_contents_view_->second_button();
+}
 
 std::unique_ptr<views::NonClientFrameView>
 AnchoredNudge::CreateNonClientFrameView(views::Widget* widget) {
@@ -64,8 +88,33 @@ AnchoredNudge::CreateNonClientFrameView(views::Widget* widget) {
   return frame;
 }
 
-void AnchoredNudge::UpdateArrowFromShelfAlignment(ShelfAlignment alignment) {
-  SetArrow(GetArrowAlignmentFromShelf(alignment));
+bool AnchoredNudge::OnMousePressed(const ui::MouseEvent& event) {
+  return true;
+}
+
+bool AnchoredNudge::OnMouseDragged(const ui::MouseEvent& event) {
+  return true;
+}
+
+void AnchoredNudge::OnMouseReleased(const ui::MouseEvent& event) {
+  if (event.IsOnlyLeftMouseButton() && !nudge_click_callback_.is_null()) {
+    std::move(nudge_click_callback_).Run();
+  }
+}
+
+void AnchoredNudge::OnGestureEvent(ui::GestureEvent* event) {
+  switch (event->type()) {
+    case ui::ET_GESTURE_TAP: {
+      if (!nudge_click_callback_.is_null()) {
+        std::move(nudge_click_callback_).Run();
+        event->SetHandled();
+      }
+      return;
+    }
+    default: {
+      // Do nothing.
+    }
+  }
 }
 
 BEGIN_METADATA(AnchoredNudge, views::BubbleDialogDelegateView)

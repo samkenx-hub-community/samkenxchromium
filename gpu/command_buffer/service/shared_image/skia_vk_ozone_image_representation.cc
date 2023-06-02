@@ -7,7 +7,7 @@
 #include <utility>
 
 #include "components/viz/common/gpu/vulkan_context_provider.h"
-#include "components/viz/common/resources/resource_format_utils.h"
+#include "components/viz/common/resources/shared_image_format_utils.h"
 #include "gpu/command_buffer/common/shared_image_usage.h"
 #include "gpu/command_buffer/service/external_semaphore_pool.h"
 #include "gpu/command_buffer/service/memory_tracking.h"
@@ -226,7 +226,7 @@ void SkiaVkOzoneImageRepresentation::EndAccess(bool readonly) {
     SemaphoreHandle semaphore_handle = vk_implementation()->GetSemaphoreHandle(
         vk_device(), end_access_semaphore_);
     fence = std::move(semaphore_handle).ToGpuFenceHandle();
-    DCHECK(!fence.is_null());
+    DLOG_IF(ERROR, fence.is_null()) << "Failed to convert the external semaphore to fence.";
   }
 
   ozone_backing()->EndAccess(readonly, OzoneImageBacking::AccessStream::kVulkan,

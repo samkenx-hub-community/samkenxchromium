@@ -120,6 +120,11 @@ class ASH_EXPORT CaptureModeSession
   // nullptr if no window is available for selection.
   aura::Window* GetSelectedWindow() const;
 
+  // Sets the pre-selected window to be observed by `capture_window_observer_`,
+  // once set, the window can't be altered throughout the entire capture
+  // session.
+  void SetPreSelectedWindow(aura::Window* pre_selected_window);
+
   // Called when a user toggles the capture source or capture type to announce
   // an accessibility alert. If `trigger_now` is true, it will announce
   // immediately; otherwise, it will trigger another alert asynchronously with
@@ -129,10 +134,13 @@ class ASH_EXPORT CaptureModeSession
   // Called when switching a capture type from another capture type.
   void A11yAlertCaptureType();
 
-  // Called when either the capture source, type, or recording type changes.
+  // Called when either the capture source, type, recording type, audio
+  // recording mode or demo tools changes.
   void OnCaptureSourceChanged(CaptureModeSource new_source);
   void OnCaptureTypeChanged(CaptureModeType new_type);
   void OnRecordingTypeChanged();
+  void OnAudioRecordingModeChanged();
+  void OnDemoToolsSettingsChanged();
 
   // When performing capture, or at the end of the 3-second count down, the DLP
   // manager is checked for any restricted content. The DLP manager may choose
@@ -256,6 +264,15 @@ class ASH_EXPORT CaptureModeSession
 
   void OnCameraPreviewDestroyed();
 
+  // If there's a user nudge currently showing, it will be dismissed forever,
+  // and will no longer be shown to the user.
+  void MaybeDismissUserNudgeForever();
+
+  // Sets the correct screen bounds on the `capture_mode_bar_widget_` based on
+  // the `current_root_`, potentially moving the bar to a new display if
+  // `current_root_` is different`.
+  void RefreshBarWidgetBounds();
+
  private:
   friend class CaptureModeSettingsTestApi;
   friend class CaptureModeSessionFocusCycler;
@@ -287,19 +304,14 @@ class ASH_EXPORT CaptureModeSession
   // could be shown, otherwise, returns false.
   bool CanShowWidget(views::Widget* widget) const;
 
-  // Sets the correct screen bounds on the `capture_mode_bar_widget_` based on
-  // the `current_root_`, potentially moving the bar to a new display if
-  // `current_root_` is different`.
-  void RefreshBarWidgetBounds();
+  // Triggers a selfie camera visibility update during capture mode session on
+  // capture mode type changed.
+  void MaybeUpdateSelfieCamInSessionVisibility();
 
   // If possible, this recreates and shows the nudge that alerts the user about
   // the new folder selection settings. The nudge will be created on top of the
   // the settings button on the capture mode bar.
   void MaybeCreateUserNudge();
-
-  // If there's a user nudge currently showing, it will be dismissed forever,
-  // and will no longer be shown to the user.
-  void MaybeDismissUserNudgeForever();
 
   // Called to accept and trigger a capture operation. This happens e.g. when
   // the user hits enter, selects a window/display to capture, or presses on the

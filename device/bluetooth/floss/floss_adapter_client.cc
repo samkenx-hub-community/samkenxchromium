@@ -114,6 +114,13 @@ void FlossAdapterClient::GetRemoteUuids(
       std::move(callback), adapter::kGetRemoteUuids, device);
 }
 
+void FlossAdapterClient::GetRemoteVendorProductInfo(
+    ResponseCallback<FlossAdapterClient::VendorProductInfo> callback,
+    FlossDeviceId device) {
+  CallAdapterMethod<FlossAdapterClient::VendorProductInfo>(
+      std::move(callback), adapter::kGetRemoteVendorProductInfo, device);
+}
+
 void FlossAdapterClient::GetBondState(ResponseCallback<uint32_t> callback,
                                       const FlossDeviceId& device) {
   CallAdapterMethod<uint32_t>(std::move(callback), adapter::kGetBondState,
@@ -242,6 +249,18 @@ void FlossAdapterClient::Init(dbus::Bus* bus,
       base::BindRepeating(&FlossAdapterClient::OnSspRequest,
                           weak_ptr_factory_.GetWeakPtr()),
       base::BindOnce(&HandleExported, adapter::kOnSspRequest));
+
+  callbacks->ExportMethod(
+      adapter::kCallbackInterface, adapter::kOnPinDisplay,
+      base::BindRepeating(&FlossAdapterClient::OnPinDisplay,
+                          weak_ptr_factory_.GetWeakPtr()),
+      base::BindOnce(&HandleExported, adapter::kOnPinDisplay));
+
+  callbacks->ExportMethod(
+      adapter::kCallbackInterface, adapter::kOnPinRequest,
+      base::BindRepeating(&FlossAdapterClient::OnPinRequest,
+                          weak_ptr_factory_.GetWeakPtr()),
+      base::BindOnce(&HandleExported, adapter::kOnPinRequest));
 
   callbacks->ExportMethod(
       adapter::kCallbackInterface, adapter::kOnBondStateChanged,
@@ -433,6 +452,49 @@ void FlossAdapterClient::OnSspRequest(
   for (auto& observer : observers_) {
     observer.AdapterSspRequest(
         device, cod, static_cast<BluetoothSspVariant>(variant), passkey);
+  }
+
+  std::move(response_sender).Run(dbus::Response::FromMethodCall(method_call));
+}
+
+void FlossAdapterClient::OnPinDisplay(
+    dbus::MethodCall* method_call,
+    dbus::ExportedObject::ResponseSender response_sender) {
+  dbus::MessageReader reader(method_call);
+  FlossDeviceId device;
+  std::string pincode;
+
+  if (!ReadAllDBusParams(&reader, &device, &pincode)) {
+    std::move(response_sender)
+        .Run(dbus::ErrorResponse::FromMethodCall(
+            method_call, kErrorInvalidParameters, std::string()));
+    return;
+  }
+
+  for (auto& observer : observers_) {
+    observer.AdapterPinDisplay(device, pincode);
+  }
+
+  std::move(response_sender).Run(dbus::Response::FromMethodCall(method_call));
+}
+
+void FlossAdapterClient::OnPinRequest(
+    dbus::MethodCall* method_call,
+    dbus::ExportedObject::ResponseSender response_sender) {
+  dbus::MessageReader reader(method_call);
+  FlossDeviceId device;
+  uint32_t cod;
+  bool min_16_digit;
+
+  if (!ReadAllDBusParams(&reader, &device, &cod, &min_16_digit)) {
+    std::move(response_sender)
+        .Run(dbus::ErrorResponse::FromMethodCall(
+            method_call, kErrorInvalidParameters, std::string()));
+    return;
+  }
+
+  for (auto& observer : observers_) {
+    observer.AdapterPinRequest(device, cod, min_16_digit);
   }
 
   std::move(response_sender).Run(dbus::Response::FromMethodCall(method_call));

@@ -263,6 +263,8 @@ class CreditCardAccessManager : public CreditCardCvcAuthenticator::Requester,
 
   // Determines what type of authentication is required. |fido_auth_enabled|
   // suggests whether the server has offered FIDO auth as an option.
+  // TODO(crbug.com/1449351): Prefix these functions with
+  // "StartAuthenticationFlow" instead of "GetAuthenticationType".
   void GetAuthenticationType(bool fido_auth_enabled);
   void GetAuthenticationTypeForVirtualCard(bool fido_auth_enabled);
   void GetAuthenticationTypeForMaskedServerCard(bool fido_auth_enabled);
@@ -421,6 +423,9 @@ class CreditCardAccessManager : public CreditCardCvcAuthenticator::Requester,
       const std::u16string& cvc,
       bool successful_auth);
 
+  // Callback that resets `device_authenticator_` after an authentication.
+  void OnReauthCompleted();
+
   // The current form of authentication in progress.
   UnmaskAuthFlowType unmask_auth_flow_type_ = UnmaskAuthFlowType::kNone;
 
@@ -429,7 +434,7 @@ class CreditCardAccessManager : public CreditCardCvcAuthenticator::Requester,
   bool is_authentication_in_progress_ = false;
 
   // The associated autofill driver. Weak reference.
-  const raw_ptr<AutofillDriver> driver_;
+  const raw_ptr<AutofillDriver, DanglingUntriaged> driver_;
 
   // The associated autofill client. Weak reference.
   const raw_ptr<AutofillClient> client_;
@@ -516,6 +521,13 @@ class CreditCardAccessManager : public CreditCardCvcAuthenticator::Requester,
   // Cached data of cards which have been unmasked. This is cleared upon page
   // navigation. Map key is the card's server_id.
   std::unordered_map<std::string, CachedServerCardInfo> unmasked_card_cache_;
+
+  // Used to authenticate autofills when there was no interactive
+  // authentication. This class must keep this reference to
+  // `device_authenticator_` alive while an authentication is in progress. Set
+  // when we initiate a re-auth using `DeviceAuthenticator`, and reset once the
+  // authentication has finished.
+  scoped_refptr<device_reauth::DeviceAuthenticator> device_authenticator_;
 
   base::WeakPtrFactory<CreditCardAccessManager> weak_ptr_factory_{this};
 };

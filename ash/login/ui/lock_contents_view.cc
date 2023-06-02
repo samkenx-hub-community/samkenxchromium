@@ -652,6 +652,7 @@ void LockContentsView::OnUsersChanged(const std::vector<LoginUserInfo>& users) {
     LOG(WARNING)
         << "LockContentsView::OnUsersChanged called during Authentication.";
   }
+  AuthEventsRecorder::Get()->OnLockContentsViewUpdate();
   // The debug view will potentially call this method many times. Make sure to
   // invalidate any child references.
   primary_big_view_ = nullptr;
@@ -1912,9 +1913,6 @@ void LockContentsView::LayoutAuth(LoginBigUserView* to_update,
         if (state->show_pin) {
           to_update_auth |= LoginAuthUserView::AUTH_PIN;
         }
-        if (state->enable_tap_auth) {
-          to_update_auth |= LoginAuthUserView::AUTH_TAP;
-        }
         if (state->fingerprint_state != FingerprintState::UNAVAILABLE) {
           to_update_auth |= LoginAuthUserView::AUTH_FINGERPRINT;
         }
@@ -2518,7 +2516,7 @@ void LockContentsView::SetKioskLicenseModeForTesting(
 void LockContentsView::RecordAndResetPasswordAttempts(
     AuthEventsRecorder::AuthenticationOutcome outcome,
     AccountId account_id) {
-  AuthEventsRecorder::Get()->OnExistingUserLoginExit(
+  AuthEventsRecorder::Get()->OnExistingUserLoginScreenExit(
       outcome, unlock_attempt_by_user_[account_id]);
   unlock_attempt_by_user_[account_id] = 0;
 }

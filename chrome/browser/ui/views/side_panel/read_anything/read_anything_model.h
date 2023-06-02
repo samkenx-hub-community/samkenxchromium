@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "base/memory/raw_ptr_exclusion.h"
 #include "base/observer_list.h"
 #include "base/observer_list_types.h"
 #include "base/strings/utf_string_conversions.h"
@@ -63,8 +64,6 @@ class ReadAnythingFontModel : public ui::ComboboxModel {
   void SetDefaultLanguage(const std::string& lang);
   size_t GetFontNameIndex(std::string font_name);
   void SetSelectedIndex(size_t index);
-  std::vector<std::string> GetLabelFontNameAt(size_t index) override;
-  absl::optional<int> GetLabelFontSize() override;
   size_t GetSelectedIndex() { return selected_index_; }
   ReadAnythingFont GetFontLoggingValue() {
     return font_choices_[selected_index_].enum_value;
@@ -215,7 +214,9 @@ class ReadAnythingLineSpacingModel : public ReadAnythingMenuModel {
     std::u16string name;
 
     // The resources value/identifier for the icon image asset.
-    const gfx::VectorIcon& icon_asset;
+    // This field is not a raw_ref<> because it was filtered by the rewriter
+    // for: #constexpr-ctor-field-initializer
+    RAW_PTR_EXCLUSION const gfx::VectorIcon& icon_asset;
   };
 
   bool IsValidIndex(size_t index) override;
@@ -253,7 +254,9 @@ class ReadAnythingLetterSpacingModel : public ReadAnythingMenuModel {
     std::u16string name;
 
     // The resources value/identifier for the icon image asset.
-    const gfx::VectorIcon& icon_asset;
+    // This field is not a raw_ref<> because it was filtered by the rewriter
+    // for: #constexpr-ctor-field-initializer
+    RAW_PTR_EXCLUSION const gfx::VectorIcon& icon_asset;
   };
 
   bool IsValidIndex(size_t index) override;
