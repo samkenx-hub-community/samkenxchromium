@@ -6,7 +6,7 @@
 #define GPU_COMMAND_BUFFER_SERVICE_SKIA_UTILS_H_
 
 #include "base/functional/callback_forward.h"
-#include "components/viz/common/resources/resource_format.h"
+#include "gpu/config/gpu_driver_bug_workarounds.h"
 #include "gpu/config/gpu_preferences.h"
 #include "gpu/gpu_gles2_export.h"
 #include "gpu/ipc/common/vulkan_ycbcr_info.h"
@@ -33,6 +33,7 @@ class SkImage;
 
 namespace gfx {
 class Size;
+class ColorSpace;
 }  // namespace gfx
 
 namespace viz {
@@ -59,7 +60,7 @@ class SharedContextState;
 GPU_GLES2_EXPORT GrContextOptions GetDefaultGrContextOptions();
 
 GPU_GLES2_EXPORT skgpu::graphite::ContextOptions
-GetDefaultGraphiteContextOptions();
+GetDefaultGraphiteContextOptions(const GpuDriverBugWorkarounds& workarounds);
 
 // Returns internal gl format of texture for Skia for given `gl_storage_format`.
 GPU_GLES2_EXPORT GLuint GetGrGLBackendTextureFormat(
@@ -104,11 +105,14 @@ GPU_GLES2_EXPORT void DeleteSkSurface(SharedContextState* context_state,
                                       sk_sp<SkSurface> sk_surface);
 
 #if BUILDFLAG(ENABLE_VULKAN)
-GPU_GLES2_EXPORT GrVkImageInfo CreateGrVkImageInfo(VulkanImage* image);
+GPU_GLES2_EXPORT GrVkImageInfo
+CreateGrVkImageInfo(VulkanImage* image, const gfx::ColorSpace& color_space);
 
 GPU_GLES2_EXPORT GrVkYcbcrConversionInfo CreateGrVkYcbcrConversionInfo(
     VkPhysicalDevice physical_device,
     VkImageTiling tiling,
+    VkFormat format,
+    const gfx::ColorSpace& color_space,
     const absl::optional<VulkanYCbCrInfo>& ycbcr_info);
 #endif  // BUILDFLAG(ENABLE_VULKAN)
 

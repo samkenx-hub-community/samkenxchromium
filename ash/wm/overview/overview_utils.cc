@@ -8,8 +8,8 @@
 
 #include "ash/accessibility/accessibility_controller_impl.h"
 #include "ash/public/cpp/shelf_config.h"
-#include "ash/public/cpp/shell_window_ids.h"
 #include "ash/public/cpp/window_properties.h"
+#include "ash/root_window_controller.h"
 #include "ash/scoped_animation_disabler.h"
 #include "ash/screen_util.h"
 #include "ash/shelf/shelf.h"
@@ -19,12 +19,13 @@
 #include "ash/wm/overview/cleanup_animation_observer.h"
 #include "ash/wm/overview/delayed_animation_observer_impl.h"
 #include "ash/wm/overview/overview_controller.h"
+#include "ash/wm/overview/overview_focus_cycler.h"
 #include "ash/wm/overview/overview_grid.h"
-#include "ash/wm/overview/overview_highlight_controller.h"
 #include "ash/wm/overview/overview_item.h"
 #include "ash/wm/overview/overview_session.h"
 #include "ash/wm/overview/scoped_overview_animation_settings.h"
 #include "ash/wm/splitview/split_view_controller.h"
+#include "ash/wm/splitview/split_view_overview_session.h"
 #include "ash/wm/splitview/split_view_utils.h"
 #include "ash/wm/tablet_mode/tablet_mode_controller.h"
 #include "ash/wm/window_state.h"
@@ -37,8 +38,6 @@
 #include "ui/compositor/layer.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/geometry/transform_util.h"
-#include "ui/gfx/scoped_canvas.h"
-#include "ui/views/background.h"
 #include "ui/views/view.h"
 #include "ui/views/widget/widget.h"
 #include "ui/views/widget/widget_delegate.h"
@@ -46,6 +45,18 @@
 #include "ui/wm/core/window_animations.h"
 
 namespace ash {
+
+bool IsInOverviewSession() {
+  OverviewController* overview_controller = Shell::Get()->overview_controller();
+  return overview_controller && overview_controller->InOverviewSession();
+}
+
+OverviewSession* GetOverviewSession() {
+  OverviewController* overview_controller = Shell::Get()->overview_controller();
+  return overview_controller && overview_controller->InOverviewSession()
+             ? overview_controller->overview_session()
+             : nullptr;
+}
 
 bool CanCoverAvailableWorkspace(aura::Window* window) {
   SplitViewController* split_view_controller = SplitViewController::Get(window);
@@ -199,10 +210,27 @@ gfx::Rect GetGridBoundsInScreen(
     bool divider_changed,
     bool account_for_hotseat) {
   auto* split_view_controller = SplitViewController::Get(target_root);
-  auto state = split_view_controller->state();
+  SplitViewController::State state = split_view_controller->state();
+
+  // `split_view_overview_session` may have started without updating
+  // `split_view_controller->state()`, i.e. from SnapGroupController. Convert
+  // the split view overview session window to a split view state.
+  // TODO(sophiewen): See if we can remove `state` and just check this.
+  if (auto* split_view_overview_session =
+          RootWindowController::ForWindow(target_root)
+              ->split_view_overview_session()) {
+    auto* window_state =
+        WindowState::Get(split_view_overview_session->window());
+    CHECK(window_state->IsSnapped());
+    chromeos::WindowStateType window_state_type = window_state->GetStateType();
+    state = window_state_type == chromeos::WindowStateType::kPrimarySnapped
+                ? SplitViewController::State::kPrimarySnapped
+                : SplitViewController::State::kSecondarySnapped;
+  }
 
   // If we are in splitview mode already just use the given state, otherwise
-  // convert |window_dragging_state| to a split view state.
+  // convert `window_dragging_state` to a split view state. Note this will
+  // override `state` from `split_view_overview_session` if there is any.
   if (!split_view_controller->InSplitViewMode() && window_dragging_state) {
     switch (*window_dragging_state) {
       case SplitViewDragIndicators::WindowDraggingState::kToSnapPrimary:
@@ -220,6 +248,12 @@ gfx::Rect GetGridBoundsInScreen(
   gfx::Rect work_area =
       WorkAreaInsets::ForWindow(target_root)->ComputeStableWorkArea();
   absl::optional<SplitViewController::SnapPosition> opposite_position;
+
+  // We should show partial overview for the following use cases:
+  // 1. In tablet split view mode;
+  // 2. On one window snapped in clamshell mode with feature flag `kSnapGroup`
+  // is enabled and feature param `kAutomaticallyLockGroup` is true;
+  // 3. On one window snapped in clamshell in overview session.
   switch (state) {
     case SplitViewController::State::kPrimarySnapped:
       bounds = split_view_controller->GetSnappedWindowBoundsInScreen(
@@ -272,8 +306,9 @@ gfx::Rect GetGridBoundsInScreen(
     }
   }
 
-  if (!divider_changed)
+  if (!divider_changed) {
     return bounds;
+  }
 
   DCHECK(opposite_position);
   const bool horizontal = SplitViewController::IsLayoutHorizontal(target_root);
@@ -339,30 +374,12 @@ gfx::Rect ToStableSizeRoundedRect(const gfx::RectF& rect) {
                    gfx::ToRoundedSize(rect.size()));
 }
 
-void UpdateOverviewHighlightForFocus(OverviewHighlightableView* target_view) {
-  auto* highlight_controller = Shell::Get()
-                                   ->overview_controller()
-                                   ->overview_session()
-                                   ->highlight_controller();
-  DCHECK(highlight_controller);
+void MoveFocusToView(OverviewFocusableView* target_view) {
+  auto* focus_cycler =
+      Shell::Get()->overview_controller()->overview_session()->focus_cycler();
+  CHECK(focus_cycler);
 
-  highlight_controller->MoveHighlightToView(target_view);
-}
-
-void UpdateOverviewHighlightForFocusAndSpokenFeedback(
-    OverviewHighlightableView* target_view) {
-  AccessibilityControllerImpl* a11y_controller =
-      Shell::Get()->accessibility_controller();
-  DCHECK(a11y_controller);
-  auto* highlight_controller = Shell::Get()
-                                   ->overview_controller()
-                                   ->overview_session()
-                                   ->highlight_controller();
-  DCHECK(highlight_controller);
-  DCHECK(a11y_controller);
-  if (a11y_controller->spoken_feedback().enabled()) {
-    UpdateOverviewHighlightForFocus(target_view);
-  }
+  focus_cycler->MoveFocusToView(target_view);
 }
 
 }  // namespace ash

@@ -48,10 +48,7 @@ int AutocompleteClassifier::DefaultOmniboxProviders() {
   return
 #if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
       // Custom search engines cannot be used on mobile.
-      AutocompleteProvider::TYPE_KEYWORD |
-      (OmniboxFieldTrial::IsSiteSearchStarterPackEnabled()
-           ? AutocompleteProvider::TYPE_OPEN_TAB
-           : 0) |
+      AutocompleteProvider::TYPE_KEYWORD | AutocompleteProvider::TYPE_OPEN_TAB |
 #else
       AutocompleteProvider::TYPE_CLIPBOARD |
       AutocompleteProvider::TYPE_MOST_VISITED_SITES |
@@ -80,7 +77,8 @@ int AutocompleteClassifier::DefaultOmniboxProviders() {
       AutocompleteProvider::TYPE_SEARCH | AutocompleteProvider::TYPE_SHORTCUTS |
       (OmniboxFieldTrial::IsFuzzyUrlSuggestionsEnabled()
            ? AutocompleteProvider::TYPE_HISTORY_FUZZY
-           : 0);
+           : 0) |
+      AutocompleteProvider::TYPE_CALCULATOR;
 }
 
 void AutocompleteClassifier::Classify(
@@ -92,12 +90,6 @@ void AutocompleteClassifier::Classify(
     GURL* alternate_nav_url) {
   TRACE_EVENT1("omnibox", "AutocompleteClassifier::Classify", "text",
                base::UTF16ToUTF8(text));
-
-  // TODO(manukh): Remove this histogram when `kRedoCurrentMatch` &
-  //   `kRevertModelBeforeClosingPopup` launch or are abandoned.
-  SCOPED_UMA_HISTOGRAM_TIMER_MICROS(
-      "Omnibox.AutocompleteClassifierClassifyTime");
-
   DCHECK(!inside_classify_);
   base::AutoReset<bool> reset(&inside_classify_, true);
   AutocompleteInput input(text, page_classification, *scheme_classifier_);

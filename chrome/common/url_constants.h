@@ -91,6 +91,9 @@ extern const char kIsolatedAppScheme[];
 // widgets instead of using HTML.
 extern const char kChromeNativeScheme[];
 
+// The URL of safe section in Chrome page (https://www.google.com/chrome).
+extern const char kChromeSafePageURL[];
+
 // Pages under chrome-search.
 extern const char kChromeSearchLocalNtpHost[];
 
@@ -152,12 +155,21 @@ extern const char kDownloadInterruptedLearnMoreURL[];
 // The URL for the "Learn more" page for download scanning.
 extern const char kDownloadScanningLearnMoreURL[];
 
+// The URL for the "Learn more" page for blocked downloads.
+extern const char kDownloadBlockedLearnMoreURL[];
+
 // "Learn more" URL for the Settings API, NTP bubble and other settings bubbles
 // showing which extension is controlling them.
 extern const char kExtensionControlledSettingLearnMoreURL[];
 
 // URL used to indicate that an extension resource load request was invalid.
 extern const char kExtensionInvalidRequestURL[];
+
+// Link for creating family group with Google Families.
+extern const char kFamilyGroupCreateURL[];
+
+// Link for viewing family group with Google Families.
+extern const char kFamilyGroupViewURL[];
 
 // "Learn more" URL for first party sets.
 extern const char kFirstPartySetsLearnMoreURL[];
@@ -197,9 +209,18 @@ extern const char kHighEfficiencyModeLearnMoreUrl[];
 // exceptions add dialog.
 extern const char kHighEfficiencyModeTabDiscardingHelpUrl[];
 
+// The URL to the help center article of Incognito mode.
+extern const char kIncognitoHelpCenterURL[];
+
+// The URL for "Learn more" page for Isolated Web Apps.
+extern const char kIsolatedWebAppsLearnMoreUrl[];
+
 // The URL for the "Learn more" page for the usage/crash reporting option in the
 // first run dialog.
 extern const char kLearnMoreReportingURL[];
+
+// The URL for the Help Center page about managing third-party cookies.
+extern const char kManage3pcHelpCenterURL[];
 
 // The URL for the Learn More page about policies and enterprise enrollment.
 extern const char kManagedUiLearnMoreUrl[];
@@ -227,6 +248,12 @@ extern const char kPasswordManagerLearnMoreURL[];
 // Help URL for passwords import.
 extern const char kPasswordManagerImportLearnMoreURL[];
 
+// Help URL for password sharing.
+extern const char kPasswordSharingLearnMoreURL[];
+
+// Help URL for troubleshooting password sharing.
+extern const char kPasswordSharingTroubleshootURL[];
+
 // Help URL for the Payment methods page of the Google Pay site.
 extern const char kPaymentMethodsURL[];
 
@@ -244,6 +271,15 @@ extern const char kResetProfileSettingsLearnMoreURL[];
 
 // "Learn more" URL for Safebrowsing
 extern const char kSafeBrowsingHelpCenterURL[];
+
+// Updated "Info icon" URL for Safebrowsing
+extern const char kSafeBrowsingHelpCenterUpdatedURL[];
+
+// "Learn more" URL for Enhanced Protection
+extern const char kSafeBrowsingInChromeHelpCenterURL[];
+
+// The URL of Safe Browsing p-tour.
+extern const char kSafeBrowsingPTourURL[];
 
 // "Learn more" URL for safety tip bubble.
 extern const char kSafetyTipHelpCenterURL[];
@@ -284,6 +320,12 @@ extern const char kSyncTrustedVaultOptInURL[];
 
 // The URL for the "Learn more" link for the trusted vault sync passphrase.
 extern const char kSyncTrustedVaultLearnMoreURL[];
+
+// The URL for the Help Center page about Tracking Protection settings.
+extern const char kTrackingProtectionHelpCenterURL[];
+
+// The URL for the Help Center page about User Bypass.
+extern const char kUserBypassHelpCenterURL[];
 
 extern const char kUpgradeHelpCenterBaseURL[];
 
@@ -402,6 +444,9 @@ extern const char kLinuxAppsLearnMoreURL[];
 // The URL for the "Learn more" link for natural scrolling on ChromeOS.
 extern const char kNaturalScrollHelpURL[];
 
+// The URL for the "Learn more" link for scrolling acceleration on ChromeOS.
+extern const char kControlledScrollingHelpURL[];
+
 // The URL for the "Learn more" link for touchpad haptic feedback on Chrome OS.
 extern const char kHapticFeedbackHelpURL[];
 
@@ -448,6 +493,12 @@ extern const char kSmartPrivacySettingsLearnMoreURL[];
 
 // The URL for the "Learn more" page for the network file shares settings page.
 extern const char kSmbSharesLearnMoreURL[];
+
+// The URL for the "Learn more" page when the user tries to clean up their
+// Google Drive offline storage in the OS settings page.
+extern const char kGoogleDriveCleanUpStorageLearnMoreURL[];
+
+extern const char kGoogleDriveOfflineLearnMoreURL[];
 
 // The URL for the "Learn more" page for Speak-on-mute Detection in the privacy
 // hub page.

@@ -10,20 +10,21 @@
 import {assertInstanceof, assertNotReached} from 'chrome://resources/ash/common/assert.js';
 
 import {getMimeType, startIOTask} from '../../common/js/api.js';
-import {metrics} from '../../common/js/metrics.js';
+import {type AnnotatedTask, getDefaultTask} from '../../common/js/file_tasks.js';
+import {recordDirectoryListLoadWithTolerance, startInterval} from '../../common/js/metrics.js';
 import {str, strf, util} from '../../common/js/util.js';
 import {Crostini} from '../../externs/background/crostini.js';
 import {ProgressCenter} from '../../externs/background/progress_center.js';
 import {FilesAppDirEntry, FilesAppEntry} from '../../externs/files_app_entry_interfaces.js';
 import {FileData, FileKey, FileTasks as StoreFileTasks, PropStatus, State} from '../../externs/ts/state.js';
 import {VolumeManager} from '../../externs/volume_manager.js';
-import {fetchFileTasks} from '../../state/actions_producers/current_directory.js';
-import {getFilesData, getStore, Store, waitForState} from '../../state/store.js';
-import {FilesPasswordDialog} from '../elements/files_password_dialog.js';
+import {fetchFileTasks} from '../../state/ducks/current_directory.js';
+import {getFilesData, getStore, type Store, waitForState} from '../../state/store.js';
+import {XfPasswordDialog} from '../../widgets/xf_password_dialog.js';
 
 import {DirectoryModel} from './directory_model.js';
 import {FileSelection, FileSelectionHandler} from './file_selection.js';
-import {AnnotatedTask, FileTasks, getDefaultTask, TaskPickerType} from './file_tasks.js';
+import {FileTasks, TaskPickerType} from './file_tasks.js';
 import {FileTransferController} from './file_transfer_controller.js';
 import {MetadataModel} from './metadata/metadata_model.js';
 import {MetadataUpdateController} from './metadata_update_controller.js';
@@ -93,21 +94,20 @@ export class TaskController {
   onStateChanged(newState: State) {
     const keys = newState.currentDirectory?.selection.keys ?? [];
     const tasks = newState.currentDirectory?.selection.fileTasks;
+    // If the selection changed.
     if (keys !== this.selectionKeys_ &&
         (keys.length > 0 || this.selectionKeys_.length > 0)) {
       this.selectionKeys_ = keys;
       this.selectionFilesData_ = getFilesData(newState, keys ?? []);
       // Kickoff the async/ActionsProducer to fetch the tasks for the new
-      // selection.
+      // selection. If the new selection is empty, still need to update the
+      // store so no old file task lingers.
       this.tasks_ = null;
-      // Only fetch if there is anything to fetch.
-      if (keys.length > 0) {
-        this.store_.dispatch(fetchFileTasks(this.selectionFilesData_));
-      }
+      this.store_.dispatch(fetchFileTasks(this.selectionFilesData_));
       // Hides the button while fetching the tasks.
       this.maybeHideButton();
     }
-
+    // If the file tasks changed.
     if (tasks !== this.selectionTasks_) {
       this.selectionTasks_ = tasks;
       if (tasks?.status === PropStatus.SUCCESS) {
@@ -419,7 +419,7 @@ export class TaskController {
 
     try {
       const metricName = 'UpdateAvailableApps';
-      metrics.startInterval(metricName);
+      startInterval(metricName);
       const tasks = await this.getFileTasks();
       // Update the DOM.
       this.display_(tasks);
@@ -429,7 +429,7 @@ export class TaskController {
       if (window.IN_TEST) {
         this.ui_.taskMenuButton.toggleAttribute('get-tasks-completed', true);
       }
-      metrics.recordDirectoryListLoadWithTolerance(
+      recordDirectoryListLoadWithTolerance(
           metricName, openTaskItems.length, [10, 100], /*tolerance=*/ 0.8);
     } catch (error: any) {
       if (error) {
@@ -629,7 +629,7 @@ export class TaskController {
     let password: string|null = null;
     // Ask for password.
     try {
-      const dialog = this.ui_.passwordDialog as FilesPasswordDialog;
+      const dialog = this.ui_.passwordDialog as XfPasswordDialog;
       password = await dialog.askForPassword(entry.fullPath, password);
     } catch (error) {
       console.warn('User cancelled password fetch ', error);

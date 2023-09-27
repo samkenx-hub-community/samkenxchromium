@@ -15,9 +15,10 @@
 #include "gpu/command_buffer/service/skia_utils.h"
 #include "third_party/skia/include/core/SkCanvas.h"
 #include "third_party/skia/include/core/SkColorSpace.h"
-#include "third_party/skia/include/core/SkPromiseImageTexture.h"
+#include "third_party/skia/include/gpu/GpuTypes.h"
 #include "third_party/skia/include/gpu/GrDirectContext.h"
 #include "third_party/skia/include/gpu/ganesh/SkSurfaceGanesh.h"
+#include "third_party/skia/include/private/chromium/GrPromiseImageTexture.h"
 
 namespace gpu {
 
@@ -75,25 +76,25 @@ class RawDrawImageBacking::SkiaRawDrawImageRepresentation
       const gfx::Rect& update_rect,
       std::vector<GrBackendSemaphore>* begin_semaphores,
       std::vector<GrBackendSemaphore>* end_semaphores,
-      std::unique_ptr<GrBackendSurfaceMutableState>* end_state) override {
+      std::unique_ptr<skgpu::MutableTextureState>* end_state) override {
     NOTIMPLEMENTED();
     return {};
   }
 
-  std::vector<sk_sp<SkPromiseImageTexture>> BeginWriteAccess(
+  std::vector<sk_sp<GrPromiseImageTexture>> BeginWriteAccess(
       std::vector<GrBackendSemaphore>* begin_semaphores,
       std::vector<GrBackendSemaphore>* end_semaphores,
-      std::unique_ptr<GrBackendSurfaceMutableState>* end_state) override {
+      std::unique_ptr<skgpu::MutableTextureState>* end_state) override {
     NOTIMPLEMENTED();
     return {};
   }
 
   void EndWriteAccess() override { NOTIMPLEMENTED(); }
 
-  std::vector<sk_sp<SkPromiseImageTexture>> BeginReadAccess(
+  std::vector<sk_sp<GrPromiseImageTexture>> BeginReadAccess(
       std::vector<GrBackendSemaphore>* begin_semaphores,
       std::vector<GrBackendSemaphore>* end_semaphores,
-      std::unique_ptr<GrBackendSurfaceMutableState>* end_state) override {
+      std::unique_ptr<skgpu::MutableTextureState>* end_state) override {
     auto promise_texture = raw_draw_backing()->BeginSkiaReadAccess();
     if (!promise_texture)
       return {};
@@ -194,14 +195,14 @@ bool RawDrawImageBacking::CreateBackendTextureAndFlushPaintOps(bool flush) {
   GrDirectContext* direct_context = context_state_->gr_context();
   CHECK(direct_context);
   backend_texture_ = direct_context->createBackendTexture(
-      size().width(), size().height(), sk_color, GrMipMapped::kNo,
+      size().width(), size().height(), sk_color, skgpu::Mipmapped::kNo,
       GrRenderable::kYes, GrProtected::kNo, label);
   if (!backend_texture_.isValid()) {
     DLOG(ERROR) << "createBackendTexture() failed with SkColorType:"
                 << sk_color;
     return false;
   }
-  promise_texture_ = SkPromiseImageTexture::Make(backend_texture_);
+  promise_texture_ = GrPromiseImageTexture::Make(backend_texture_);
 
   auto surface = SkSurfaces::WrapBackendTexture(
       direct_context, backend_texture_, surface_origin(), final_msaa_count_,
@@ -222,7 +223,7 @@ bool RawDrawImageBacking::CreateBackendTextureAndFlushPaintOps(bool flush) {
   }
 
   if (flush) {
-    direct_context->flush(surface);
+    direct_context->flush(surface.get());
   } else {
     // For a MSAA SkSurface, if gr_context->flush() is called, all draws on the
     // SkSurface will be flush into a temp MSAA buffer, but the it will not
@@ -352,7 +353,7 @@ cc::PaintOpBuffer* RawDrawImageBacking::BeginRasterReadAccess(
   return base::OptionalToPtr(paint_op_buffer_);
 }
 
-sk_sp<SkPromiseImageTexture> RawDrawImageBacking::BeginSkiaReadAccess() {
+sk_sp<GrPromiseImageTexture> RawDrawImageBacking::BeginSkiaReadAccess() {
   DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
   AutoLock auto_lock(this);
   if (!backend_texture_.isValid() &&

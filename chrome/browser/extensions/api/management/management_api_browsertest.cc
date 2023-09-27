@@ -32,14 +32,13 @@
 #include "extensions/browser/extension_host_test_helper.h"
 #include "extensions/browser/extension_prefs.h"
 #include "extensions/browser/extension_registry.h"
-#include "extensions/browser/notification_types.h"
 #include "extensions/common/extension_builder.h"
 #include "extensions/common/extension_id.h"
 #include "extensions/test/extension_test_message_listener.h"
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
 #include "chrome/browser/ash/login/demo_mode/demo_session.h"
-#include "chrome/browser/ash/login/demo_mode/demo_setup_test_utils.h"
+#include "chrome/browser/ash/login/demo_mode/demo_mode_test_utils.h"
 #endif
 
 namespace keys = extension_management_api_constants;
@@ -265,15 +264,7 @@ IN_PROC_BROWSER_TEST_P(ExtensionManagementApiTestWithBackgroundType,
 
 #endif  // !BUILDFLAG(IS_CHROMEOS_LACROS)
 
-// TODO(crbug.com/1446968): The service worker version is flaky.
-using ExtensionManagementApiBackgroundPageTest =
-    ExtensionManagementApiTestWithBackgroundType;
-
-INSTANTIATE_TEST_SUITE_P(BackgroundPage,
-                         ExtensionManagementApiBackgroundPageTest,
-                         ::testing::Values(ContextType::kPersistentBackground));
-
-IN_PROC_BROWSER_TEST_P(ExtensionManagementApiBackgroundPageTest,
+IN_PROC_BROWSER_TEST_P(ExtensionManagementApiTestWithBackgroundType,
                        SelfUninstall) {
   // Wait for the helper script to finish before loading the primary
   // extension. This ensures that the onUninstall event listener is
@@ -288,8 +279,7 @@ IN_PROC_BROWSER_TEST_P(ExtensionManagementApiBackgroundPageTest,
   ASSERT_TRUE(listener2.WaitUntilSatisfied());
 }
 
-// TODO(crbug.com/1446968): The service worker version is flaky.
-IN_PROC_BROWSER_TEST_P(ExtensionManagementApiBackgroundPageTest,
+IN_PROC_BROWSER_TEST_P(ExtensionManagementApiTestWithBackgroundType,
                        SelfUninstallNoPermissions) {
   // Wait for the helper script to finish before loading the primary
   // extension. This ensures that the onUninstall event listener is

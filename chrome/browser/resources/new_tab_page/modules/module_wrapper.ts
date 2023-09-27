@@ -41,7 +41,6 @@ export class ModuleWrapperElement extends PolymerElement {
         observer: 'onModuleChange_',
         type: Object,
       },
-
       modulesRedesignedEnabled_: {
         type: Boolean,
         value: () => loadTimeData.getBoolean('modulesRedesignedEnabled'),

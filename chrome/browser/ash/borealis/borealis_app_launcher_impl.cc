@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 #include "chrome/browser/ash/borealis/borealis_app_launcher_impl.h"
 
+#include "ash/constants/ash_features.h"
 #include "base/functional/bind.h"
 #include "chrome/browser/ash/borealis/borealis_app_launcher.h"
 #include "chrome/browser/ash/borealis/borealis_context.h"
@@ -12,7 +13,9 @@
 #include "chrome/browser/ash/profiles/profile_helper.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/views/borealis/borealis_installer_view.h"
+#include "chrome/browser/ui/views/borealis/borealis_launch_error_dialog.h"
 #include "chrome/browser/ui/views/borealis/borealis_splash_screen_view.h"
+#include "chrome/browser/ui/webui/ash/borealis_installer/borealis_installer_dialog.h"
 
 namespace borealis {
 BorealisAppLauncherImpl::~BorealisAppLauncherImpl() = default;
@@ -31,7 +34,11 @@ void BorealisAppLauncherImpl::Launch(std::string app_id,
   if (!borealis::BorealisService::GetForProfile(profile_)
            ->Features()
            .IsEnabled()) {
-    borealis::ShowBorealisInstallerView(profile_);
+    if (base::FeatureList::IsEnabled(ash::features::kBorealisWebUIInstaller)) {
+      ash::BorealisInstallerDialog::Show(profile_);
+    } else {
+      borealis::ShowBorealisInstallerView(profile_);
+    }
     std::move(callback).Run(LaunchResult::kSuccess);
     return;
   }
@@ -42,7 +49,8 @@ void BorealisAppLauncherImpl::Launch(std::string app_id,
   }
   BorealisService::GetForProfile(profile_)->ContextManager().StartBorealis(
       base::BindOnce(
-          [](std::string app_id, const std::vector<std::string>& args,
+          [](Profile* profile, std::string app_id,
+             const std::vector<std::string>& args,
              BorealisAppLauncherImpl::OnLaunchedCallback callback,
              BorealisContextManager::ContextOrFailure result) {
             if (!result.has_value()) {
@@ -52,13 +60,15 @@ void BorealisAppLauncherImpl::Launch(std::string app_id,
               // If splash screen is showing and borealis did not launch
               // properly, close it.
               borealis::CloseBorealisSplashScreenView();
+              views::borealis::ShowBorealisLaunchErrorView(
+                  profile, result.error().error());
               std::move(callback).Run(LaunchResult::kError);
               return;
             }
             BorealisAppLauncher::Launch(*result.value(), std::move(app_id),
                                         std::move(args), std::move(callback));
           },
-          std::move(app_id), std::move(args), std::move(callback)));
+          profile_, std::move(app_id), std::move(args), std::move(callback)));
 }
 
 }  // namespace borealis

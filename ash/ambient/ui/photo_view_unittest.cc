@@ -6,10 +6,12 @@
 
 #include "ash/ambient/ambient_constants.h"
 #include "ash/ambient/ambient_controller.h"
+#include "ash/ambient/ambient_ui_settings.h"
 #include "ash/ambient/test/ambient_ash_test_base.h"
 #include "ash/ambient/ui/ambient_container_view.h"
 #include "ash/assistant/ui/assistant_view_ids.h"
 #include "ash/public/cpp/ambient/proto/photo_cache_entry.pb.h"
+#include "ash/webui/personalization_app/mojom/personalization_app.mojom-shared.h"
 #include "ui/display/manager/display_manager.h"
 #include "ui/display/test/display_manager_test_api.h"
 #include "ui/gfx/geometry/rect.h"
@@ -18,7 +20,13 @@
 
 namespace ash {
 
-using AmbientPhotoViewTest = AmbientAshTestBase;
+class AmbientPhotoViewTest : public AmbientAshTestBase {
+ protected:
+  void SetUp() override {
+    AmbientAshTestBase::SetUp();
+    SetAmbientTheme(personalization_app::mojom::AmbientTheme::kSlideshow);
+  }
+};
 
 // Test that a new topic s rendered every cycle.
 TEST_F(AmbientPhotoViewTest, ShouldRefreshImagesEveryCycle) {

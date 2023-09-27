@@ -8,13 +8,13 @@
 
 #include "ash/app_list/app_list_util.h"
 #include "ash/style/style_util.h"
-#include "chrome/app/vector_icons/vector_icons.h"
 #include "chrome/browser/ash/arc/input_overlay/arc_input_overlay_uma.h"
 #include "chrome/browser/ash/arc/input_overlay/display_overlay_controller.h"
 #include "chrome/browser/ash/arc/input_overlay/touch_injector.h"
 #include "chrome/browser/ash/arc/input_overlay/util.h"
 #include "chrome/grit/generated_resources.h"
 #include "chromeos/strings/grit/chromeos_strings.h"
+#include "chromeos/ui/vector_icons/vector_icons.h"
 #include "components/vector_icons/vector_icons.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/color/color_id.h"
@@ -159,12 +159,12 @@ void MenuEntryView::Init() {
 
   SetImageModel(
       views::Button::STATE_NORMAL,
-      ui::ImageModel::FromVectorIcon(kGameControlsGamepadIcon, SK_ColorBLACK,
-                                     kMenuEntryIconSize));
+      ui::ImageModel::FromVectorIcon(chromeos::kGameDashboardGamepadIcon,
+                                     SK_ColorBLACK, kMenuEntryIconSize));
   SetImageHorizontalAlignment(views::ImageButton::ALIGN_CENTER);
   SetImageVerticalAlignment(views::ImageButton::ALIGN_MIDDLE);
 
-  // Set up focus ring for |menu_entry_|.
+  // Set up focus ring for `menu_entry_`.
   views::InstallRoundRectHighlightPathGenerator(this, gfx::Insets(),
                                                 kMenuEntryCornerRadius);
   ash::StyleUtil::SetUpInkDropForButton(this, gfx::Insets(),
@@ -183,7 +183,7 @@ gfx::Point MenuEntryView::CalculatePosition() const {
   const auto* touch_injector = display_overlay_controller_->touch_injector();
   auto normalized_location = touch_injector->menu_entry_location();
   if (normalized_location) {
-    auto content_bounds = touch_injector->content_bounds();
+    auto content_bounds = touch_injector->content_bounds_f();
     return gfx::Point(static_cast<int>(std::round(normalized_location->x() *
                                                   content_bounds.width())),
                       static_cast<int>(std::round(normalized_location->y() *

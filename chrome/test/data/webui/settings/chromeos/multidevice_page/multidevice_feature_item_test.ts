@@ -29,7 +29,6 @@ suite('<settings-multidevice-feature-item>', () => {
       mode: MultiDeviceSettingsMode.NO_HOST_SET,
       hostDeviceName: undefined,
       instantTetheringState: MultiDeviceFeatureState.DISABLED_BY_USER,
-      messagesState: MultiDeviceFeatureState.ENABLED_BY_USER,
       smartLockState: MultiDeviceFeatureState.ENABLED_BY_USER,
       phoneHubState: MultiDeviceFeatureState.DISABLED_BY_USER,
       phoneHubCameraRollState: MultiDeviceFeatureState.DISABLED_BY_USER,
@@ -37,7 +36,6 @@ suite('<settings-multidevice-feature-item>', () => {
       phoneHubTaskContinuationState: MultiDeviceFeatureState.DISABLED_BY_USER,
       phoneHubAppsState: MultiDeviceFeatureState.DISABLED_BY_USER,
       wifiSyncState: MultiDeviceFeatureState.DISABLED_BY_USER,
-      isAndroidSmsPairingComplete: true,
       cameraRollAccessStatus:
           PhoneHubFeatureAccessStatus.AVAILABLE_BUT_NOT_GRANTED,
       notificationAccessStatus: PhoneHubFeatureAccessStatus.ACCESS_GRANTED,
@@ -89,8 +87,8 @@ suite('<settings-multidevice-feature-item>', () => {
     crToggle = featureToggle.$.toggle;
 
     initialRoute = routes.MULTIDEVICE_FEATURES;
-    const FREE_CANDY = routes.BASIC.createSection('/freeCandy', 'freeCandy');
-    featureItem.subpageRoute = FREE_CANDY;
+    const dummyRoute = new Route('/freeCandy');
+    featureItem.subpageRoute = dummyRoute;
 
     resetFeatureData();
     Router.getInstance().navigateTo(initialRoute);

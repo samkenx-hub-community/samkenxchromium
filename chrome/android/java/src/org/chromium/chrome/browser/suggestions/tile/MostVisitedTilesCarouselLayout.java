@@ -21,7 +21,6 @@ import org.chromium.components.browser_ui.widget.tile.TileView;
  */
 public class MostVisitedTilesCarouselLayout extends LinearLayout implements MostVisitedTilesLayout {
     // There's a minimum limit of 4.
-    private static final int MIN_RESULTS = 4;
 
     private int mTileViewWidth;
     private int mTileViewMinIntervalPaddingTablet;
@@ -29,7 +28,10 @@ public class MostVisitedTilesCarouselLayout extends LinearLayout implements Most
     private Integer mInitialTileNum;
     private Integer mIntervalPaddingsLandscapeTablet;
     private Integer mIntervalPaddingsPortraitTablet;
-    private boolean mIsMultiColumnFeedOnTabletEnabled;
+    private boolean mIsNtpAsHomeSurfaceEnabled;
+    private boolean mIsSurfacePolishEnabled;
+    private Integer mIntervalPaddingsTabletForPolish;
+    private Integer mEdgePaddingsTabletForPolish;
 
     /**
      * Constructor for inflating from XML.
@@ -43,6 +45,10 @@ public class MostVisitedTilesCarouselLayout extends LinearLayout implements Most
                 org.chromium.chrome.R.dimen.tile_carousel_layout_min_interval_margin_tablet);
         mTileViewMaxIntervalPaddingTablet = getResources().getDimensionPixelOffset(
                 org.chromium.chrome.R.dimen.tile_carousel_layout_max_interval_margin_tablet);
+        mIntervalPaddingsTabletForPolish = getResources().getDimensionPixelSize(
+                org.chromium.chrome.R.dimen.tile_view_padding_interval_tablet_polish);
+        mEdgePaddingsTabletForPolish = getResources().getDimensionPixelSize(
+                org.chromium.chrome.R.dimen.tile_view_padding_edge_tablet_polish);
     }
 
     void setIntervalPaddings(int padding) {
@@ -88,7 +94,6 @@ public class MostVisitedTilesCarouselLayout extends LinearLayout implements Most
     }
 
     @Nullable
-    @VisibleForTesting
     public SuggestionsTileView findTileViewForTesting(SiteSuggestion suggestion) {
         int childCount = getChildCount();
         for (int i = 0; i < childCount; i++) {
@@ -109,6 +114,27 @@ public class MostVisitedTilesCarouselLayout extends LinearLayout implements Most
         } else if (!isOrientationLandscape && mIntervalPaddingsPortraitTablet != null) {
             setIntervalPaddings(mIntervalPaddingsPortraitTablet);
         }
+    }
+
+    /**
+     * Adjusts the edge margin of the tile elements when they are displayed in the center of the NTP
+     * on the tablet.
+     * @param totalWidth The width of the mv tiles container.
+     */
+    void updateEdgeMarginTablet(int totalWidth) {
+        boolean isFullFilled = totalWidth - mTileViewWidth * mInitialTileNum
+                        - mIntervalPaddingsTabletForPolish * (mInitialTileNum - 1)
+                        - 2 * mEdgePaddingsTabletForPolish
+                >= 0;
+        if (!isFullFilled) {
+            return;
+        }
+
+        int currentNum = getChildCount();
+        int edgeMargin = (totalWidth - mTileViewWidth * currentNum
+                                 - mIntervalPaddingsTabletForPolish * (currentNum - 1))
+                / 2;
+        setEdgePaddings(edgeMargin);
     }
 
     /**
@@ -133,11 +159,10 @@ public class MostVisitedTilesCarouselLayout extends LinearLayout implements Most
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        if (mIsMultiColumnFeedOnTabletEnabled) {
-            if (mInitialTileNum == null) {
-                mInitialTileNum = getChildCount();
-            }
-
+        if (mInitialTileNum == null) {
+            mInitialTileNum = getChildCount();
+        }
+        if (mIsNtpAsHomeSurfaceEnabled && !mIsSurfacePolishEnabled) {
             int currentOrientation = getResources().getConfiguration().orientation;
             if ((currentOrientation == Configuration.ORIENTATION_LANDSCAPE
                         && mIntervalPaddingsLandscapeTablet == null)
@@ -155,36 +180,39 @@ public class MostVisitedTilesCarouselLayout extends LinearLayout implements Most
                 setIntervalPaddings(tileViewIntervalPadding);
             }
         }
+
+        if (mIsNtpAsHomeSurfaceEnabled && mIsSurfacePolishEnabled) {
+            updateEdgeMarginTablet(widthMeasureSpec);
+        }
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
     }
 
     @Override
-    public void setIsMultiColumnFeedOnTabletEnabled(boolean isMultiColumnFeedOnTabletEnabled) {
-        mIsMultiColumnFeedOnTabletEnabled = isMultiColumnFeedOnTabletEnabled;
+    public void setIsNtpAsHomeSurfaceEnabled(boolean isNtpAsHomeSurfaceEnabled) {
+        mIsNtpAsHomeSurfaceEnabled = isNtpAsHomeSurfaceEnabled;
     }
 
-    @VisibleForTesting
-    boolean getIsMultiColumnFeedOnTabletEnabledForTesting() {
-        return mIsMultiColumnFeedOnTabletEnabled;
+    public void setIsSurfacePolishEnabled(boolean isSurfacePolishEnabled) {
+        mIsSurfacePolishEnabled = isSurfacePolishEnabled;
     }
 
-    @VisibleForTesting
+    boolean getIsNtpAsHomeSurfaceEnabledForTesting() {
+        return mIsNtpAsHomeSurfaceEnabled;
+    }
+
     public void setInitialTileNumForTesting(int initialTileNum) {
         mInitialTileNum = initialTileNum;
     }
 
-    @VisibleForTesting
     public void setTileViewWidthForTesting(int tileViewWidth) {
         mTileViewWidth = tileViewWidth;
     }
 
-    @VisibleForTesting
     public void setTileViewMinIntervalPaddingTabletForTesting(
             int tileViewMinIntervalPaddingTablet) {
         mTileViewMinIntervalPaddingTablet = tileViewMinIntervalPaddingTablet;
     }
 
-    @VisibleForTesting
     public void setTileViewMaxIntervalPaddingTabletForTesting(
             int tileViewMaxIntervalPaddingTablet) {
         mTileViewMaxIntervalPaddingTablet = tileViewMaxIntervalPaddingTablet;

@@ -7,6 +7,7 @@
 #include <string>
 #include <utility>
 
+#include "ash/constants/ash_features.h"
 #include "ash/constants/ash_switches.h"
 #include "base/check.h"
 #include "base/command_line.h"
@@ -15,8 +16,10 @@
 #include "base/memory/weak_ptr.h"
 #include "chrome/browser/ash/accessibility/accessibility_manager.h"
 #include "chrome/browser/ash/login/chrome_restart_request.h"
+#include "chrome/browser/ash/shimless_rma/diagnostics_app_profile_helper.h"
 #include "chrome/browser/ash/system/device_disabling_manager.h"
 #include "chrome/browser/ui/webui/ash/diagnostics_dialog.h"
+#include "chrome/common/chromeos/extensions/chromeos_system_extension_info.h"
 #include "chrome/services/qrcode_generator/public/cpp/qrcode_generator_service.h"
 #include "chrome/services/qrcode_generator/public/mojom/qrcode_generator.mojom.h"
 #include "content/public/browser/web_ui.h"
@@ -95,6 +98,26 @@ void ChromeShimlessRmaDelegate::SetQRCodeServiceForTesting(
              qrcode_generator::QRImageGenerator::ResponseCallback callback)>
         qrcode_service_override) {
   qrcode_service_override_ = std::move(qrcode_service_override);
+}
+
+void ChromeShimlessRmaDelegate::PrepareDiagnosticsAppBrowserContext(
+    const base::FilePath& crx_path,
+    const base::FilePath& swbn_path,
+    PrepareDiagnosticsAppBrowserContextCallback callback) {
+  CHECK(::ash::features::IsShimlessRMA3pDiagnosticsEnabled());
+  PrepareDiagnosticsAppProfile(diagnostics_app_profile_helper_delegete_ptr_,
+                               crx_path, swbn_path, std::move(callback));
+}
+
+bool ChromeShimlessRmaDelegate::IsChromeOSSystemExtensionProvider(
+    const std::string& manufacturer) {
+  return chromeos::IsChromeOSSystemExtensionProvider(manufacturer);
+}
+
+void ChromeShimlessRmaDelegate::
+    SetDiagnosticsAppProfileHelperDelegateForTesting(
+        DiagnosticsAppProfileHelperDelegate* delegate) {
+  diagnostics_app_profile_helper_delegete_ptr_ = delegate;
 }
 
 }  // namespace shimless_rma

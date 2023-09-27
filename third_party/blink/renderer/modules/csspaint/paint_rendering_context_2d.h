@@ -16,7 +16,6 @@
 
 namespace blink {
 
-class CanvasImageSource;
 class Color;
 
 // In our internal implementation, there are different kinds of canvas such as
@@ -52,7 +51,6 @@ class MODULES_EXPORT PaintRenderingContext2D : public ScriptWrappable,
   // is always clean, and unable to taint it.
   bool OriginClean() const final { return true; }
   void SetOriginTainted() final {}
-  bool WouldTaintOrigin(CanvasImageSource*) final { return false; }
 
   int Width() const final;
   int Height() const final;
@@ -73,7 +71,6 @@ class MODULES_EXPORT PaintRenderingContext2D : public ScriptWrappable,
   void setShadowBlur(double) final;
 
   sk_sp<PaintFilter> StateGetFilter() final;
-  void SnapshotStateForFilter() final {}
 
   bool HasAlpha() const final { return context_settings_->alpha(); }
 
@@ -83,7 +80,6 @@ class MODULES_EXPORT PaintRenderingContext2D : public ScriptWrappable,
   // PaintRenderingContext2D uses a recording canvas, so it should never
   // allocate a pixel buffer and is not accelerated.
   bool CanCreateCanvas2dResourceProvider() const final { return false; }
-  bool IsAccelerated() const final { return false; }
 
   // CSS Paint doesn't have any notion of image orientation.
   RespectImageOrientationEnum RespectImageOrientation() const final {
@@ -93,7 +89,7 @@ class MODULES_EXPORT PaintRenderingContext2D : public ScriptWrappable,
   DOMMatrix* getTransform() final;
   void resetTransform() final;
 
-  void FlushCanvas(CanvasResourceProvider::FlushReason) final {}
+  void FlushCanvas(FlushReason) final {}
 
   PaintRecord GetRecord();
 

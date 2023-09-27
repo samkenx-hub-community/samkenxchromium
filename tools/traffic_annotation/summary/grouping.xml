@@ -28,7 +28,6 @@ after discussions on the right group.
       <annotation id="minidump_uploader_android"/>
       <annotation id="oma_download_handler_android"/>
       <annotation id="partner_bookmarks_reader_get_favicon"/>
-      <annotation id="permission_request_creator"/>
       <annotation id="rlz"/>
       <annotation id="webapk_create"/>
       <annotation id="webapk_create_for_service"/>
@@ -98,21 +97,17 @@ after discussions on the right group.
       <annotation id="printing_oauth2_token_exchange_request"/>
       <annotation id="printing_server_printers_query"/>
     </sender>
-    <sender name="Device Activity">
-      <annotation id="device_activity_client_health_check"/>
-      <annotation id="device_activity_client_check_membership"/>
-      <annotation id="device_activity_client_check_in"/>
+    <sender name="Report using PSM">
+      <annotation id="report_check_membership"/>
+      <annotation id="report_check_in"/>
     </sender>
+    <sender name="Device Activity"/>
     <sender name="Enhanced Network TTS">
       <annotation id="enhanced_network_tts"/>
     </sender>
   </group>
   <group name="Unsorted" hidden="true">
     <sender name="Unsorted Sender">
-      <annotation id="auction_downloader"/>
-      <annotation id="auction_report_sender"/>
-      <annotation id="interest_group_update_fetcher"/>
-      <annotation id="interest_group_well_known_fetcher"/>
       <annotation id="shared_storage_worklet_module_script_downloader"/>
       <annotation id="proxy_config_windows_resolver"/>
       <annotation id="remoting_directory_delete_host"/>
@@ -228,9 +223,6 @@ after discussions on the right group.
       <annotation id="download_bubble_retry_download"/>
       <annotation id="quick_answers_loader"/>
       <annotation id="chrome_search_suggest_service"/>
-      <annotation id="chrome_commerce_subscriptions_create"/>
-      <annotation id="chrome_commerce_subscriptions_delete"/>
-      <annotation id="chrome_commerce_subscriptions_get"/>
       <annotation id="cryptauth_get_my_devices"/>
       <annotation id="chrome_commerce_waa_fetcher"/>
       <annotation id="shopping_list_ui_image_fetcher"/>
@@ -289,6 +281,18 @@ after discussions on the right group.
       <annotation id="crash_file_uploader"/>
       <annotation id="glanceables_classroom_integration"/>
       <annotation id="promise_app_service_download_icon"/>
+      <annotation id="ip_protection_service_get_token"/>
+      <annotation id="supervised_user_request_blocked_site_permission"/>
+      <annotation id="password_sharing_recipients"/>
+      <annotation id="page_insights"/>
+      <annotation id="ntp_image_url_verification"/>
+      <annotation id="passkey_enclave_client"/>
+      <annotation id="iwa_update_discovery_update_manifest"/>
+      <annotation id="iwa_update_discovery_web_bundle"/>
+      <annotation id="almanac_launcher_app"/>
+      <annotation id="ip_protection_service_get_proxy_config"/>
+      <annotation id="plus_address_creation"/>
+      <annotation id="get_all_plus_addresses"/>
     </sender>
   </group>
   <group name="Admin Features" hidden="true">
@@ -305,9 +309,7 @@ after discussions on the right group.
     </sender>
   </group>
   <group name="Apps and Content" hidden="true">
-    <sender name="Chrome Cleanup">
-      <annotation id="chrome_cleaner"/>
-    </sender>
+    <sender name="Chrome Cleanup"/>
     <sender name="Extension and App Management">
       <annotation id="chrome_apps_socket_api"/>
       <annotation id="extension_blacklist"/>
@@ -357,6 +359,19 @@ after discussions on the right group.
       <annotation id="tailored_security_service"/>
     </sender>
   </group>
+  <group name="Chrome Commerce" hidden="true">
+    <sender name="Parcel Tracking">
+      <annotation id="chrome_commerce_parcels_status"/>
+      <annotation id="chrome_commerce_start_tracking_parcel"/>
+      <annotation id="chrome_commerce_stop_tracking_parcel"/>
+      <annotation id="chrome_commerce_stop_tracking_all_parcel"/>
+    </sender>
+    <sender name="Subscription">
+      <annotation id="chrome_commerce_subscriptions_create"/>
+      <annotation id="chrome_commerce_subscriptions_delete"/>
+      <annotation id="chrome_commerce_subscriptions_get"/>
+    </sender>
+  </group>
   <group name="Cookieless Ads" hidden="true">
     <sender name="Conversion Measurements">
       <annotation id="conversion_measurement_report"/>
@@ -365,11 +380,19 @@ after discussions on the right group.
       <annotation id="aggregation_service_helper_keys"/>
       <annotation id="aggregation_service_report"/>
     </sender>
+    <sender name="Protected Audiences">
+      <annotation id="auction_downloader"/>
+      <annotation id="auction_report_sender"/>
+      <annotation id="bidding_and_auction_server_key_fetch"/>
+      <annotation id="interest_group_update_fetcher"/>
+      <annotation id="interest_group_well_known_fetcher"/>
+    </sender>
   </group>
   <group name="Identity and Security" hidden="true">
     <sender name="Accounts, Identity, and Authentication">
       <annotation id="accounts_image_fetcher"/>
       <annotation id="affiliation_lookup_by_hash"/>
+      <annotation id="device_bound_session_register"/>
       <annotation id="device_management_service"/>
       <annotation id="lookup_single_password_leak"/>
     </sender>
@@ -378,10 +401,8 @@ after discussions on the right group.
       <annotation id="fedcm_account_profile_image_fetcher"/>
       <annotation id="gaia_auth_check_connection_info"/>
       <annotation id="gaia_auth_exchange_device_id"/>
-      <annotation id="gaia_auth_fetch_for_uber"/>
       <annotation id="gaia_auth_list_accounts"/>
       <annotation id="gaia_auth_log_out"/>
-      <annotation id="gaia_auth_merge_sessions"/>
       <annotation id="gaia_auth_revoke_token"/>
       <annotation id="gaia_auth_rotate_bound_cookies"/>
       <annotation id="gaia_auth_multilogin"/>

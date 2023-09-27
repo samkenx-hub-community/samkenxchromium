@@ -11,13 +11,13 @@
 #include <string>
 #include <utility>
 
+#import "base/apple/foundation_util.h"
 #include "base/containers/flat_map.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/functional/callback_helpers.h"
-#import "base/mac/foundation_util.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/sequence_checker.h"
 #include "base/strings/string_util.h"
@@ -26,14 +26,11 @@
 #include "chrome/updater/constants.h"
 #include "chrome/updater/net/network.h"
 #include "chrome/updater/policy/service.h"
+#include "chrome/updater/util/util.h"
 #include "components/update_client/network.h"
 #import "net/base/mac/url_conversions.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "url/gurl.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 using ResponseStartedCallback =
     update_client::NetworkFetcher::ResponseStartedCallback;
@@ -235,7 +232,7 @@ using DownloadToFileCompleteCallback =
     return;
 
   const base::FilePath tempPath =
-      base::mac::NSStringToFilePath([location path]);
+      base::apple::NSStringToFilePath([location path]);
   _moveTempFileSuccessful = base::Move(tempPath, _filePath);
   if (!_moveTempFileSuccessful) {
     DPLOG(ERROR)
@@ -302,7 +299,7 @@ class NetworkFetcher : public update_client::NetworkFetcher {
       update_client::NetworkFetcher::PostRequestCompleteCallback
           post_request_complete_callback) override;
 
-  void DownloadToFile(
+  base::OnceClosure DownloadToFile(
       const GURL& url,
       const base::FilePath& file_path,
       update_client::NetworkFetcher::ResponseStartedCallback
@@ -347,6 +344,8 @@ void NetworkFetcher::PostRequest(
   urlRequest.HTTPMethod = @"POST";
   urlRequest.HTTPBody = [[NSData alloc] initWithBytes:post_data.c_str()
                                                length:post_data.size()];
+  [urlRequest setValue:base::SysUTF8ToNSString(GetUpdaterUserAgent())
+      forHTTPHeaderField:@"User-Agent"];
   [urlRequest addValue:base::SysUTF8ToNSString(content_type)
       forHTTPHeaderField:@"Content-Type"];
 
@@ -362,7 +361,7 @@ void NetworkFetcher::PostRequest(
   [dataTask resume];
 }
 
-void NetworkFetcher::DownloadToFile(
+base::OnceClosure NetworkFetcher::DownloadToFile(
     const GURL& url,
     const base::FilePath& file_path,
     ResponseStartedCallback response_started_callback,
@@ -386,10 +385,13 @@ void NetworkFetcher::DownloadToFile(
 
   NSMutableURLRequest* urlRequest =
       [[NSMutableURLRequest alloc] initWithURL:net::NSURLWithGURL(url)];
+  [urlRequest setValue:base::SysUTF8ToNSString(GetUpdaterUserAgent())
+      forHTTPHeaderField:@"User-Agent"];
 
   NSURLSessionDownloadTask* downloadTask =
       [session downloadTaskWithRequest:urlRequest];
   [downloadTask resume];
+  return base::DoNothing();
 }
 
 }  // namespace

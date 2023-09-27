@@ -116,7 +116,9 @@ TEST_F(NetworkDetailedNetworkViewPixelTest, Basics) {
       ->unified_system_tray_controller()
       ->ShowNetworkDetailedView(/*force=*/true);
   TrayDetailedView* detailed_view =
-      system_tray->bubble()->quick_settings_view()->GetDetailedViewForTest();
+      system_tray->bubble()
+          ->quick_settings_view()
+          ->GetDetailedViewForTest<TrayDetailedView>();
   ASSERT_TRUE(detailed_view);
   ASSERT_TRUE(
       views::IsViewClass<NetworkDetailedNetworkViewImpl>(detailed_view));
@@ -129,11 +131,12 @@ TEST_F(NetworkDetailedNetworkViewPixelTest, Basics) {
   ASSERT_TRUE(scroll_contents);
   ASSERT_TRUE(scroll_contents->children().empty());
   ChildAddedWaiter(scroll_contents).Wait();
+  ASSERT_FALSE(scroll_contents->children().empty());
 
   // Compare pixels.
   EXPECT_TRUE(GetPixelDiffer()->CompareUiComponentsOnPrimaryScreen(
       "check_view",
-      /*revision_number=*/0, detailed_view));
+      /*revision_number=*/6, detailed_view));
 }
 
 }  // namespace

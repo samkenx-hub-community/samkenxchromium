@@ -22,12 +22,6 @@ namespace base {
 
 namespace {
 
-const char kWeekdayName[7][4] = {"Sun", "Mon", "Tue", "Wed",
-                                 "Thu", "Fri", "Sat"};
-
-const char kMonthName[12][4] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
-
 TimeTicks g_shared_time_ticks_at_unix_epoch;
 
 }  // namespace
@@ -52,55 +46,6 @@ std::atomic<ThreadTicksNowFunction> g_thread_ticks_now_function{
 }  // namespace internal
 
 // TimeDelta ------------------------------------------------------------------
-
-int TimeDelta::InDays() const {
-  if (!is_inf())
-    return static_cast<int>(delta_ / Time::kMicrosecondsPerDay);
-  return (delta_ < 0) ? std::numeric_limits<int>::min()
-                      : std::numeric_limits<int>::max();
-}
-
-int TimeDelta::InDaysFloored() const {
-  if (!is_inf()) {
-    const int result = delta_ / Time::kMicrosecondsPerDay;
-    // Convert |result| from truncating to flooring.
-    return (result * Time::kMicrosecondsPerDay > delta_) ? (result - 1)
-                                                         : result;
-  }
-  return (delta_ < 0) ? std::numeric_limits<int>::min()
-                      : std::numeric_limits<int>::max();
-}
-
-double TimeDelta::InMillisecondsF() const {
-  if (!is_inf())
-    return static_cast<double>(delta_) / Time::kMicrosecondsPerMillisecond;
-  return (delta_ < 0) ? -std::numeric_limits<double>::infinity()
-                      : std::numeric_limits<double>::infinity();
-}
-
-int64_t TimeDelta::InMilliseconds() const {
-  if (!is_inf())
-    return delta_ / Time::kMicrosecondsPerMillisecond;
-  return (delta_ < 0) ? std::numeric_limits<int64_t>::min()
-                      : std::numeric_limits<int64_t>::max();
-}
-
-int64_t TimeDelta::InMillisecondsRoundedUp() const {
-  if (!is_inf()) {
-    const int64_t result = delta_ / Time::kMicrosecondsPerMillisecond;
-    // Convert |result| from truncating to ceiling.
-    return (delta_ > result * Time::kMicrosecondsPerMillisecond) ? (result + 1)
-                                                                 : result;
-  }
-  return delta_;
-}
-
-double TimeDelta::InMicrosecondsF() const {
-  if (!is_inf())
-    return static_cast<double>(delta_);
-  return (delta_ < 0) ? -std::numeric_limits<double>::infinity()
-                      : std::numeric_limits<double>::infinity();
-}
 
 TimeDelta TimeDelta::CeilToMultiple(TimeDelta interval) const {
   if (is_inf() || interval.is_zero())
@@ -149,74 +94,6 @@ Time Time::NowFromSystemTime() {
   // Just use g_time_now_function because it returns the system time.
   return internal::g_time_now_from_system_time_function.load(
       std::memory_order_relaxed)();
-}
-
-time_t Time::ToTimeT() const {
-  if (is_null())
-    return 0;  // Preserve 0 so we can tell it doesn't exist.
-  if (!is_inf() && ((std::numeric_limits<int64_t>::max() -
-                     kTimeTToMicrosecondsOffset) > us_)) {
-    return static_cast<time_t>((*this - UnixEpoch()).InSeconds());
-  }
-  return (us_ < 0) ? std::numeric_limits<time_t>::min()
-                   : std::numeric_limits<time_t>::max();
-}
-
-// static
-Time Time::FromDoubleT(double dt) {
-  // Preserve 0 so we can tell it doesn't exist.
-  return (dt == 0 || std::isnan(dt)) ? Time() : (UnixEpoch() + Seconds(dt));
-}
-
-double Time::ToDoubleT() const {
-  if (is_null())
-    return 0;  // Preserve 0 so we can tell it doesn't exist.
-  if (!is_inf())
-    return (*this - UnixEpoch()).InSecondsF();
-  return (us_ < 0) ? -std::numeric_limits<double>::infinity()
-                   : std::numeric_limits<double>::infinity();
-}
-
-#if BUILDFLAG(IS_POSIX) || BUILDFLAG(IS_FUCHSIA)
-// static
-Time Time::FromTimeSpec(const timespec& ts) {
-  return FromDoubleT(ts.tv_sec +
-                     static_cast<double>(ts.tv_nsec) / kNanosecondsPerSecond);
-}
-#endif
-
-// static
-Time Time::FromJsTime(double ms_since_epoch) {
-  // The epoch is a valid time, so this constructor doesn't interpret 0 as the
-  // null time.
-  return UnixEpoch() + Milliseconds(ms_since_epoch);
-}
-
-double Time::ToJsTime() const {
-  // Preserve 0 so the invalid result doesn't depend on the platform.
-  return is_null() ? 0 : ToJsTimeIgnoringNull();
-}
-
-double Time::ToJsTimeIgnoringNull() const {
-  // Preserve max and min without offset to prevent over/underflow.
-  if (!is_inf())
-    return (*this - UnixEpoch()).InMillisecondsF();
-  return (us_ < 0) ? -std::numeric_limits<double>::infinity()
-                   : std::numeric_limits<double>::infinity();
-}
-
-Time Time::FromJavaTime(int64_t ms_since_epoch) {
-  return UnixEpoch() + Milliseconds(ms_since_epoch);
-}
-
-int64_t Time::ToJavaTime() const {
-  // Preserve 0 so the invalid result doesn't depend on the platform.
-  if (is_null())
-    return 0;
-  if (!is_inf())
-    return (*this - UnixEpoch()).InMilliseconds();
-  return (us_ < 0) ? std::numeric_limits<int64_t>::min()
-                   : std::numeric_limits<int64_t>::max();
 }
 
 Time Time::Midnight(bool is_local) const {
@@ -310,7 +187,13 @@ int64_t Time::ToRoundedDownMillisecondsSinceUnixEpoch() const {
 std::ostream& operator<<(std::ostream& os, Time time) {
   Time::Exploded exploded;
   time.UTCExplode(&exploded);
-  // Use StringPrintf because iostreams formatting is painful.
+  // Can't call `UnlocalizedTimeFormatWithPattern()`/`TimeFormatAsIso8601()`
+  // since `//base` can't depend on `//base:i18n`. Use `StringPrintf()` because
+  // iostreams formatting is painful.
+  //
+  // TODO(pkasting): Consider whether `operator<<()` should move to
+  // `base/i18n/time_formatting.h` -- would let us implement in terms of
+  // existing time formatting, but might be confusing.
   return os << StringPrintf("%04d-%02d-%02d %02d:%02d:%02d.%03d UTC",
                             exploded.year,
                             exploded.month,
@@ -424,15 +307,6 @@ bool Time::Exploded::HasValidValues() const {
          (0 <= second) && (second <= 60) &&
          (0 <= millisecond) && (millisecond <= 999);
   // clang-format on
-}
-
-std::string TimeFormatHTTP(base::Time time) {
-  base::Time::Exploded exploded;
-  time.UTCExplode(&exploded);
-  return base::StringPrintf(
-      "%s, %02d %s %04d %02d:%02d:%02d GMT", kWeekdayName[exploded.day_of_week],
-      exploded.day_of_month, kMonthName[exploded.month - 1], exploded.year,
-      exploded.hour, exploded.minute, exploded.second);
 }
 
 }  // namespace base

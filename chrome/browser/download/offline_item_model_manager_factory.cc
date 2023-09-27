@@ -4,13 +4,14 @@
 
 #include "chrome/browser/download/offline_item_model_manager_factory.h"
 
-#include "base/memory/singleton.h"
+#include "base/no_destructor.h"
 #include "chrome/browser/download/offline_item_model_manager.h"
 #include "content/public/browser/browser_context.h"
 
 // static
 OfflineItemModelManagerFactory* OfflineItemModelManagerFactory::GetInstance() {
-  return base::Singleton<OfflineItemModelManagerFactory>::get();
+  static base::NoDestructor<OfflineItemModelManagerFactory> instance;
+  return instance.get();
 }
 
 // static
@@ -32,7 +33,8 @@ OfflineItemModelManagerFactory::OfflineItemModelManagerFactory()
 
 OfflineItemModelManagerFactory::~OfflineItemModelManagerFactory() = default;
 
-KeyedService* OfflineItemModelManagerFactory::BuildServiceInstanceFor(
+std::unique_ptr<KeyedService>
+OfflineItemModelManagerFactory::BuildServiceInstanceForBrowserContext(
     content::BrowserContext* context) const {
-  return new OfflineItemModelManager(context);
+  return std::make_unique<OfflineItemModelManager>(context);
 }

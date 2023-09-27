@@ -32,7 +32,10 @@ import org.chromium.chrome.browser.customtabs.CustomTabActivity;
 import org.chromium.chrome.browser.ui.android.webid.AccountSelectionProperties.AccountProperties;
 import org.chromium.chrome.browser.ui.android.webid.AccountSelectionProperties.ContinueButtonProperties;
 import org.chromium.chrome.browser.ui.android.webid.AccountSelectionProperties.DataSharingConsentProperties;
+import org.chromium.chrome.browser.ui.android.webid.AccountSelectionProperties.ErrorProperties;
+import org.chromium.chrome.browser.ui.android.webid.AccountSelectionProperties.GotItButtonProperties;
 import org.chromium.chrome.browser.ui.android.webid.AccountSelectionProperties.HeaderProperties;
+import org.chromium.chrome.browser.ui.android.webid.AccountSelectionProperties.IdpSignInProperties;
 import org.chromium.chrome.browser.ui.android.webid.AccountSelectionProperties.ItemProperties;
 import org.chromium.chrome.browser.ui.android.webid.data.Account;
 import org.chromium.chrome.browser.ui.android.webid.data.IdentityProviderMetadata;
@@ -204,6 +207,62 @@ class AccountSelectionViewBinder {
     }
 
     /**
+     * Called whenever IDP sign in is bound to this view.
+     * @param model The model containing the data for the view.
+     * @param view The view to be bound.
+     * @param key The key of the property to be bound.
+     */
+    static void bindIdpSignInView(PropertyModel model, View view, PropertyKey key) {
+        if (key != IdpSignInProperties.IDP_FOR_DISPLAY) {
+            assert false : "Unhandled update to property: " + key;
+            return;
+        }
+        String idpForDisplay = model.get(IdpSignInProperties.IDP_FOR_DISPLAY);
+        Context context = view.getContext();
+        TextView textView = view.findViewById(R.id.idp_signin);
+        textView.setText(String.format(
+                context.getString(R.string.idp_signin_status_mismatch_dialog_body, idpForDisplay)));
+        textView.setMovementMethod(LinkMovementMethod.getInstance());
+    }
+
+    /**
+     * Called whenever error summary is bound to this view.
+     * @param model The model containing the data for the view.
+     * @param view The view to be bound.
+     * @param key The key of the property to be bound.
+     */
+    static void bindErrorSummaryView(PropertyModel model, View view, PropertyKey key) {
+        if (key != ErrorProperties.IDP_FOR_DISPLAY) {
+            assert false : "Unhandled update to property: " + key;
+            return;
+        }
+        String idpForDisplay = model.get(ErrorProperties.IDP_FOR_DISPLAY);
+        Context context = view.getContext();
+        TextView textView = view.findViewById(R.id.error_summary);
+        textView.setText(String.format(
+                context.getString(R.string.signin_generic_error_dialog_summary, idpForDisplay)));
+        textView.setMovementMethod(LinkMovementMethod.getInstance());
+    }
+
+    /**
+     * Called whenever error description is bound to this view.
+     * @param model The model containing the data for the view.
+     * @param view The view to be bound.
+     * @param key The key of the property to be bound.
+     */
+    static void bindErrorDescriptionView(PropertyModel model, View view, PropertyKey key) {
+        if (key != ErrorProperties.IDP_FOR_DISPLAY) {
+            assert false : "Unhandled update to property: " + key;
+            return;
+        }
+        Context context = view.getContext();
+        TextView textView = view.findViewById(R.id.error_description);
+        textView.setText(
+                String.format(context.getString(R.string.signin_generic_error_dialog_description)));
+        textView.setMovementMethod(LinkMovementMethod.getInstance());
+    }
+
+    /**
      * Called whenever a continue button for a single account is bound to this view.
      * @param model The model containing the data for the view.
      * @param view The view to be bound.
@@ -234,19 +293,58 @@ class AccountSelectionViewBinder {
                 }
             }
         } else if (key == ContinueButtonProperties.ACCOUNT) {
+            String btnText;
             Account account = model.get(ContinueButtonProperties.ACCOUNT);
-            // Prefers to use given name if it is provided otherwise falls back to using the name.
-            String givenName = account.getGivenName();
-            String displayedName =
-                    givenName != null && !givenName.isEmpty() ? givenName : account.getName();
-            String btnText = String.format(
-                    context.getString(R.string.account_selection_continue), displayedName);
+            if (account != null) {
+                // Prefers to use given name if it is provided otherwise falls back to using the
+                // name.
+                String givenName = account.getGivenName();
+                String displayedName =
+                        givenName != null && !givenName.isEmpty() ? givenName : account.getName();
+                btnText = String.format(
+                        context.getString(R.string.account_selection_continue), displayedName);
+            } else {
+                btnText = String.format(
+                        context.getString(R.string.idp_signin_status_mismatch_dialog_continue));
+            }
+            assert btnText != null;
             button.setText(btnText);
         } else if (key == ContinueButtonProperties.ON_CLICK_LISTENER) {
             button.setOnClickListener(clickedView -> {
                 Account account = model.get(ContinueButtonProperties.ACCOUNT);
                 model.get(ContinueButtonProperties.ON_CLICK_LISTENER).onResult(account);
             });
+        } else {
+            assert false : "Unhandled update to property:" + key;
+        }
+    }
+
+    /**
+     * Called whenever a got it button for the error dialog is bound to this view.
+     * @param model The model containing the data for the view.
+     * @param view The view to be bound.
+     * @param key The key of the property to be bound.
+     */
+    @SuppressWarnings("checkstyle:SetTextColorAndSetTextSizeCheck")
+    static void bindGotItButtonView(PropertyModel model, View view, PropertyKey key) {
+        Context context = view.getContext();
+        ButtonCompat button = view.findViewById(R.id.got_it_btn);
+        button.setText(
+                String.format(context.getString(R.string.signin_error_dialog_got_it_button)));
+        if (key == GotItButtonProperties.IDP_METADATA) {
+            if (!ColorUtils.inNightMode(context)) {
+                IdentityProviderMetadata idpMetadata =
+                        model.get(GotItButtonProperties.IDP_METADATA);
+
+                // TODO(crbug.com/1484245): Decide on how to set colours for error buttons.
+                Integer textColor = idpMetadata.getBrandBackgroundColor();
+                button.setTextColor(textColor != null
+                                ? textColor
+                                : MaterialColors.getColor(context, R.attr.colorOnPrimary, TAG));
+            }
+        } else if (key == GotItButtonProperties.ON_CLICK_LISTENER) {
+            button.setOnClickListener(
+                    clickedView -> { model.get(GotItButtonProperties.ON_CLICK_LISTENER).run(); });
         } else {
             assert false : "Unhandled update to property:" + key;
         }
@@ -271,6 +369,18 @@ class AccountSelectionViewBinder {
         } else if (key == ItemProperties.DATA_SHARING_CONSENT) {
             itemView = view.findViewById(R.id.user_data_sharing_consent);
             itemBinder = AccountSelectionViewBinder::bindDataSharingConsentView;
+        } else if (key == ItemProperties.IDP_SIGNIN) {
+            itemView = view.findViewById(R.id.idp_signin);
+            itemBinder = AccountSelectionViewBinder::bindIdpSignInView;
+        } else if (key == ItemProperties.ERROR_SUMMARY) {
+            itemView = view.findViewById(R.id.error_summary);
+            itemBinder = AccountSelectionViewBinder::bindErrorSummaryView;
+        } else if (key == ItemProperties.ERROR_DESCRIPTION) {
+            itemView = view.findViewById(R.id.error_description);
+            itemBinder = AccountSelectionViewBinder::bindErrorDescriptionView;
+        } else if (key == ItemProperties.GOT_IT_BUTTON) {
+            itemView = view.findViewById(R.id.got_it_btn);
+            itemBinder = AccountSelectionViewBinder::bindGotItButtonView;
         } else {
             assert false : "Unhandled update to property:" + key;
             return;
@@ -320,6 +430,7 @@ class AccountSelectionViewBinder {
                     model.get(HeaderProperties.IDP_FOR_DISPLAY),
                     model.get(HeaderProperties.RP_CONTEXT));
             headerTitleText.setText(title);
+            headerTitleText.setMovementMethod(LinkMovementMethod.getInstance());
 
             // Make instructions for closing the bottom sheet part of the header's content
             // description. This is needed because the bottom sheet's content description (which

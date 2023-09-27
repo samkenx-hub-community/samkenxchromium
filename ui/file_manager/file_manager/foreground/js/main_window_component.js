@@ -5,14 +5,14 @@
 import {assertInstanceof} from 'chrome://resources/ash/common/assert.js';
 
 import {DialogType, isFolderDialogType} from '../../common/js/dialog_type.js';
-import {getKeyModifiers} from '../../common/js/dom_utils.js';
-import {metrics} from '../../common/js/metrics.js';
+import {getFocusedTreeItem, getKeyModifiers} from '../../common/js/dom_utils.js';
+import {recordEnum} from '../../common/js/metrics.js';
 import {TrashEntry} from '../../common/js/trash.js';
 import {str, util} from '../../common/js/util.js';
 import {VolumeManagerCommon} from '../../common/js/volume_manager_types.js';
 import {DirectoryChangeEvent} from '../../externs/directory_change_event.js';
 import {VolumeManager} from '../../externs/volume_manager.js';
-import {changeDirectory} from '../../state/actions/current_directory.js';
+import {changeDirectory} from '../../state/ducks/current_directory.js';
 import {getStore} from '../../state/store.js';
 
 import {AppStateController} from './app_state_controller.js';
@@ -22,6 +22,7 @@ import {FileSelectionHandler} from './file_selection.js';
 import {NamingController} from './naming_controller.js';
 import {TaskController} from './task_controller.js';
 import {Command} from './ui/command.js';
+import {DirectoryTree} from './ui/directory_tree.js';
 import {FileManagerUI} from './ui/file_manager_ui.js';
 import {FileTapHandler} from './ui/file_tap_handler.js';
 import {ListContainer} from './ui/list_container.js';
@@ -375,8 +376,7 @@ export class MainWindowComponent {
     // explicitly show the tooltip.
     this.ui_.filesTooltip.updateTooltipText(
         /** @type {!HTMLElement} */ (this.ui_.toggleViewButton));
-    metrics.recordEnum(
-        'ToggleFileListType', listType, ListContainer.ListTypesForUMA);
+    recordEnum('ToggleFileListType', listType, ListContainer.ListTypesForUMA);
   }
 
   /**
@@ -425,15 +425,15 @@ export class MainWindowComponent {
   onDirectoryTreeKeyDown_(event) {
     // Enter => Change directory or perform default action.
     if (getKeyModifiers(event) + event.key === 'Enter') {
-      const selectedItem = this.ui_.directoryTree.selectedItem;
-      if (!selectedItem) {
+      const focusedItem = getFocusedTreeItem(this.ui_.directoryTree);
+      if (!focusedItem) {
         return;
       }
-      selectedItem.activate();
+      focusedItem.activate();
       if (this.dialogType_ !== DialogType.FULL_PAGE &&
-          !selectedItem.hasAttribute('renaming') &&
+          !focusedItem.hasAttribute('renaming') &&
           util.isSameEntry(
-              this.directoryModel_.getCurrentDirEntry(), selectedItem.entry) &&
+              this.directoryModel_.getCurrentDirEntry(), focusedItem.entry) &&
           !this.ui_.dialogFooter.okButton.disabled) {
         this.ui_.dialogFooter.okButton.click();
       }

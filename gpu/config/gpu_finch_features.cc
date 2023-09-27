@@ -11,6 +11,7 @@
 #include "gpu/config/gpu_switches.h"
 #include "ui/gl/gl_features.h"
 #include "ui/gl/gl_surface_egl.h"
+#include "ui/gl/gl_switches.h"
 #include "ui/gl/gl_utils.h"
 
 #if BUILDFLAG(IS_ANDROID)
@@ -22,7 +23,12 @@
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
 #include "ui/gfx/android/android_surface_control_compat.h"
-#endif
+#endif  // BUILDFLAG(IS_ANDROID)
+
+#if BUILDFLAG(IS_MAC)
+#include "base/mac/mac_util.h"
+#include "base/system/sys_info.h"
+#endif  // BUILDFLAG(IS_MAC)
 
 namespace features {
 namespace {
@@ -49,8 +55,7 @@ bool IsDeviceBlocked(const char* field, const std::string& block_list) {
   }
   return false;
 }
-
-#endif
+#endif  // BUILDFLAG(IS_ANDROID)
 
 }  // namespace
 
@@ -129,6 +134,12 @@ const base::FeatureParam<std::string>
         "DisableIncreaseBufferCountForHighFrameRate", ""};
 #endif
 
+// Use shorter timeout when performDeferredCleanup, and enable
+// performDeferredCleanup for Android WebView.
+BASE_FEATURE(kAggressiveSkiaGpuResourcePurge,
+             "AggressiveSkiaGpuResourcePurge",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Enable GPU Rasterization by default. This can still be overridden by
 // --enable-gpu-rasterization or --disable-gpu-rasterization.
 // DefaultEnableGpuRasterization has launched on Mac, Windows, ChromeOS,
@@ -147,12 +158,20 @@ BASE_FEATURE(kDefaultEnableGpuRasterization,
 BASE_FEATURE(kCanvasOopRasterization,
              "CanvasOopRasterization",
 #if BUILDFLAG(IS_FUCHSIA) || BUILDFLAG(IS_IOS) || BUILDFLAG(IS_WIN) || \
-    (BUILDFLAG(IS_MAC) && defined(ARCH_CPU_ARM64))
+    (BUILDFLAG(IS_MAC) && defined(ARCH_CPU_ARM64)) || BUILDFLAG(IS_ANDROID)
              base::FEATURE_ENABLED_BY_DEFAULT
 #else
              base::FEATURE_DISABLED_BY_DEFAULT
 #endif
 );
+
+#if BUILDFLAG(IS_OZONE)
+// Detect front buffering condition and set buffer usage as such.
+// This is a killswitch to be removed once launched.
+BASE_FEATURE(kOzoneFrontBufferUsage,
+             "OzoneFrontBufferUsage",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+#endif  // BUILDFLAG(IS_OZONE)
 
 // Enables the use of MSAA in skia on Ice Lake and later intel architectures.
 BASE_FEATURE(kEnableMSAAOnNewIntelGPUs,
@@ -162,6 +181,11 @@ BASE_FEATURE(kEnableMSAAOnNewIntelGPUs,
 // Enables the use of ANGLE validation for non-WebGL contexts.
 BASE_FEATURE(kDefaultEnableANGLEValidation,
              "DefaultEnableANGLEValidation",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Disables MSAA in Graphite if MSAA is reported as being slow for the device.
+BASE_FEATURE(kDisableSlowMSAAInGraphite,
+             "DisableSlowMSAAInGraphite",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables canvas to free its resources by default when it's running in
@@ -251,33 +275,29 @@ BASE_FEATURE(kForceGpuMainThreadToNormalPriorityDrDc,
              "ForceGpuMainThreadToNormalPriorityDrDc",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-#if BUILDFLAG(IS_ANDROID)
-BASE_FEATURE(kEnableDrDcVulkan,
-             "EnableDrDcVulkan",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-#endif  // BUILDFLAG(IS_ANDROID)
-
 // Enable WebGPU on gpu service side only. This is used with origin trial and
 // enabled by default on supported platforms.
-BASE_FEATURE(kWebGPUService,
-             "WebGPUService",
 #if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN) || BUILDFLAG(IS_CHROMEOS_ASH)
-             base::FEATURE_ENABLED_BY_DEFAULT
+#define WEBGPU_ENABLED base::FEATURE_ENABLED_BY_DEFAULT
 #else
-             base::FEATURE_DISABLED_BY_DEFAULT
+#define WEBGPU_ENABLED base::FEATURE_DISABLED_BY_DEFAULT
 #endif
-);
+BASE_FEATURE(kWebGPUService, "WebGPUService", WEBGPU_ENABLED);
+BASE_FEATURE(kWebGPUBlobCache, "WebGPUBlobCache", WEBGPU_ENABLED);
+#undef WEBGPU_ENABLED
+
+BASE_FEATURE(kWebGPUUseDXC, "WebGPUUseDXC2", base::FEATURE_DISABLED_BY_DEFAULT);
 
 #if BUILDFLAG(IS_ANDROID)
 
 const base::FeatureParam<std::string> kVulkanBlockListByHardware{
-    &kVulkan, "BlockListByHardware", "mt*"};
+    &kVulkan, "BlockListByHardware", ""};
 
 const base::FeatureParam<std::string> kVulkanBlockListByBrand{
-    &kVulkan, "BlockListByBrand", "HONOR"};
+    &kVulkan, "BlockListByBrand", ""};
 
 const base::FeatureParam<std::string> kVulkanBlockListByDevice{
-    &kVulkan, "BlockListByDevice", "OP4863|OP4883"};
+    &kVulkan, "BlockListByDevice", ""};
 
 const base::FeatureParam<std::string> kVulkanBlockListByAndroidBuildId{
     &kVulkan, "BlockListByAndroidBuildId", ""};
@@ -289,8 +309,7 @@ const base::FeatureParam<std::string> kVulkanBlockListByModel{
     &kVulkan, "BlockListByModel", ""};
 
 const base::FeatureParam<std::string> kVulkanBlockListByBoard{
-    &kVulkan, "BlockListByBoard",
-    "RM67*|RM68*|k68*|mt6*|oppo67*|oppo68*|QM215|rk30sdk"};
+    &kVulkan, "BlockListByBoard", ""};
 
 const base::FeatureParam<std::string> kVulkanBlockListByAndroidBuildFP{
     &kVulkan, "BlockListByAndroidBuildFP", ""};
@@ -330,7 +349,24 @@ const base::FeatureParam<std::string> kDrDcBlockListByAndroidBuildFP{
 // Enable Skia Graphite. This will use the Dawn backend by default, but can be
 // overridden with command line flags for testing on non-official developer
 // builds. See --skia-graphite-backend flag in gpu_switches.h.
-BASE_FEATURE(kSkiaGraphite, "SkiaGraphite", base::FEATURE_DISABLED_BY_DEFAULT);
+BASE_FEATURE(kSkiaGraphite,
+             "SkiaGraphite",
+#if BUILDFLAG(IS_IOS)
+             base::FEATURE_ENABLED_BY_DEFAULT
+#else
+             base::FEATURE_DISABLED_BY_DEFAULT
+#endif
+);
+
+// Whether the Dawn "skip_validation" toggle is enabled for Skia Graphite.
+const base::FeatureParam<bool> kSkiaGraphiteDawnSkipValidation{
+    &kSkiaGraphite, "dawn_skip_validation", true};
+
+#if BUILDFLAG(IS_WIN)
+BASE_FEATURE(kSkiaGraphiteDawnUseD3D12,
+             "SkiaGraphiteDawnUseD3D12",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+#endif
 
 // Enable GrShaderCache to use with Vulkan backend.
 BASE_FEATURE(kEnableGrShaderCacheForVulkan,
@@ -374,7 +410,12 @@ BASE_FEATURE(kForceRestartGpuKillSwitch,
 // Using the new SchedulerDfs GPU scheduler.
 BASE_FEATURE(kUseGpuSchedulerDfs,
              "UseGpuSchedulerDfs",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+#if BUILDFLAG(IS_ANDROID)
+             base::FEATURE_DISABLED_BY_DEFAULT
+#else
+             base::FEATURE_ENABLED_BY_DEFAULT
+#endif
+);
 
 // Use the ClientGmb interface to create GpuMemoryBuffers. This is supposed to
 // reduce number of IPCs happening while creating GpuMemoryBuffers by allowing
@@ -394,6 +435,14 @@ BASE_FEATURE(kPassthroughYuvRgbConversion,
 BASE_FEATURE(kGpuCleanupInBackground,
              "GpuCleanupInBackground",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+#if BUILDFLAG(IS_ANDROID)
+// When enabled, the validating command decoder always returns true
+// from IsGL_REDSupportedOnFBOs in feature_info.cc on Android.
+BASE_FEATURE(kCmdDecoderSkipGLRedMesaWorkaroundOnAndroid,
+             "CmdDecoderSkipGLRedMesaWorkaroundOnAndroid",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+#endif
 
 bool UseGles2ForOopR() {
 #if BUILDFLAG(IS_ANDROID) && defined(ARCH_CPU_X86_FAMILY)
@@ -498,8 +547,8 @@ bool IsDrDcEnabled() {
 
   if (!base::FeatureList::IsEnabled(kEnableDrDc))
     return false;
-  return IsUsingVulkan() ? base::FeatureList::IsEnabled(kEnableDrDcVulkan)
-                         : true;
+
+  return true;
 #else
   return false;
 #endif
@@ -548,11 +597,74 @@ bool IsANGLEValidationEnabled() {
          UsePassthroughCommandDecoder();
 }
 
+bool IsSkiaGraphiteEnabled(const base::CommandLine* command_line) {
+  // Force Graphite on if --skia-graphite-backend flag is specified.
+  if (command_line->HasSwitch(switches::kSkiaGraphiteBackend)) {
+    return true;
+  }
+#if BUILDFLAG(IS_APPLE)
+  // Graphite only works well with ANGLE Metal on Mac or iOS.
+  // TODO(crbug.com/1423574): Remove this after ANGLE Metal launches fully.
+  const bool is_angle_metal_enabled =
+      UsePassthroughCommandDecoder() &&
+      (base::FeatureList::IsEnabled(features::kDefaultANGLEMetal) ||
+       command_line->GetSwitchValueASCII(switches::kUseANGLE) ==
+           gl::kANGLEImplementationMetalName);
+  if (!is_angle_metal_enabled) {
+    return false;
+  }
+#if BUILDFLAG(IS_MAC)
+  // The following code tries to match angle::IsMetalRendererAvailable().
+  // ANGLE requires at least macOS 10.13 for Metal 2.0.
+  const int macos_version = base::mac::MacOSVersion();
+  if (macos_version < 10'13'00) {
+    return false;
+  }
+  auto model_name_split = base::SysInfo::SplitHardwareModelNameDoNotUse(
+      base::SysInfo::HardwareModelName());
+  if (model_name_split.has_value()) {
+    // We hardcode the minimum model numbers supporting Mac2 Metal GPU family
+    // since ANGLE Metal requires that. We can't check if ANGLE uses Metal until
+    // we initialize the GPU process, but this code runs in the browser so we
+    // just do our best here to skip the feature check below if we know that
+    // ANGLE can't possibly use Metal since we don't want to contaminate the
+    // experiment arms with devices that won't run Graphite. Any models not in
+    // the list are those that support Mac2 GPU family universally e.g. Mac
+    // Mini/Studio. The 5K Retina iMac15,1 is special as it has a discrete GPU
+    // and can support ANGLE Metal, but its successors can't until iMac17,1.
+    const bool is_imac_15_1 = model_name_split->category == "iMac" &&
+                              model_name_split->model == 15 &&
+                              model_name_split->variant == 1;
+    if (!is_imac_15_1) {
+      static constexpr struct {
+        const char* category;
+        int32_t min_supported_model;
+      } kModelSupportData[] = {
+          {"MacBookPro", 13}, {"MacBookAir", 8}, {"MacBook", 9},
+          {"iMac", 17},       {"MacPro", 6},
+      };
+      for (const auto& [category, min_supported_model] : kModelSupportData) {
+        if (model_name_split->category == category) {
+          if (model_name_split->model < min_supported_model) {
+            return false;
+          }
+          break;
+        }
+      }
+    }
+  }
+#endif  // BUILDFLAG(IS_MAC)
+#endif  // BUILDFLAG(IS_APPLE)
+  return base::FeatureList::IsEnabled(features::kSkiaGraphite);
+}
+
 #if BUILDFLAG(IS_ANDROID)
 bool IsAImageReaderEnabled() {
   // Device Hammer_Energy_2 seems to be very crash with image reader during
   // gl::GLImageEGL::BindTexImage(). Disable image reader on that device for
   // now. crbug.com/1323921
+  // TODO(crbug.com/1323921): Can we revisit this now that GLImage no longer
+  // exists?
   if (IsDeviceBlocked(base::android::BuildInfo::GetInstance()->device(),
                       "Hammer_Energy_2")) {
     return false;

@@ -34,6 +34,7 @@
 #include "components/bookmarks/browser/bookmark_node.h"
 #include "components/bookmarks/browser/bookmark_undo_provider.h"
 #include "components/bookmarks/browser/bookmark_utils.h"
+#include "components/bookmarks/browser/bookmark_uuids.h"
 #include "components/bookmarks/browser/titled_url_match.h"
 #include "components/bookmarks/browser/url_and_title.h"
 #include "components/bookmarks/common/bookmark_metrics.h"
@@ -341,6 +342,8 @@ class BookmarkModelTest : public testing::Test, public BookmarkModelObserver {
     ClearCounts();
   }
 
+  ~BookmarkModelTest() override { model_->RemoveObserver(this); }
+
   BookmarkModelTest(const BookmarkModelTest&) = delete;
   BookmarkModelTest& operator=(const BookmarkModelTest&) = delete;
 
@@ -513,6 +516,16 @@ class BookmarkModelTest : public testing::Test, public BookmarkModelObserver {
   base::UserActionTester* user_action_tester() { return &user_action_tester_; }
 
  protected:
+  // Set `model_` to a new model with a new client whose storage state for uma
+  // is storage_state.
+  void ResetModel(metrics::StorageStateForUma storage_state) {
+    model_->RemoveObserver(this);
+    auto client = std::make_unique<TestBookmarkClient>();
+    client->SetStorageStateForUma(storage_state);
+    model_ = TestBookmarkClient::CreateModelWithClient(std::move(client));
+    model_->AddObserver(this);
+  }
+
   std::unique_ptr<BookmarkModel> model_;
   ObserverDetails observer_details_;
   std::vector<AllNodesRemovedDetail> all_bookmarks_removed_details_;
@@ -560,9 +573,7 @@ TEST_F(BookmarkModelTest, InitialState) {
 // Tests recording Bookmarks.Storage.TimeToLoadAtStartup2 histogram for account
 // storage.
 TEST_F(BookmarkModelTest, LoadModelWithAccountStorage) {
-  auto client = std::make_unique<TestBookmarkClient>();
-  client->SetStorageStateForUma(metrics::StorageStateForUma::kAccount);
-  model_ = TestBookmarkClient::CreateModelWithClient(std::move(client));
+  ResetModel(metrics::StorageStateForUma::kAccount);
 
   histogram_tester()->ExpectTotalCount("Bookmarks.Storage.TimeToLoadAtStartup2",
                                        1);
@@ -573,9 +584,7 @@ TEST_F(BookmarkModelTest, LoadModelWithAccountStorage) {
 // Tests recording Bookmarks.Storage.TimeToLoadAtStartup2 histogram for local
 // storage not syncing.
 TEST_F(BookmarkModelTest, LoadModelWithLocalStorageNotSyncing) {
-  auto client = std::make_unique<TestBookmarkClient>();
-  client->SetStorageStateForUma(metrics::StorageStateForUma::kLocalOnly);
-  model_ = TestBookmarkClient::CreateModelWithClient(std::move(client));
+  ResetModel(metrics::StorageStateForUma::kLocalOnly);
 
   histogram_tester()->ExpectTotalCount("Bookmarks.Storage.TimeToLoadAtStartup2",
                                        1);
@@ -586,9 +595,7 @@ TEST_F(BookmarkModelTest, LoadModelWithLocalStorageNotSyncing) {
 // Tests recording Bookmarks.Storage.TimeToLoadAtStartup2 histogram for local
 // storage syncing.
 TEST_F(BookmarkModelTest, LoadModelWithLocalStorageSyncing) {
-  auto client = std::make_unique<TestBookmarkClient>();
-  client->SetStorageStateForUma(metrics::StorageStateForUma::kSyncEnabled);
-  model_ = TestBookmarkClient::CreateModelWithClient(std::move(client));
+  ResetModel(metrics::StorageStateForUma::kSyncEnabled);
 
   histogram_tester()->ExpectTotalCount("Bookmarks.Storage.TimeToLoadAtStartup2",
                                        1);
@@ -646,9 +653,7 @@ TEST_F(BookmarkModelTest, AddNewURL) {
 
 // Tests recording user action when adding a bookmark in account storage.
 TEST_F(BookmarkModelTest, AddNewURLAccountStorage) {
-  auto client = std::make_unique<TestBookmarkClient>();
-  client->SetStorageStateForUma(metrics::StorageStateForUma::kAccount);
-  model_ = TestBookmarkClient::CreateModelWithClient(std::move(client));
+  ResetModel(metrics::StorageStateForUma::kAccount);
 
   model_->AddNewURL(model_->bookmark_bar_node(), 0, u"title",
                     GURL("http://foo.com"));
@@ -660,9 +665,7 @@ TEST_F(BookmarkModelTest, AddNewURLAccountStorage) {
 // Tests recording user action when adding a bookmark in local storage not
 // syncing.
 TEST_F(BookmarkModelTest, AddNewURLLocalStorageNotSyncing) {
-  auto client = std::make_unique<TestBookmarkClient>();
-  client->SetStorageStateForUma(metrics::StorageStateForUma::kLocalOnly);
-  model_ = TestBookmarkClient::CreateModelWithClient(std::move(client));
+  ResetModel(metrics::StorageStateForUma::kLocalOnly);
 
   model_->AddNewURL(model_->bookmark_bar_node(), 0, u"title",
                     GURL("http://foo.com"));
@@ -673,9 +676,7 @@ TEST_F(BookmarkModelTest, AddNewURLLocalStorageNotSyncing) {
 
 // Tests recording user action when adding a bookmark in local storage syncing.
 TEST_F(BookmarkModelTest, AddNewURLLocalStorageSyncing) {
-  auto client = std::make_unique<TestBookmarkClient>();
-  client->SetStorageStateForUma(metrics::StorageStateForUma::kSyncEnabled);
-  model_ = TestBookmarkClient::CreateModelWithClient(std::move(client));
+  ResetModel(metrics::StorageStateForUma::kSyncEnabled);
 
   model_->AddNewURL(model_->bookmark_bar_node(), 0, u"title",
                     GURL("http://foo.com"));
@@ -686,9 +687,7 @@ TEST_F(BookmarkModelTest, AddNewURLLocalStorageSyncing) {
 
 // Tests recording user action when adding a folder in account storage.
 TEST_F(BookmarkModelTest, AddNewFolderAccountStorage) {
-  auto client = std::make_unique<TestBookmarkClient>();
-  client->SetStorageStateForUma(metrics::StorageStateForUma::kAccount);
-  model_ = TestBookmarkClient::CreateModelWithClient(std::move(client));
+  ResetModel(metrics::StorageStateForUma::kAccount);
 
   model_->AddFolder(model_->mobile_node(), 0, u"title");
   EXPECT_EQ(1, user_action_tester()->GetActionCount("Bookmarks.FolderAdded"));
@@ -699,9 +698,7 @@ TEST_F(BookmarkModelTest, AddNewFolderAccountStorage) {
 // Tests recording user action when adding a folder in local storage not
 // syncing.
 TEST_F(BookmarkModelTest, AddNewFolderLocalStorageNotSyncing) {
-  auto client = std::make_unique<TestBookmarkClient>();
-  client->SetStorageStateForUma(metrics::StorageStateForUma::kLocalOnly);
-  model_ = TestBookmarkClient::CreateModelWithClient(std::move(client));
+  ResetModel(metrics::StorageStateForUma::kLocalOnly);
 
   model_->AddFolder(model_->mobile_node(), 0, u"title");
   EXPECT_EQ(1, user_action_tester()->GetActionCount("Bookmarks.FolderAdded"));
@@ -713,9 +710,7 @@ TEST_F(BookmarkModelTest, AddNewFolderLocalStorageNotSyncing) {
 
 // Tests recording user action when adding a folder in local storage syncing.
 TEST_F(BookmarkModelTest, AddNewFolderLocalStorageSyncing) {
-  auto client = std::make_unique<TestBookmarkClient>();
-  client->SetStorageStateForUma(metrics::StorageStateForUma::kSyncEnabled);
-  model_ = TestBookmarkClient::CreateModelWithClient(std::move(client));
+  ResetModel(metrics::StorageStateForUma::kSyncEnabled);
 
   model_->AddFolder(model_->mobile_node(), 0, u"title");
   EXPECT_EQ(1, user_action_tester()->GetActionCount("Bookmarks.FolderAdded"));
@@ -1043,12 +1038,12 @@ TEST_F(BookmarkModelTest, ClearLastUsedTimeInRange) {
   GURL url("http://foo.com");
   const BookmarkNode* url_node =
       model_->AddURL(bookmark_bar_node, 0, title, url);
-  model_->UpdateLastUsedTime(url_node, time);
+  model_->UpdateLastUsedTime(url_node, time, /*just_opened=*/true);
 
   // Add a folder with child URL.
   const BookmarkNode* folder = model_->AddFolder(bookmark_bar_node, 0, title);
   const BookmarkNode* folder_url_node = model_->AddURL(folder, 0, title, url);
-  model_->UpdateLastUsedTime(folder_url_node, time);
+  model_->UpdateLastUsedTime(folder_url_node, time, /*just_opened=*/true);
   EXPECT_EQ(time, url_node->date_last_used());
   EXPECT_EQ(time, folder_url_node->date_last_used());
 
@@ -1070,12 +1065,12 @@ TEST_F(BookmarkModelTest, ClearLastUsedTimeInRangeForAllTime) {
   GURL url("http://foo.com");
   const BookmarkNode* url_node =
       model_->AddURL(bookmark_bar_node, 0, title, url);
-  model_->UpdateLastUsedTime(url_node, time);
+  model_->UpdateLastUsedTime(url_node, time, /*just_opened=*/true);
 
   // Add a folder with child URL.
   const BookmarkNode* folder = model_->AddFolder(bookmark_bar_node, 0, title);
   const BookmarkNode* folder_url_node = model_->AddURL(folder, 0, title, url);
-  model_->UpdateLastUsedTime(folder_url_node, time);
+  model_->UpdateLastUsedTime(folder_url_node, time, /*just_opened=*/true);
   EXPECT_EQ(time, url_node->date_last_used());
   EXPECT_EQ(time, folder_url_node->date_last_used());
 
@@ -1548,23 +1543,21 @@ TEST_F(BookmarkModelTest, GetMostRecentlyAddedUserNodeForURL) {
   ASSERT_EQ(n2, model_->GetMostRecentlyAddedUserNodeForURL(url));
 }
 
-// Makes sure GetBookmarks removes duplicates.
-TEST_F(BookmarkModelTest, GetBookmarksWithDups) {
+// Makes sure GetUniqueUrls removes duplicates.
+TEST_F(BookmarkModelTest, GetUniqueUrlsWithDups) {
   const GURL url("http://foo.com/0");
   const std::u16string title(u"blah");
   model_->AddURL(model_->bookmark_bar_node(), 0, title, url);
   model_->AddURL(model_->bookmark_bar_node(), 1, title, url);
 
-  std::vector<UrlAndTitle> bookmarks;
-  model_->GetBookmarks(&bookmarks);
+  std::vector<UrlAndTitle> bookmarks = model_->GetUniqueUrls();
   ASSERT_EQ(1U, bookmarks.size());
   EXPECT_EQ(url, bookmarks[0].url);
   EXPECT_EQ(title, bookmarks[0].title);
 
   model_->AddURL(model_->bookmark_bar_node(), 2, u"Title2", url);
   // Only one returned, even titles are different.
-  bookmarks.clear();
-  model_->GetBookmarks(&bookmarks);
+  bookmarks = model_->GetUniqueUrls();
   EXPECT_EQ(1U, bookmarks.size());
 }
 
@@ -1860,6 +1853,112 @@ TEST_F(BookmarkModelTest, TitledUrlIndexUpdatedOnChangeURL) {
                     .size());
 }
 
+TEST_F(BookmarkModelTest, GetNodeByUuid) {
+  const BookmarkNode* bookmark_bar_node = model_->bookmark_bar_node();
+  const base::Uuid explicit_uuid1 = base::Uuid::GenerateRandomV4();
+  const base::Uuid explicit_uuid2 = base::Uuid::GenerateRandomV4();
+
+  // Create two nodes (URL and folder) without specifying a UUID, which means
+  // a random one is used.
+  const BookmarkNode* url_node_with_implicit_uuid =
+      model_->AddURL(bookmark_bar_node, 0, u"title", GURL("http://foo.com"));
+  const BookmarkNode* folder_node_with_implicit_uuid =
+      model_->AddFolder(bookmark_bar_node, 0, u"title");
+
+  // Create two more with an explicit UUID provided.
+  const BookmarkNode* url_node_with_explicit_uuid = model_->AddURL(
+      bookmark_bar_node, 0, u"title", GURL("http://foo.com"),
+      /*meta_info=*/nullptr, /*creation_time=*/absl::nullopt, explicit_uuid1);
+  const BookmarkNode* folder_node_with_explicit_uuid = model_->AddFolder(
+      bookmark_bar_node, 0, u"title",
+      /*meta_info=*/nullptr, /*creation_time=*/absl::nullopt, explicit_uuid2);
+
+  ASSERT_TRUE(url_node_with_implicit_uuid);
+  ASSERT_TRUE(folder_node_with_implicit_uuid);
+  ASSERT_TRUE(url_node_with_explicit_uuid);
+  ASSERT_TRUE(folder_node_with_explicit_uuid);
+
+  EXPECT_EQ(url_node_with_implicit_uuid,
+            model_->GetNodeByUuid(url_node_with_implicit_uuid->uuid()));
+  EXPECT_EQ(folder_node_with_implicit_uuid,
+            model_->GetNodeByUuid(folder_node_with_implicit_uuid->uuid()));
+  EXPECT_EQ(url_node_with_explicit_uuid, model_->GetNodeByUuid(explicit_uuid1));
+  EXPECT_EQ(folder_node_with_explicit_uuid,
+            model_->GetNodeByUuid(explicit_uuid2));
+
+  // Verify cases that should return nullptr.
+  EXPECT_EQ(nullptr, model_->GetNodeByUuid(base::Uuid()));
+  EXPECT_EQ(nullptr, model_->GetNodeByUuid(base::Uuid::GenerateRandomV4()));
+}
+
+TEST_F(BookmarkModelTest, GetPermanentNodeByUuid) {
+  // Permanent nodes should be returned by UUID.
+  EXPECT_EQ(model_->root_node(),
+            model_->GetNodeByUuid(base::Uuid::ParseLowercase(kRootNodeUuid)));
+  EXPECT_EQ(
+      model_->bookmark_bar_node(),
+      model_->GetNodeByUuid(base::Uuid::ParseLowercase(kBookmarkBarNodeUuid)));
+  EXPECT_EQ(model_->mobile_node(),
+            model_->GetNodeByUuid(
+                base::Uuid::ParseLowercase(kMobileBookmarksNodeUuid)));
+  EXPECT_EQ(model_->other_node(),
+            model_->GetNodeByUuid(
+                base::Uuid::ParseLowercase(kOtherBookmarksNodeUuid)));
+
+  // Managed bookmarks don't exist by default.
+  EXPECT_EQ(nullptr, model_->GetNodeByUuid(
+                         base::Uuid::ParseLowercase(kManagedNodeUuid)));
+
+  BookmarkPermanentNode* managed_node = ReloadModelWithManagedNode();
+  EXPECT_EQ(managed_node, model_->GetNodeByUuid(
+                              base::Uuid::ParseLowercase(kManagedNodeUuid)));
+}
+
+TEST_F(BookmarkModelTest, GetNodeByUuidAfterRemove) {
+  const BookmarkNode* folder1 =
+      model_->AddFolder(model_->bookmark_bar_node(), 0, u"title1");
+  const BookmarkNode* folder2 =
+      model_->AddFolder(model_->bookmark_bar_node(), 0, u"title2");
+
+  const base::Uuid uuid1 = folder1->uuid();
+  const base::Uuid uuid2 = folder2->uuid();
+
+  ASSERT_EQ(folder1, model_->GetNodeByUuid(uuid1));
+  ASSERT_EQ(folder2, model_->GetNodeByUuid(uuid2));
+
+  model_->Remove(folder1, bookmarks::metrics::BookmarkEditSource::kOther);
+
+  EXPECT_EQ(nullptr, model_->GetNodeByUuid(uuid1));
+  EXPECT_EQ(folder2, model_->GetNodeByUuid(uuid2));
+
+  model_->Remove(folder2, bookmarks::metrics::BookmarkEditSource::kOther);
+
+  EXPECT_EQ(nullptr, model_->GetNodeByUuid(uuid2));
+}
+
+TEST_F(BookmarkModelTest, GetNodeByUuidAfterRemoveAllUserBookmarks) {
+  const BookmarkNode* folder1 =
+      model_->AddFolder(model_->bookmark_bar_node(), 0, u"title1");
+  const BookmarkNode* folder2 =
+      model_->AddFolder(model_->bookmark_bar_node(), 0, u"title2");
+
+  const base::Uuid uuid1 = folder1->uuid();
+  const base::Uuid uuid2 = folder2->uuid();
+
+  ASSERT_EQ(folder1, model_->GetNodeByUuid(uuid1));
+  ASSERT_EQ(folder2, model_->GetNodeByUuid(uuid2));
+
+  model_->RemoveAllUserBookmarks();
+
+  EXPECT_EQ(nullptr, model_->GetNodeByUuid(uuid1));
+  EXPECT_EQ(nullptr, model_->GetNodeByUuid(uuid2));
+
+  // Permanent nodes should continue to exist and be returned by UUID.
+  EXPECT_EQ(
+      model_->bookmark_bar_node(),
+      model_->GetNodeByUuid(base::Uuid::ParseLowercase(kBookmarkBarNodeUuid)));
+}
+
 // Verifies the TitledUrlIndex is probably loaded.
 TEST(BookmarkModelLoadTest, TitledUrlIndexPopulatedOnLoad) {
   // Create a model with a single url.
@@ -1971,6 +2070,7 @@ class BookmarkModelFaviconTest : public testing::Test,
             std::make_unique<TestBookmarkClientWithUndo>())) {
     model_->AddObserver(this);
   }
+  ~BookmarkModelFaviconTest() override { model_->RemoveObserver(this); }
 
   BookmarkModelFaviconTest(const BookmarkModelFaviconTest&) = delete;
   BookmarkModelFaviconTest& operator=(const BookmarkModelFaviconTest&) = delete;
@@ -2186,11 +2286,12 @@ TEST_F(BookmarkDualModelTest, MoveToOtherModel) {
       .InSequence(account_sequence)
       .WillOnce(testing::SaveArg<1>(&captured_bar_parent));
 
-  local_or_syncable_model_->MoveToOtherModelWithNewNodeIdsAndUuids(
-      folder, account_model_.get(), dest_folder);
+  const BookmarkNode* moved_folder =
+      local_or_syncable_model_->MoveToOtherModelWithNewNodeIdsAndUuids(
+          folder, account_model_.get(), dest_folder);
 
-  ASSERT_EQ(dest_folder->children().size(), 1u);
-  const BookmarkNode* moved_folder = dest_folder->children()[0].get();
+  ASSERT_THAT(dest_folder->children(),
+              testing::ElementsAre(testing::Pointer(moved_folder)));
   EXPECT_EQ(moved_folder->GetTitle(), u"folder");
   ASSERT_EQ(moved_folder->children().size(), 2u);
   EXPECT_EQ(captured_foo_parent, moved_folder);

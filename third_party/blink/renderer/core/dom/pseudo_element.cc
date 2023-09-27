@@ -37,6 +37,7 @@
 #include "third_party/blink/renderer/core/html/forms/html_input_element.h"
 #include "third_party/blink/renderer/core/input_type_names.h"
 #include "third_party/blink/renderer/core/layout/generated_children.h"
+#include "third_party/blink/renderer/core/layout/layout_counter.h"
 #include "third_party/blink/renderer/core/layout/layout_object.h"
 #include "third_party/blink/renderer/core/layout/layout_quote.h"
 #include "third_party/blink/renderer/core/layout/list_marker.h"
@@ -60,7 +61,7 @@ PseudoElement* PseudoElement::Create(Element* parent,
     return MakeGarbageCollected<FirstLetterPseudoElement>(parent);
   } else if (IsTransitionPseudoElement(pseudo_id)) {
     auto* transition =
-        ViewTransitionUtils::GetActiveTransition(parent->GetDocument());
+        ViewTransitionUtils::GetTransition(parent->GetDocument());
     DCHECK(transition);
     return transition->CreatePseudoElement(parent, pseudo_id,
                                            view_transition_name);
@@ -196,7 +197,7 @@ PseudoElement::PseudoElement(Element* parent,
   }
 }
 
-scoped_refptr<const ComputedStyle> PseudoElement::CustomStyleForLayoutObject(
+const ComputedStyle* PseudoElement::CustomStyleForLayoutObject(
     const StyleRecalcContext& style_recalc_context) {
   Element* parent = ParentOrShadowHostElement();
   return parent->StyleForPseudoElement(
@@ -204,14 +205,14 @@ scoped_refptr<const ComputedStyle> PseudoElement::CustomStyleForLayoutObject(
                                          view_transition_name_));
 }
 
-scoped_refptr<const ComputedStyle> PseudoElement::LayoutStyleForDisplayContents(
+const ComputedStyle* PseudoElement::LayoutStyleForDisplayContents(
     const ComputedStyle& style) {
   // For display:contents we should not generate a box, but we generate a non-
   // observable inline box for pseudo elements to be able to locate the
   // anonymous layout objects for generated content during DetachLayoutTree().
   ComputedStyleBuilder builder =
-      GetDocument().GetStyleResolver().CreateComputedStyleBuilder();
-  builder.InheritFrom(style);
+      GetDocument().GetStyleResolver().CreateComputedStyleBuilderInheritingFrom(
+          style);
   builder.SetContent(style.GetContentData());
   builder.SetDisplay(EDisplay::kInline);
   builder.SetStyleType(pseudo_id_);
@@ -307,7 +308,15 @@ void PseudoElement::AttachLayoutTree(AttachContext& context) {
           StyleContainmentScope* scope =
               tree.FindOrCreateEnclosingScopeForElement(*this);
           scope->AttachQuote(*To<LayoutQuote>(child));
-          tree.UpdateOutermostDirtyScope(scope);
+          tree.UpdateOutermostQuotesDirtyScope(scope);
+        }
+        if (auto* counter = DynamicTo<LayoutCounter>(child)) {
+          StyleContainmentScopeTree& tree =
+              GetDocument().GetStyleEngine().EnsureStyleContainmentScopeTree();
+          StyleContainmentScope* scope =
+              tree.FindOrCreateEnclosingScopeForElement(*this);
+          scope->CreateCounterNodeForLayoutCounter(*counter);
+          tree.UpdateOutermostCountersDirtyScope(scope);
         }
       } else {
         child->Destroy();

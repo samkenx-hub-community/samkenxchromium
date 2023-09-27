@@ -89,16 +89,11 @@ void HTMLTableCellElement::CollectStyleForPresentationAttribute(
     const AtomicString& value,
     MutableCSSPropertyValueSet* style) {
   if (name == html_names::kNowrapAttr) {
-    if (!RuntimeEnabledFeatures::CSSWhiteSpaceShorthandEnabled()) {
-      AddPropertyToPresentationAttributeStyle(style, CSSPropertyID::kWhiteSpace,
-                                              CSSValueID::kNowrap);
-    } else {
-      // Longhands of `white-space: nowrap`.
-      AddPropertyToPresentationAttributeStyle(
-          style, CSSPropertyID::kWhiteSpaceCollapse, CSSValueID::kCollapse);
-      AddPropertyToPresentationAttributeStyle(style, CSSPropertyID::kTextWrap,
-                                              CSSValueID::kNowrap);
-    }
+    // Longhands of `white-space: nowrap`.
+    AddPropertyToPresentationAttributeStyle(
+        style, CSSPropertyID::kWhiteSpaceCollapse, CSSValueID::kCollapse);
+    AddPropertyToPresentationAttributeStyle(style, CSSPropertyID::kTextWrap,
+                                            CSSValueID::kNowrap);
   } else if (name == html_names::kWidthAttr) {
     if (!value.empty()) {
       AddHTMLLengthToStyle(style, CSSPropertyID::kWidth, value,
@@ -144,12 +139,6 @@ bool HTMLTableCellElement::HasLegalLinkAttribute(
   return (HasTagName(html_names::kTdTag) &&
           name == html_names::kBackgroundAttr) ||
          HTMLTablePartElement::HasLegalLinkAttribute(name);
-}
-
-const QualifiedName& HTMLTableCellElement::SubResourceAttributeName() const {
-  return HasTagName(html_names::kTdTag)
-             ? html_names::kBackgroundAttr
-             : HTMLTablePartElement::SubResourceAttributeName();
 }
 
 const AtomicString& HTMLTableCellElement::Abbr() const {

@@ -72,13 +72,20 @@
           "builder": "fuchsia-fyi-x64-dbg-persistent-emulator",
           "project": "chromium"
         }
+      ],
+      "mirroring_builder_group_and_names": [
+        {
+          "builder": "fuchsia-fyi-x64-dbg-persistent-emulator",
+          "group": "tryserver.chromium.fuchsia"
+        }
       ]
     }
   },
   "$build/reclient": {
     "instance": "rbe-chromium-trusted",
     "jobs": 250,
-    "metrics_project": "chromium-reclient-metrics"
+    "metrics_project": "chromium-reclient-metrics",
+    "scandeps_server": true
   },
   "$recipe_engine/resultdb/test_presentation": {
     "column_keys": [],

@@ -56,13 +56,14 @@ TEST_F(RootfsLacrosLoaderTest, LoadRootfsLacros) {
          const std::vector<std::string>& upstart_env) {
         EXPECT_EQ(job, kLacrosMounterUpstartJob);
         *callback_called = true;
-        return true;
+        return ash::FakeUpstartClient::StartJobResult(true /* success */);
       },
       &callback_called));
 
   base::test::TestFuture<base::Version, const base::FilePath&> future;
   rootfs_lacros_loader_->Load(
-      future.GetCallback<base::Version, const base::FilePath&>());
+      future.GetCallback<base::Version, const base::FilePath&>(),
+      /*forced=*/false);
   EXPECT_EQ(base::Version(version_str), future.Get<0>());
   EXPECT_TRUE(callback_called);
 }

@@ -12,6 +12,7 @@ import android.os.Handler;
 import android.view.DragEvent;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
+import android.view.PointerIcon;
 import android.view.View;
 import android.view.View.OnDragListener;
 import android.view.View.OnSystemUiVisibilityChangeListener;
@@ -38,6 +39,8 @@ import org.chromium.ui.base.EventForwarder;
 import org.chromium.ui.base.EventOffsetHandler;
 import org.chromium.ui.dragdrop.DragEventDispatchHelper.DragEventDispatchDestination;
 
+import java.util.function.Supplier;
+
 /**
  * The containing view for {@link WebContents} that exists in the Android UI hierarchy and exposes
  * the various {@link View} functionality to it.
@@ -51,8 +54,6 @@ public class ContentView extends FrameLayout
         implements ViewEventSink.InternalAccessDelegate, SmartClipProvider,
                    OnHierarchyChangeListener, OnSystemUiVisibilityChangeListener, OnDragListener,
                    DragEventDispatchDestination {
-    private static final String TAG = "ContentView";
-
     // Default value to signal that the ContentView's size need not be overridden.
     public static final int DEFAULT_MEASURE_SPEC =
             MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED);
@@ -66,6 +67,8 @@ public class ContentView extends FrameLayout
             new ObserverList<>();
     private final ObserverList<OnDragListener> mOnDragListeners = new ObserverList<>();
     private ViewEventSink mViewEventSink;
+    @Nullable
+    private Supplier<PointerIcon> mStylusWritingIconSupplier;
 
     /**
      * The desired size of this view in {@link MeasureSpec}. Set by the host
@@ -182,6 +185,10 @@ public class ContentView extends FrameLayout
         assert mDragDropEventOffsetHandler == null || handler == null
             : "Non-null DragDropEventOffsetHandler was overwritten with another.";
         mDragDropEventOffsetHandler = handler;
+    }
+
+    public void setStylusWritingIconSupplier(Supplier<PointerIcon> iconSupplier) {
+        mStylusWritingIconSupplier = iconSupplier;
     }
 
     @Override
@@ -437,6 +444,18 @@ public class ContentView extends FrameLayout
     public boolean onGenericMotionEvent(MotionEvent event) {
         EventForwarder forwarder = getEventForwarder();
         return forwarder != null ? forwarder.onGenericMotionEvent(event) : false;
+    }
+
+    @Override
+    public PointerIcon onResolvePointerIcon(MotionEvent event, int pointerIndex) {
+        PointerIcon icon = null;
+        if (mStylusWritingIconSupplier != null) {
+            icon = mStylusWritingIconSupplier.get();
+        }
+        if (icon != null) {
+            return icon;
+        }
+        return super.onResolvePointerIcon(event, pointerIndex);
     }
 
     @Nullable

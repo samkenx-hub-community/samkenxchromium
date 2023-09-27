@@ -15,7 +15,6 @@
 
 namespace password_manager {
 
-struct FieldInfo;
 struct InteractionsStats;
 struct PasswordForm;
 class PasswordStoreInterface;
@@ -45,10 +44,6 @@ class PasswordStoreConsumer {
   // site statistics.
   virtual void OnGetSiteStatistics(std::vector<InteractionsStats> stats);
 
-  // Called when the GetAllFieldInfo() request is finished, with the associated
-  // field info.
-  virtual void OnGetAllFieldInfo(std::vector<FieldInfo> field_info);
-
   // The base::CancelableTaskTracker can be used for cancelling the
   // tasks associated with the consumer.
   base::CancelableTaskTracker* cancelable_task_tracker() {
@@ -63,7 +58,7 @@ class PasswordStoreConsumer {
   // TODO(crbug.com/1360343): Remove when the `FormsOrError` version is
   // implemented by all consumers.
   virtual void OnGetPasswordStoreResults(
-      std::vector<std::unique_ptr<PasswordForm>> results) = 0;
+      std::vector<std::unique_ptr<PasswordForm>> results);
 
   // Like OnGetPasswordStoreResults(), but also receives the originating
   // PasswordStoreInterface as a parameter. This is useful for consumers that

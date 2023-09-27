@@ -17,10 +17,13 @@
 #include "base/memory/weak_ptr.h"
 #include "base/test/scoped_feature_list.h"
 #include "components/vector_icons/vector_icons.h"
+#include "ui/accessibility/ax_enums.mojom-shared.h"
+#include "ui/accessibility/ax_node_data.h"
 #include "ui/chromeos/styles/cros_tokens_color_mappings.h"
 #include "ui/views/animation/ink_drop.h"
 #include "ui/views/animation/ink_drop_state.h"
 #include "ui/views/controls/image_view.h"
+#include "ui/views/controls/label.h"
 #include "ui/views/test/views_test_utils.h"
 
 namespace ash {
@@ -302,6 +305,54 @@ TEST_F(FeatureTileTest, PrimaryTile_ToggleWithDecorativeDrillIn) {
   EXPECT_EQ(tile, focus_manager->GetFocusedView());
 }
 
+TEST_F(FeatureTileTest, PrimaryTile_WithSubLabel) {
+  FeatureTile primary_tile_with_sub_label(base::DoNothing(),
+                                          /*is_togglable=*/true,
+                                          FeatureTile::TileType::kPrimary);
+  primary_tile_with_sub_label.SetLabel(u"Button label");
+  primary_tile_with_sub_label.SetSubLabel(u"Sub label");
+
+  EXPECT_EQ(primary_tile_with_sub_label.label()->GetHorizontalAlignment(),
+            gfx::ALIGN_LEFT);
+  EXPECT_EQ(primary_tile_with_sub_label.label()->GetMultiLine(), false);
+  EXPECT_EQ((int)primary_tile_with_sub_label.label()->GetMaxLines(), 0);
+}
+
+TEST_F(FeatureTileTest, CompactTile_AddedAndRemoveSubLabel) {
+  // Create initial compact `FeatureTile` without a sub-label and verify default
+  // parameters.
+  FeatureTile compact_tile_with_sub_label(base::DoNothing(),
+                                          /*is_togglable=*/true,
+                                          FeatureTile::TileType::kCompact);
+  compact_tile_with_sub_label.SetLabel(u"Button label");
+
+  EXPECT_FALSE(compact_tile_with_sub_label.sub_label()->GetVisible());
+  EXPECT_EQ(compact_tile_with_sub_label.label()->GetHorizontalAlignment(),
+            gfx::ALIGN_CENTER);
+  EXPECT_EQ(compact_tile_with_sub_label.label()->GetMultiLine(), true);
+  EXPECT_EQ((int)compact_tile_with_sub_label.label()->GetMaxLines(), 2);
+
+  // Add a sub-label, update visibility, and verify parameters are updated.
+  compact_tile_with_sub_label.SetSubLabel(u"Sub label");
+  compact_tile_with_sub_label.SetSubLabelVisibility(true);
+
+  EXPECT_EQ(compact_tile_with_sub_label.label()->GetText(), u"Button label");
+  EXPECT_EQ(compact_tile_with_sub_label.label()->GetHorizontalAlignment(),
+            gfx::ALIGN_CENTER);
+  EXPECT_EQ(compact_tile_with_sub_label.label()->GetMultiLine(), false);
+  EXPECT_EQ((int)compact_tile_with_sub_label.label()->GetMaxLines(), 1);
+  EXPECT_TRUE(compact_tile_with_sub_label.sub_label()->GetVisible());
+
+  // Hide sub-label and verify parameters are back to defaults.
+  compact_tile_with_sub_label.SetSubLabelVisibility(false);
+
+  EXPECT_FALSE(compact_tile_with_sub_label.sub_label()->GetVisible());
+  EXPECT_EQ(compact_tile_with_sub_label.label()->GetHorizontalAlignment(),
+            gfx::ALIGN_CENTER);
+  EXPECT_EQ(compact_tile_with_sub_label.label()->GetMultiLine(), true);
+  EXPECT_EQ((int)compact_tile_with_sub_label.label()->GetMaxLines(), 2);
+}
+
 TEST_F(FeatureTileTest, CompactTile_LaunchSurface) {
   auto mock_controller = std::make_unique<MockFeaturePodController>(
       /*togglable=*/false);
@@ -367,6 +418,36 @@ TEST_F(FeatureTileTest, TogglingTileHidesInkDrop) {
   ASSERT_TRUE(tile->IsToggled());
   EXPECT_EQ(views::InkDrop::Get(tile)->GetInkDrop()->GetTargetInkDropState(),
             views::InkDropState::HIDDEN);
+}
+
+TEST_F(FeatureTileTest, AccessibilityRoles) {
+  // Togglable feature tiles (like Do Not Disturb) have role "toggle button".
+  FeatureTile togglable_tile(base::DoNothing(), /*is_togglable=*/true);
+  togglable_tile.SetToggled(true);
+  ui::AXNodeData node_data;
+  togglable_tile.GetAccessibleNodeData(&node_data);
+  EXPECT_EQ(node_data.role, ax::mojom::Role::kToggleButton);
+  EXPECT_EQ(node_data.GetCheckedState(), ax::mojom::CheckedState::kTrue);
+
+  togglable_tile.SetToggled(false);
+  ui::AXNodeData node_data2;
+  togglable_tile.GetAccessibleNodeData(&node_data2);
+  EXPECT_EQ(node_data2.role, ax::mojom::Role::kToggleButton);
+  EXPECT_EQ(node_data2.GetCheckedState(), ax::mojom::CheckedState::kFalse);
+
+  // However, togglable feature tiles that have a clickable icon (like Network
+  // and Bluetooth) do not have role "toggle button", since clicking the main
+  // tile takes the user to a detail page.
+  togglable_tile.SetIconClickable(true);
+  ui::AXNodeData node_data3;
+  togglable_tile.GetAccessibleNodeData(&node_data3);
+  EXPECT_EQ(node_data3.role, ax::mojom::Role::kButton);
+
+  // Non-togglable feature tiles are just buttons.
+  FeatureTile non_togglable_tile(base::DoNothing(), /*is_togglable=*/false);
+  ui::AXNodeData node_data4;
+  non_togglable_tile.GetAccessibleNodeData(&node_data4);
+  EXPECT_EQ(node_data4.role, ax::mojom::Role::kButton);
 }
 
 }  // namespace ash

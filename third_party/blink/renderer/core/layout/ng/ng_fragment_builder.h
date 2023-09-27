@@ -17,6 +17,7 @@
 #include "third_party/blink/renderer/core/layout/ng/ng_out_of_flow_positioned_node.h"
 #include "third_party/blink/renderer/core/layout/ng/ng_physical_fragment.h"
 #include "third_party/blink/renderer/core/layout/ng/ng_style_variant.h"
+#include "third_party/blink/renderer/core/scroll/scroll_start_targets.h"
 #include "third_party/blink/renderer/core/style/computed_style.h"
 #include "third_party/blink/renderer/platform/heap/collection_support/heap_hash_map.h"
 #include "third_party/blink/renderer/platform/text/writing_direction_mode.h"
@@ -167,6 +168,9 @@ class CORE_EXPORT NGFragmentBuilder {
   void SetItemsBuilder(NGFragmentItemsBuilder* builder) {
     items_builder_ = builder;
   }
+
+  void PropagateStickyDescendants(const NGPhysicalFragment& child);
+  void PropagateSnapAreas(const NGPhysicalFragment& child);
 
   // Propagate |child|'s anchor for the CSS Anchor Positioning to |this|
   // builder. This includes the anchor of the |child| itself and anchors
@@ -380,6 +384,7 @@ class CORE_EXPORT NGFragmentBuilder {
   }
 
   void SetIsBlockInInline() { is_block_in_inline_ = true; }
+  void SetIsLineForParallelFlow() { is_line_for_parallel_flow_ = true; }
 
   void SetHasBlockFragmentation() { has_block_fragmentation_ = true; }
 
@@ -418,6 +423,9 @@ class CORE_EXPORT NGFragmentBuilder {
   void SetShouldForceSameFragmentationFlow() {
     should_force_same_fragmentation_flow_ = true;
   }
+  bool ShouldForceSameFragmentationFlow() const {
+    return should_force_same_fragmentation_flow_;
+  }
 
   // Downgrade the break appeal if the specified break appeal is lower than any
   // found so far.
@@ -446,6 +454,40 @@ class CORE_EXPORT NGFragmentBuilder {
     block_end_annotation_space_ = space;
   }
 
+  // Report space shortage, i.e. how much more space would have been sufficient
+  // to prevent some piece of content from breaking. This information may be
+  // used by the column balancer to stretch columns.
+  void PropagateSpaceShortage(absl::optional<LayoutUnit> space_shortage);
+
+  absl::optional<LayoutUnit> MinimalSpaceShortage() const {
+    if (minimal_space_shortage_ == kIndefiniteSize) {
+      return absl::nullopt;
+    }
+    return minimal_space_shortage_;
+  }
+
+  void PropagateTallestUnbreakableBlockSize(LayoutUnit unbreakable_block_size) {
+    // We should only calculate the block-size of the tallest piece of
+    // unbreakable content during the initial column balancing pass, when we
+    // haven't set a tentative fragmentainer block-size yet.
+    DCHECK(IsInitialColumnBalancingPass());
+
+    tallest_unbreakable_block_size_ =
+        std::max(tallest_unbreakable_block_size_, unbreakable_block_size);
+  }
+
+  void SetIsInitialColumnBalancingPass() {
+    // Note that we have no dedicated flag for being in the initial column
+    // balancing pass here. We'll just bump tallest_unbreakable_block_size_ to
+    // 0, so that NGLayoutResult knows that we need to store unbreakable
+    // block-size.
+    DCHECK_EQ(tallest_unbreakable_block_size_, LayoutUnit::Min());
+    tallest_unbreakable_block_size_ = LayoutUnit();
+  }
+  bool IsInitialColumnBalancingPass() const {
+    return tallest_unbreakable_block_size_ >= LayoutUnit();
+  }
+
   const NGLayoutResult* Abort(NGLayoutResult::EStatus);
 
 #if DCHECK_IS_ON()
@@ -454,19 +496,22 @@ class CORE_EXPORT NGFragmentBuilder {
 
  protected:
   NGFragmentBuilder(const NGLayoutInputNode& node,
-                    scoped_refptr<const ComputedStyle> style,
+                    const ComputedStyle* style,
                     const NGConstraintSpace& space,
                     WritingDirectionMode writing_direction)
       : node_(node),
         space_(space),
-        style_(std::move(style)),
+        style_(style),
         writing_direction_(writing_direction),
         style_variant_(NGStyleVariant::kStandard) {
     DCHECK(style_);
     layout_object_ = node.GetLayoutBox();
   }
 
+  HeapVector<Member<LayoutBoxModelObject>>& EnsureStickyDescendants();
+  HeapHashSet<Member<LayoutBox>>& EnsureSnapAreas();
   NGLogicalAnchorQuery& EnsureAnchorQuery();
+  ScrollStartTargetCandidates& EnsureScrollStartTargets();
 
   void PropagateFromLayoutResultAndFragment(
       const NGLayoutResult&,
@@ -475,6 +520,7 @@ class CORE_EXPORT NGFragmentBuilder {
       const NGInlineContainer<LogicalOffset>* = nullptr);
 
   void PropagateFromLayoutResult(const NGLayoutResult&);
+  void PropagateScrollStartTarget(const NGPhysicalFragment& child);
 
   void PropagateFromFragment(
       const NGPhysicalFragment& child,
@@ -496,7 +542,7 @@ class CORE_EXPORT NGFragmentBuilder {
 
   NGLayoutInputNode node_;
   const NGConstraintSpace& space_;
-  scoped_refptr<const ComputedStyle> style_;
+  const ComputedStyle* style_;
   WritingDirectionMode writing_direction_;
   NGStyleVariant style_variant_;
   NGPhysicalFragment::NGBoxType box_type_ =
@@ -510,12 +556,16 @@ class CORE_EXPORT NGFragmentBuilder {
   // The break token to store in the resulting fragment.
   const NGBreakToken* break_token_ = nullptr;
 
+  HeapVector<Member<LayoutBoxModelObject>>* sticky_descendants_ = nullptr;
+  HeapHashSet<Member<LayoutBox>>* snap_areas_ = nullptr;
   NGLogicalAnchorQuery* anchor_query_ = nullptr;
   LayoutUnit bfc_line_offset_;
   absl::optional<LayoutUnit> bfc_block_offset_;
   NGMarginStrut end_margin_strut_;
   NGExclusionSpace exclusion_space_;
   absl::optional<int> lines_until_clamp_;
+
+  ScrollStartTargetCandidates* scroll_start_targets_ = nullptr;
 
   ChildrenVector children_;
 
@@ -546,6 +596,9 @@ class CORE_EXPORT NGFragmentBuilder {
   // See NGLayoutResult::BlockEndAnnotationSpace().
   LayoutUnit block_end_annotation_space_;
 
+  LayoutUnit minimal_space_shortage_ = kIndefiniteSize;
+  LayoutUnit tallest_unbreakable_block_size_ = LayoutUnit::Min();
+
   // The number of line boxes or flex lines added to the builder. Only updated
   // if we're performing block fragmentation.
   int line_count_ = 0;
@@ -556,8 +609,8 @@ class CORE_EXPORT NGFragmentBuilder {
   bool is_pushed_by_floats_ = false;
   bool subtree_modified_margin_strut_ = false;
   bool is_new_fc_ = false;
-  bool is_legacy_layout_root_ = false;
   bool is_block_in_inline_ = false;
+  bool is_line_for_parallel_flow_ = false;
   bool has_floating_descendants_for_paint_ = false;
   bool has_descendant_that_depends_on_percentage_block_size_ = false;
   bool has_orthogonal_fallback_size_descendant_ = false;

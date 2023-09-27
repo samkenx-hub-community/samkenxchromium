@@ -36,67 +36,27 @@
 #include "media/gpu/media_gpu_export.h"
 #include "media/gpu/v4l2/v4l2_device_poller.h"
 #include "media/gpu/v4l2/v4l2_queue.h"
+#include "media/gpu/v4l2/v4l2_utils.h"
 #include "media/video/video_decode_accelerator.h"
 #include "media/video/video_encode_accelerator.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "ui/gfx/geometry/size.h"
 #include "ui/gl/gl_bindings.h"
 
-// TODO(b/255770680): Remove this once V4L2 header is updated.
-// https://patchwork.linuxtv.org/project/linux-media/patch/20210810220552.298140-2-daniel.almeida@collabora.com/
+// This has not been accepted upstream.
 #ifndef V4L2_PIX_FMT_AV1
 #define V4L2_PIX_FMT_AV1 v4l2_fourcc('A', 'V', '0', '1') /* AV1 */
 #endif
+// This has been upstreamed and backported for ChromeOS, but has not been
+// picked up by the Chromium sysroots.
 #ifndef V4L2_PIX_FMT_AV1_FRAME
 #define V4L2_PIX_FMT_AV1_FRAME                        \
   v4l2_fourcc('A', 'V', '1', 'F') /* AV1 parsed frame \
                                    */
 #endif
 
-// TODO(b/278157861): Remove this once ChromeOS V4L2 header is updated
-// Add it directly instead of including hevc-ctrls-upstream.h
-#ifndef V4L2_PIX_FMT_HEVC_SLICE
-#define V4L2_PIX_FMT_HEVC_SLICE \
-  v4l2_fourcc('S', '2', '6', '5') /* HEVC parsed slices */
-#endif
-
-#if BUILDFLAG(IS_CHROMEOS)
-#ifndef V4L2_CID_MPEG_VIDEO_AV1_PROFILE
-#define V4L2_CID_MPEG_VIDEO_AV1_PROFILE V4L2_CID_STATELESS_AV1_PROFILE
-#endif
-#ifndef V4L2_MPEG_VIDEO_AV1_PROFILE_MAIN
-#define V4L2_MPEG_VIDEO_AV1_PROFILE_MAIN V4L2_STATELESS_AV1_PROFILE_MAIN
-#endif
-#ifndef V4L2_MPEG_VIDEO_AV1_PROFILE_HIGH
-#define V4L2_MPEG_VIDEO_AV1_PROFILE_HIGH V4L2_STATELESS_AV1_PROFILE_HIGH
-#endif
-#ifndef V4L2_MPEG_VIDEO_AV1_PROFILE_PROFESSIONAL
-#define V4L2_MPEG_VIDEO_AV1_PROFILE_PROFESSIONAL \
-  V4L2_STATELESS_AV1_PROFILE_PROFESSIONAL
-#endif
-#endif
-
-// TODO(b/260863940): Remove this once V4L2 header is updated
-#ifndef V4L2_CID_MPEG_VIDEO_HEVC_PROFILE
-#define V4L2_CID_MPEG_VIDEO_HEVC_PROFILE (V4L2_CID_MPEG_BASE + 615)
-#endif
-
-// TODO(b/132589320): remove this once V4L2 header is updated.
-#ifndef V4L2_PIX_FMT_MM21
-// MTK 8-bit block mode, two non-contiguous planes.
-#define V4L2_PIX_FMT_MM21 v4l2_fourcc('M', 'M', '2', '1')
-#endif
-
-#ifndef V4L2_PIX_FMT_P010
-#define V4L2_PIX_FMT_P010 \
-  v4l2_fourcc('P', '0', '1', '0') /* 24  Y/CbCr 4:2:0 10-bit per component */
-#endif
 #ifndef V4L2_PIX_FMT_MT2T
 #define V4L2_PIX_FMT_MT2T v4l2_fourcc('M', 'T', '2', 'T')
-#endif
-#ifndef V4L2_PIX_FMT_QC08C
-#define V4L2_PIX_FMT_QC08C \
-  v4l2_fourcc('Q', '0', '8', 'C') /* Qualcomm 8-bit compressed */
 #endif
 #ifndef V4L2_PIX_FMT_QC10C
 #define V4L2_PIX_FMT_QC10C \
@@ -111,21 +71,12 @@ class V4L2Queue;
 class V4L2RequestRef;
 class V4L2RequestsQueue;
 
-// Wrapper for the 'v4l2_ext_control' structure.
-struct V4L2ExtCtrl {
-  V4L2ExtCtrl(uint32_t id);
-  V4L2ExtCtrl(uint32_t id, int32_t val);
-  struct v4l2_ext_control ctrl;
-};
+struct V4L2ExtCtrl;
 
 class MEDIA_GPU_EXPORT V4L2Device
     : public base::RefCountedThreadSafe<V4L2Device> {
  public:
   // Utility format conversion functions
-  // If there is no corresponding single- or multi-planar format, returns
-  // V4L2_PIX_FMT_INVALID.
-  static uint32_t VideoCodecProfileToV4L2PixFmt(VideoCodecProfile profile,
-                                                bool slice_based);
   // Calculates the largest plane's allocation size requested by a V4L2 device.
   static gfx::Size AllocatedSizeFromV4L2Format(
       const struct v4l2_format& format);
@@ -133,14 +84,6 @@ class MEDIA_GPU_EXPORT V4L2Device
   // Convert required H264 profile and level to V4L2 enums.
   static int32_t VideoCodecProfileToV4L2H264Profile(VideoCodecProfile profile);
   static int32_t H264LevelIdcToV4L2H264Level(uint8_t level_idc);
-
-  // Composes VideoFrameLayout based on v4l2_format.
-  // If error occurs, it returns absl::nullopt.
-  static absl::optional<VideoFrameLayout> V4L2FormatToVideoFrameLayout(
-      const struct v4l2_format& format);
-
-  // Returns number of planes of |pix_fmt|.
-  static size_t GetNumPlanesOfV4L2PixFmt(uint32_t pix_fmt);
 
   enum class Type {
     kDecoder,
@@ -150,20 +93,7 @@ class MEDIA_GPU_EXPORT V4L2Device
     kJpegEncoder,
   };
 
-  inline static constexpr char kLibV4l2Path[] =
-#if defined(__aarch64__)
-      "/usr/lib64/libv4l2.so";
-#else
-      "/usr/lib/libv4l2.so";
-#endif
-
-  // Returns true iff libv4l2 should be used to interact with the V4L2 driver.
-  // This method is thread-safe.
-  static bool UseLibV4L2();
-
-  // Create and initialize an appropriate V4L2Device instance for the current
-  // platform, or return nullptr if not available.
-  static scoped_refptr<V4L2Device> Create();
+  V4L2Device();
 
   // Open a V4L2 device of |type| for use with |v4l2_pixfmt|.
   // Return true on success.
@@ -206,14 +136,6 @@ class MEDIA_GPU_EXPORT V4L2Device
              int flags,
              unsigned int offset);
   void Munmap(void* addr, unsigned int len);
-
-  // Return a vector of dmabuf file descriptors, exported for V4L2 buffer with
-  // |index|, assuming the buffer contains |num_planes| V4L2 planes and is of
-  // |type|. Return an empty vector on failure.
-  // The caller is responsible for closing the file descriptors after use.
-  std::vector<base::ScopedFD> GetDmabufsForV4L2Buffer(int index,
-                                                      size_t num_planes,
-                                                      enum v4l2_buf_type type);
 
   // Return true if the given V4L2 pixfmt can be used in CreateEGLImage()
   // for the current platform.
@@ -308,28 +230,26 @@ class MEDIA_GPU_EXPORT V4L2Device
   // Set periodic keyframe placement (group of pictures length)
   bool SetGOPLength(uint32_t gop_length);
 
+  void set_secure_allocate_cb(
+      AllocateSecureBufferAsCallback secure_allocate_cb) {
+    secure_allocate_cb_ = secure_allocate_cb;
+  }
+  AllocateSecureBufferAsCallback get_secure_allocate_cb() {
+    return secure_allocate_cb_;
+  }
+
  private:
   friend class base::RefCountedThreadSafe<V4L2Device>;
   // Vector of video device node paths and corresponding pixelformats supported
   // by each device node.
   using Devices = std::vector<std::pair<std::string, std::vector<uint32_t>>>;
 
-  // Lazily initialize static data after sandbox is enabled.  Return false on
-  // init failure.
-  static bool PostSandboxInitialization();
-
-  V4L2Device();
   ~V4L2Device();
 
   VideoDecodeAccelerator::SupportedProfiles EnumerateSupportedDecodeProfiles(
       const std::vector<uint32_t>& pixelformats);
 
   VideoEncodeAccelerator::SupportedProfiles EnumerateSupportedEncodeProfiles();
-
-  // Perform platform-specific initialization of the device instance.
-  // Return true on success, false on error or if the particular implementation
-  // is not available.
-  [[nodiscard]] bool Initialize();
 
   // Open device node for |path| as a device of |type|.
   bool OpenDevicePath(const std::string& path, Type type);
@@ -375,11 +295,11 @@ class MEDIA_GPU_EXPORT V4L2Device
   // interrupted.
   base::ScopedFD device_poll_interrupt_fd_;
 
-  // Use libv4l2 when operating |device_fd_|.
-  bool use_libv4l2_ = false;
-
   // Associates a v4l2_buf_type to its queue.
   base::flat_map<enum v4l2_buf_type, V4L2Queue*> queues_;
+
+  // Callback to use for allocating secure buffers.
+  AllocateSecureBufferAsCallback secure_allocate_cb_;
 
   SEQUENCE_CHECKER(client_sequence_checker_);
 };

@@ -73,11 +73,15 @@ class ASH_EXPORT MediaTray : public MediaNotificationProviderObserver,
   void CloseBubble() override;
   void HideBubbleWithView(const TrayBubbleView* bubble_view) override;
   void ClickedOutsideBubble() override;
+  void UpdateTrayItemColor(bool is_active) override;
   void AnchorUpdated() override;
 
   // SessionObserver:
   void OnLockStateChanged(bool locked) override;
   void OnActiveUserPrefServiceChanged(PrefService* pref_service) override;
+
+  // Callback called when this TrayBackgroundView is pressed.
+  void OnTrayButtonPressed();
 
   // Show/hide media tray.
   void UpdateDisplayState();
@@ -105,7 +109,8 @@ class ASH_EXPORT MediaTray : public MediaNotificationProviderObserver,
   void ShowEmptyState();
 
   // Ptr to pin button in the dialog, owned by the view hierarchy.
-  raw_ptr<views::Button, ExperimentalAsh> pin_button_ = nullptr;
+  raw_ptr<views::Button, DanglingUntriaged | ExperimentalAsh> pin_button_ =
+      nullptr;
 
   std::unique_ptr<TrayBubbleWrapper> bubble_;
   std::unique_ptr<PrefChangeRegistrar> pref_change_registrar_;
@@ -113,7 +118,8 @@ class ASH_EXPORT MediaTray : public MediaNotificationProviderObserver,
   // Weak pointer, will be parented by TrayContainer for its lifetime.
   raw_ptr<views::ImageView, ExperimentalAsh> icon_;
 
-  raw_ptr<views::View, ExperimentalAsh> content_view_ = nullptr;
+  raw_ptr<views::View, DanglingUntriaged | ExperimentalAsh> content_view_ =
+      nullptr;
   raw_ptr<views::View, ExperimentalAsh> empty_state_view_ = nullptr;
 
   bool bubble_has_shown_ = false;

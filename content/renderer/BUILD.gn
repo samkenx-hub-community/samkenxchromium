@@ -29,6 +29,7 @@ target(link_target_type, "renderer") {
     "//content/public/renderer:renderer_sources",
     "//content/renderer:audio_decoder_fuzzer",
     "//content/renderer:content_security_policy_util_fuzzer",
+    "//media/mojo/clients:unit_tests",
   ]
 
   sources = [
@@ -200,10 +201,6 @@ target(link_target_type, "renderer") {
     ]
   }
 
-  if (is_apple) {
-    configs += [ "//build/config/compiler:enable_arc" ]
-  }
-
   if (is_mac) {
     sources += [
       "renderer_main_platform_delegate_mac.mm",
@@ -249,6 +246,7 @@ target(link_target_type, "renderer") {
     "//components/discardable_memory/client",
     "//components/metrics",
     "//components/metrics:single_sample_metrics",
+    "//components/startup_metric_utils",
     "//components/url_formatter",
     "//components/variations:variations_mojom",
     "//components/variations/net",
@@ -334,8 +332,6 @@ target(link_target_type, "renderer") {
 
   if (is_android) {
     deps += [
-      "//components/power_scheduler",
-
       # Used by Android WebView only.
       "//components/viz/service",
       "//third_party/ashmem",

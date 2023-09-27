@@ -197,8 +197,10 @@ class WaylandSurfaceFactoryTest : public WaylandTest {
     // Set this bug fix so that WaylandFrameManager does not use a freeze
     // counter. Otherwise, we won't be able to have a reliable test order of
     // frame submissions. This must be set before any window is created
-    // (WaylandTest does that for us during the SetUp phase).
-    server_.zaura_shell()->SetBugFixes({1358908});
+    // (WaylandTest does that for us during the SetUp phase). See
+    // crbug.com/1358908 for more details.
+    constexpr uint32_t kBugIdFreezeTimer = 1358908;
+    server_.zaura_shell()->SetBugFixes({kBugIdFreezeTimer});
 
     WaylandTest::SetUp();
 
@@ -208,7 +210,9 @@ class WaylandSurfaceFactoryTest : public WaylandTest {
         /*supports_dma_buf=*/false,
         /*supports_viewporter=*/true,
         /*supports_acquire_fence=*/false,
-        /*supports_overlays=*/true, kAugmentedSurfaceNotSupportedVersion);
+        /*supports_overlays=*/true, kAugmentedSurfaceNotSupportedVersion,
+        /*supports_single_pixel_buffer=*/true,
+        /*bug_fix_ids=*/{kBugIdFreezeTimer});
 
     // Wait until initialization and mojo calls go through.
     base::RunLoop().RunUntilIdle();

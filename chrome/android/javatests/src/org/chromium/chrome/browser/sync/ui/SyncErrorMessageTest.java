@@ -58,7 +58,7 @@ import java.io.IOException;
  */
 @RunWith(ChromeJUnit4ClassRunner.class)
 @DoNotBatch(reason = "TODO(crbug.com/1168590): SyncTestRule doesn't support batching.")
-@EnableFeatures({ChromeFeatureList.MESSAGES_FOR_ANDROID_INFRASTRUCTURE})
+@EnableFeatures(ChromeFeatureList.MESSAGES_FOR_ANDROID_INFRASTRUCTURE)
 @CommandLineFlags.Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE})
 public class SyncErrorMessageTest {
     @Mock
@@ -192,7 +192,7 @@ public class SyncErrorMessageTest {
         int syncError = TestThreadUtils.runOnUiThreadBlockingNoException(() -> {
             mFakeSyncServiceImpl.setInitialSyncFeatureSetupComplete(
                     SyncFirstSetupCompleteSource.BASIC_FLOW);
-            return SyncSettingsUtils.getSyncError();
+            return SyncSettingsUtils.getSyncError(mSyncTestRule.getSyncService());
         });
 
         Assert.assertEquals(MessageType.NOT_SHOWN, SyncErrorMessage.getMessageType(syncError));

@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -144,6 +144,7 @@ TEST_F(ArcPolicyUtilTest, RecordPolicyMetricsWithKnownKeys) {
       kArcPolicyKeyCredentialsConfigDisabled,
       kArcPolicyKeyCaCerts,
       kArcPolicyKeyRequiredKeyPairs,
+      kArcPolicyKeyEnabledSystemAppPackageNames,
   };
   std::string policy = CreatePolicyWithKeys(test_keys);
 
@@ -202,7 +203,9 @@ TEST_F(ArcPolicyUtilTest, RecordPolicyMetricsWithKnownKeys) {
   tester_.ExpectBucketCount(kArcPolicyKeyHistogram, ArcPolicyKey::kCaCerts, 1);
   tester_.ExpectBucketCount(kArcPolicyKeyHistogram,
                             ArcPolicyKey::kRequiredKeyPairs, 1);
-  tester_.ExpectTotalCount(kArcPolicyKeyHistogram, 26);
+  tester_.ExpectBucketCount(kArcPolicyKeyHistogram,
+                            ArcPolicyKey::kEnabledSystemAppPackageNames, 1);
+  tester_.ExpectTotalCount(kArcPolicyKeyHistogram, 27);
 }
 
 TEST_F(ArcPolicyUtilTest, RecordPolicyMetricsWithOneAppOfEachType) {

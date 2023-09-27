@@ -21,6 +21,7 @@
 #include "ui/views/controls/webview/webview_export.h"
 #include "ui/views/metadata/view_factory.h"
 #include "ui/views/view.h"
+#include "ui/views/view_tracker.h"
 
 namespace views {
 
@@ -53,6 +54,8 @@ class WEBVIEW_EXPORT WebView : public View,
   WebView& operator=(const WebView&) = delete;
 
   ~WebView() override;
+
+  static bool IsWebViewContents(const content::WebContents* web_contents);
 
   // This creates a WebContents if |browser_context_| has been set and there is
   // not yet a WebContents associated with this WebView, otherwise it will
@@ -90,7 +93,11 @@ class WEBVIEW_EXPORT WebView : public View,
 
   // If provided, this View will be shown in place of the web contents
   // when the web contents is in a crashed state. This is cleared automatically
-  // if the web contents is changed.
+  // if the web contents is changed. The passed-in overlay view must be owned by
+  // the client; this method never takes ownership of it.
+  //
+  // TODO(https://crbug.com/1471674): This method should take ownership of
+  // `crashed_overlay_view`.
   void SetCrashedOverlayView(View* crashed_overlay_view);
 
   // Adds a callback for when a WebContents is attached to this WebView.
@@ -106,6 +113,12 @@ class WEBVIEW_EXPORT WebView : public View,
   // processed. Default is false.
   void set_allow_accelerators(bool allow_accelerators) {
     allow_accelerators_ = allow_accelerators;
+  }
+
+  // When `lock = true` changes in web contents will not reset the override.
+  // Default is false.
+  void set_lock_child_ax_tree_id_override(bool lock) {
+    lock_child_ax_tree_id_override_ = lock;
   }
 
   // Overridden from content::WebContentsDelegate:
@@ -203,8 +216,10 @@ class WEBVIEW_EXPORT WebView : public View,
   bool is_letterboxing_ = false;
   raw_ptr<content::BrowserContext> browser_context_;
   bool allow_accelerators_ = false;
-  raw_ptr<View, DanglingUntriaged> crashed_overlay_view_ = nullptr;
+  ViewTracker crashed_overlay_view_;
   bool is_primary_web_contents_for_window_ = false;
+
+  bool lock_child_ax_tree_id_override_ = false;
 
   // Minimum and maximum sizes to determine WebView bounds for auto-resizing.
   // Empty if auto resize is not enabled.

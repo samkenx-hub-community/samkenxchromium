@@ -97,6 +97,15 @@ ScopedJavaLocalRef<jobject> SelectionPopupController::GetContext() const {
   return Java_SelectionPopupControllerImpl_getContext(env, obj);
 }
 
+void SelectionPopupController::SetTextHandlesHiddenForDropdownMenu(
+    JNIEnv* env,
+    const JavaParamRef<jobject>& obj,
+    jboolean hidden) {
+  if (rwhva_) {
+    rwhva_->SetTextHandlesHiddenForDropdownMenu(hidden);
+  }
+}
+
 void SelectionPopupController::SetTextHandlesTemporarilyHidden(
     JNIEnv* env,
     const JavaParamRef<jobject>& obj,
@@ -106,13 +115,14 @@ void SelectionPopupController::SetTextHandlesTemporarilyHidden(
 }
 
 std::unique_ptr<ui::TouchHandleDrawable>
-SelectionPopupController::CreateTouchHandleDrawable() {
+SelectionPopupController::CreateTouchHandleDrawable(
+    gfx::NativeView parent_native_view,
+    cc::slim::Layer* parent_layer) {
   ScopedJavaLocalRef<jobject> activityContext = GetContext();
   // If activityContext is null then Application context is used instead on
   // the java side in CompositedTouchHandleDrawable.
-  auto* view = web_contents()->GetNativeView();
-  return std::unique_ptr<ui::TouchHandleDrawable>(
-      new CompositedTouchHandleDrawable(view, activityContext));
+  return std::make_unique<CompositedTouchHandleDrawable>(
+      parent_native_view, parent_layer, activityContext);
 }
 
 void SelectionPopupController::MoveRangeSelectionExtent(
@@ -209,8 +219,9 @@ bool SelectionPopupController::ShowSelectionMenu(
     return false;
 
   // Don't show paste pop-up for non-editable textarea.
-  if (!params.is_editable && params.selection_text.empty())
+  if (!params.is_editable && params.selection_text.empty()) {
     return false;
+  }
 
   const bool can_select_all =
       !!(params.edit_flags & blink::ContextMenuDataEditFlags::kCanSelectAll);
@@ -225,11 +236,11 @@ bool SelectionPopupController::ShowSelectionMenu(
                               params.source_type == ui::MENU_SOURCE_LONG_PRESS;
 
   Java_SelectionPopupControllerImpl_showSelectionMenu(
-      env, obj, params.selection_rect.x(), params.selection_rect.y(),
-      params.selection_rect.right(), params.selection_rect.bottom(),
-      handle_height, params.is_editable, is_password_type, jselected_text,
-      params.selection_start_offset, can_select_all, can_edit_richly,
-      should_suggest, params.source_type,
+      env, obj, params.x, params.y, params.selection_rect.x(),
+      params.selection_rect.y(), params.selection_rect.right(),
+      params.selection_rect.bottom(), handle_height, params.is_editable,
+      is_password_type, jselected_text, params.selection_start_offset,
+      can_select_all, can_edit_richly, should_suggest, params.source_type,
       render_frame_host->GetJavaRenderFrameHost());
   return true;
 }

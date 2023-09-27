@@ -30,11 +30,16 @@ BASE_FEATURE(kCustomizeChromeColorExtraction,
              "CustomizeChromeColorExtraction",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-// If enabled, Customize Chrome will be an option in the Unified Side Panel
-// when on the New Tab Page.
-BASE_FEATURE(kCustomizeChromeSidePanel,
-             "CustomizeChromeSidePanel",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+// If enabled, shows an extension card within the Customize Chrome Side
+// Panel for access to the Chrome Web Store extensions.
+BASE_FEATURE(kCustomizeChromeSidePanelExtensionsCard,
+             "CustomizeChromeSidePanelExtensionsCard",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// If enabled, shows wallpaper search within the Cusotmize Chrome Side Panel.
+BASE_FEATURE(kCustomizeChromeWallpaperSearch,
+             "CustomizeChromeWallpaperSearch",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Forces a dark Google logo for a specific subset of Chrome Web Store themes
 // (see crbug.com/1329552). This is enabled by default to allow finch to disable
@@ -59,11 +64,10 @@ BASE_FEATURE(kRealboxWidthBehavior,
              "NtpRealboxWidthBehavior",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// If enabled, the NTP "realbox" will have the same rounded corners as
-// searchbox.
-BASE_FEATURE(kRealboxRoundedCorners,
-             "NtpRealboxRoundedCorners",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+// If enabled, the realbox will be taller.
+BASE_FEATURE(kRealboxIsTall,
+             "NtpRealboxIsTall",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // If enabled, the real search box ("realbox") on the New Tab page will show a
 // Google (g) icon instead of the typical magnifying glass (aka loupe).
@@ -104,6 +108,17 @@ BASE_FEATURE(kNtpDummyModules,
 BASE_FEATURE(kNtpDriveModule,
              "NtpDriveModule",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+// If enabled, segmentation data will be collected to decide whether or not to
+// show the Drive module.
+BASE_FEATURE(kNtpDriveModuleSegmentation,
+             "NtpDriveModuleSegmentation",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// If enabled, six files show in the NTP Drive module, instead of three.
+BASE_FEATURE(kNtpDriveModuleShowSixFiles,
+             "NtpDriveModuleShowSixFiles",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // If enabled, handles navigations from the Most Visited tiles explicitly and
 // overrides the navigation's transition type to bookmark navigation before the
@@ -148,6 +163,16 @@ BASE_FEATURE(kNtpModulesOrder,
              "NtpModulesOrder",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Dummy feature to set param "NtpModulesMaxColumnCountParam".
+BASE_FEATURE(kNtpModulesMaxColumnCount,
+             "NtpModulesMaxColumnCount",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Dummy feature to set param "NtpModulesLoadedWithOtherModulesMaxInstanceCount"
+BASE_FEATURE(kNtpModulesLoadedWithOtherModulesMaxInstanceCount,
+             "NtpModulesLoadedWithOtherModulesMaxInstanceCount",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // If true, displays a horizontal scrollbar on overflowing modules.
 BASE_FEATURE(kNtpModulesOverflowScrollbar,
              "NtpModulesOverflowScrollbar",
@@ -161,7 +186,7 @@ BASE_FEATURE(kNtpModulesDragAndDrop,
 // If enabled, the first run experience for Modular NTP Desktop v1 will show.
 BASE_FEATURE(kNtpModulesFirstRunExperience,
              "NtpModulesFirstRunExperience",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // If enabled, modules will be loaded but not shown. This is useful to determine
 // if a user would have seen modules in order to counterfactually log or
@@ -219,16 +244,17 @@ BASE_FEATURE(kNtpFeedModule,
 // If enabled, Google Lens image search will be shown in the NTP Realbox.
 BASE_FEATURE(kNtpRealboxLensSearch,
              "NtpRealboxLensSearch",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
+// If enabled, Google Lens image search will call Lens v3 direct upload
+// endpoint instead of uploading to Scotty.
+BASE_FEATURE(kNtpLensDirectUpload,
+             "NtpLensDirectUpload",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // If enabled, recipe tasks module will be shown.
 BASE_FEATURE(kNtpRecipeTasksModule,
              "NtpRecipeTasksModule",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-// Controls whether the scrim is removed.
-BASE_FEATURE(kNtpRemoveScrim,
-             "NtpRemoveScrim",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 // If enabled, SafeBrowsing module will be shown to a target user.
@@ -286,6 +312,17 @@ BASE_FEATURE(kNtpModulesHeaderIcon,
              "NtpModulesHeaderIcon",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// If enabled a suggestion chip will show in the header for Quests V2.
+BASE_FEATURE(kNtpHistoryClustersModuleSuggestionChipHeader,
+             "NtpHistoryClustersModuleSuggestionChipHeader",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// If enabled, Discounts badge will show on the visit tile in the History
+// clusters module when available.
+BASE_FEATURE(kNtpHistoryClustersModuleDiscounts,
+             "NtpHistoryClustersModuleDiscounts",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // If enabled, ChromeCart tile will show in the History clusters module when
 // available.
 BASE_FEATURE(kNtpChromeCartInHistoryClusterModule,
@@ -294,6 +331,10 @@ BASE_FEATURE(kNtpChromeCartInHistoryClusterModule,
 
 BASE_FEATURE(kNtpHistoryClustersModuleUseModelRanking,
              "NtpHistoryClustersModuleUseModelRanking",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kNtpHistoryClustersModuleTextOnly,
+             "NtpHistoryClustersModuleTextOnly",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // If enabled, ChromeCart module will show together with ChromeCart+History
@@ -309,16 +350,25 @@ BASE_FEATURE(kNtpHistoryClustersModuleFetchClustersUntilExhausted,
              "NtpHistoryClustersModuleFetchClustersUntilExhausted",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-const base::FeatureParam<std::string> kNtpOgbButtonSelectorParam{
-    &kNtpRemoveScrim, "NtpOgbButtonSelectorParam", ".gb_A"};
+// If enabled, the History clusters module will contain visits from other
+// devices.
+BASE_FEATURE(kNtpHistoryClustersModuleIncludeSyncedVisits,
+             "NtpHistoryClustersModuleIncludeSyncedVisits",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
-const base::FeatureParam<std::string> kNtpOgbUnprotectedTextSelectorParam{
-    &kNtpRemoveScrim, "NtpOgbUnprotectedTextSelectorParam", ".gb_d"};
+// If enabled, the History clsuters module will enable content clustering for
+// the displayed clusters.
+BASE_FEATURE(kNtpHistoryClustersModuleEnableContentClustering,
+             "HistoryClustersModuleEnableContentClustering",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 const char kNtpModulesEligibleForHappinessTrackingSurveyParam[] =
     "NtpModulesEligibleForHappinessTrackingSurveyParam";
 const char kNtpModulesLoadTimeoutMillisecondsParam[] =
     "NtpModulesLoadTimeoutMillisecondsParam";
+const char kNtpModulesLoadedWithOtherModulesMaxInstanceCountParam[] =
+    "NtpModulesLoadedWithOtherModulesMaxInstanceCountParam";
+const char kNtpModulesMaxColumnCountParam[] = "NtpModulesMaxColumnCountParam";
 const char kNtpModulesOrderParam[] = "NtpModulesOrderParam";
 const char kNtpChromeCartModuleDataParam[] = "NtpChromeCartModuleDataParam";
 const char kNtpChromeCartModuleAbandonedCartDiscountParam[] =
@@ -369,6 +419,8 @@ const char kNtpHistoryClustersModuleCategoriesBoostlistParam[] =
 const char kNtpHistoryClustersModuleMaxClustersParam[] =
     "NtpHistoryClustersModuleMaxClustersParam";
 const char kNtpRealboxWidthBehaviorParam[] = "NtpRealboxWidthBehaviorParam";
+const char kCustomizeChromeWallpaperSearchResolutionParam[] =
+    "CustomizeChromeWallpaperSearchResolutionParam";
 
 base::TimeDelta GetModulesLoadTimeout() {
   std::string param_value = base::GetFieldTrialParamValueByFeature(
@@ -381,6 +433,17 @@ base::TimeDelta GetModulesLoadTimeout() {
     return base::Seconds(3);
   }
   return base::Milliseconds(param_value_as_int);
+}
+
+int GetModulesMaxColumnCount() {
+  return base::GetFieldTrialParamByFeatureAsInt(
+      kNtpModulesMaxColumnCount, kNtpModulesMaxColumnCountParam, 3);
+}
+
+int GetMultipleLoadedModulesMaxModuleInstanceCount() {
+  return base::GetFieldTrialParamByFeatureAsInt(
+      kNtpModulesLoadedWithOtherModulesMaxInstanceCount,
+      kNtpModulesLoadedWithOtherModulesMaxInstanceCountParam, 2);
 }
 
 std::vector<std::string> GetModulesOrder() {

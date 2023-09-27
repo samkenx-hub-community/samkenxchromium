@@ -7,7 +7,9 @@ package org.chromium.chrome.browser.device_lock;
 import android.content.Context;
 import android.content.Intent;
 
-import org.chromium.chrome.browser.ui.signin.DeviceLockActivityLauncher;
+import androidx.annotation.Nullable;
+
+import org.chromium.components.browser_ui.device_lock.DeviceLockActivityLauncher;
 import org.chromium.ui.base.WindowAndroid;
 
 /**
@@ -30,10 +32,11 @@ public class DeviceLockActivityLauncherImpl implements DeviceLockActivityLaunche
     private DeviceLockActivityLauncherImpl() {}
 
     @Override
-    public void launchDeviceLockActivity(Context context, boolean inSignInFlow,
-            String selectedAccount, WindowAndroid windowAndroid,
+    public void launchDeviceLockActivity(Context context, @Nullable String selectedAccount,
+            boolean requireDeviceLockReauthentication, WindowAndroid windowAndroid,
             WindowAndroid.IntentCallback callback) {
-        Intent intent = DeviceLockActivity.createIntent(context, inSignInFlow, selectedAccount);
+        Intent intent = DeviceLockActivity.createIntent(
+                context, selectedAccount, requireDeviceLockReauthentication);
         windowAndroid.showIntent(intent, callback, null);
     }
 }

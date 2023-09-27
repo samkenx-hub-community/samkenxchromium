@@ -149,7 +149,7 @@ void CrossRealmTransformSendError(ScriptState* script_state,
                                   MessagePort* port,
                                   v8::Local<v8::Value> error) {
   ExceptionState exception_state(script_state->GetIsolate(),
-                                 ExceptionState::kUnknownContext, "", "");
+                                 ExceptionContextType::kUnknown, "", "");
 
   // https://streams.spec.whatwg.org/#abstract-opdef-crossrealmtransformsenderror
   // 1. Perform PackAndPostMessage(port, "error", error), discarding the result.
@@ -177,7 +177,7 @@ bool PackAndPostMessageHandlingError(
     AllowPerChunkTransferring allow_per_chunk_transferring,
     v8::Local<v8::Value>* error) {
   ExceptionState exception_state(script_state->GetIsolate(),
-                                 ExceptionState::kUnknownContext, "", "");
+                                 ExceptionContextType::kUnknown, "", "");
 
   // https://streams.spec.whatwg.org/#abstract-opdef-packandpostmessagehandlingerror
   // 1. Let result be PackAndPostMessage(port, type, value).
@@ -818,15 +818,23 @@ class ConcatenatingUnderlyingSource final : public UnderlyingSourceBase {
       source_->has_finished_reading_stream1_ = true;
       ReadableStreamDefaultController* controller =
           source_->Controller()->GetOriginalController();
-      // TODO(ricea): Remove or demote to DCHECK once
-      // https://crbug.com/1418910 has been fixed.
-      CHECK(controller);
-      resolver_->Resolve(
-          script_state,
-          ToV8(source_->source2_->startWrapper(script_state, controller)
-                   .Then(CreateFunction<PullSource2>(script_state, source_)),
-               script_state->GetContext()->Global(),
-               script_state->GetIsolate()));
+      auto* isolate = script_state->GetIsolate();
+      if (controller) {
+        resolver_->Resolve(
+            script_state,
+            ToV8(source_->source2_->startWrapper(script_state, controller)
+                     .Then(CreateFunction<PullSource2>(script_state, source_)),
+                 script_state->GetContext()->Global(), isolate));
+      } else {
+        // TODO(crbug.com/1418910): Investigate how to handle cases when the
+        // controller is cleared.
+        resolver_->Reject(script_state,
+                          v8::Exception::TypeError(V8String(
+                              isolate,
+                              "The readable stream controller has been cleared "
+                              "and cannot be used to start reading the second "
+                              "stream.")));
+      }
     }
 
     void ErrorSteps(ScriptState* script_state,
@@ -837,7 +845,7 @@ class ConcatenatingUnderlyingSource final : public UnderlyingSourceBase {
               /*high_water_mark=*/0);
 
       ExceptionState exception_state(script_state->GetIsolate(),
-                                     ExceptionState::kUnknownContext, "", "");
+                                     ExceptionContextType::kUnknown, "", "");
       dummy_stream->cancel(
           script_state,
           ScriptValue(script_state->GetIsolate(),
@@ -869,7 +877,7 @@ class ConcatenatingUnderlyingSource final : public UnderlyingSourceBase {
 
   ScriptPromise Start(ScriptState* script_state) override {
     ExceptionState exception_state(script_state->GetIsolate(),
-                                   ExceptionState::kUnknownContext, "", "");
+                                   ExceptionContextType::kUnknown, "", "");
     reader_for_stream1_ = ReadableStream::AcquireDefaultReader(
         script_state, stream1_, exception_state);
     if (exception_state.HadException()) {
@@ -897,7 +905,7 @@ class ConcatenatingUnderlyingSource final : public UnderlyingSourceBase {
       return source2_->Cancel(script_state, reason);
     }
     ExceptionState exception_state(script_state->GetIsolate(),
-                                   ExceptionState::kUnknownContext, "", "");
+                                   ExceptionContextType::kUnknown, "", "");
     ScriptPromise cancel_promise1 =
         reader_for_stream1_->cancel(script_state, reason, exception_state);
     if (exception_state.HadException()) {

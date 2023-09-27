@@ -95,14 +95,13 @@ class AutocompleteController : public AutocompleteProviderListener,
                                  bool default_match_changed) {}
   };
 
-  // Given a match, returns the appropriate type and zero or more subtypes
-  // corresponding to the SuggestType and SuggestSubtype enums in types.proto.
+  // Given a match, returns zero or more subtypes corresponding to SuggestType
+  // and SuggestSubtype enums in //third_party/omnibox_proto/types.proto.
   // This is needed to update Chrome's native types/subtypes to those expected
   // by the server. For more details, see go/chrome-suggest-logging.
   // Note: `subtypes` may be prepopulated with server-reported subtypes.
-  static void GetMatchTypeAndExtendSubtypes(
+  static void ExtendMatchSubtypes(
       const AutocompleteMatch& match,
-      omnibox::SuggestType* type,
       base::flat_set<omnibox::SuggestSubtype>* subtypes);
 
   // |provider_types| is a bitmap containing AutocompleteProvider::Type values
@@ -120,9 +119,9 @@ class AutocompleteController : public AutocompleteProviderListener,
   AutocompleteController& operator=(const AutocompleteController&) = delete;
 
   // UI elements that need to be notified when the results get updated should
-  // be added as an |observer|. So far there is no need for a RemoveObserver
-  // method because all observers outlive the AutocompleteController.
+  // be added as an |observer|.
   void AddObserver(Observer* observer);
+  void RemoveObserver(Observer* observer);
 
   // Starts an autocomplete query, which continues until all providers are
   // done or the query is Stop()ed.  It is safe to Start() a new query without
@@ -209,9 +208,9 @@ class AutocompleteController : public AutocompleteProviderListener,
   OpenTabProvider* open_tab_provider() const { return open_tab_provider_; }
 
   const AutocompleteInput& input() const { return input_; }
-  const AutocompleteResult& result() const;
-  // Groups result_ by search vs URL.
-  // See also AutocompleteResult::GroupSuggestionsBySearchVsURL()
+  const AutocompleteResult& result() const { return published_result_; };
+  // Groups `published_result_` by search vs URL.
+  // See also `AutocompleteResult::GroupSuggestionsBySearchVsURL()`.
   void GroupSuggestionsBySearchVsURL(size_t begin, size_t end);
   bool done() const { return done_; }
   bool sync_pass_done() const { return sync_pass_done_; }
@@ -238,7 +237,13 @@ class AutocompleteController : public AutocompleteProviderListener,
   // match into the result set, currently still needed only by iOS.
   size_t InjectAdHocMatch(AutocompleteMatch match);
 
+  // Sets the position of the omnibox when it's in steady state (unfocused).
+  // Only used on iOS for logging purposes.
+  void SetSteadyStateOmniboxPosition(
+      metrics::OmniboxEventProto::OmniboxPosition position);
+
  private:
+  friend class AutocompleteControllerTest;
   friend class FakeAutocompleteController;
   friend class AutocompleteProviderTest;
   friend class OmniboxSuggestionButtonRowBrowserTest;
@@ -279,6 +284,8 @@ class AutocompleteController : public AutocompleteProviderListener,
                            PopupInlineAutocompleteAndTemporaryText);
   FRIEND_TEST_ALL_PREFIXES(OmniboxPopupViewViewsTest,
                            EmitSelectedChildrenChangedAccessibilityEvent);
+  FRIEND_TEST_ALL_PREFIXES(OmniboxEditModelPopupTest,
+                           OpenActionSelectionLogsOmniboxEvent);
 
   // Helpers called by the constructor. These initialize the specified providers
   // and add them `providers_`. Split into 2 methods to avoid accidentally
@@ -287,7 +294,7 @@ class AutocompleteController : public AutocompleteProviderListener,
   void InitializeAsyncProviders(int provider_types);
   void InitializeSyncProviders(int provider_types);
 
-  // Updates |result_| to reflect the current provider state and fires
+  // Updates |internal_result_| to reflect the current provider state and fires
   // notifications.  If |regenerate_result| then we clear the result
   // so when we incorporate the current provider state we end up
   // implicitly removing all expired matches.  (Normally we allow
@@ -303,6 +310,14 @@ class AutocompleteController : public AutocompleteProviderListener,
   // even if the default match didn't change.
   void UpdateResult(bool regenerate_result,
                     bool force_notify_default_match_changed);
+
+  // When the preserve default feature param is enabled, the default match
+  // that would have been shown before ML scoring is preserved. In this case,
+  // call `SortAndCull()` before the ML model is invoked to determine what
+  // this default match would've been. This also limits the potential
+  // suggestions to only what would've been shown in the legacy system.
+  absl::optional<AutocompleteMatch> PreprocessResultForMlScoring(
+      absl::optional<AutocompleteMatch> default_match_to_preserve);
 
   // Calls `SortAndCull()`, then annotates the final set of suggestions (with
   // open tab match, pedals, keyword info, etc.). Upon completion, notifies the
@@ -375,11 +390,14 @@ class AutocompleteController : public AutocompleteProviderListener,
   // for all the eligible matches, whether successfully or not.
   void RunUrlScoringModel(base::OnceClosure completion_callback);
 
-  // Runs the async batch scoring for all the eligible matches in
-  // `results_.matches_`. Passes `completion_callback` to
-  // `OnUrlScoringModelDone()` callback which is called once the model is done
-  // for all the eligible matches, whether successfully or not.
-  void RunBatchUrlScoringModel(base::OnceClosure completion_callback);
+  // Runs the batch scoring for all the eligible matches in
+  // `results_.matches_`. If `is_sync` is true, runs sync ML scoring on the
+  // current thread. Otherwise, runs async ML scoring. Passes
+  // `completion_callback` to `OnUrlScoringModelDone()` callback which is called
+  // once the model is done for all the eligible matches, whether successfully
+  // or not.
+  void RunBatchUrlScoringModel(base::OnceClosure completion_callback,
+                               bool is_sync);
 
   // Called when the async scoring model is done running for all the eligible
   // matches in `results_.matches_`. Redistributes the existing relevance scores
@@ -445,14 +463,12 @@ class AutocompleteController : public AutocompleteProviderListener,
   AutocompleteInput input_;
 
   // Data from the autocomplete query.
-  AutocompleteResult result_;
+  AutocompleteResult internal_result_;
 
-  // When debouncing is enabled, `result_` may change without invoking
-  // `NotifyChanged()`. To ensure `result()` is stable between `NotifyChanged()`
-  // calls, `published_result_` snapshots `result_` before invoking
-  // `NotifyChanged()`, and observers only see the stable `published_result_`.
-  // When `kUpdateResultDebounce` is disabled, `published_result_` is always
-  // empty and unused.
+  // A snapshot of `internal_result_` when `NotifyChanged()` is called. Because
+  // it's debounced, `internal_result_` may change without invoking
+  // `NotifyChanged()`. `published_result_` ensures observers get a stable
+  // result.
   AutocompleteResult published_result_;
 
   // Used for logging the changes between updates.
@@ -490,8 +506,7 @@ class AutocompleteController : public AutocompleteProviderListener,
   // quick succession. The last call, i.e. when all providers complete and
   // `done_` is set true; and the 1st call, i.e. the sync update, are immune to
   // this restriction. Calls not succeeding a result update (i.e. a call from
-  // closing the popup) bypass the delay as well. Only applies when the
-  // `kUpdateResultDebounce` is enabled.
+  // closing the popup) bypass the delay as well.
   AutocompleteProviderDebouncer notify_changed_debouncer_;
 
   // Tracks if any delayed `DelayedNotifyChanged()` call since the last
@@ -504,9 +519,9 @@ class AutocompleteController : public AutocompleteProviderListener,
   // done and all providers have provided their async updates.
   bool done_ = true;
 
-  // True, if the synchronous pass is done. Used to avoid updating `result_` and
-  // sending notifications until the the synchronous pass is done on all
-  // providers.
+  // True, if the synchronous pass is done. Used to avoid updating
+  // `internal_result_` and sending notifications until the the synchronous pass
+  // is done on all providers.
   bool sync_pass_done_ = true;
 
   // True if this instance of AutocompleteController is owned by the CrOS
@@ -525,6 +540,9 @@ class AutocompleteController : public AutocompleteProviderListener,
   raw_ptr<TemplateURLService> template_url_service_;
 
   raw_ptr<OmniboxTriggeredFeatureService> triggered_feature_service_;
+
+  // The preferred steady state (unfocused) omnibox position.
+  metrics::OmniboxEventProto::OmniboxPosition steady_state_omnibox_position_;
 
   // Combined, used to cancel model execution requests sent to
   // `AutocompleteScoringModelService` and to prevent its callbacks from being

@@ -6,7 +6,7 @@
 
 #import "base/time/time.h"
 #import "components/content_settings/core/browser/host_content_settings_map.h"
-#import "ios/chrome/browser/content_settings/host_content_settings_map_factory.h"
+#import "ios/chrome/browser/content_settings/model/host_content_settings_map_factory.h"
 #import "ios/chrome/browser/https_upgrades/https_only_mode_upgrade_tab_helper.h"
 #import "ios/chrome/browser/https_upgrades/https_upgrade_service_factory.h"
 #import "ios/chrome/browser/https_upgrades/typed_navigation_upgrade_tab_helper.h"
@@ -14,10 +14,6 @@
 #import "ios/chrome/test/app/chrome_test_util.h"
 #import "ios/chrome/test/app/tab_test_util.h"
 #import "ios/web/public/web_state.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 @implementation HttpsUpgradeAppInterface
 

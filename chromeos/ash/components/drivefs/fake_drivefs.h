@@ -33,6 +33,7 @@ struct FakeMetadata {
   base::FilePath path;
   std::string mime_type;
   std::string original_name;
+  bool dirty = false;
   bool pinned = false;
   bool available_offline = false;
   bool shared = false;
@@ -42,6 +43,7 @@ struct FakeMetadata {
   std::string alternate_url;
   bool shortcut = false;
   bool can_pin = true;
+  base::FilePath shortcut_target_path;
 };
 
 class FakeDriveFsBootstrapListener : public DriveFsBootstrapListener {
@@ -105,6 +107,11 @@ class FakeDriveFs : public drivefs::mojom::DriveFs,
       (override));
 
   MOCK_METHOD(void,
+              ClearOfflineFiles,
+              (drivefs::mojom::DriveFs::ClearOfflineFilesCallback callback),
+              (override));
+
+  MOCK_METHOD(void,
               ImmediatelyUpload,
               (const base::FilePath& path,
                drivefs::mojom::DriveFs::ImmediatelyUploadCallback callback),
@@ -126,7 +133,13 @@ class FakeDriveFs : public drivefs::mojom::DriveFs,
 
   absl::optional<bool> IsItemPinned(const std::string& path);
 
+  absl::optional<bool> IsItemDirty(const std::string& path);
+
   bool SetCanPin(const std::string& path, bool can_pin);
+
+  void SetPooledStorageQuotaUsage(int64_t used_user_bytes,
+                                  int64_t total_user_bytes,
+                                  bool organization_limit_exceeded);
 
   struct FileMetadata {
     FileMetadata();
@@ -135,6 +148,7 @@ class FakeDriveFs : public drivefs::mojom::DriveFs,
     ~FileMetadata();
 
     std::string mime_type;
+    bool dirty = false;
     bool pinned = false;
     bool hosted = false;
     bool shared = false;
@@ -145,7 +159,7 @@ class FakeDriveFs : public drivefs::mojom::DriveFs,
     std::string doc_id;
     int64_t stable_id = 0;
     std::string alternate_url;
-    bool shortcut = false;
+    absl::optional<mojom::ShortcutDetails> shortcut_details;
     bool can_pin = true;
   };
 
@@ -154,6 +168,13 @@ class FakeDriveFs : public drivefs::mojom::DriveFs,
 
  private:
   class SearchQuery;
+
+  struct PooledQuotaUsage {
+    mojom::UserType user_type = mojom::UserType::kUnmanaged;
+    int64_t used_user_bytes = int64_t(1) << 30;
+    int64_t total_user_bytes = int64_t(2) << 30;
+    bool organization_limit_exceeded = false;
+  } pooled_quota_usage_;
 
   // drivefs::mojom::DriveFsBootstrap:
   void Init(
@@ -238,14 +259,13 @@ class FakeDriveFs : public drivefs::mojom::DriveFs,
 
   void PollHostedFilePinStates() override;
 
-  void CancelUploadByPath(const base::FilePath& path) override;
+  void CancelUploadByPath(
+      const base::FilePath& path,
+      drivefs::mojom::DriveFs::CancelUploadMode cancel_mode) override;
 
   void SetDocsOfflineEnabled(
       bool enabled,
       drivefs::mojom::DriveFs::SetDocsOfflineEnabledCallback callback) override;
-
-  void ClearOfflineFiles(
-      drivefs::mojom::DriveFs::ClearOfflineFilesCallback) override;
 
   void GetDocsOfflineStats(
       drivefs::mojom::DriveFs::GetDocsOfflineStatsCallback) override;

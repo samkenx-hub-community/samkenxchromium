@@ -393,6 +393,25 @@ void AudioDevicesPrefHandlerImpl::SetNoiseCancellationState(
                            noise_cancellation_state);
 }
 
+bool AudioDevicesPrefHandlerImpl::GetForceRespectUiGainsState() {
+  return local_state_->GetBoolean(prefs::kInputForceRespectUiGainsEnabled);
+}
+
+void AudioDevicesPrefHandlerImpl::SetForceRespectUiGainsState(
+    bool force_respect_ui_gains_state) {
+  local_state_->SetBoolean(prefs::kInputForceRespectUiGainsEnabled,
+                           force_respect_ui_gains_state);
+}
+
+bool AudioDevicesPrefHandlerImpl::GetHfpMicSrState() {
+  return local_state_->GetBoolean(prefs::kHandsFreeProfileInputSuperResolution);
+}
+
+void AudioDevicesPrefHandlerImpl::SetHfpMicSrState(bool hfp_mic_sr_state) {
+  local_state_->SetBoolean(prefs::kHandsFreeProfileInputSuperResolution,
+                           hfp_mic_sr_state);
+}
+
 AudioDevicesPrefHandlerImpl::AudioDevicesPrefHandlerImpl(
     PrefService* local_state)
     : local_state_(local_state) {
@@ -531,6 +550,8 @@ void AudioDevicesPrefHandlerImpl::RegisterPrefs(PrefRegistrySimple* registry) {
   registry->RegisterDictionaryPref(prefs::kAudioDevicesMute);
   registry->RegisterDictionaryPref(prefs::kAudioDevicesState);
   registry->RegisterBooleanPref(prefs::kInputNoiseCancellationEnabled, false);
+  registry->RegisterBooleanPref(prefs::kHandsFreeProfileInputSuperResolution,
+                                false);
 
   // Register the prefs backing the audio muting policies.
   // Policy for audio input is handled by kAudioCaptureAllowed in the Chrome
@@ -546,6 +567,8 @@ void AudioDevicesPrefHandlerImpl::RegisterPrefs(PrefRegistrySimple* registry) {
   registry->RegisterDictionaryPref(prefs::kAudioOutputDevicesUserPriority);
 
   registry->RegisterDictionaryPref(prefs::kAudioDevicesLastSeen);
+
+  registry->RegisterBooleanPref(prefs::kInputForceRespectUiGainsEnabled, false);
 }
 
 }  // namespace ash

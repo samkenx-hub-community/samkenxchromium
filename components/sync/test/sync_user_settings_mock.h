@@ -7,8 +7,10 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "build/chromeos_buildflags.h"
+#include "components/signin/public/base/gaia_id_hash.h"
 #include "components/sync/engine/nigori/nigori.h"
 #include "components/sync/service/sync_user_settings.h"
 #include "testing/gmock/include/gmock/gmock.h"
@@ -20,14 +22,20 @@ class SyncUserSettingsMock : public SyncUserSettings {
   SyncUserSettingsMock();
   ~SyncUserSettingsMock() override;
   MOCK_METHOD(bool, IsInitialSyncFeatureSetupComplete, (), (const override));
+#if !BUILDFLAG(IS_CHROMEOS_ASH)
   MOCK_METHOD(void,
               SetInitialSyncFeatureSetupComplete,
               (SyncFirstSetupCompleteSource),
               (override));
+#endif  // !BUILDFLAG(IS_CHROMEOS_ASH)
   MOCK_METHOD(bool, IsSyncEverythingEnabled, (), (const override));
   MOCK_METHOD(UserSelectableTypeSet, GetSelectedTypes, (), (const override));
   MOCK_METHOD(bool,
               IsTypeManagedByPolicy,
+              (UserSelectableType),
+              (const override));
+  MOCK_METHOD(bool,
+              IsTypeManagedByCustodian,
               (UserSelectableType),
               (const override));
   MOCK_METHOD(void,
@@ -35,6 +43,10 @@ class SyncUserSettingsMock : public SyncUserSettings {
               (bool, UserSelectableTypeSet),
               (override));
   MOCK_METHOD(void, SetSelectedType, (UserSelectableType, bool), (override));
+  MOCK_METHOD(void,
+              KeepAccountSettingsPrefsOnlyForUsers,
+              (const std::vector<signin::GaiaIdHash>&),
+              (override));
 #if BUILDFLAG(IS_IOS)
   MOCK_METHOD(void,
               SetBookmarksAndReadingListAccountStorageOptIn,
@@ -94,7 +106,10 @@ class SyncUserSettingsMock : public SyncUserSettings {
   MOCK_METHOD(bool, IsTrustedVaultRecoverabilityDegraded, (), (const override));
   MOCK_METHOD(bool, IsUsingExplicitPassphrase, (), (const override));
   MOCK_METHOD(base::Time, GetExplicitPassphraseTime, (), (const override));
-  MOCK_METHOD(PassphraseType, GetPassphraseType, (), (const override));
+  MOCK_METHOD(absl::optional<PassphraseType>,
+              GetPassphraseType,
+              (),
+              (const override));
   MOCK_METHOD(void, SetEncryptionPassphrase, (const std::string&), (override));
   MOCK_METHOD(bool, SetDecryptionPassphrase, (const std::string&), (override));
   MOCK_METHOD(void,

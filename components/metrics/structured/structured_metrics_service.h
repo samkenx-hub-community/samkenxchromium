@@ -52,6 +52,8 @@ class StructuredMetricsService final {
   // Clears all event and log data.
   void Purge();
 
+  MetricsServiceClient* GetMetricsServiceClient() const;
+
   bool reporting_active() const {
     return reporting_service_->reporting_active();
   }
@@ -64,6 +66,7 @@ class StructuredMetricsService final {
 
  private:
   friend class StructuredMetricsServiceTest;
+  friend class StructuredMetricsMixin;
   friend class metrics::StructuredMetricsServiceTestBase;
 
   FRIEND_TEST_ALL_PREFIXES(StructuredMetricsServiceTest, RotateLogs);
@@ -73,6 +76,9 @@ class StructuredMetricsService final {
   StructuredMetricsService(MetricsServiceClient* client,
                            PrefService* local_state,
                            std::unique_ptr<StructuredMetricsRecorder> recorder);
+
+  // Sets the instance of the recorder used for test.
+  void SetRecorderForTest(std::unique_ptr<StructuredMetricsRecorder> recorder);
 
   // Callback function to get the upload interval.
   base::TimeDelta GetUploadTimeInterval();
@@ -108,8 +114,12 @@ class StructuredMetricsService final {
   // Marks that initialization has completed.
   bool initialize_complete_ = false;
 
+  // Represents if structured metrics and the service is enabled. This isn't
+  // to indicate if the service is recording.
+  bool structured_metrics_enabled_ = false;
+
   // The metrics client |this| is service is associated.
-  base::raw_ptr<MetricsServiceClient> client_;
+  raw_ptr<MetricsServiceClient> client_;
 
   SEQUENCE_CHECKER(sequence_checker_);
 

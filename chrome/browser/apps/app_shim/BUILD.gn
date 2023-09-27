@@ -22,10 +22,7 @@ source_set("app_shim") {
     "web_app_shim_manager_delegate_mac.h",
   ]
 
-  configs += [
-    "//build/config/compiler:enable_arc",
-    "//build/config/compiler:wexit_time_destructors",
-  ]
+  configs += [ "//build/config/compiler:wexit_time_destructors" ]
 
   deps = [
     "//apps",
@@ -42,6 +39,7 @@ source_set("app_shim") {
     "//components/crx_file",
     "//components/remote_cocoa/browser",
     "//components/version_info",
+    "//components/webapps/common",
     "//content/public/browser",
     "//content/public/common",
     "//services/preferences/public/cpp:cpp",

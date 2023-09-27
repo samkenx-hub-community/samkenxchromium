@@ -5,6 +5,9 @@
 #ifndef UI_OZONE_PLATFORM_WAYLAND_HOST_WAYLAND_TOPLEVEL_WINDOW_H_
 #define UI_OZONE_PLATFORM_WAYLAND_HOST_WAYLAND_TOPLEVEL_WINDOW_H_
 
+#include <memory>
+#include <ostream>
+
 #include "base/memory/raw_ptr.h"
 #include "build/chromeos_buildflags.h"
 #include "ui/base/dragdrop/mojom/drag_drop_types.mojom-shared.h"
@@ -23,18 +26,6 @@
 namespace views::corewm {
 enum class TooltipTrigger;
 }  // namespace views::corewm
-
-namespace wl {
-
-// Client-side decorations on Wayland take some portion of the window surface,
-// and when they are turned on or off, the window geometry is changed.  That
-// happens only once at the moment of switching the decoration mode, and has
-// no further impact on the user experience, but the initial geometry of a
-// top-level window is different on Wayland if compared to other platforms,
-// which affects certain tests.
-void AllowClientSideDecorationsForTesting(bool allow);
-
-}  // namespace wl
 
 namespace ui {
 
@@ -104,8 +95,13 @@ class WaylandToplevelWindow : public WaylandWindow,
                    const base::TimeDelta hide_delay) override;
   void HideTooltip() override;
   void PropagateBufferScale(float new_scale) override;
+  void OnRotateFocus(uint32_t serial, uint32_t direction, bool restart);
 
-  // WmDragHandler overrides:
+#if BUILDFLAG(IS_CHROMEOS_LACROS)
+  void OnOverviewModeChanged(bool in_overview);
+#endif
+
+  // WmDragHandler:
   bool ShouldReleaseCaptureForDrag(ui::OSExchangeData* data) const override;
 
   // WmMoveResizeHandler
@@ -139,8 +135,9 @@ class WaylandToplevelWindow : public WaylandWindow,
   bool ShouldUseNativeFrame() const override;
   bool ShouldUpdateWindowShape() const override;
   bool CanSetDecorationInsets() const override;
-  void SetOpaqueRegion(const std::vector<gfx::Rect>* region_px) override;
-  void SetInputRegion(const gfx::Rect* region_px) override;
+  void SetOpaqueRegion(
+      absl::optional<std::vector<gfx::Rect>> region_px) override;
+  void SetInputRegion(absl::optional<gfx::Rect> region_px) override;
   bool IsClientControlledWindowMovementSupported() const override;
   void NotifyStartupComplete(const std::string& startup_id) override;
   void SetAspectRatio(const gfx::SizeF& aspect_ratio) override;
@@ -157,6 +154,7 @@ class WaylandToplevelWindow : public WaylandWindow,
       bool allow_system_drag) override;
 #if BUILDFLAG(IS_CHROMEOS_LACROS)
   void SetImmersiveFullscreenStatus(bool status) override;
+  void SetTopInset(int height) override;
 #endif
   void ShowSnapPreview(WaylandWindowSnapDirection snap,
                        bool allow_haptic_feedback) override;
@@ -168,7 +166,9 @@ class WaylandToplevelWindow : public WaylandWindow,
   void Lock(WaylandOrientationLockType lock_Type) override;
   void Unlock() override;
   bool GetTabletMode() override;
-  void SetFloat(bool value) override;
+  void SetFloatToLocation(
+      WaylandFloatStartLocation float_start_location) override;
+  void UnSetFloat() override;
 
   // DeskExtension:
   int GetNumberOfDesks() const override;
@@ -190,6 +190,8 @@ class WaylandToplevelWindow : public WaylandWindow,
   // SystemModalExtension:
   void SetSystemModal(bool modal) override;
 
+  void DumpState(std::ostream& out) const override;
+
  private:
   // WaylandWindow protected overrides:
   // Calls UpdateWindowShape, set_input_region and set_opaque_region for this
@@ -199,7 +201,15 @@ class WaylandToplevelWindow : public WaylandWindow,
   void UpdateSystemModal();
 
   void TriggerStateChanges();
-  void SetWindowState(PlatformWindowState state);
+
+  // Sets the new window `state` to the window. `target_display_id` gets ignored
+  // unless the state is `PlatformWindowState::kFullscreen`.
+  void SetWindowState(PlatformWindowState state, int64_t target_display_id);
+
+  bool ShouldTriggerStateChange(PlatformWindowState state,
+                                int64_t target_display_id) const;
+
+  WaylandOutput* GetWaylandOutputForDisplayId(int64_t display_id);
 
   // Creates a surface window, which is visible as a main window.
   bool CreateShellToplevel();
@@ -232,7 +242,7 @@ class WaylandToplevelWindow : public WaylandWindow,
   // all desks state.
   void OnDeskChanged(int state);
 
-  // Sets |workspace_| to |aura_surface_|.
+  // Sets `workspace_` to `aura_surface_`.
   // This must be called in SetUpShellIntegration().
   void SetInitialWorkspace();
 
@@ -243,6 +253,8 @@ class WaylandToplevelWindow : public WaylandWindow,
   PlatformWindowState state_ = PlatformWindowState::kUnknown;
   // Contains the previous state of the window.
   PlatformWindowState previous_state_ = PlatformWindowState::kUnknown;
+  // The display ID to switch to in case the state is `kFullscreen`.
+  int64_t fullscreen_display_id_ = display::kInvalidDisplayId;
 
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS_LACROS)
   // Contains the current state of the tiled edges.
@@ -254,9 +266,15 @@ class WaylandToplevelWindow : public WaylandWindow,
 #if BUILDFLAG(IS_CHROMEOS_LACROS)
   bool is_immersive_fullscreen_ = false;
 
+  // This is used to detect fullscreen state changes from the Aura side
+  // to inform Lacros clients from the asynchronous task completion.
+  bool is_fullscreen_ = false;
+
   // Unique ID for this window. May be shared over non-Wayland IPC transports
   // (e.g. mojo) to identify the window.
   std::string window_unique_id_;
+
+  int64_t initial_display_id_ = display::kInvalidDisplayId;
 #else
   // Id of the chromium app passed through
   // PlatformWindowInitProperties::wm_class_name. This is used by Wayland

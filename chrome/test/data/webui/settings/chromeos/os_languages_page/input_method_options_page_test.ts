@@ -4,7 +4,7 @@
 
 import 'chrome://os-settings/lazy_load.js';
 
-import {LanguageState, SettingsInputMethodOptionsPageElement} from 'chrome://os-settings/lazy_load.js';
+import {SettingsInputMethodOptionsPageElement} from 'chrome://os-settings/lazy_load.js';
 import {CrSettingsPrefs, Router, routes} from 'chrome://os-settings/os_settings.js';
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {flush} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
@@ -12,100 +12,13 @@ import {assertEquals, assertTrue} from 'chrome://webui-test/chai_assert.js';
 import {FakeSettingsPrivate} from 'chrome://webui-test/fake_settings_private.js';
 import {waitAfterNextRender} from 'chrome://webui-test/polymer_test_util.js';
 
+import {FakeLanguageHelper, FIRST_PARTY_INPUT_METHOD_ID_PREFIX} from './fake_language_helper.js';
+
 /**
  * @fileoverview Suite of tests for the OS Settings input method options page.
  */
-const FIRST_PARTY_INPUT_METHOD_ID_PREFIX =
-    '_comp_ime_jkghodnilhceideoidjikpgommlajknk';
-const PREFS_KEY = 'settings.language.input_method_specific_settings';
 
-class FakeLanguageHelper {
-  async whenReady() {}
-  setProspectiveUiLanguage(_: string) {}
-  requiresRestart() {
-    return false;
-  }
-  getArcImeLanguageCode() {
-    return '';
-  }
-  isLanguageCodeForArcIme(_: string) {
-    return false;
-  }
-  isLanguageTranslatable(_: chrome.languageSettingsPrivate.Language) {
-    return true;
-  }
-  isLanguageEnabled(_: string) {
-    return true;
-  }
-  enableLanguage(_: string) {}
-  disableLanguage(_: string) {}
-  isOnlyTranslateBlockedLanguage(_: LanguageState) {
-    return false;
-  }
-  canDisableLanguage(_: LanguageState) {
-    return true;
-  }
-  canEnableLanguage(_: chrome.languageSettingsPrivate.Language) {
-    return true;
-  }
-  moveLanguage(_1: string, _2: boolean) {}
-  moveLanguageToFront(_: string) {}
-  enableTranslateLanguage(_: string) {}
-  disableTranslateLanguage(_: string) {}
-  setLanguageAlwaysTranslateState(_1: string, _2: boolean) {}
-  toggleSpellCheck(_1: string, _2: boolean) {}
-  convertLanguageCodeForTranslate(_: string) {
-    return '';
-  }
-  getLanguageCodeWithoutRegion(_: string) {
-    return '';
-  }
-  getLanguage(_: string) {
-    return undefined;
-  }
-  retryDownloadDictionary(_: string) {}
-  addInputMethod(_: string) {}
-  removeInputMethod(_: string) {}
-  setCurrentInputMethod(_: string) {}
-  getInputMethodsForLanguage(_: string) {
-    return [
-      {
-        id: 'fake display name',
-        displayName: 'fake display name',
-        languageCodes: ['en', 'en-US'],
-        tags: [],
-        enabled: true,
-      },
-    ];
-  }
-  getInputMethodsForLanguages(_: string[]) {
-    return [
-      {
-        id: 'fake display name',
-        displayName: 'fake display name',
-        languageCodes: ['en', 'en-US'],
-        tags: [],
-        enabled: true,
-      },
-    ];
-  }
-  getEnabledLanguageCodes() {
-    return new Set<string>();
-  }
-  isInputMethodEnabled(_: string) {
-    return true;
-  }
-  isComponentIme(_: chrome.languageSettingsPrivate.InputMethod) {
-    return false;
-  }
-  openInputMethodOptions(_: string) {}
-  getInputMethodDisplayName(_: string) {
-    return 'fake display name';
-  }
-  getCurrentInputMethod() {
-    return Promise.resolve(FIRST_PARTY_INPUT_METHOD_ID_PREFIX + 'xkb:us::eng');
-  }
-}
+const PREFS_KEY = 'settings.language.input_method_specific_settings';
 
 function getFakePrefs() {
   return [{
@@ -118,6 +31,27 @@ function getFakePrefs() {
       },
     },
   }];
+}
+
+function setDefaultLoadTimeData() {
+  loadTimeData.overrideValues({
+    // Assume by default that an admin has not disabled autocorrect.
+    isPhysicalKeyboardAutocorrectAllowed: true,
+    // Assume by default that the predictive writing feature is disabled.
+    isPhysicalKeyboardPredictiveWritingAllowed: false,
+  });
+}
+
+function setAutocorrectAllowed(value: boolean) {
+  loadTimeData.overrideValues({
+    isPhysicalKeyboardAutocorrectAllowed: value,
+  });
+}
+
+function setPredictiveWritingAllowed(value: boolean) {
+  loadTimeData.overrideValues({
+    isPhysicalKeyboardPredictiveWritingAllowed: value,
+  });
 }
 
 suite('<settings-input-method-options-page>', () => {
@@ -151,7 +85,7 @@ suite('<settings-input-method-options-page>', () => {
   }
 
   test('US English page', async () => {
-    loadTimeData.overrideValues({allowPredictiveWriting: false});
+    setDefaultLoadTimeData();
     createOptionsPage(FIRST_PARTY_INPUT_METHOD_ID_PREFIX + 'xkb:us::eng');
     await waitAfterNextRender(optionsPage);
     const titles = optionsPage.shadowRoot!.querySelectorAll('h2');
@@ -161,7 +95,7 @@ suite('<settings-input-method-options-page>', () => {
   });
 
   test('US English page from current input method', async () => {
-    loadTimeData.overrideValues({allowPredictiveWriting: false});
+    setDefaultLoadTimeData();
     createOptionsPage('');
     await waitAfterNextRender(optionsPage);
     const titles = optionsPage.shadowRoot!.querySelectorAll('h2');
@@ -171,7 +105,8 @@ suite('<settings-input-method-options-page>', () => {
   });
 
   test('US English page with predictive writing', async () => {
-    loadTimeData.overrideValues({allowPredictiveWriting: true});
+    setDefaultLoadTimeData();
+    setPredictiveWritingAllowed(true);
     createOptionsPage(FIRST_PARTY_INPUT_METHOD_ID_PREFIX + 'xkb:us::eng');
     await waitAfterNextRender(optionsPage);
     const titles = optionsPage.shadowRoot!.querySelectorAll('h2');
@@ -181,7 +116,21 @@ suite('<settings-input-method-options-page>', () => {
     assertEquals('Suggestions', titles[2]!.textContent);
   });
 
+  test('US English page with autocorrect disallowed', async () => {
+    setDefaultLoadTimeData();
+    setAutocorrectAllowed(false);
+    createOptionsPage(FIRST_PARTY_INPUT_METHOD_ID_PREFIX + 'xkb:us::eng');
+    await waitAfterNextRender(optionsPage);
+    const titles = optionsPage.shadowRoot!.querySelectorAll('h2');
+    assertEquals(1, titles.length);
+    // Note that the physical keyboard section is completely omitted if the
+    // autocorrect toggle is removed. This is because the autocorrect toggle is
+    // the only setting allowed for latin languages on the physical keyboard.
+    assertEquals('On-screen keyboard', titles[0]!.textContent);
+  });
+
   test('Pinyin page', async () => {
+    setDefaultLoadTimeData();
     createOptionsPage(FIRST_PARTY_INPUT_METHOD_ID_PREFIX + 'zh-t-i0-pinyin');
     await waitAfterNextRender(optionsPage);
     const titles = optionsPage.shadowRoot!.querySelectorAll('h2');
@@ -191,10 +140,11 @@ suite('<settings-input-method-options-page>', () => {
   });
 
   test('updates options in prefs', async () => {
+    setDefaultLoadTimeData();
     createOptionsPage(FIRST_PARTY_INPUT_METHOD_ID_PREFIX + 'xkb:us::eng');
     await waitAfterNextRender(optionsPage);
     const options = optionsPage.shadowRoot!.querySelectorAll('.list-item');
-    assertEquals(8, options.length);
+    assertEquals(7, options.length);
     const autoCorrection = options[0]!.querySelector('.start');
     assertTrue(!!autoCorrection);
     assertEquals('Auto-correction', autoCorrection.textContent!.trim());

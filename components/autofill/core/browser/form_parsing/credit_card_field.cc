@@ -10,7 +10,7 @@
 #include <string>
 #include <utility>
 
-#include "base/memory/ptr_util.h"
+#include "base/containers/contains.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
@@ -32,10 +32,6 @@
 namespace autofill {
 
 namespace {
-
-// Credit card numbers are at most 19 digits in length.
-// [Ref: http://en.wikipedia.org/wiki/Bank_card_number]
-constexpr size_t kMaxValidCardNumberSize = 19;
 
 // Returns true if a field that has |max_length| can fit the data for a field of
 // |type|.
@@ -65,6 +61,7 @@ bool FieldCanFitDataForFieldType(int max_length, ServerFieldType type) {
 // static
 std::unique_ptr<FormField> CreditCardField::Parse(
     AutofillScanner* scanner,
+    const GeoIpCountryCode& client_country,
     const LanguageCode& page_language,
     PatternSource pattern_source,
     LogManager* log_manager) {
@@ -191,30 +188,12 @@ std::unique_ptr<FormField> CreditCardField::Parse(
 
     // TODO(crbug.com/591816): Make sure parsing cc-numbers of type password
     // doesn't have bad side effects.
-    AutofillField* current_number_field;
+    raw_ptr<AutofillField> current_number_field;
     base::span<const MatchPatternRef> patterns =
         GetMatchPatterns(CREDIT_CARD_NUMBER, page_language, pattern_source);
     if (ParseFieldSpecifics(scanner, kCardNumberRe, kMatchNumTelAndPwd,
                             patterns, &current_number_field,
                             {log_manager, "kCardNumberRe"})) {
-      // Avoid autofilling any credit card number field having very low or high
-      // |start_index| on the HTML form.
-      size_t start_index = 0;
-      if (!credit_card_field->numbers_.empty()) {
-        size_t last_number_field_size =
-            credit_card_field->numbers_.back()->credit_card_number_offset() +
-            credit_card_field->numbers_.back()->max_length;
-
-        // Distinguish between
-        //   (a) one card split across multiple fields
-        //   (b) multiple fields for multiple cards
-        // Treat this field as a part of the same card as the last field, except
-        // when doing so would cause overflow.
-        if (last_number_field_size < kMaxValidCardNumberSize)
-          start_index = last_number_field_size;
-      }
-
-      current_number_field->set_credit_card_number_offset(start_index);
       credit_card_field->numbers_.push_back(current_number_field);
       nb_unknown_fields = 0;
       continue;
@@ -240,12 +219,16 @@ std::unique_ptr<FormField> CreditCardField::Parse(
     // detection decision, we allow for 4 UNKONWN fields in between.
     // We can't allow for a lot of unknown fields, because the name on address
     // sections may sometimes be mistakenly detected as cardholder name.
-    if ((credit_card_field->verification_ ||
-         !credit_card_field->numbers_.empty() ||
-         credit_card_field->HasExpiration()) &&
-        (!credit_card_field->verification_ ||
-         credit_card_field->numbers_.empty() ||
-         !credit_card_field->HasExpiration()) &&
+    // Yet, it does happen that a field separates the name from the CC number
+    // (e.g. a tax payer ID). Therefore, we also allow a field between name
+    // and other fields.
+    bool has_name =
+        credit_card_field->cardholder_ || credit_card_field->cardholder_last_;
+    bool has_verification = credit_card_field->verification_;
+    bool has_numbers = !credit_card_field->numbers_.empty();
+    bool has_expiration = credit_card_field->HasExpiration();
+    if ((has_name || has_verification || has_numbers || has_expiration) &&
+        (!has_verification || !has_numbers || !has_expiration) &&
         nb_unknown_fields < 4) {
       scanner->Advance();
       fields--;  // We continue searching in the same credit card section, but
@@ -255,6 +238,9 @@ std::unique_ptr<FormField> CreditCardField::Parse(
     break;
   }
 
+  bool has_verification = credit_card_field->verification_;
+  bool has_numbers = !credit_card_field->numbers_.empty();
+  bool has_expiration = credit_card_field->HasExpiration();
   // Some pages have a billing address field after the cardholder name field.
   // For that case, allow only just the cardholder name field.  The remaining
   // CC fields will be picked up in a following CreditCardField.
@@ -262,9 +248,7 @@ std::unique_ptr<FormField> CreditCardField::Parse(
     // If we got the cardholder name with a dangerous check, require at least a
     // card number and one of expiration or verification fields.
     if (!cardholder_name_match_has_low_confidence ||
-        (!credit_card_field->numbers_.empty() &&
-         (credit_card_field->verification_ ||
-          credit_card_field->HasExpiration()))) {
+        (has_numbers && (has_verification || has_expiration))) {
       return std::move(credit_card_field);
     }
   }
@@ -276,11 +260,10 @@ std::unique_ptr<FormField> CreditCardField::Parse(
   // a strong enough signal that this is a credit card.  It is possible that
   // the number and name were parsed in a separate part of the form.  So if
   // the cvc and date were found independently they are returned.
-  const bool has_cc_number_or_verification =
-      (credit_card_field->verification_ ||
-       !credit_card_field->numbers_.empty());
-  if (has_cc_number_or_verification && credit_card_field->HasExpiration())
+  const bool has_cc_number_or_verification = (has_verification || has_numbers);
+  if (has_cc_number_or_verification && credit_card_field->HasExpiration()) {
     return std::move(credit_card_field);
+  }
 
   scanner->RewindTo(saved_cursor);
   return nullptr;
@@ -375,6 +358,17 @@ bool CreditCardField::LikelyCardYearSelectField(
 
   auto OptionsContain = [&](const std::vector<std::u16string>& year_needles,
                             const auto& option_projection) {
+    // If the <option>s contain single-digits elements, this may lead to false
+    // positives. Consider:
+    // <option value="1">Afghanistan</option>
+    // ...
+    // <option value="23">Botswana</option>
+    // While 23 is a valid expiration year, the selector is not a expiration
+    // year selector. In case we find a single-digit entry, we reject this as
+    // an expiration year selector.
+    if (base::Contains(field->options, u"2", option_projection)) {
+      return false;
+    }
     auto is_substring = [](base::StringPiece16 option,
                            base::StringPiece16 year_needle) {
       return option.find(year_needle) != base::StringPiece16::npos;
@@ -504,8 +498,10 @@ void CreditCardField::AddClassifications(
               ? CREDIT_CARD_EXP_DATE_2_DIGIT_YEAR
               : CREDIT_CARD_EXP_DATE_4_DIGIT_YEAR;
       ExpirationDateFormat format =
-          CreditCardField::DetermineExpirationDateFormat(*expiration_date_,
-                                                         fallback_type);
+          CreditCardField::DetermineExpirationDateFormat(
+              *expiration_date_, /*fallback_type=*/fallback_type,
+              /*server_hint=*/NO_SERVER_DATA,
+              /*forced_field_type=*/NO_SERVER_DATA);
       AddClassification(expiration_date_,
                         format.digits_in_expiration_year == 2
                             ? CREDIT_CARD_EXP_DATE_2_DIGIT_YEAR
@@ -655,12 +651,114 @@ bool CreditCardField::ParseExpirationDate(AutofillScanner* scanner,
   return false;
 }
 
+// static
+ServerFieldType CreditCardField::DetermineExpirationYearType(
+    const AutofillField& field,
+    ServerFieldType fallback_type,
+    ServerFieldType server_hint,
+    ServerFieldType forced_field_type) {
+  // Forced server classifications always take priority if the field type
+  // matches. Otherwise, the server override happens at a different spot.
+  if (forced_field_type == CREDIT_CARD_EXP_2_DIGIT_YEAR ||
+      forced_field_type == CREDIT_CARD_EXP_4_DIGIT_YEAR) {
+    return forced_field_type;
+  }
+
+  // For text fields, look for placeholder patterns.
+  if (field.IsTextInputElement()) {
+    if (field.max_length == 2) {
+      return CREDIT_CARD_EXP_2_DIGIT_YEAR;
+    }
+    static constexpr char16_t kYYYYRegex[] = u"yyyy|aaaa|jjjj";
+    if (MatchesRegex<kYYYYRegex>(field.placeholder, nullptr) ||
+        MatchesRegex<kYYYYRegex>(field.label, nullptr)) {
+      return CREDIT_CARD_EXP_4_DIGIT_YEAR;
+    }
+    static constexpr char16_t kYYRegex[] = u"yy|aa|jj";
+    if (MatchesRegex<kYYRegex>(field.placeholder, nullptr) ||
+        MatchesRegex<kYYRegex>(field.label, nullptr)) {
+      return CREDIT_CARD_EXP_2_DIGIT_YEAR;
+    }
+    if (field.max_length == 4) {
+      return CREDIT_CARD_EXP_4_DIGIT_YEAR;
+    }
+  }
+
+  // For select elements, look for today's year in the list of possible
+  // expiration years and search for 4-digit and 2-digit representations.
+  auto OptionsContain = [](const AutofillField& field,
+                           const std::u16string& year_needle,
+                           const auto& option_projection) {
+    // If the <option>s contain single-digits elements, this may lead to false
+    // positives. Consider:
+    // <option value="1">Afghanistan</option>
+    // ...
+    // <option value="23">Botswana</option>
+    // While 23 is a valid expiration year, the selector is not a expiration
+    // year selector. In case we find a single-digit entry, we reject this as
+    // an expiration year selector.
+    if (base::Contains(field.options, u"2", option_projection)) {
+      return false;
+    }
+    auto is_substring = [&year_needle](std::u16string_view option) {
+      return option.find(year_needle) != std::u16string_view::npos;
+    };
+    return base::ranges::any_of(field.options, is_substring, option_projection);
+  };
+  if (field.IsSelectOrSelectListElement()) {
+    base::Time::Exploded time_exploded;
+    AutofillClock::Now().UTCExplode(&time_exploded);
+    std::u16string year_4_digits = base::NumberToString16(time_exploded.year);
+    std::u16string year_2_digits = year_4_digits.substr(2);
+
+    // Options are structured as <option value="$value">$content</option>.
+    // Search in the $value first, because that's what's used for voting in
+    // crowdsourcing and is more relevant.
+    if (OptionsContain(field, year_4_digits, &SelectOption::value)) {
+      return CREDIT_CARD_EXP_4_DIGIT_YEAR;
+    }
+    if (OptionsContain(field, year_2_digits, &SelectOption::value)) {
+      return CREDIT_CARD_EXP_2_DIGIT_YEAR;
+    }
+    // Fallback to content.
+    if (OptionsContain(field, year_4_digits, &SelectOption::content)) {
+      return CREDIT_CARD_EXP_4_DIGIT_YEAR;
+    }
+    if (OptionsContain(field, year_2_digits, &SelectOption::content)) {
+      return CREDIT_CARD_EXP_2_DIGIT_YEAR;
+    }
+  }
+
+  if (server_hint == CREDIT_CARD_EXP_2_DIGIT_YEAR ||
+      server_hint == CREDIT_CARD_EXP_4_DIGIT_YEAR) {
+    return server_hint;
+  }
+  return fallback_type;
+}
+
 ServerFieldType CreditCardField::GetExpirationYearType() const {
-  return (expiration_date_
-              ? exp_year_type_
-              : ((expiration_year_ && expiration_year_->max_length == 2)
-                     ? CREDIT_CARD_EXP_2_DIGIT_YEAR
-                     : CREDIT_CARD_EXP_4_DIGIT_YEAR));
+  if (expiration_date_) {
+    return exp_year_type_;
+  }
+  if (!expiration_year_) {
+    return UNKNOWN_TYPE;
+  }
+  if (base::FeatureList::IsEnabled(
+          features::kAutofillEnableExpirationDateImprovements)) {
+    // The default for select or list elements does not really matter because
+    // it's practically always chosen from the select options. The default for
+    // text elements was chosen base on statistics from server side
+    // classifications (go/iqwtu).
+    // Keep this in sync with
+    // FormStructureRationalizer::RationalizeAutocompleteAttributes.
+    return DetermineExpirationYearType(
+        *expiration_year_,
+        /*fallback_type=*/CREDIT_CARD_EXP_4_DIGIT_YEAR,
+        /*server_hint=*/NO_SERVER_DATA,
+        /*forced_field_type=*/NO_SERVER_DATA);
+  }
+  return expiration_year_->max_length == 2 ? CREDIT_CARD_EXP_2_DIGIT_YEAR
+                                           : CREDIT_CARD_EXP_4_DIGIT_YEAR;
 }
 
 bool CreditCardField::HasExpiration() const {
@@ -671,9 +769,11 @@ bool CreditCardField::HasExpiration() const {
 CreditCardField::ExpirationDateFormat
 CreditCardField::DetermineExpirationDateFormat(
     const AutofillField& field,
-    ServerFieldType assumed_field_type) {
-  CHECK(assumed_field_type == CREDIT_CARD_EXP_DATE_2_DIGIT_YEAR ||
-        assumed_field_type == CREDIT_CARD_EXP_DATE_4_DIGIT_YEAR);
+    ServerFieldType fallback_type,
+    ServerFieldType server_hint,
+    ServerFieldType forced_field_type) {
+  CHECK(fallback_type == CREDIT_CARD_EXP_DATE_2_DIGIT_YEAR ||
+        fallback_type == CREDIT_CARD_EXP_DATE_4_DIGIT_YEAR);
   static constexpr size_t kMonthLength = 2;  // 2 characters for a MM format.
   // Check whether we find one of the standard format descriptors like
   // "mm/yy", "mm/yyyy", "mm / yy", "mm-yyyy", ... in one of the human
@@ -682,6 +782,7 @@ CreditCardField::DetermineExpirationDateFormat(
   bool matches = false;
   if (base::FeatureList::IsEnabled(
           features::kAutofillEnableExpirationDateImprovements)) {
+    // TODO(crbug/1326244): We should use a language specific regex.
     static constexpr char16_t kFormatRegex[] =
         u"mm(\\s?[/-]?\\s?)?(y{2,4}|a{2,4})";
     //       ^^^^ opt white space
@@ -690,6 +791,13 @@ CreditCardField::DetermineExpirationDateFormat(
     //                       ^^^^^^^^^^^^^^ year
     matches = MatchesRegex<kFormatRegex>(field.placeholder, &groups) ||
               MatchesRegex<kFormatRegex>(field.label, &groups);
+    // Support "--/--" and "--/----" as recognized placeholders.
+    if (!matches) {
+      static constexpr char16_t kFormatRegEx2[] =
+          u"(?:--|__)(\\s?/\\s?)(-{2,4}|_{2,4})";
+      matches = MatchesRegex<kFormatRegEx2>(field.placeholder, &groups) ||
+                MatchesRegex<kFormatRegEx2>(field.label, &groups);
+    }
   } else {
     static constexpr char16_t kFormatRegEx[] = u"mm(\\s?[/-]?\\s?)?(y{2,4})";
     //                                              ^^^^ opt white space
@@ -699,25 +807,70 @@ CreditCardField::DetermineExpirationDateFormat(
     matches = MatchesRegex<kFormatRegEx>(field.placeholder, &groups) ||
               MatchesRegex<kFormatRegEx>(field.label, &groups);
   }
-  // TODO(crbug/1326244): We should use language specific regex.
+
+  // Build a list of separator candidates from the regular expression sorted
+  // by what we want to fill most.
+  std::vector<std::u16string> separator_candidates;
   if (matches) {
+    // First choice: The matching separator with padding whitespace.
     const std::u16string& separator = groups[1];
-    const std::u16string& year_format = groups[2];
-    uint8_t year_length = year_format.length();
-    uint8_t candidate_size = kMonthLength + separator.length() + year_length;
-    if (field.max_length == 0 || candidate_size <= field.max_length) {
-      return {separator, year_length};
-    }
-    // Try once more with a stripped version of the separator if the previous
-    // version did not fit.
+    separator_candidates.emplace_back(separator);
+
+    // Fallback: The matching separator with padding whitespace trimmed.
     base::StringPiece16 trimmed_separator =
-        base::TrimWhitespace(groups[1], base::TRIM_ALL);
-    candidate_size = kMonthLength + trimmed_separator.length() + year_length;
-    if (field.max_length == 0 || candidate_size <= field.max_length) {
-      return {std::u16string(trimmed_separator), year_length};
+        base::TrimWhitespace(separator, base::TRIM_ALL);
+    if (trimmed_separator != separator) {
+      separator_candidates.emplace_back(trimmed_separator);
+    }
+  }
+  // Add generic fallbacks.
+  for (const char16_t* fallback : {u"/", u""}) {
+    if (!base::Contains(separator_candidates, fallback)) {
+      separator_candidates.emplace_back(fallback);
     }
   }
 
+  // Build a list of lengths of the expiration year (this can only contain
+  // entries for a length of 2 or 4 digits; or remain empty). The order of the
+  // elements matters.
+  // We may temporarily add 0 entries in case a specific parameter does not
+  // have an indication for the format to use. This simplifies the code.
+  constexpr uint8_t kInvalid = 0;
+  auto type_length = [](ServerFieldType type) -> uint8_t {
+    return type == CREDIT_CARD_EXP_DATE_2_DIGIT_YEAR   ? 2
+           : type == CREDIT_CARD_EXP_DATE_4_DIGIT_YEAR ? 4
+                                                       : kInvalid;
+  };
+  std::vector<uint8_t> year_length_candidates = {
+      // First choice: Look at the forced field type (this is a server override
+      // or the result of the entire classification chain).
+      type_length(forced_field_type),
+      // Fall back to a pattern found with the regex if the server does not have
+      // an override. If the regex matched, groups[2] refers to the the the year
+      // part (i.e. YY or YYYY in English strings).
+      matches ? static_cast<uint8_t>(groups[2].length()) : kInvalid,
+      // Finally, fall back to server hints if they are available.
+      type_length(server_hint)};
+  // Now erase all zeros that indicate that some of the three cases above did
+  // not lead to a hint.
+  base::Erase(year_length_candidates, kInvalid);
+
+  // If we don't have any concrete hints from the server or the matched date
+  // pattern, we leave `year_length_candidates` empty (instead of always adding
+  // a 4 and/or 2) as we have further heuristics based on `field.max_length`
+  // that will be processed later.
+
+  for (uint8_t year_length : year_length_candidates) {
+    for (const std::u16string& separator : separator_candidates) {
+      uint8_t candidate_size = kMonthLength + separator.length() + year_length;
+      if (field.max_length == 0 || candidate_size <= field.max_length) {
+        return {separator, year_length};
+      }
+    }
+  }
+
+  // Now use to the `field.max_length` attribute to guess an appropriate
+  // format.
   switch (field.max_length) {
     case 1:
     case 2:
@@ -739,7 +892,7 @@ CreditCardField::DetermineExpirationDateFormat(
       return {.separator = u"/", .digits_in_expiration_year = 4};
     default:
       // Includes the case where max_length is not specified (0).
-      return assumed_field_type == CREDIT_CARD_EXP_DATE_2_DIGIT_YEAR
+      return fallback_type == CREDIT_CARD_EXP_DATE_2_DIGIT_YEAR
                  ? ExpirationDateFormat{u"/", /*digits_in_expiration_year*/ 2}
                  : ExpirationDateFormat{u"/", /*digits_in_expiration_year*/ 4};
   }

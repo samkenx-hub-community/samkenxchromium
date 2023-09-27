@@ -21,7 +21,6 @@ import static org.chromium.ui.test.util.ViewUtils.onViewWaiting;
 
 import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
-import android.text.TextUtils;
 import android.util.Size;
 import android.view.View;
 
@@ -35,13 +34,14 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ErrorCollector;
 import org.junit.runner.RunWith;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 
 import org.chromium.base.BaseSwitches;
 import org.chromium.base.Callback;
 import org.chromium.base.NativeLibraryLoadedStatus;
-import org.chromium.base.SysUtils;
 import org.chromium.base.library_loader.LibraryLoader;
 import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.base.test.util.CommandLineFlags;
@@ -53,12 +53,12 @@ import org.chromium.base.test.util.JniMocker;
 import org.chromium.base.test.util.Restriction;
 import org.chromium.build.BuildConfig;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
+import org.chromium.chrome.browser.browser_controls.BrowserControlsStateProvider;
 import org.chromium.chrome.browser.compositor.layouts.Layout;
 import org.chromium.chrome.browser.compositor.layouts.LayoutManagerChromePhone;
 import org.chromium.chrome.browser.compositor.layouts.LayoutManagerChromeTablet;
 import org.chromium.chrome.browser.compositor.layouts.StaticLayout;
 import org.chromium.chrome.browser.compositor.layouts.content.TabContentManager;
-import org.chromium.chrome.browser.device.DeviceClassManager;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.homepage.HomepageManager;
@@ -71,7 +71,6 @@ import org.chromium.chrome.browser.tasks.pseudotab.PseudoTab;
 import org.chromium.chrome.browser.tasks.pseudotab.TabAttributeCache;
 import org.chromium.chrome.browser.tasks.tab_management.TabUiFeatureUtilities;
 import org.chromium.chrome.browser.tasks.tab_management.TabUiTestHelper;
-import org.chromium.chrome.browser.util.ChromeAccessibilityUtil;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
 import org.chromium.chrome.test.R;
@@ -98,8 +97,8 @@ import java.util.concurrent.CountDownLatch;
 // clang-format off
 @CommandLineFlags.
     Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE, "force-fieldtrials=Study/Group"})
-@EnableFeatures({ChromeFeatureList.TAB_GRID_LAYOUT_ANDROID,
-        ChromeFeatureList.START_SURFACE_ANDROID, ChromeFeatureList.INSTANT_START})
+@EnableFeatures({ChromeFeatureList.START_SURFACE_ANDROID, ChromeFeatureList.INSTANT_START,
+    ChromeFeatureList.EMPTY_STATES})
 @Restriction({Restriction.RESTRICTION_TYPE_NON_LOW_END_DEVICE,
     UiRestriction.RESTRICTION_TYPE_PHONE})
 @DoNotBatch(reason = "InstantStartTest tests startup behaviours and thus can't be batched.")
@@ -132,8 +131,12 @@ public class InstantStartTest {
     @Rule
     public SuggestionsDependenciesRule mSuggestionsDeps = new SuggestionsDependenciesRule();
 
+    @Mock
+    public BrowserControlsStateProvider mBrowserControlsStateProvider;
+
     @Before
     public void setUp() {
+        MockitoAnnotations.initMocks(this);
         ReturnToChromeUtil.setSkipInitializationCheckForTesting(true);
     }
 
@@ -149,11 +152,9 @@ public class InstantStartTest {
      */
     @Test
     @SmallTest
-    @EnableFeatures({ChromeFeatureList.TAB_GRID_LAYOUT_ANDROID + "<Study"})
     // clang-format off
     @Restriction({Restriction.RESTRICTION_TYPE_NON_LOW_END_DEVICE})
-    @CommandLineFlags.Add({ChromeSwitches.DISABLE_NATIVE_INITIALIZATION,
-            "force-fieldtrial-params=Study.Group:thumbnail_aspect_ratio/2.0"})
+    @CommandLineFlags.Add({ChromeSwitches.DISABLE_NATIVE_INITIALIZATION})
     public void fetchThumbnailsPreNativeTest() {
         // clang-format on
         StartSurfaceTestUtils.startMainActivityFromLauncher(mActivityTestRule);
@@ -173,8 +174,8 @@ public class InstantStartTest {
         TabContentManager tabContentManager =
                 mActivityTestRule.getActivity().getTabContentManager();
 
-        final Bitmap thumbnailBitmap =
-                StartSurfaceTestUtils.createThumbnailBitmapAndWriteToFile(tabId);
+        final Bitmap thumbnailBitmap = StartSurfaceTestUtils.createThumbnailBitmapAndWriteToFile(
+                tabId, mActivityTestRule.getActivity().getBrowserControlsManager());
         tabContentManager.getTabThumbnailWithCallback(
                 tabId, new Size(0, 0), thumbnailFetchListener, false, false);
         CriteriaHelper.pollInstrumentationThread(
@@ -215,10 +216,7 @@ public class InstantStartTest {
     @SmallTest
     // clang-format off
     @EnableFeatures({ChromeFeatureList.START_SURFACE_RETURN_TIME + "<Study,",
-            ChromeFeatureList.START_SURFACE_ANDROID + "<Study",
-            ChromeFeatureList.TAB_GRID_LAYOUT_ANDROID + "<Study",
-            ChromeFeatureList.TAB_GROUPS_ANDROID,
-            ChromeFeatureList.TAB_GROUPS_CONTINUATION_ANDROID + "<Study"})
+            ChromeFeatureList.START_SURFACE_ANDROID + "<Study"})
     // TODO(https://crbug.com/1315676): Removes this test once the start surface refactoring is
     // done, since the secondary tasks surface will go away.
     @DisableFeatures(ChromeFeatureList.START_SURFACE_REFACTOR)
@@ -282,7 +280,7 @@ public class InstantStartTest {
         // clang-format on
         StartSurfaceTestUtils.startMainActivityFromLauncher(mActivityTestRule);
         Assert.assertTrue(StartSurfaceConfiguration.isStartSurfaceFlagEnabled());
-        Assert.assertFalse(TextUtils.isEmpty(HomepageManager.getHomepageUri()));
+        Assert.assertFalse(HomepageManager.getHomepageGurl().isEmpty());
 
         TestThreadUtils.runOnUiThreadBlocking(
                 (Runnable) ()
@@ -312,47 +310,12 @@ public class InstantStartTest {
 
     @Test
     @SmallTest
-    @EnableFeatures({ChromeFeatureList.START_SURFACE_ANDROID + "<Study"})
-    // clang-format off
-    @CommandLineFlags.Add({ChromeSwitches.ENABLE_ACCESSIBILITY_TAB_SWITCHER,
-        INSTANT_START_TEST_BASE_PARAMS})
-    public void testInstantStartNotCrashWhenAccessibilityLayoutEnabled() throws IOException {
-        // clang-format on
-        TestThreadUtils.runOnUiThreadBlocking(
-                () -> ChromeAccessibilityUtil.get().setAccessibilityEnabledForTesting(true));
-
-        StartSurfaceTestUtils.createTabStateFile(new int[] {123});
-        mActivityTestRule.startMainActivityFromLauncher();
-        Assert.assertTrue(
-                DeviceClassManager.enableAccessibilityLayout(mActivityTestRule.getActivity()));
-
-        Assert.assertFalse(
-                TabUiFeatureUtilities.supportInstantStart(false, mActivityTestRule.getActivity()));
-        Assert.assertTrue(ChromeFeatureList.sInstantStart.isEnabled());
-
-        ChromeTabbedActivity cta = mActivityTestRule.getActivity();
-        Assert.assertFalse(ReturnToChromeUtil.isStartSurfaceEnabled(cta));
-        Assert.assertEquals(1, cta.getTabModelSelector().getCurrentModel().getCount());
-        Layout activeLayout = cta.getLayoutManager().getActiveLayout();
-        Assert.assertTrue(activeLayout instanceof StaticLayout);
-        Assert.assertEquals(123, ((StaticLayout) activeLayout).getCurrentTabIdForTesting());
-    }
-
-    @Test
-    @SmallTest
     @CommandLineFlags.Add(BaseSwitches.ENABLE_LOW_END_DEVICE_MODE)
     // clang-format off
-    @EnableFeatures({ChromeFeatureList.TAB_GROUPS_ANDROID,
-            ChromeFeatureList.TAB_GROUPS_CONTINUATION_ANDROID})
     public void testInstantStartDisabledOnLowEndDevice() throws IOException {
         // clang-format on
         StartSurfaceTestUtils.createTabStateFile(new int[] {123});
         mActivityTestRule.startMainActivityFromLauncher();
-        // SysUtils.resetForTesting is required here due to the test restriction setup. With the
-        // RESTRICTION_TYPE_NON_LOW_END_DEVICE restriction on the class, SysUtils#detectLowEndDevice
-        // is called before the BaseSwitches.ENABLE_LOW_END_DEVICE_MODE is applied. Reset here to
-        // make sure BaseSwitches.ENABLE_LOW_END_DEVICE_MODE can be applied.
-        SysUtils.resetForTesting();
 
         Assert.assertFalse(
                 TabUiFeatureUtilities.supportInstantStart(false, mActivityTestRule.getActivity()));
@@ -368,7 +331,7 @@ public class InstantStartTest {
         if (!BuildConfig.ENABLE_ASSERTS) return;
         StartSurfaceTestUtils.startMainActivityFromLauncher(mActivityTestRule);
         collector.checkThat(StartSurfaceConfiguration.isStartSurfaceFlagEnabled(), is(true));
-        collector.checkThat(TextUtils.isEmpty(HomepageManager.getHomepageUri()), is(false));
+        collector.checkThat(HomepageManager.getHomepageGurl().isEmpty(), is(false));
         Assert.assertFalse(
                 NativeLibraryLoadedStatus.getProviderForTesting().areNativeMethodsReady());
         ReturnToChromeUtil.shouldShowStartSurfaceAsTheHomePage(mActivityTestRule.getActivity());
@@ -450,7 +413,7 @@ public class InstantStartTest {
 
     private void testShowLastTabAtStartUp() throws IOException {
         StartSurfaceTestUtils.createTabStateFile(new int[] {0});
-        StartSurfaceTestUtils.createThumbnailBitmapAndWriteToFile(0);
+        StartSurfaceTestUtils.createThumbnailBitmapAndWriteToFile(0, mBrowserControlsStateProvider);
         TabAttributeCache.setTitleForTesting(0, "Google");
 
         // Launches Chrome and verifies that the last visited Tab is showing.

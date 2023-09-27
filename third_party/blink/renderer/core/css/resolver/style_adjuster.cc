@@ -62,9 +62,9 @@
 #include "third_party/blink/renderer/core/html/shadow/shadow_element_names.h"
 #include "third_party/blink/renderer/core/html_names.h"
 #include "third_party/blink/renderer/core/input_type_names.h"
+#include "third_party/blink/renderer/core/layout/layout_text_combine.h"
 #include "third_party/blink/renderer/core/layout/layout_theme.h"
 #include "third_party/blink/renderer/core/layout/list_marker.h"
-#include "third_party/blink/renderer/core/layout/ng/inline/layout_ng_text_combine.h"
 #include "third_party/blink/renderer/core/mathml/mathml_element.h"
 #include "third_party/blink/renderer/core/style/computed_style.h"
 #include "third_party/blink/renderer/core/style/computed_style_constants.h"
@@ -157,8 +157,6 @@ bool ElementForcesStackingContext(Element* element) {
 static EDisplay EquivalentBlockDisplay(EDisplay display) {
   switch (display) {
     case EDisplay::kFlowRootListItem:
-      DCHECK(RuntimeEnabledFeatures::CSSDisplayMultipleValuesEnabled());
-      [[fallthrough]];
     case EDisplay::kBlock:
     case EDisplay::kTable:
     case EDisplay::kWebkitBox:
@@ -182,10 +180,8 @@ static EDisplay EquivalentBlockDisplay(EDisplay display) {
     case EDisplay::kInlineLayoutCustom:
       return EDisplay::kLayoutCustom;
     case EDisplay::kInlineListItem:
-      DCHECK(RuntimeEnabledFeatures::CSSDisplayMultipleValuesEnabled());
       return EDisplay::kListItem;
     case EDisplay::kInlineFlowRootListItem:
-      DCHECK(RuntimeEnabledFeatures::CSSDisplayMultipleValuesEnabled());
       return EDisplay::kFlowRootListItem;
 
     case EDisplay::kContents:
@@ -244,7 +240,16 @@ static bool LayoutParentStyleForcesZIndexToCreateStackingContext(
   return layout_parent_style.IsDisplayFlexibleOrGridBox();
 }
 
-void StyleAdjuster::AdjustStyleForEditing(ComputedStyleBuilder& builder) {
+void StyleAdjuster::AdjustStyleForEditing(ComputedStyleBuilder& builder,
+                                          Element* element) {
+  if (element && element->editContext()) {
+    // If an element is associated with an EditContext, it should
+    // become editable and should have -webkit-user-modify set to
+    // read-write. This overrides any other values that have been
+    // specified for contenteditable or -webkit-user-modify on that element.
+    builder.SetUserModify(EUserModify::kReadWrite);
+  }
+
   if (builder.UserModify() != EUserModify::kReadWritePlaintextOnly) {
     return;
   }
@@ -297,8 +302,8 @@ void StyleAdjuster::AdjustStyleForCombinedText(ComputedStyleBuilder& builder) {
 #if DCHECK_IS_ON()
   DCHECK_EQ(builder.GetFont().GetFontDescription().Orientation(),
             FontOrientation::kHorizontal);
-  scoped_refptr<const ComputedStyle> cloned_style = builder.CloneStyle();
-  LayoutNGTextCombine::AssertStyleIsValid(*cloned_style);
+  const ComputedStyle* cloned_style = builder.CloneStyle();
+  LayoutTextCombine::AssertStyleIsValid(*cloned_style);
 #endif
 }
 
@@ -748,7 +753,7 @@ static void AdjustStyleForInert(ComputedStyleBuilder& builder,
     return;
   }
 
-  if (auto& base_data = builder.BaseData()) {
+  if (StyleBaseData* base_data = builder.BaseData()) {
     if (RuntimeEnabledFeatures::InertDisplayTransitionEnabled() &&
         base_data->GetBaseComputedStyle()->Display() == EDisplay::kNone) {
       // Elements which are transitioning to display:none should become inert:
@@ -769,6 +774,8 @@ void StyleAdjuster::AdjustForForcedColorsMode(ComputedStyleBuilder& builder) {
   builder.SetTextShadow(ComputedStyleInitialValues::InitialTextShadow());
   builder.SetBoxShadow(ComputedStyleInitialValues::InitialBoxShadow());
   builder.SetColorScheme({AtomicString("light"), AtomicString("dark")});
+  builder.SetScrollbarColor(
+      ComputedStyleInitialValues::InitialScrollbarColor());
   if (builder.ShouldForceColor(builder.AccentColor())) {
     builder.SetAccentColor(ComputedStyleInitialValues::InitialAccentColor());
   }
@@ -816,9 +823,6 @@ void StyleAdjuster::AdjustComputedStyle(StyleResolverState& state,
 
   auto* svg_element = DynamicTo<SVGElement>(element);
 
-  bool is_mathml_element = RuntimeEnabledFeatures::MathMLCoreEnabled() &&
-                           IsA<MathMLElement>(element);
-
   if (builder.Display() != EDisplay::kNone) {
     if (svg_element) {
       AdjustStyleForSvgElement(*svg_element, builder);
@@ -837,8 +841,7 @@ void StyleAdjuster::AdjustComputedStyle(StyleResolverState& state,
     // be left alone because the fullscreen.css doesn't apply any style to
     // them.
     if ((builder.Overlay() == EOverlay::kAuto && !is_document_element) ||
-        builder.StyleType() == kPseudoIdBackdrop ||
-        builder.StyleType() == kPseudoIdViewTransition) {
+        builder.StyleType() == kPseudoIdBackdrop) {
       if (builder.GetPosition() == EPosition::kStatic ||
           builder.GetPosition() == EPosition::kRelative) {
         builder.SetPosition(EPosition::kAbsolute);
@@ -864,8 +867,7 @@ void StyleAdjuster::AdjustComputedStyle(StyleResolverState& state,
 
     // math display values on non-MathML elements compute to flow display
     // values.
-    if ((!element || !is_mathml_element) && builder.IsDisplayMathType()) {
-      DCHECK(RuntimeEnabledFeatures::MathMLCoreEnabled());
+    if (!IsA<MathMLElement>(element) && builder.IsDisplayMathType()) {
       builder.SetDisplay(builder.Display() == EDisplay::kBlockMath
                              ? EDisplay::kBlock
                              : EDisplay::kInline);
@@ -891,7 +893,7 @@ void StyleAdjuster::AdjustComputedStyle(StyleResolverState& state,
     // it to have a backdrop filter either.
     if (is_document_element && is_in_main_frame &&
         builder.HasBackdropFilter()) {
-      builder.MutableBackdropFilter().clear();
+      builder.SetBackdropFilter(FilterOperations());
     }
   } else {
     AdjustStyleForFirstLetter(builder);
@@ -918,6 +920,15 @@ void StyleAdjuster::AdjustComputedStyle(StyleResolverState& state,
       builder.StyleType() == kPseudoIdBackdrop ||
       builder.StyleType() == kPseudoIdViewTransition) {
     builder.SetForcesStackingContext(true);
+  }
+
+  // Though will-change is not itself an inherited property, the intent
+  // expressed by 'will-change: contents' includes descendants.
+  // (We can't mark will-change as inherited and copy this in
+  // WillChange::ApplyInherit(), as Apply() for noninherited
+  // properties, like will-change, gets skipped on partial MPC hits.)
+  if (state.ParentStyle()->SubtreeWillChangeContents()) {
+    builder.SetSubtreeWillChangeContents(true);
   }
 
   if (builder.OverflowX() != EOverflow::kVisible ||
@@ -963,7 +974,7 @@ void StyleAdjuster::AdjustComputedStyle(StyleResolverState& state,
 
   AdjustStyleForInert(builder, element);
 
-  AdjustStyleForEditing(builder);
+  AdjustStyleForEditing(builder, element);
 
   bool is_svg_root = false;
 
@@ -1013,7 +1024,7 @@ void StyleAdjuster::AdjustComputedStyle(StyleResolverState& state,
     }
     builder.SetCssDominantBaseline(baseline);
 
-  } else if (is_mathml_element) {
+  } else if (IsA<MathMLElement>(element)) {
     if (builder.Display() == EDisplay::kContents) {
       // https://drafts.csswg.org/css-display/#unbox-mathml
       builder.SetDisplay(EDisplay::kNone);
@@ -1070,9 +1081,16 @@ void StyleAdjuster::AdjustComputedStyle(StyleResolverState& state,
     element->AdjustStyle(base::PassKey<StyleAdjuster>(), builder);
   }
 
-  if (element && ViewTransitionUtils::IsViewTransitionParticipantFromSupplement(
-                     *element)) {
+  if (element &&
+      ViewTransitionUtils::IsViewTransitionElementExcludingRootFromSupplement(
+          *element)) {
     builder.SetElementIsViewTransitionParticipant();
+  }
+
+  if (RuntimeEnabledFeatures::
+          CSSContentVisibilityImpliesContainIntrinsicSizeAutoEnabled() &&
+      builder.ContentVisibility() == EContentVisibility::kAuto) {
+    builder.SetContainIntrinsicSizeAuto();
   }
 }
 

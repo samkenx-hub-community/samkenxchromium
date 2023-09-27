@@ -8,6 +8,7 @@
 #include "ash/shelf/shelf.h"
 #include "ash/shell.h"
 #include "ash/system/media/media_notification_provider.h"
+#include "ash/system/media/mock_media_notification_provider.h"
 #include "ash/system/status_area_widget.h"
 #include "ash/system/status_area_widget_test_helper.h"
 #include "ash/system/tray/tray_bubble_wrapper.h"
@@ -23,51 +24,6 @@ namespace ash {
 namespace {
 
 constexpr gfx::Size kMockTraySize = gfx::Size(48, 48);
-
-class MockMediaNotificationProvider : public MediaNotificationProvider {
- public:
-  MockMediaNotificationProvider()
-      : old_provider_(MediaNotificationProvider::Get()) {
-    MediaNotificationProvider::Set(this);
-
-    ON_CALL(*this, GetMediaNotificationListView(_, _, _))
-        .WillByDefault([](auto, auto, const auto&) {
-          return std::make_unique<views::View>();
-        });
-  }
-
-  ~MockMediaNotificationProvider() override {
-    MediaNotificationProvider::Set(old_provider_);
-  }
-
-  // MediaNotificationProvider implementations.
-  MOCK_METHOD((std::unique_ptr<views::View>),
-              GetMediaNotificationListView,
-              (int, bool, const std::string&));
-  MOCK_METHOD(void, OnBubbleClosing, ());
-  MOCK_METHOD(global_media_controls::MediaItemManager*,
-              GetMediaItemManager,
-              ());
-  void AddObserver(MediaNotificationProviderObserver* observer) override {}
-  void RemoveObserver(MediaNotificationProviderObserver* observer) override {}
-  bool HasActiveNotifications() override { return has_active_notifications_; }
-  bool HasFrozenNotifications() override { return has_frozen_notifications_; }
-  void SetColorTheme(
-      const media_message_center::NotificationTheme& color_theme) override {}
-
-  void SetHasActiveNotifications(bool has_active_notifications) {
-    has_active_notifications_ = has_active_notifications;
-  }
-
-  void SetHasFrozenNotifications(bool has_frozen_notifications) {
-    has_frozen_notifications_ = has_frozen_notifications;
-  }
-
- private:
-  bool has_active_notifications_ = false;
-  bool has_frozen_notifications_ = false;
-  const raw_ptr<MediaNotificationProvider, ExperimentalAsh> old_provider_;
-};
 
 // Mock tray button used to test media tray bubble's anchor update.
 class MockTrayBackgroundView : public ash::TrayBackgroundView {
@@ -85,6 +41,7 @@ class MockTrayBackgroundView : public ash::TrayBackgroundView {
   void HandleLocaleChange() override {}
   void HideBubbleWithView(const TrayBubbleView* bubble_view) override {}
   void ClickedOutsideBubble() override {}
+  void UpdateTrayItemColor(bool is_active) override {}
 };
 
 }  // namespace
@@ -96,9 +53,7 @@ class MediaTrayTest : public AshTestBase {
 
   void SetUp() override {
     AshTestBase::SetUp();
-
     provider_ = std::make_unique<MockMediaNotificationProvider>();
-
     media_tray_ = status_area_widget()->media_tray();
     ASSERT_TRUE(MediaTray::IsPinnedToShelf());
   }
@@ -120,12 +75,6 @@ class MediaTrayTest : public AshTestBase {
 
   void SimulateNotificationListChanged() {
     media_tray_->OnNotificationListChanged();
-  }
-
-  void SimulateTapOnMediaTray() {
-    ui::GestureEvent tap(0, 0, 0, base::TimeTicks(),
-                         ui::GestureEventDetails(ui::ET_GESTURE_TAP));
-    media_tray_->PerformAction(tap);
   }
 
   void SimulateTapOnPinButton() {
@@ -162,7 +111,7 @@ class MediaTrayTest : public AshTestBase {
 
  private:
   std::unique_ptr<MockMediaNotificationProvider> provider_;
-  raw_ptr<MediaTray, ExperimentalAsh> media_tray_;
+  raw_ptr<MediaTray, DanglingUntriaged | ExperimentalAsh> media_tray_;
   std::unique_ptr<MockTrayBackgroundView> mock_tray_;
 };
 
@@ -215,16 +164,16 @@ TEST_F(MediaTrayTest, ShowAndHideBubbleTest) {
   // Tap the media tray should show the bubble, and media tray should
   // be active. GetMediaNotificationlistview also should be called for
   // getting active notifications.
-  EXPECT_CALL(*provider(),
-              GetMediaNotificationListView(_, /*should_clip_height=*/true, _));
-  SimulateTapOnMediaTray();
+  EXPECT_CALL(*provider(), GetMediaNotificationListView(
+                               _, /*should_clip_height=*/true, _, _));
+  GestureTapOn(media_tray());
   EXPECT_NE(GetBubbleWrapper(), nullptr);
   EXPECT_TRUE(media_tray()->is_active());
 
   // Tap again should close the bubble and MediaNotificationProvider should
   // be notified.
   EXPECT_CALL(*provider(), OnBubbleClosing());
-  SimulateTapOnMediaTray();
+  GestureTapOn(media_tray());
   EXPECT_EQ(GetBubbleWrapper(), nullptr);
   EXPECT_FALSE(media_tray()->is_active());
 }
@@ -240,7 +189,8 @@ TEST_F(MediaTrayTest, OpenBubbleForcesShelfToShow) {
   EXPECT_FALSE(status_area_widget()->ShouldShowShelf());
 
   // Open the media tray bubble and verify that the shelf is forced to show.
-  SimulateTapOnMediaTray();
+  GestureTapOn(media_tray());
+  ;
   EXPECT_TRUE(status_area_widget()->ShouldShowShelf());
 }
 
@@ -256,7 +206,8 @@ TEST_F(MediaTrayTest, ShowEmptyStateWhenNoActiveNotification) {
   EXPECT_FALSE(media_tray()->is_active());
 
   // Tap and show bubble.
-  SimulateTapOnMediaTray();
+  GestureTapOn(media_tray());
+
   EXPECT_NE(GetBubbleWrapper(), nullptr);
   EXPECT_TRUE(media_tray()->is_active());
 
@@ -283,7 +234,7 @@ TEST_F(MediaTrayTest, PinButtonTest) {
   provider()->SetHasActiveNotifications(true);
   SimulateNotificationListChanged();
   EXPECT_TRUE(media_tray()->GetVisible());
-  SimulateTapOnMediaTray();
+  GestureTapOn(media_tray());
   EXPECT_NE(GetBubbleWrapper(), nullptr);
 
   // Tapping the pin button while the media controls dialog is opened
@@ -328,7 +279,7 @@ TEST_F(MediaTrayTest, DialogAnchor) {
   provider()->SetHasActiveNotifications(true);
   SimulateNotificationListChanged();
   EXPECT_TRUE(media_tray()->GetVisible());
-  SimulateTapOnMediaTray();
+  GestureTapOn(media_tray());
   EXPECT_NE(GetBubbleWrapper(), nullptr);
 
   EXPECT_TRUE(status_area_widget()->shelf()->IsHorizontalAlignment());
@@ -367,9 +318,9 @@ TEST_F(MediaTrayTest, DialogAnchor) {
 
   // Hide bubble, change shelf alignment to left (vertical), and open
   // bubble again.
-  SimulateTapOnMediaTray();
+  GestureTapOn(media_tray());
   status_area_widget()->shelf()->SetAlignment(ShelfAlignment::kLeft);
-  SimulateTapOnMediaTray();
+  GestureTapOn(media_tray());
 
   // Get new bounds.
   initial_bounds = GetBubbleBounds();
@@ -385,11 +336,11 @@ TEST_F(MediaTrayTest, DialogAnchor) {
 
   // Hide bubble, change shelf alignment back to bottom and switch ui
   // direction to RTL.
-  SimulateTapOnMediaTray();
+  GestureTapOn(media_tray());
   status_area_widget()->shelf()->SetAlignment(ShelfAlignment::kBottom);
   base::i18n::SetRTLForTesting(true);
   status_area_widget()->UpdateLayout(false);
-  SimulateTapOnMediaTray();
+  GestureTapOn(media_tray());
 
   // Get new bounds.
   initial_bounds = GetBubbleBounds();
@@ -408,7 +359,7 @@ TEST_F(MediaTrayTest, ShowBubble) {
   // We start with no bubble view.
   EXPECT_EQ(nullptr, media_tray()->GetBubbleView());
 
-  EXPECT_CALL(*provider(), GetMediaNotificationListView(_, _, ""));
+  EXPECT_CALL(*provider(), GetMediaNotificationListView(_, _, "", ""));
   media_tray()->ShowBubble();
   EXPECT_NE(nullptr, media_tray()->GetBubbleView());
 }
@@ -418,7 +369,7 @@ TEST_F(MediaTrayTest, ShowBubbleWithItem) {
   EXPECT_EQ(nullptr, media_tray()->GetBubbleView());
 
   const std::string item_id = "my-item-id";
-  EXPECT_CALL(*provider(), GetMediaNotificationListView(_, _, item_id));
+  EXPECT_CALL(*provider(), GetMediaNotificationListView(_, _, item_id, ""));
   media_tray()->ShowBubbleWithItem(item_id);
   EXPECT_NE(nullptr, media_tray()->GetBubbleView());
 }

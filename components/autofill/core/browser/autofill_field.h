@@ -16,6 +16,7 @@
 #include "components/autofill/core/browser/data_model/autofill_profile.h"
 #include "components/autofill/core/browser/field_types.h"
 #include "components/autofill/core/browser/form_parsing/regex_patterns.h"
+#include "components/autofill/core/browser/heuristic_source.h"
 #include "components/autofill/core/browser/metrics/log_event.h"
 #include "components/autofill/core/browser/proto/api_v1.pb.h"
 #include "components/autofill/core/browser/proto/password_requirements.pb.h"
@@ -38,7 +39,8 @@ enum class FormControlType {
   kCheckbox = 4,
   kRadio = 5,
   kSelectOne = 6,
-  kMaxValue = kSelectOne,
+  kSelectlist = 7,
+  kMaxValue = kSelectlist,
 };
 
 class AutofillField : public FormFieldData {
@@ -58,6 +60,8 @@ class AutofillField : public FormFieldData {
 
   AutofillField(const AutofillField&) = delete;
   AutofillField& operator=(const AutofillField&) = delete;
+  AutofillField(AutofillField&&);
+  AutofillField& operator=(AutofillField&&);
 
   virtual ~AutofillField();
 
@@ -68,7 +72,7 @@ class AutofillField : public FormFieldData {
       FieldSignature field_signature);
 
   ServerFieldType heuristic_type() const;
-  ServerFieldType heuristic_type(PatternSource s) const;
+  ServerFieldType heuristic_type(HeuristicSource s) const;
   ServerFieldType server_type() const;
   bool server_type_prediction_is_override() const;
   const std::vector<
@@ -96,7 +100,7 @@ class AutofillField : public FormFieldData {
   bool only_fill_when_focused() const { return only_fill_when_focused_; }
 
   // Setters for the detected types.
-  void set_heuristic_type(PatternSource s, ServerFieldType t);
+  void set_heuristic_type(HeuristicSource s, ServerFieldType t);
   void add_possible_types_validities(
       const ServerFieldTypeValidityStateMap& possible_types_validities);
   void set_server_predictions(
@@ -201,14 +205,15 @@ class AutofillField : public FormFieldData {
   // Returns true if the field's type is a credit card expiration type.
   bool HasExpirationDateType() const;
 
-  // Address Autofill gets disabled by an unrecognized autocomplete attribute.
-  // If `kAutofillFillAndImportFromMoreFields` is enabled, this changes and the
-  // server/heuristic predictions overwrite the unrecognized autocomplete
-  // attribute. Depending on the feature's parameters, Autofill then fills or
-  // imports from these fields.
-  // This function returns true if the field's type prediction is only available
-  // due to the aforementioned feature.
-  bool HasPredictionDespiteUnrecognizedAutocompleteAttribute() const;
+  // Address Autofill is disabled for fields with unrecognized autocomplete
+  // attribute - except if the field has a server overwrite.
+  // Without `kAutofillPredictionsForAutocompleteUnrecognized`, this happens
+  // implicitly, since ac=unrecognized suppresses the predicted type. As of
+  // `kAutofillPredictionsForAutocompleteUnrecognized`, ac=unrecognized fields
+  // receive a predictions, but suggestions and filling are still suppressed.
+  // This function can be used to determine whether suggestions and filling
+  // should be suppressed for this field (independently of the predicted type).
+  bool ShouldSuppressSuggestionsAndFillingByDefault() const;
 
   void set_initial_value_hash(uint32_t value) { initial_value_hash_ = value; }
   absl::optional<uint32_t> initial_value_hash() { return initial_value_hash_; }
@@ -350,7 +355,8 @@ class AutofillField : public FormFieldData {
   // Predictions which where calculated on the client. This is initialized to
   // `NO_SERVER_DATA`, which means "NO_DATA", i.e. no classification was
   // attempted.
-  std::array<ServerFieldType, static_cast<size_t>(PatternSource::kMaxValue) + 1>
+  std::array<ServerFieldType,
+             static_cast<size_t>(HeuristicSource::kMaxValue) + 1>
       local_type_predictions_;
 
   // The type of the field. Overrides all other types (html_type_,
@@ -432,6 +438,9 @@ class AutofillField : public FormFieldData {
   // to the autofill profile's GUID for the current value if `is_autofilled` is
   // set or for the previously autofilled value if the field was changed after
   // filling. nullopt means the field wasn't autofilled.
+  // Note: `is_autofilled` is true for autocompleted fields. So `is_autofilled`
+  // is not a sufficient condition for `autofill_source_profile_guid_` to have a
+  // value.
   absl::optional<std::string> autofill_source_profile_guid_;
 };
 

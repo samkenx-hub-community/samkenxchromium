@@ -1,6 +1,7 @@
 include_rules = [
     "+base/atomic_sequence_num.h",
     "+base/memory/scoped_refptr.h",
+    "+mojo/public/cpp/base",
     "+mojo/public/cpp/bindings",
     "+mojo/public/cpp/system",
     "+net/base/net_errors.h",
@@ -66,7 +67,6 @@ specific_include_rules = {
         "+net/base/ip_endpoint.h",
     ],
     ".*socket.cc": [
-        "+base/barrier_callback.h",
         "+base/functional/identity.h",
     ],
 }

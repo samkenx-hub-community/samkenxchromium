@@ -42,7 +42,6 @@
 #include "chrome/browser/web_applications/web_app.h"
 #include "chrome/browser/web_applications/web_app_command_scheduler.h"
 #include "chrome/browser/web_applications/web_app_constants.h"
-#include "chrome/browser/web_applications/web_app_id.h"
 #include "chrome/browser/web_applications/web_app_provider.h"
 #include "chrome/browser/web_applications/web_app_registrar.h"
 #include "chrome/browser/web_applications/web_app_registry_update.h"
@@ -50,8 +49,10 @@
 #include "chrome/browser/web_applications/web_app_utils.h"
 #include "chrome/common/chrome_features.h"
 #include "chrome/common/chrome_switches.h"
+#include "components/keep_alive_registry/keep_alive_registry.h"
 #include "components/keep_alive_registry/keep_alive_types.h"
 #include "components/keep_alive_registry/scoped_keep_alive.h"
+#include "components/webapps/common/web_app_id.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/blink/public/common/custom_handlers/protocol_handler_utils.h"
 #include "third_party/blink/public/common/security/protocol_handler_security_level.h"
@@ -100,6 +101,13 @@ class StartupWebAppCreator
     if (app_id.empty())
       return false;
 
+    // Ensure keep alive registry is available and is not shutting down before
+    // attempting a web apps launch.
+    KeepAliveRegistry* keep_alive_registry = KeepAliveRegistry::GetInstance();
+    if (!keep_alive_registry || keep_alive_registry->IsShuttingDown()) {
+      return false;
+    }
+
     scoped_refptr<StartupWebAppCreator> web_app_startup =
         base::AdoptRef(new StartupWebAppCreator(command_line, cur_dir, profile,
                                                 is_first_run, app_id));
@@ -127,7 +135,7 @@ class StartupWebAppCreator
                        const base::FilePath& cur_dir,
                        Profile* profile,
                        chrome::startup::IsFirstRun is_first_run,
-                       const AppId& app_id)
+                       const webapps::AppId& app_id)
       : command_line_(command_line),
         cur_dir_(cur_dir),
         profile_(profile),
@@ -341,7 +349,7 @@ class StartupWebAppCreator
   chrome::startup::IsFirstRun is_first_run_;
 
   // The app id for this launch, corresponding to --app-id on the command line.
-  const AppId app_id_;
+  const webapps::AppId app_id_;
 
   raw_ptr<WebAppProvider> provider_;
 

@@ -453,4 +453,31 @@ AudioNodeList::iterator FakeCrasAudioClient::FindNode(uint64_t node_id) {
   return base::ranges::find(node_list_, node_id, &AudioNode::id);
 }
 
+void FakeCrasAudioClient::SetForceRespectUiGains(
+    bool force_respect_ui_gains_enabled) {
+  force_respect_ui_gains_enabled_ = force_respect_ui_gains_enabled;
+}
+
+void FakeCrasAudioClient::GetNumStreamIgnoreUiGains(
+    chromeos::DBusMethodCallback<int> callback) {
+  std::move(callback).Run(false);
+}
+
+void FakeCrasAudioClient::GetHfpMicSrSupported(
+    chromeos::DBusMethodCallback<bool> callback) {
+  std::move(callback).Run(hfp_mic_sr_supported_);
+}
+
+void FakeCrasAudioClient::SetHfpMicSrSupported(bool hfp_mic_sr_supported) {
+  hfp_mic_sr_supported_ = hfp_mic_sr_supported;
+}
+
+uint32_t FakeCrasAudioClient::GetHfpMicSrEnabled() {
+  return hfp_mic_sr_enabled_;
+}
+
+void FakeCrasAudioClient::SetHfpMicSrEnabled(bool hfp_mic_sr_on) {
+  hfp_mic_sr_enabled_ = hfp_mic_sr_on;
+}
+
 }  // namespace ash

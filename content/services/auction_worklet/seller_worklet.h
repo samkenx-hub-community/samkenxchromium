@@ -70,6 +70,8 @@ class CONTENT_EXPORT SellerWorklet : public mojom::SellerWorklet {
       bool pause_for_debugger_on_start,
       mojo::PendingRemote<network::mojom::URLLoaderFactory>
           pending_url_loader_factory,
+      mojo::PendingRemote<auction_worklet::mojom::AuctionNetworkEventsHandler>
+          auction_network_events_handler,
       const GURL& decision_logic_url,
       const absl::optional<GURL>& trusted_scoring_signals_url,
       const url::Origin& top_window_origin,
@@ -100,7 +102,11 @@ class CONTENT_EXPORT SellerWorklet : public mojom::SellerWorklet {
       const blink::AuctionConfig::NonSharedParams&
           auction_ad_config_non_shared_params,
       const absl::optional<GURL>& direct_from_seller_seller_signals,
+      const absl::optional<std::string>&
+          direct_from_seller_seller_signals_header_ad_slot,
       const absl::optional<GURL>& direct_from_seller_auction_signals,
+      const absl::optional<std::string>&
+          direct_from_seller_auction_signals_header_ad_slot,
       mojom::ComponentAuctionOtherSellerPtr browser_signals_other_seller,
       const absl::optional<blink::AdCurrency>& component_expect_bid_currency,
       const url::Origin& browser_signal_interest_group_owner,
@@ -116,7 +122,11 @@ class CONTENT_EXPORT SellerWorklet : public mojom::SellerWorklet {
       const blink::AuctionConfig::NonSharedParams&
           auction_ad_config_non_shared_params,
       const absl::optional<GURL>& direct_from_seller_seller_signals,
+      const absl::optional<std::string>&
+          direct_from_seller_seller_signals_header_ad_slot,
       const absl::optional<GURL>& direct_from_seller_auction_signals,
+      const absl::optional<std::string>&
+          direct_from_seller_auction_signals_header_ad_slot,
       mojom::ComponentAuctionOtherSellerPtr browser_signals_other_seller,
       const url::Origin& browser_signal_interest_group_owner,
       const absl::optional<std::string>&
@@ -159,7 +169,7 @@ class CONTENT_EXPORT SellerWorklet : public mojom::SellerWorklet {
     absl::optional<blink::AdCurrency> component_expect_bid_currency;
     url::Origin browser_signal_interest_group_owner;
     GURL browser_signal_render_url;
-    // While these are URLs, it's more concenient to store these as strings
+    // While these are URLs, it's more convenient to store these as strings
     // rather than GURLs, both for creating a v8 array from, and for sharing
     // ScoringSignals code with BidderWorklets.
     std::vector<std::string> browser_signal_ad_components;
@@ -196,6 +206,12 @@ class CONTENT_EXPORT SellerWorklet : public mojom::SellerWorklet {
         direct_from_seller_result_auction_signals;
     // DirectFromSellerSignals errors are fatal, so no error information is
     // stored here.
+
+    // Header-based DirectFromSellerSignals.
+    absl::optional<std::string>
+        direct_from_seller_seller_signals_header_ad_slot;
+    absl::optional<std::string>
+        direct_from_seller_auction_signals_header_ad_slot;
   };
 
   using ScoreAdTaskList = std::list<ScoreAdTask>;
@@ -244,6 +260,12 @@ class CONTENT_EXPORT SellerWorklet : public mojom::SellerWorklet {
     // DirectFromSellerSignals errors are fatal, so no error information is
     // stored here.
 
+    // Header-based DirectFromSellerSignals.
+    absl::optional<std::string>
+        direct_from_seller_seller_signals_header_ad_slot;
+    absl::optional<std::string>
+        direct_from_seller_auction_signals_header_ad_slot;
+
     ReportResultCallback callback;
   };
 
@@ -268,7 +290,6 @@ class CONTENT_EXPORT SellerWorklet : public mojom::SellerWorklet {
         absl::optional<GURL> debug_win_report_url,
         PrivateAggregationRequests pa_requests,
         base::TimeDelta scoring_latency,
-        base::TimeDelta trusted_signals_fetch_latency,
         std::vector<std::string> errors)>;
     using ReportResultCallbackInternal =
         base::OnceCallback<void(absl::optional<std::string> signals_for_winner,
@@ -300,8 +321,12 @@ class CONTENT_EXPORT SellerWorklet : public mojom::SellerWorklet {
             auction_ad_config_non_shared_params,
         DirectFromSellerSignalsRequester::Result
             direct_from_seller_result_seller_signals,
+        const absl::optional<std::string>&
+            direct_from_seller_seller_signals_header_ad_slot,
         DirectFromSellerSignalsRequester::Result
             direct_from_seller_result_auction_signals,
+        const absl::optional<std::string>&
+            direct_from_seller_auction_signals_header_ad_slot,
         scoped_refptr<TrustedSignals::Result> trusted_scoring_signals,
         mojom::ComponentAuctionOtherSellerPtr browser_signals_other_seller,
         const absl::optional<blink::AdCurrency>& component_expect_bid_currency,
@@ -311,7 +336,6 @@ class CONTENT_EXPORT SellerWorklet : public mojom::SellerWorklet {
         uint32_t browser_signal_bidding_duration_msecs,
         const absl::optional<base::TimeDelta> seller_timeout,
         uint64_t trace_id,
-        base::TimeDelta trusted_signals_fetch_latency,
         base::ScopedClosureRunner cleanup_score_ad_task,
         ScoreAdCallbackInternal callback);
 
@@ -320,8 +344,12 @@ class CONTENT_EXPORT SellerWorklet : public mojom::SellerWorklet {
             auction_ad_config_non_shared_params,
         DirectFromSellerSignalsRequester::Result
             direct_from_seller_result_seller_signals,
+        const absl::optional<std::string>&
+            direct_from_seller_seller_signals_header_ad_slot,
         DirectFromSellerSignalsRequester::Result
             direct_from_seller_result_auction_signals,
+        const absl::optional<std::string>&
+            direct_from_seller_auction_signals_header_ad_slot,
         mojom::ComponentAuctionOtherSellerPtr browser_signals_other_seller,
         const url::Origin& browser_signal_interest_group_owner,
         const absl::optional<std::string>&
@@ -354,6 +382,7 @@ class CONTENT_EXPORT SellerWorklet : public mojom::SellerWorklet {
     // report URLs, even if the methods to set them have been invoked.
     void PostScoreAdCallbackToUserThreadOnError(
         ScoreAdCallbackInternal callback,
+        base::TimeDelta scoring_latency,
         std::vector<std::string> errors,
         PrivateAggregationRequests pa_requests = {});
 
@@ -369,7 +398,6 @@ class CONTENT_EXPORT SellerWorklet : public mojom::SellerWorklet {
         absl::optional<GURL> debug_win_report_url,
         PrivateAggregationRequests pa_requests,
         base::TimeDelta scoring_latency,
-        base::TimeDelta trusted_signals_fetch_latency,
         std::vector<std::string> errors);
 
     void PostReportResultCallbackToUserThread(
@@ -453,7 +481,6 @@ class CONTENT_EXPORT SellerWorklet : public mojom::SellerWorklet {
       absl::optional<GURL> debug_win_report_url,
       PrivateAggregationRequests pa_requests,
       base::TimeDelta scoring_latency,
-      base::TimeDelta trusted_signals_fetch_latency,
       std::vector<std::string> errors);
 
   // Removes `task` from `score_ad_tasks_` only. Used in case where the
@@ -530,6 +557,9 @@ class CONTENT_EXPORT SellerWorklet : public mojom::SellerWorklet {
   absl::optional<std::string> load_script_error_msg_;
 
   base::CancelableTaskTracker cancelable_task_tracker_;
+
+  mojo::Remote<auction_worklet::mojom::AuctionNetworkEventsHandler>
+      auction_network_events_handler_;
 
   SEQUENCE_CHECKER(user_sequence_checker_);
 

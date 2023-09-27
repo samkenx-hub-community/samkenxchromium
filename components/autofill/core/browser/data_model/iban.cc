@@ -102,6 +102,9 @@ static constexpr auto kCountryToIbanLength =
         {"XK", 20},  // Kosovo
     });
 
+static constexpr int kPrefixLength = 4;
+static constexpr int kSuffixLength = 4;
+
 int GetIbanCountryToLength(base::StringPiece country_code) {
   auto* it = kCountryToIbanLength.find(country_code);
   if (it == kCountryToIbanLength.end()) {
@@ -176,26 +179,30 @@ constexpr char16_t kCapitalizedIbanPattern[] =
 constexpr char16_t kEllipsisOneDot = u'\u2022';
 constexpr char16_t kEllipsisOneSpace = u'\u2006';
 
-IBAN::IBAN(const std::string& guid) : AutofillDataModel(guid) {}
+Iban::Iban() : record_type_(RecordType::kUnknown) {}
 
-IBAN::IBAN() : IBAN(base::Uuid::GenerateRandomV4().AsLowercaseString()) {}
+Iban::Iban(const Guid& guid)
+    : identifier_(guid), record_type_(RecordType::kLocalIban) {}
 
-IBAN::IBAN(const IBAN& iban) : IBAN() {
+Iban::Iban(const InstrumentId& instrument_id)
+    : identifier_(instrument_id), record_type_(RecordType::kServerIban) {}
+
+Iban::Iban(const Iban& iban) : Iban() {
   operator=(iban);
 }
 
-IBAN::~IBAN() = default;
+Iban::~Iban() = default;
 
-IBAN& IBAN::operator=(const IBAN& iban) = default;
+Iban& Iban::operator=(const Iban& iban) = default;
 
-AutofillMetadata IBAN::GetMetadata() const {
+AutofillMetadata Iban::GetMetadata() const {
   AutofillMetadata metadata = AutofillDataModel::GetMetadata();
   metadata.id = guid();
   return metadata;
 }
 
 // static
-bool IBAN::IsValid(const std::u16string& value) {
+bool Iban::IsValid(const std::u16string& value) {
   std::u16string iban_value = RemoveIbanSeparators(value);
   iban_value = base::i18n::ToUpper(iban_value);
   // IBANs must be at least 16 digits and at most 33 digits long.
@@ -221,21 +228,17 @@ bool IBAN::IsValid(const std::u16string& value) {
 }
 
 // static
-bool IBAN::IsIbanApplicableInCountry(const std::string& country_code) {
+bool Iban::IsIbanApplicableInCountry(const std::string& country_code) {
   auto* it = kCountryToIbanLength.find(country_code);
   return it != kCountryToIbanLength.end();
 }
 
-bool IBAN::SetMetadata(const AutofillMetadata& metadata) {
+bool Iban::SetMetadata(const AutofillMetadata& metadata) {
   // Make sure the ids match.
   return metadata.id != guid() && AutofillDataModel::SetMetadata(metadata);
 }
 
-bool IBAN::IsDeletable() const {
-  return false;
-}
-
-std::u16string IBAN::GetRawInfo(ServerFieldType type) const {
+std::u16string Iban::GetRawInfo(ServerFieldType type) const {
   if (type == IBAN_VALUE) {
     return value_;
   }
@@ -244,7 +247,7 @@ std::u16string IBAN::GetRawInfo(ServerFieldType type) const {
   return std::u16string();
 }
 
-void IBAN::SetRawInfoWithVerificationStatus(ServerFieldType type,
+void Iban::SetRawInfoWithVerificationStatus(ServerFieldType type,
                                             const std::u16string& value,
                                             VerificationStatus status) {
   if (type == IBAN_VALUE) {
@@ -254,47 +257,102 @@ void IBAN::SetRawInfoWithVerificationStatus(ServerFieldType type,
   }
 }
 
-void IBAN::GetSupportedTypes(ServerFieldTypeSet* supported_types) const {
+void Iban::GetSupportedTypes(ServerFieldTypeSet* supported_types) const {
   supported_types->insert(IBAN_VALUE);
 }
 
-bool IBAN::IsEmpty(const std::string& app_locale) const {
+bool Iban::IsEmpty(const std::string& app_locale) const {
   ServerFieldTypeSet types;
   GetNonEmptyTypes(app_locale, &types);
   return types.empty();
 }
 
-int IBAN::Compare(const IBAN& iban) const {
-  int comparison = server_id_.compare(iban.server_id_);
+int Iban::Compare(const Iban& iban) const {
+  if (identifier_ < iban.identifier_) {
+    return -1;
+  }
+
+  if (identifier_ > iban.identifier_) {
+    return 1;
+  }
+
+  int comparison = nickname_.compare(iban.nickname_);
   if (comparison != 0) {
     return comparison;
   }
 
-  comparison = nickname_.compare(iban.nickname_);
+  comparison = value_.compare(iban.value_);
   if (comparison != 0) {
     return comparison;
   }
 
-  return value_.compare(iban.value_);
+  comparison = prefix_.compare(iban.prefix_);
+  if (comparison != 0) {
+    return comparison;
+  }
+
+  comparison = suffix_.compare(iban.suffix_);
+  if (comparison != 0) {
+    return comparison;
+  }
+
+  if (length_ != iban.length_) {
+    return 1;
+  }
+
+  if (record_type_ != iban.record_type_) {
+    return 1;
+  }
+  return 0;
 }
 
-bool IBAN::operator==(const IBAN& iban) const {
+bool Iban::operator==(const Iban& iban) const {
   return guid() == iban.guid() && Compare(iban) == 0;
 }
 
-bool IBAN::operator!=(const IBAN& iban) const {
+bool Iban::operator!=(const Iban& iban) const {
   return !operator==(iban);
 }
 
-void IBAN::set_value(const std::u16string& value) {
+void Iban::set_identifier(const absl::variant<Guid, InstrumentId>& identifier) {
+  if (absl::holds_alternative<Guid>(identifier_)) {
+    CHECK_NE(record_type_, kServerIban);
+  } else {
+    CHECK_EQ(record_type_, kServerIban);
+  }
+  identifier_ = identifier;
+}
+
+const std::string& Iban::guid() const {
+  CHECK(absl::holds_alternative<Guid>(identifier_));
+  return absl::get<Guid>(identifier_).value();
+}
+
+const std::string& Iban::instrument_id() const {
+  CHECK(absl::holds_alternative<InstrumentId>(identifier_));
+  return absl::get<InstrumentId>(identifier_).value();
+}
+
+void Iban::set_value(const std::u16string& value) {
   if (!IsValid(value)) {
     return;
   }
   // Get rid of all separators in the value before storing.
   value_ = RemoveIbanSeparators(value);
+  static_assert(
+      base::ranges::min_element(kCountryToIbanLength, {},
+                                [](const auto& entry) { return entry.second; })
+          ->second >= kPrefixLength + kSuffixLength);
+  // The `IsValid()` call above ensures we have a valid IBAN length. We should
+  // never set the `kPrefixLength` and `kSuffixLength` in a way where they can
+  // be longer than the total length of the IBAN.
+  CHECK(value_.length() >= kPrefixLength + kSuffixLength);
+  set_prefix(value_.substr(0, kPrefixLength));
+  set_suffix(value_.substr(value_.length() - kSuffixLength));
+  set_length(value_.length());
 }
 
-void IBAN::set_nickname(const std::u16string& nickname) {
+void Iban::set_nickname(const std::u16string& nickname) {
   // First replace all tabs and newlines with whitespaces and store it as
   // |nickname_|.
   base::ReplaceChars(nickname, u"\t\r\n", u" ", &nickname_);
@@ -306,10 +364,17 @@ void IBAN::set_nickname(const std::u16string& nickname) {
                                /*trim_sequences_with_line_breaks=*/true);
 }
 
-std::u16string IBAN::GetIdentifierStringForAutofillDisplay(
+bool Iban::IsValid() {
+  CHECK_NE(record_type_, RecordType::kUnknown);
+  return record_type_ == kServerIban || IsValid(value_);
+}
+
+std::u16string Iban::GetIdentifierStringForAutofillDisplay(
     bool is_value_masked) const {
-  DCHECK(!value_.empty());
   const std::u16string stripped_value = GetStrippedValue();
+  if (stripped_value.empty()) {
+    return stripped_value;
+  }
   size_t value_length = stripped_value.size();
   auto ShouldMask = [&](size_t i) {
     // The first 2-letter country code and 2 IBAN check digits will stay
@@ -328,7 +393,7 @@ std::u16string IBAN::GetIdentifierStringForAutofillDisplay(
   return output;
 }
 
-std::u16string IBAN::GetStrippedValue() const {
+std::u16string Iban::GetStrippedValue() const {
   return value_;
 }
 

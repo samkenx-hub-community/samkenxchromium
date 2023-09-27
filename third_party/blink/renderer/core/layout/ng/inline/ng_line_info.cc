@@ -20,7 +20,7 @@ void NGLineInfo::Reset() {
   bfc_offset_ = NGBfcOffset();
 
   break_token_ = nullptr;
-  propagated_break_tokens_.Shrink(0);
+  parallel_flow_break_tokens_.Shrink(0);
 
   block_in_inline_layout_result_ = nullptr;
 
@@ -180,6 +180,15 @@ bool NGLineInfo::ShouldHangTrailingSpaces() const {
       return IsRtl(BaseDirection());
   }
   NOTREACHED();
+}
+
+bool NGLineInfo::IsHyphenated() const {
+  for (const NGInlineItemResult& item_result : base::Reversed(Results())) {
+    if (item_result.Length()) {
+      return item_result.is_hyphenated;
+    }
+  }
+  return false;
 }
 
 void NGLineInfo::UpdateTextAlign() {

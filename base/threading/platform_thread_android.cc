@@ -28,10 +28,12 @@ namespace internal {
 // result in heavy throttling and force the thread onto a little core on
 // big.LITTLE devices.
 const ThreadPriorityToNiceValuePairForTest
-    kThreadPriorityToNiceValueMapForTest[5] = {
+    kThreadPriorityToNiceValueMapForTest[7] = {
         {ThreadPriorityForTest::kRealtimeAudio, -16},
         {ThreadPriorityForTest::kDisplay, -4},
+        {ThreadPriorityForTest::kCompositing, -4},
         {ThreadPriorityForTest::kNormal, 0},
+        {ThreadPriorityForTest::kResourceEfficient, 0},
         {ThreadPriorityForTest::kUtility, 1},
         {ThreadPriorityForTest::kBackground, 10},
 };
@@ -87,7 +89,7 @@ GetCurrentThreadPriorityForPlatformForTest() {
 }  // namespace internal
 
 void PlatformThread::SetName(const std::string& name) {
-  ThreadIdNameManager::GetInstance()->SetName(name);
+  SetNameCommon(name);
 
   // Like linux, on android we can get the thread names to show up in the
   // debugger by setting the process name for the LWP.

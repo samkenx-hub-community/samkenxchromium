@@ -195,7 +195,7 @@ suite('PasswordDetailsCardTest', function() {
         PasswordViewPageInteractions.PASSWORD_DELETE_BUTTON_CLICKED,
         await passwordManager.whenCalled('recordPasswordViewInteraction'));
 
-    const params = await passwordManager.whenCalled('removeSavedPassword');
+    const params = await passwordManager.whenCalled('removeCredential');
     assertEquals(params.id, password.id);
     assertEquals(params.fromStores, password.storedIn);
   });
@@ -227,7 +227,7 @@ suite('PasswordDetailsCardTest', function() {
 
                 // Verify that password was not deleted immediately.
                 assertEquals(
-                    0, passwordManager.getCallCount('removeSavedPassword'));
+                    0, passwordManager.getCallCount('removeCredential'));
 
                 const deleteDialog = card.shadowRoot!.querySelector(
                     'multi-store-delete-password-dialog');
@@ -247,7 +247,7 @@ suite('PasswordDetailsCardTest', function() {
                 deleteDialog.$.removeButton.click();
 
                 const params =
-                    await passwordManager.whenCalled('removeSavedPassword');
+                    await passwordManager.whenCalled('removeCredential');
                 assertEquals(password.id, params.id);
                 assertEquals(store, params.fromStores);
               }));
@@ -273,7 +273,7 @@ suite('PasswordDetailsCardTest', function() {
     await flushTasks();
 
     // Verify that password was not deleted immediately.
-    assertEquals(0, passwordManager.getCallCount('removeSavedPassword'));
+    assertEquals(0, passwordManager.getCallCount('removeCredential'));
 
     const deleteDialog =
         card.shadowRoot!.querySelector('multi-store-delete-password-dialog');
@@ -362,6 +362,55 @@ suite('PasswordDetailsCardTest', function() {
     assertTrue(!!shareButton);
     assertTrue(isVisible(shareButton));
     assertEquals(shareButton.textContent!.trim(), card.i18n('share'));
+
+    assertFalse(!!card.shadowRoot!.querySelector('share-password-flow'));
+
+    // Share flow should become available after the button click.
+    shareButton.click();
+    await passwordManager.whenCalled('fetchFamilyMembers');
+    await flushTasks();
+
+    const shareFlow = card.shadowRoot!.querySelector('share-password-flow');
+    assertTrue(!!shareFlow);
+  });
+
+  test('share button available for account store users', async function() {
+    loadTimeData.overrideValues({enableSendPasswords: true});
+
+    syncProxy.syncInfo = {
+      isEligibleForAccountStorage: true,
+      isSyncingPasswords: false,
+    };
+
+    passwordManager.data.isOptedInAccountStorage = true;
+
+    const card = await createCardElement();
+
+    const shareButton =
+        card.shadowRoot!.querySelector<HTMLElement>('#shareButton');
+    assertTrue(!!shareButton);
+    assertTrue(isVisible(shareButton));
+    assertEquals(shareButton.textContent!.trim(), card.i18n('share'));
+  });
+
+  test('sharing unavailable for federated credentials', async function() {
+    loadTimeData.overrideValues({enableSendPasswords: true});
+
+    syncProxy.syncInfo = {
+      isEligibleForAccountStorage: false,
+      isSyncingPasswords: true,
+    };
+
+    const card =
+        await createCardElement(createPasswordEntry({federationText: 'text'}));
+
+    const shareButton =
+        card.shadowRoot!.querySelector<HTMLElement>('#shareButton');
+    assertFalse(!!shareButton);
+
+    const sharePasswordFlow =
+        card.shadowRoot!.querySelector('share-password-flow');
+    assertFalse(!!sharePasswordFlow);
   });
 
   test('sharing unavailable without enableSendPasswords', async function() {
@@ -377,6 +426,10 @@ suite('PasswordDetailsCardTest', function() {
     const shareButton =
         card.shadowRoot!.querySelector<HTMLElement>('#shareButton');
     assertFalse(!!shareButton);
+
+    const sharePasswordFlow =
+        card.shadowRoot!.querySelector('share-password-flow');
+    assertFalse(!!sharePasswordFlow);
   });
 
   test('share button unavailable when sync disabled', async function() {
@@ -392,5 +445,9 @@ suite('PasswordDetailsCardTest', function() {
     const shareButton =
         card.shadowRoot!.querySelector<HTMLElement>('#shareButton');
     assertFalse(!!shareButton);
+
+    const sharePasswordFlow =
+        card.shadowRoot!.querySelector('share-password-flow');
+    assertFalse(!!sharePasswordFlow);
   });
 });

@@ -2,16 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {contextMenuHandler} from './ui/context_menu_handler.js';
-
-import {DriveSyncHandler} from '../../externs/background/drive_sync_handler.js';
+import {getFocusedTreeItem} from '../../common/js/dom_utils.js';
+import {util} from '../../common/js/util.js';
 import {VolumeManager} from '../../externs/volume_manager.js';
+import {XfTree} from '../../widgets/xf_tree.js';
 
 import {Action, ActionsModel} from './actions_model.js';
 import {DirectoryModel} from './directory_model.js';
 import {FileSelectionHandler} from './file_selection.js';
 import {FolderShortcutsDataModel} from './folder_shortcuts_data_model.js';
 import {MetadataModel} from './metadata/metadata_model.js';
+import {contextMenuHandler} from './ui/context_menu_handler.js';
 import {FileManagerUI} from './ui/file_manager_ui.js';
 
 /**
@@ -23,13 +24,12 @@ export class ActionsController {
    * @param {!MetadataModel} metadataModel
    * @param {!DirectoryModel} directoryModel
    * @param {!FolderShortcutsDataModel} shortcutsModel
-   * @param {!DriveSyncHandler} driveSyncHandler
    * @param {!FileSelectionHandler} selectionHandler
    * @param {!FileManagerUI} ui
    */
   constructor(
       volumeManager, metadataModel, directoryModel, shortcutsModel,
-      driveSyncHandler, selectionHandler, ui) {
+      selectionHandler, ui) {
     /** @private @const {!VolumeManager} */
     this.volumeManager_ = volumeManager;
 
@@ -41,9 +41,6 @@ export class ActionsController {
 
     /** @private @const {!FolderShortcutsDataModel} */
     this.shortcutsModel_ = shortcutsModel;
-
-    /** @private @const {!DriveSyncHandler} */
-    this.driveSyncHandler_ = driveSyncHandler;
 
     /** @private @const {!FileSelectionHandler} */
     this.selectionHandler_ = selectionHandler;
@@ -79,8 +76,14 @@ export class ActionsController {
 
     // Attach listeners to non-user events which will only update the in-memory
     // ActionsModel.
-    this.ui_.directoryTree.addEventListener(
-        'change', this.onNavigationListSelectionChanged_.bind(this), true);
+    if (util.isFilesAppExperimental()) {
+      this.ui_.directoryTree.addEventListener(
+          XfTree.events.TREE_SELECTION_CHANGED,
+          this.onNavigationListSelectionChanged_.bind(this), true);
+    } else {
+      this.ui_.directoryTree.addEventListener(
+          'change', this.onNavigationListSelectionChanged_.bind(this), true);
+    }
     this.selectionHandler_.addEventListener(
         FileSelectionHandler.EventType.CHANGE_THROTTLED,
         this.onSelectionChanged_.bind(this));
@@ -122,9 +125,10 @@ export class ActionsController {
         // DirectoryItem has "entry" attribute.
         return [element.entry];
       }
-      if (element.selectedItem && element.selectedItem.entry) {
-        // DirectoryTree has the selected item.
-        return [element.selectedItem.entry];
+      // DirectoryTree has the focused item.
+      const focusedItem = getFocusedTreeItem(element);
+      if (focusedItem?.entry) {
+        return [focusedItem.entry];
       }
     }
 
@@ -212,8 +216,8 @@ export class ActionsController {
    * @private
    */
   onNavigationListSelectionChanged_() {
-    const entry = this.ui_.directoryTree.selectedItem &&
-        this.ui_.directoryTree.selectedItem.entry;
+    const focusedItem = getFocusedTreeItem(this.ui_.directoryTree);
+    const entry = focusedItem?.entry;
 
     if (!entry) {
       this.currentDirKey_ = null;
@@ -282,7 +286,7 @@ export class ActionsController {
 
     actionsModel = new ActionsModel(
         this.volumeManager_, this.metadataModel_, this.shortcutsModel_,
-        this.driveSyncHandler_, this.ui_, entries);
+        this.ui_, entries);
 
     actionsModel.addEventListener('invalidated', () => {
       this.clearLocalCache_(key);

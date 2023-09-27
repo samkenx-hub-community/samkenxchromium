@@ -53,10 +53,6 @@
 #include "third_party/blink/renderer/platform/wtf/std_lib_extras.h"
 #include "third_party/blink/renderer/platform/wtf/wtf.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 // Forward declare Mac SPIs.
 // Request for public API: rdar://13803570
 @interface NSFont (WebKitSPI)
@@ -224,8 +220,8 @@ scoped_refptr<SimpleFontData> FontCache::PlatformFallbackFontForCharacter(
                         !IsAppKitFontWeightBold(substitute_font_weight);
 
   std::unique_ptr<FontPlatformData> alternate_font = FontPlatformDataFromNSFont(
-      substitute_font, platform_data.size(), font_description.SpecifiedSize(),
-      synthetic_bold,
+      substitute_font, font_description.EffectiveFontSize(),
+      font_description.SpecifiedSize(), synthetic_bold,
       (traits & NSFontItalicTrait) &&
           !(substitute_font_traits & NSFontItalicTrait),
       font_description.TextRendering(), ResolvedFontFeatures(),

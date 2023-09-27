@@ -6,14 +6,17 @@
 #define CONTENT_BROWSER_PRIVATE_AGGREGATION_PRIVATE_AGGREGATION_BUDGETER_H_
 
 #include <memory>
+#include <set>
 #include <vector>
 
 #include "base/functional/callback.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/time/time.h"
+#include "base/timer/timer.h"
 #include "content/browser/private_aggregation/private_aggregation_budget_key.h"
 #include "content/common/content_export.h"
+#include "content/public/browser/private_aggregation_data_model.h"
 #include "content/public/browser/storage_partition.h"
 
 namespace base {
@@ -52,9 +55,8 @@ class CONTENT_EXPORT PrivateAggregationBudgeter {
     kInsufficientLargerScopeBudget = 2,
     kRequestedMoreThanTotalBudget = 3,
     kTooManyPendingCalls = 4,
-    kInvalidRequest = 5,
-    kStorageInitializationFailed = 6,
-    kBadValuesOnDisk = 7,
+    kStorageInitializationFailed = 5,
+    kBadValuesOnDisk = 6,
     kMaxValue = kBadValuesOnDisk,
   };
 
@@ -74,6 +76,15 @@ class CONTENT_EXPORT PrivateAggregationBudgeter {
     kSpansMoreThanADay = 6,
     kContainsNonPositiveValue = 7,
     kMaxValue = kContainsNonPositiveValue,
+  };
+
+  // Indicates the desired behavior when budget is denied for a report request.
+  enum class BudgetDeniedBehavior {
+    // Still send a report, but remove all requested contributions.
+    kSendNullReport,
+
+    // Drop the report.
+    kDontSendReport,
   };
 
   // Represents the two different types of budgets, which differ on the duration
@@ -115,6 +126,10 @@ class CONTENT_EXPORT PrivateAggregationBudgeter {
   static_assert(kLargerScopeValues.budget_scope_duration %
                     PrivateAggregationBudgetKey::TimeWindow::kDuration ==
                 base::TimeDelta());
+
+  // The minimum time that needs to pass between `CleanUpStaleData()` calls to
+  // avoid unnecessary computation.
+  static constexpr base::TimeDelta kMinStaleDataCleanUpGap = base::Minutes(5);
 
   // To avoid unbounded memory growth, limit the number of pending calls during
   // initialization. Data clearing calls can be posted even if it would exceed
@@ -168,7 +183,16 @@ class CONTENT_EXPORT PrivateAggregationBudgeter {
                          StoragePartition::StorageKeyMatcherFunction filter,
                          base::OnceClosure done);
 
-  // TODO(crbug.com/1449005): Clear stale data periodically and on startup.
+  // Runs `callback` with all reporting origins as DataKeys for the Browsing
+  // Data Model. Partial data will still be returned in the event of an error.
+  virtual void GetAllDataKeys(
+      base::OnceCallback<void(std::set<PrivateAggregationDataModel::DataKey>)>
+          callback);
+
+  // Deletes all data in storage for storage keys matching the provided
+  // reporting origin in the data key.
+  virtual void DeleteByDataKey(const PrivateAggregationDataModel::DataKey& key,
+                               base::OnceClosure callback);
 
  protected:
   // Should only be used for testing/mocking to avoid creating the underlying
@@ -194,9 +218,24 @@ class CONTENT_EXPORT PrivateAggregationBudgeter {
                      base::Time delete_end,
                      StoragePartition::StorageKeyMatcherFunction filter,
                      base::OnceClosure done);
-  void OnClearDataComplete();
+  void GetAllDataKeysImpl(
+      base::OnceCallback<void(std::set<PrivateAggregationDataModel::DataKey>)>
+          callback);
+
+  void OnUserVisibleTaskStarted();
+  void OnUserVisibleTaskComplete();
 
   void ProcessAllPendingCalls();
+
+  bool DidStorageInitializationSucceed();
+
+  // Deletes any budgeting data that is too old to affect current or future
+  // calls to the API.
+  void CleanUpStaleData();
+
+  // Runs `CleanUpStaleData()` unless it was run too recently, when it will be
+  // run after waiting for `kMinStaleDataCleanUpGap` to pass between calls.
+  void CleanUpStaleDataSoon();
 
   // While the storage initializes, queues calls (e.g. to `ConsumeBudget()`) in
   // the order the calls are received. Should be empty after storage is
@@ -209,14 +248,22 @@ class CONTENT_EXPORT PrivateAggregationBudgeter {
   // clear data task is queued or running. Otherwise `BEST_EFFORT` is used.
   scoped_refptr<base::UpdateableSequencedTaskRunner> db_task_runner_;
 
-  // How many clear data storage tasks are queued or running currently, i.e.
+  // How many user visible storage tasks are queued or running currently, i.e.
   // have been posted but the reply has not been run.
-  int num_pending_clear_data_tasks_ = 0;
+  int num_pending_user_visible_tasks_ = 0;
 
   // `nullptr` until initialization is complete or if initialization failed.
   // Otherwise, owned by this class until destruction. Iff present,
   // `storage_status_` should be `kOpen`.
   std::unique_ptr<PrivateAggregationBudgetStorage> storage_;
+
+  // Timer used to defer calls to `CleanUpStaleData()` until
+  // `kMinStaleDataCleanUpGap` has passed since the last call.
+  base::OneShotTimer clean_up_stale_data_timer_;
+
+  // The last time `CleanUpStaleData()` was called, or `base::TimeTicks::Min()`
+  // if never called.
+  base::TimeTicks last_clean_up_time_ = base::TimeTicks::Min();
 
   // Holds a closure that will shut down the initializing storage until
   // initialization is complete. After then, it is null.

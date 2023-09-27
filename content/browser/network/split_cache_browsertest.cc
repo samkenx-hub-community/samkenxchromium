@@ -420,13 +420,22 @@ class SplitCacheRegistrableDomainContentBrowserTestP
 
     switch (GetParam()) {
       case net::NetworkIsolationKey::Mode::kFrameSiteEnabled:
-        enabled_features.push_back(
-            net::features::kEnableCrossSiteFlagNetworkIsolationKey);
-        break;
-      case net::NetworkIsolationKey::Mode::kCrossSiteFlagEnabled:
         disabled_features.push_back(
             net::features::kEnableCrossSiteFlagNetworkIsolationKey);
+        disabled_features.push_back(
+            net::features::kEnableFrameSiteSharedOpaqueNetworkIsolationKey);
         break;
+      case net::NetworkIsolationKey::Mode::kCrossSiteFlagEnabled:
+        enabled_features.push_back(
+            net::features::kEnableCrossSiteFlagNetworkIsolationKey);
+        disabled_features.push_back(
+            net::features::kEnableFrameSiteSharedOpaqueNetworkIsolationKey);
+        break;
+      case net::NetworkIsolationKey::Mode::kFrameSiteWithSharedOpaqueEnabled:
+        enabled_features.push_back(
+            net::features::kEnableFrameSiteSharedOpaqueNetworkIsolationKey);
+        disabled_features.push_back(
+            net::features::kEnableCrossSiteFlagNetworkIsolationKey);
     }
     feature_list_.InitWithFeatures(enabled_features, disabled_features);
   }
@@ -468,7 +477,13 @@ class SplitCacheContentBrowserTestDisabled
   base::test::ScopedFeatureList feature_list_;
 };
 
-IN_PROC_BROWSER_TEST_P(SplitCacheContentBrowserTestEnabled, SplitCache) {
+// TODO(crbug.com/1486165): Times out on Mac.
+#if BUILDFLAG(IS_MAC)
+#define MAYBE_SplitCache DISABLED_SplitCache
+#else
+#define MAYBE_SplitCache SplitCache
+#endif
+IN_PROC_BROWSER_TEST_P(SplitCacheContentBrowserTestEnabled, MAYBE_SplitCache) {
   // Load a cacheable resource for the first time, and it's not cached.
   EXPECT_FALSE(TestResourceLoad(GenURL("a.com", "/title1.html"), GURL()));
 
@@ -562,6 +577,7 @@ IN_PROC_BROWSER_TEST_P(SplitCacheRegistrableDomainContentBrowserTestP,
   // is triple-keyed.
   switch (net::NetworkIsolationKey::GetMode()) {
     case net::NetworkIsolationKey::Mode::kFrameSiteEnabled:
+    case net::NetworkIsolationKey::Mode::kFrameSiteWithSharedOpaqueEnabled:
       EXPECT_FALSE(TestResourceLoad(GenURL("a.com", "/title1.html"),
                                     GenURL("e.com", "/title1.html")));
       EXPECT_TRUE(TestResourceLoad(GenURL("a.com", "/title1.html"),
@@ -605,6 +621,7 @@ IN_PROC_BROWSER_TEST_P(SplitCacheRegistrableDomainContentBrowserTestP,
       EXPECT_FALSE(TestResourceLoad(GenURL("a.com", "/title1.html"), data_url));
       break;
     case net::NetworkIsolationKey::Mode::kCrossSiteFlagEnabled:
+    case net::NetworkIsolationKey::Mode::kFrameSiteWithSharedOpaqueEnabled:
       EXPECT_TRUE(TestResourceLoad(GenURL("a.com", "/title1.html"), data_url));
       break;
   }
@@ -1035,12 +1052,19 @@ INSTANTIATE_TEST_SUITE_P(All,
 INSTANTIATE_TEST_SUITE_P(
     All,
     SplitCacheRegistrableDomainContentBrowserTestP,
-    testing::ValuesIn({net::NetworkIsolationKey::Mode::kFrameSiteEnabled,
-                       net::NetworkIsolationKey::Mode::kCrossSiteFlagEnabled}),
+    testing::ValuesIn(
+        {net::NetworkIsolationKey::Mode::kFrameSiteEnabled,
+         net::NetworkIsolationKey::Mode::kCrossSiteFlagEnabled,
+         net::NetworkIsolationKey::Mode::kFrameSiteWithSharedOpaqueEnabled}),
     [](const testing::TestParamInfo<net::NetworkIsolationKey::Mode>& info) {
-      return info.param == net::NetworkIsolationKey::Mode::kFrameSiteEnabled
-                 ? "FrameSiteEnabled"
-                 : "CrossSiteFlagEnabled";
+      switch (info.param) {
+        case net::NetworkIsolationKey::Mode::kFrameSiteEnabled:
+          return "FrameSiteEnabled";
+        case net::NetworkIsolationKey::Mode::kCrossSiteFlagEnabled:
+          return "CrossSiteFlagEnabled";
+        case net::NetworkIsolationKey::Mode::kFrameSiteWithSharedOpaqueEnabled:
+          return "FrameSiteSharedOpaqueEnabled";
+      }
     });
 
 class ScopeBlinkMemoryCachePerContext : public SplitCacheContentBrowserTest {

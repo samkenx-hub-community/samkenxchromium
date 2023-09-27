@@ -48,7 +48,6 @@ import java.util.concurrent.RejectedExecutionException;
  * testing Cronet usage on Android.
  */
 final class FakeUrlRequest extends UrlRequestBase {
-    private static final int DEFAULT_UPLOAD_BUFFER_SIZE = 8192;
     // Used for logging errors.
     private static final String TAG = FakeUrlRequest.class.getSimpleName();
     // Callback used to report responses to the client.
@@ -452,6 +451,10 @@ final class FakeUrlRequest extends UrlRequestBase {
     @Override
     public void cancel() {
         synchronized (mLock) {
+            if (mState == State.NOT_STARTED || isDone()) {
+                return;
+            }
+
             final UrlResponseInfo info = mUrlResponseInfo;
             final RefCountDelegate inflightDoneCallbackCount = setTerminalState(State.CANCELLED);
             if (inflightDoneCallbackCount != null) {

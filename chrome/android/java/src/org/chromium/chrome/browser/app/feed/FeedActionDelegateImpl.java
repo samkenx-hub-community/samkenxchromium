@@ -73,11 +73,10 @@ public class FeedActionDelegateImpl implements FeedActionDelegate {
     @Override
     public void openSuggestionUrl(int disposition, LoadUrlParams params, boolean inGroup,
             Runnable onPageLoaded, Callback<VisitResult> onVisitComplete) {
-        params.setReferrer(
-                new Referrer(SuggestionsConfig.getReferrerUrl(ChromeFeatureList.INTEREST_FEED_V2),
-                        // WARNING: ReferrerPolicy.ALWAYS is assumed by other Chrome code for NTP
-                        // tiles to set consider_for_ntp_most_visited.
-                        org.chromium.network.mojom.ReferrerPolicy.ALWAYS));
+        params.setReferrer(new Referrer(SuggestionsConfig.getReferrerUrl(),
+                // WARNING: ReferrerPolicy.ALWAYS is assumed by other Chrome code for NTP
+                // tiles to set consider_for_ntp_most_visited.
+                org.chromium.network.mojom.ReferrerPolicy.ALWAYS));
 
         Tab tab = inGroup ? mNavigationDelegate.openUrlInGroup(disposition, params)
                           : mNavigationDelegate.openUrl(disposition, params);
@@ -150,14 +149,12 @@ public class FeedActionDelegateImpl implements FeedActionDelegate {
     @Override
     public void showSignInInterstitial(@SigninAccessPoint int signinAccessPoint,
             BottomSheetController bottomSheetController, WindowAndroid windowAndroid) {
-        if (ChromeFeatureList.isEnabled(ChromeFeatureList.FEED_BOC_SIGN_IN_INTERSTITIAL)) {
             SigninMetricsUtils.logSigninStartAccessPoint(signinAccessPoint);
             SigninMetricsUtils.logSigninUserActionForAccessPoint(signinAccessPoint);
             SigninBottomSheetCoordinator signinCoordinator = new SigninBottomSheetCoordinator(
                     windowAndroid, DeviceLockActivityLauncherImpl.get(), bottomSheetController,
                     Profile.getLastUsedRegularProfile(), null, null, signinAccessPoint);
             signinCoordinator.show();
-        }
     }
 
     /**

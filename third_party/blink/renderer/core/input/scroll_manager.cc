@@ -79,7 +79,7 @@ ScrollManager::ScrollManager(LocalFrame& frame) : frame_(frame) {
 void ScrollManager::Clear() {
   scrollbar_handling_scroll_gesture_ = nullptr;
   resize_scrollable_area_ = nullptr;
-  offset_from_resize_corner_ = LayoutSize();
+  offset_from_resize_corner_ = {};
   ClearGestureScrollState();
 }
 
@@ -218,7 +218,7 @@ void ScrollManager::RecomputeScrollChain(const Node& start_node,
         if (new_autoscrollable)
           cur_node = new_autoscrollable->GetNode();
       }
-      scroll_chain.push_front(DOMNodeIds::IdForNode(cur_node));
+      scroll_chain.push_front(cur_node->GetDomNodeId());
     }
   } else {
     LayoutBox* cur_box = start_node.GetLayoutObject()->EnclosingBox();
@@ -232,7 +232,7 @@ void ScrollManager::RecomputeScrollChain(const Node& start_node,
 
       if (cur_node) {
         if (CanScroll(scroll_state, *cur_node, /* for_autoscroll */ false))
-          scroll_chain.push_front(DOMNodeIds::IdForNode(cur_node));
+          scroll_chain.push_front(cur_node->GetDomNodeId());
 
         if (cur_node->IsEffectiveRootScroller())
           break;
@@ -244,8 +244,8 @@ void ScrollManager::RecomputeScrollChain(const Node& start_node,
           // the scroll chain regardlessly, as it's the only node we can latch
           // to.
           if (scroll_chain.empty() ||
-              scroll_chain.front() != DOMNodeIds::IdForNode(cur_node)) {
-            scroll_chain.push_front(DOMNodeIds::IdForNode(cur_node));
+              scroll_chain.front() != cur_node->GetDomNodeId()) {
+            scroll_chain.push_front(cur_node->GetDomNodeId());
           }
           break;
         }
@@ -921,6 +921,7 @@ bool ScrollManager::SnapAtGestureScrollEnd(
 }
 
 bool ScrollManager::GetSnapFlingInfoAndSetAnimatingSnapTarget(
+    const gfx::Vector2dF& current_delta,
     const gfx::Vector2dF& natural_displacement,
     gfx::PointF* out_initial_position,
     gfx::PointF* out_target_position) const {
@@ -1223,7 +1224,7 @@ bool ScrollManager::HandleScrollGestureOnResizer(
       resize_scrollable_area_ = layer->GetScrollableArea();
       resize_scrollable_area_->SetInResizeMode(true);
       offset_from_resize_corner_ =
-          LayoutSize(resize_scrollable_area_->OffsetFromResizeCorner(p));
+          resize_scrollable_area_->OffsetFromResizeCorner(p);
       return true;
     }
   } else if (gesture_event.GetType() ==
@@ -1274,7 +1275,7 @@ void ScrollManager::SetResizeScrollableArea(PaintLayer* layer, gfx::Point p) {
   resize_scrollable_area_ = layer->GetScrollableArea();
   resize_scrollable_area_->SetInResizeMode(true);
   offset_from_resize_corner_ =
-      LayoutSize(resize_scrollable_area_->OffsetFromResizeCorner(p));
+      resize_scrollable_area_->OffsetFromResizeCorner(p);
 }
 
 bool ScrollManager::CanHandleGestureEvent(

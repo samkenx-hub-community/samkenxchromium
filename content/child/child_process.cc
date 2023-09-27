@@ -18,20 +18,21 @@
 #include "build/build_config.h"
 #include "build/config/compiler/compiler_buildflags.h"
 #include "content/child/child_thread_impl.h"
-#include "content/common/android/cpu_time_metrics.h"
 #include "content/common/mojo_core_library_support.h"
 #include "content/common/process_visibility_tracker.h"
 #include "content/public/common/content_switches.h"
 #include "mojo/public/cpp/system/dynamic_library_support.h"
 #include "sandbox/policy/sandbox_type.h"
-#include "services/network/public/cpp/network_switches.h"
-#include "services/network/public/cpp/thread_delegate.h"
 #include "services/tracing/public/cpp/trace_startup.h"
 #include "third_party/abseil-cpp/absl/base/attributes.h"
 #include "third_party/blink/public/common/features.h"
 
 #if BUILDFLAG(CLANG_PROFILING_INSIDE_SANDBOX)
 #include "base/test/clang_profiling.h"
+#endif
+
+#if BUILDFLAG(IS_ANDROID)
+#include "content/common/android/cpu_time_metrics.h"
 #endif
 
 namespace content {
@@ -65,9 +66,9 @@ ChildProcess::ChildProcess(base::ThreadType io_thread_type,
                                thread_pool_init_params)
     : resetter_(&child_process, this, nullptr),
       io_thread_(std::make_unique<ChildIOThread>()) {
+#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
   const base::CommandLine& command_line =
       *base::CommandLine::ForCurrentProcess();
-#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
   const bool is_embedded_in_browser_process =
       !command_line.HasSwitch(switches::kProcessType);
   if (IsMojoCoreSharedLibraryEnabled() && !is_embedded_in_browser_process) {
@@ -139,10 +140,6 @@ ChildProcess::ChildProcess(base::ThreadType io_thread_type,
   // of process.
   thread_options.thread_type = base::ThreadType::kCompositing;
 #endif
-  if (command_line.HasSwitch(network::switches::kNetworkServiceScheduler)) {
-    thread_options.delegate = std::make_unique<network::ThreadDelegate>(
-        thread_options.message_pump_type);
-  }
   CHECK(io_thread_->StartWithOptions(std::move(thread_options)));
 }
 

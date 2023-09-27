@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 import {ShoppingListApiProxy} from 'chrome://bookmarks-side-panel.top-chrome/shared/commerce/shopping_list_api_proxy.js';
-import {BookmarkProductInfo, PageCallbackRouter, PageRemote, ProductInfo} from 'chrome://bookmarks-side-panel.top-chrome/shared/shopping_list.mojom-webui.js';
+import {BookmarkProductInfo, PageCallbackRouter, PageRemote, PriceInsightsInfo, PriceInsightsInfo_PriceBucket, ProductInfo} from 'chrome://bookmarks-side-panel.top-chrome/shared/shopping_list.mojom-webui.js';
 import {TestBrowserProxy} from 'chrome://webui-test/test_browser_proxy.js';
 
 export class TestShoppingListApiProxy extends TestBrowserProxy implements
@@ -12,13 +12,28 @@ export class TestShoppingListApiProxy extends TestBrowserProxy implements
   callbackRouterRemote: PageRemote;
   private products_: BookmarkProductInfo[] = [];
   private product_: ProductInfo = {
-    title: 'Product Foo',
-    domain: 'foo.com',
-    imageUrl: {url: 'https://foo.com/image'},
-    productUrl: {url: 'https://foo.com/product'},
-    currentPrice: '$12',
-    previousPrice: '$34',
+    title: '',
+    clusterTitle: '',
+    domain: '',
+    imageUrl: {url: ''},
+    productUrl: {url: ''},
+    currentPrice: '',
+    previousPrice: '',
+    clusterId: BigInt(0),
   };
+  private priceInsights_: PriceInsightsInfo = {
+    clusterId: BigInt(0),
+    typicalLowPrice: '',
+    typicalHighPrice: '',
+    catalogAttributes: '',
+    jackpot: {url: ''},
+    bucket: PriceInsightsInfo_PriceBucket.kUnknown,
+    hasMultipleCatalogs: false,
+    history: [],
+    locale: '',
+    currencyCode: '',
+  };
+  private shoppingCollectionId_: bigint = BigInt(-1);
 
   constructor() {
     super([
@@ -27,6 +42,16 @@ export class TestShoppingListApiProxy extends TestBrowserProxy implements
       'trackPriceForBookmark',
       'untrackPriceForBookmark',
       'getProductInfoForCurrentUrl',
+      'getPriceInsightsInfoForCurrentUrl',
+      'showInsightsSidePanelUi',
+      'openUrlInNewTab',
+      'showFeedback',
+      'isShoppingListEligible',
+      'getShoppingCollectionBookmarkFolderId',
+      'getPriceTrackingStatusForCurrentUrl',
+      'setPriceTrackingStatusForCurrentUrl',
+      'getParentBookmarkFolderNameForCurrentUrl',
+      'showBookmarkEditorForCurrentUrl',
     ]);
 
     this.callbackRouter = new PageCallbackRouter();
@@ -37,6 +62,10 @@ export class TestShoppingListApiProxy extends TestBrowserProxy implements
 
   setProducts(products: BookmarkProductInfo[]) {
     this.products_ = products;
+  }
+
+  setShoppingCollectionBookmarkFolderId(id: bigint) {
+    this.shoppingCollectionId_ = id;
   }
 
   getAllPriceTrackedBookmarkProductInfo() {
@@ -60,6 +89,48 @@ export class TestShoppingListApiProxy extends TestBrowserProxy implements
   getProductInfoForCurrentUrl() {
     this.methodCalled('getProductInfoForCurrentUrl');
     return Promise.resolve({productInfo: this.product_});
+  }
+
+  getPriceInsightsInfoForCurrentUrl() {
+    this.methodCalled('getPriceInsightsInfoForCurrentUrl');
+    return Promise.resolve({priceInsightsInfo: this.priceInsights_});
+  }
+
+  showInsightsSidePanelUi() {
+    this.methodCalled('showInsightsSidePanelUi');
+  }
+
+  openUrlInNewTab() {
+    this.methodCalled('openUrlInNewTab');
+  }
+
+  showFeedback() {
+    this.methodCalled('showFeedback');
+  }
+
+  isShoppingListEligible() {
+    return this.methodCalled('isShoppingListEligible');
+  }
+
+  getShoppingCollectionBookmarkFolderId() {
+    this.methodCalled('getShoppingCollectionBookmarkFolderId');
+    return Promise.resolve({collectionId: this.shoppingCollectionId_});
+  }
+
+  getPriceTrackingStatusForCurrentUrl() {
+    return this.methodCalled('getPriceTrackingStatusForCurrentUrl');
+  }
+
+  setPriceTrackingStatusForCurrentUrl(track: boolean) {
+    this.methodCalled('setPriceTrackingStatusForCurrentUrl', track);
+  }
+
+  getParentBookmarkFolderNameForCurrentUrl() {
+    return this.methodCalled('getParentBookmarkFolderNameForCurrentUrl');
+  }
+
+  showBookmarkEditorForCurrentUrl() {
+    this.methodCalled('showBookmarkEditorForCurrentUrl');
   }
 
   getCallbackRouter() {

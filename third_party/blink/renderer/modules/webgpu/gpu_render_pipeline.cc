@@ -263,8 +263,7 @@ void GPUFragmentStateAsWGPUFragmentState(GPUDevice* device,
   dawn_fragment->dawn_desc.entryPoint = dawn_fragment->entry_point.c_str();
 
   dawn_fragment->dawn_desc.targets = nullptr;
-  dawn_fragment->dawn_desc.targetCount =
-      static_cast<uint32_t>(descriptor->targets().size());
+  dawn_fragment->dawn_desc.targetCount = descriptor->targets().size();
   if (dawn_fragment->dawn_desc.targetCount > 0) {
     dawn_fragment->targets = AsDawnType(descriptor->targets());
     dawn_fragment->dawn_desc.targets = dawn_fragment->targets.get();
@@ -361,8 +360,9 @@ GPURenderPipeline* GPURenderPipeline::Create(
   DCHECK(webgpu_desc);
 
   v8::Isolate* isolate = script_state->GetIsolate();
-  ExceptionState exception_state(isolate, ExceptionState::kConstructionContext,
-                                 "GPURenderPipeline");
+  ExceptionState exception_state(
+      isolate, ExceptionContextType::kConstructorOperationInvoke,
+      "GPURenderPipeline");
 
   GPURenderPipeline* pipeline;
   OwnedRenderPipelineDescriptor dawn_desc_info;

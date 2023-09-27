@@ -14,6 +14,7 @@ import static androidx.test.espresso.matcher.ViewMatchers.withId;
 
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
+import android.os.Build.VERSION_CODES;
 import android.view.View;
 import android.view.ViewGroup;
 
@@ -24,7 +25,6 @@ import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.hamcrest.Matchers;
 import org.hamcrest.TypeSafeMatcher;
-import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -34,7 +34,7 @@ import org.junit.runner.RunWith;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.Criteria;
 import org.chromium.base.test.util.CriteriaHelper;
-import org.chromium.base.test.util.DisabledTest;
+import org.chromium.base.test.util.DisableIf;
 import org.chromium.base.test.util.Restriction;
 import org.chromium.chrome.browser.browser_controls.BrowserControlsStateProvider;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
@@ -85,11 +85,6 @@ public class StatusIndicatorTest {
         mBrowserControlsStateProvider = mActivityTestRule.getActivity().getBrowserControlsManager();
     }
 
-    @After
-    public void tearDown() {
-        TabbedRootUiCoordinator.setDisableStatusIndicatorAnimationsForTesting(false);
-    }
-
     @Test
     @MediumTest
     public void testInitialState() {
@@ -107,6 +102,8 @@ public class StatusIndicatorTest {
 
     @Test
     @MediumTest
+    @DisableIf.Build(message = "https://crbug.com/1473240", sdk_is_greater_than = VERSION_CODES.M,
+            sdk_is_less_than = VERSION_CODES.P)
     public void testShowAndHide() {
         InstrumentationRegistry.getInstrumentation().waitForIdleSync();
 
@@ -153,7 +150,6 @@ public class StatusIndicatorTest {
 
     @Test
     @MediumTest
-    @DisabledTest(message = "https://crbug.com/1188377")
     public void testShowAfterHide() {
         InstrumentationRegistry.getInstrumentation().waitForIdleSync();
 

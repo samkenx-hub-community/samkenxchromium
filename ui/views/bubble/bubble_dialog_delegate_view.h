@@ -16,10 +16,12 @@
 #include "ui/accessibility/ax_enums.mojom-forward.h"
 #include "ui/base/class_property.h"
 #include "ui/base/metadata/metadata_header_macros.h"
+#include "ui/base/metadata/metadata_utils.h"
 #include "ui/views/bubble/bubble_border.h"
 #include "ui/views/bubble/bubble_frame_view.h"
 #include "ui/views/metadata/view_factory.h"
 #include "ui/views/view_tracker.h"
+#include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 #include "ui/views/widget/widget_observer.h"
 #include "ui/views/window/dialog_delegate.h"
@@ -423,7 +425,7 @@ class VIEWS_EXPORT BubbleDialogDelegate : public DialogDelegate {
   mutable absl::optional<gfx::Rect> anchor_rect_;
 
   bool accept_events_ = true;
-  gfx::NativeView parent_window_ = nullptr;
+  gfx::NativeView parent_window_ = gfx::NativeView();
 
   // By default, all BubbleDialogDelegates have parent windows.
   bool has_parent_ = true;
@@ -455,6 +457,14 @@ class VIEWS_EXPORT BubbleDialogDelegate : public DialogDelegate {
 
   // Used to ensure the button remains anchored while this dialog is open.
   absl::optional<Button::ScopedAnchorHighlight> button_anchor_higlight_;
+
+  absl::optional<base::TimeTicks> bubble_created_time_;
+
+  // Timestamp when the bubble turns visible.
+  absl::optional<base::TimeTicks> bubble_shown_time_;
+
+  // Cumulated time of bubble being visible.
+  base::TimeDelta bubble_shown_duration_;
 };
 
 // BubbleDialogDelegateView is a BubbleDialogDelegate that is also a View.
@@ -467,9 +477,17 @@ class VIEWS_EXPORT BubbleDialogDelegateView : public BubbleDialogDelegate,
  public:
   METADATA_HEADER(BubbleDialogDelegateView);
 
+  template <typename T>
+  static bool IsBubbleDialogDelegateView(const BubbleDialogDelegateView* view) {
+    return ui::metadata::IsClass<T, BubbleDialogDelegateView>(view);
+  }
+
   // Create and initialize the bubble Widget(s) with proper bounds.
-  static Widget* CreateBubble(
-      std::unique_ptr<BubbleDialogDelegateView> delegate);
+  template <typename T>
+  static Widget* CreateBubble(std::unique_ptr<T> delegate) {
+    CHECK(IsBubbleDialogDelegateView<T>(delegate.get()));
+    return BubbleDialogDelegate::CreateBubble(std::move(delegate));
+  }
   static Widget* CreateBubble(BubbleDialogDelegateView* bubble_delegate);
 
   BubbleDialogDelegateView();

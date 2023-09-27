@@ -32,6 +32,7 @@
 #include "ui/events/types/event_type.h"
 #include "ui/gfx/text_utils.h"
 #include "ui/views/style/platform_style.h"
+#include "ui/views/style/typography_provider.h"
 #include "ui/views/test/ax_event_counter.h"
 #include "ui/views/test/combobox_test_api.h"
 #include "ui/views/test/view_metadata_test_utils.h"
@@ -267,7 +268,7 @@ class ComboboxTest : public ViewsTestBase {
   UniqueWidgetPtr widget_;
 
   // |combobox_| will be allocated InitCombobox() and then owned by |widget_|.
-  raw_ptr<TestCombobox, DanglingUntriaged> combobox_ = nullptr;
+  raw_ptr<TestCombobox, AcrossTasksDanglingUntriaged> combobox_ = nullptr;
   std::unique_ptr<ComboboxTestApi> test_api_;
 
   // Combobox does not take ownership of the model, hence it needs to be scoped.
@@ -701,7 +702,7 @@ TEST_F(ComboboxTest, ConsumingPressKeyEvents) {
 // between indices of different label lengths.
 TEST_F(ComboboxTest, ContentSizeUpdateOnSetSelectedIndex) {
   const gfx::FontList& font_list =
-      style::GetFont(Combobox::kContext, Combobox::kStyle);
+      TypographyProvider::Get().GetFont(Combobox::kContext, Combobox::kStyle);
   InitCombobox(nullptr);
   combobox_->SetSizeToLargestLabel(false);
   test_api_->PerformActionAt(1);

@@ -5,6 +5,7 @@
 #include "chrome/browser/browser_features.h"
 
 #include "base/feature_list.h"
+#include "build/branding_buildflags.h"
 #include "build/build_config.h"
 #include "build/chromeos_buildflags.h"
 
@@ -44,6 +45,12 @@ BASE_FEATURE(kDestroySystemProfiles,
 BASE_FEATURE(kDevToolsTabTarget,
              "DevToolsTabTarget",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+// Let DevTools front-end log extensive VisualElements-style UMA metrics for
+// impressions and interactions.
+BASE_FEATURE(kDevToolsVeLogging,
+             "DevToolsVeLogging",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Nukes profile directory before creating a new profile using
 // ProfileManager::CreateMultiProfileAsync().
@@ -165,12 +172,17 @@ BASE_FEATURE(kWebUsbDeviceDetection,
              "WebUsbDeviceDetection",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-#if BUILDFLAG(IS_ANDROID)
-// Enables Certificate Transparency on Android.
-BASE_FEATURE(kCertificateTransparencyAndroid,
-             "CertificateTransparencyAndroid",
+// Enables Certificate Transparency on Desktop.
+// Enabling CT enforcement requires maintaining a log policy, and the ability to
+// update the list of accepted logs. Embedders who are planning to enable this
+// should first reach out to chrome-certificate-transparency@google.com.
+BASE_FEATURE(kCertificateTransparencyAskBeforeEnabling,
+             "CertificateTransparencyAskBeforeEnabling",
+#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
              base::FEATURE_ENABLED_BY_DEFAULT);
-#endif
+#else
+             base::FEATURE_DISABLED_BY_DEFAULT);
+#endif  // BUILDFLAG(GOOGLE_CHROME_BRANDING)
 
 BASE_FEATURE(kLargeFaviconFromGoogle,
              "LargeFaviconFromGoogle",
@@ -201,6 +213,16 @@ BASE_FEATURE(kAppBoundEncryptionMetrics,
 // TODO(crbug.com/1430226): Remove after fully launched.
 BASE_FEATURE(kLockProfileCookieDatabase,
              "LockProfileCookieDatabase",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
+// Don't call the Win32 API PrefetchVirtualMemory when loading chrome.dll inside
+// non-browser processes. This is done by passing flags to these processes. This
+// prevents pulling the entirety of chrome.dll into physical memory (albeit only
+// pri-2 physical memory) under the assumption that during chrome execution,
+// portions of the DLL which are used will already be present, hopefully leading
+// to less needless memory consumption.
+BASE_FEATURE(kNoPreReadMainDll,
+             "NoPreReadMainDll",
              base::FEATURE_DISABLED_BY_DEFAULT);
 #endif
 
@@ -241,6 +263,11 @@ BASE_FEATURE(kBookmarkTriggerForPrerender2,
              "BookmarkTriggerForPrerender2",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Enables New Tab Page trigger prerendering.
+BASE_FEATURE(kNewTabPageTriggerForPrerender2,
+             "NewTabPageTriggerForPrerender2",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 BASE_FEATURE(kSupportSearchSuggestionForPrerender2,
              "SupportSearchSuggestionForPrerender2",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -253,7 +280,7 @@ const base::FeatureParam<SearchSuggestionPrerenderImplementationType>::Option
 const base::FeatureParam<SearchSuggestionPrerenderImplementationType>
     kSearchSuggestionPrerenderImplementationTypeParam{
         &kSupportSearchSuggestionForPrerender2, "implementation_type",
-        SearchSuggestionPrerenderImplementationType::kIgnorePrefetch,
+        SearchSuggestionPrerenderImplementationType::kUsePrefetch,
         &search_suggestion_implementation_types};
 
 const base::FeatureParam<SearchPreloadShareableCacheType>::Option
@@ -265,6 +292,10 @@ const base::FeatureParam<SearchPreloadShareableCacheType>
         &kSupportSearchSuggestionForPrerender2, "shareable_cache",
         SearchPreloadShareableCacheType::kEnabled,
         &search_preload_shareable_cache_types};
+
+BASE_FEATURE(kPrerenderDSEHoldback,
+             "PrerenderDSEHoldback",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kAutocompleteActionPredictorConfidenceCutoff,
              "AutocompleteActionPredictorConfidenceCutoff",
@@ -278,5 +309,9 @@ BASE_FEATURE(kAutocompleteActionPredictorConfidenceCutoff,
 BASE_FEATURE(kOmniboxTriggerForNoStatePrefetch,
              "OmniboxTriggerForNoStatePrefetch",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+#if !BUILDFLAG(IS_ANDROID)
+BASE_FEATURE(kMantaService, "MantaService", base::FEATURE_DISABLED_BY_DEFAULT);
+#endif
 
 }  // namespace features

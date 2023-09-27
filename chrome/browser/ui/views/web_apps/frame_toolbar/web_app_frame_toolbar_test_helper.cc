@@ -35,10 +35,10 @@ WebAppFrameToolbarTestHelper::WebAppFrameToolbarTestHelper() {
 
 WebAppFrameToolbarTestHelper::~WebAppFrameToolbarTestHelper() = default;
 
-web_app::AppId WebAppFrameToolbarTestHelper::InstallAndLaunchWebApp(
+webapps::AppId WebAppFrameToolbarTestHelper::InstallAndLaunchWebApp(
     Browser* browser,
     const GURL& start_url) {
-  auto web_app_info = std::make_unique<WebAppInstallInfo>();
+  auto web_app_info = std::make_unique<web_app::WebAppInstallInfo>();
   web_app_info->start_url = start_url;
   web_app_info->scope = start_url.GetWithoutFilename();
   web_app_info->title = u"A minimal-ui app";
@@ -46,7 +46,7 @@ web_app::AppId WebAppFrameToolbarTestHelper::InstallAndLaunchWebApp(
   web_app_info->user_display_mode =
       web_app::mojom::UserDisplayMode::kStandalone;
 
-  web_app::AppId app_id =
+  webapps::AppId app_id =
       web_app::test::InstallWebApp(browser->profile(), std::move(web_app_info));
   content::TestNavigationObserver navigation_observer(start_url);
   navigation_observer.StartWatchingNewWebContents();
@@ -65,11 +65,11 @@ web_app::AppId WebAppFrameToolbarTestHelper::InstallAndLaunchWebApp(
   return app_id;
 }
 
-web_app::AppId WebAppFrameToolbarTestHelper::InstallAndLaunchCustomWebApp(
+webapps::AppId WebAppFrameToolbarTestHelper::InstallAndLaunchCustomWebApp(
     Browser* browser,
-    std::unique_ptr<WebAppInstallInfo> web_app_info,
+    std::unique_ptr<web_app::WebAppInstallInfo> web_app_info,
     const GURL& start_url) {
-  web_app::AppId app_id =
+  webapps::AppId app_id =
       web_app::test::InstallWebApp(browser->profile(), std::move(web_app_info));
   content::TestNavigationObserver navigation_observer(start_url);
   navigation_observer.StartWatchingNewWebContents();
@@ -130,6 +130,32 @@ GURL WebAppFrameToolbarTestHelper::
       "  <div id=\"non-draggable\"></div>"
       "</div>"
       "<div id=\"target\"></div>";
+
+  return LoadTestPageWithDataAndGetURL(embedded_test_server, temp_dir,
+                                       kTestHTML);
+}
+
+GURL WebAppFrameToolbarTestHelper::
+    LoadWholeAppIsDraggableTestPageWithDataAndGetURL(
+        net::test_server::EmbeddedTestServer* embedded_test_server,
+        base::ScopedTempDir* temp_dir) {
+  constexpr char kTestHTML[] =
+      "<!DOCTYPE html>"
+      "<style>"
+      "  div {"
+      "    app-region: drag;"
+      "    width: 100%;"
+      "    height: 100%;"
+      "    padding: 0px;"
+      "    margin: 0px;"
+      "    position: absolute;"
+      "  }"
+      "  body {"
+      "    padding: 0px;"
+      "    margin: 0px;"
+      "  }"
+      "</style>"
+      "<div>Hello draggable world</div>";
 
   return LoadTestPageWithDataAndGetURL(embedded_test_server, temp_dir,
                                        kTestHTML);

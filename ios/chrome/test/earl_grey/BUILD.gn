@@ -5,10 +5,7 @@
 # This target is only used in routinely device checks. Thus, the target name is
 # different from other EG2 tests.
 source_set("device_check_eg2_tests") {
-  configs += [
-    "//build/config/compiler:enable_arc",
-    "//build/config/ios:xctest_config",
-  ]
+  configs += [ "//build/config/ios:xctest_config" ]
   testonly = true
   sources = [ "device_check_egtest.mm" ]
   deps = [
@@ -23,16 +20,21 @@ source_set("device_check_eg2_tests") {
 }
 
 source_set("hooks") {
-  configs += [ "//build/config/compiler:enable_arc" ]
   testonly = true
   sources = [ "eg_tests_hook.mm" ]
   deps = [
     ":switches",
     "//base",
+    "//components/password_manager/core/browser:test_support",
+    "//components/password_manager/core/browser/sharing:test_support",
+    "//components/password_manager/ios:fake_bulk_leak_check_service",
     "//components/policy/core/common:test_support",
+    "//components/signin/internal/identity_manager",
+    "//components/signin/internal/identity_manager:test_support",
     "//ios/chrome/app:tests_hook",
     "//ios/chrome/browser/flags:system_flags",
     "//ios/chrome/browser/policy:test_support",
+    "//ios/chrome/browser/shared/public/features:system_flags",
     "//ios/chrome/browser/signin:fake_system_identity",
     "//ios/chrome/browser/signin:fake_system_identity_manager",
     "//ios/chrome/browser/ui/authentication:eg_app_support+eg2",
@@ -41,10 +43,7 @@ source_set("hooks") {
 }
 
 source_set("eg_app_support+eg2") {
-  configs += [
-    "//build/config/compiler:enable_arc",
-    "//build/config/ios:xctest_config",
-  ]
+  configs += [ "//build/config/ios:xctest_config" ]
   testonly = true
   sources = [
     "accessibility_util.h",
@@ -82,12 +81,13 @@ source_set("eg_app_support+eg2") {
     "//ios/chrome/app/strings",
     "//ios/chrome/browser/autofill",
     "//ios/chrome/browser/autofill/automation:eg_app_support+eg2",
-    "//ios/chrome/browser/content_settings:content_settings",
+    "//ios/chrome/browser/content_settings/model:model",
     "//ios/chrome/browser/default_browser:test_support",
     "//ios/chrome/browser/default_browser:utils",
     "//ios/chrome/browser/device_sharing:eg_app_support+eg2",
     "//ios/chrome/browser/find_in_page",
     "//ios/chrome/browser/find_in_page:eg_app_support+eg2",
+    "//ios/chrome/browser/first_run",
     "//ios/chrome/browser/https_upgrades:eg_app_support+eg2",
     "//ios/chrome/browser/metrics:eg_app_support+eg2",
     "//ios/chrome/browser/ntp:features",
@@ -177,11 +177,10 @@ source_set("eg_app_support+eg2") {
     "//ios/chrome/browser/ui/settings/privacy:privacy_ui",
     "//ios/chrome/browser/ui/settings/sync",
     "//ios/chrome/browser/ui/settings/tabs:tabs_constants",
-    "//ios/chrome/browser/ui/settings/tabs/inactive_tabs:inactive_tabs_constants",
     "//ios/chrome/browser/ui/tab_switcher/tab_grid:tab_grid_ui_constants",
     "//ios/chrome/browser/ui/tab_switcher/tab_grid/grid:grid_ui",
     "//ios/chrome/browser/ui/tab_switcher/tab_grid/grid:grid_ui_constants",
-    "//ios/chrome/browser/ui/thumb_strip:feature_flags",
+    "//ios/chrome/browser/ui/tabs/tests:eg_app_support+eg2",
     "//ios/chrome/browser/ui/toolbar:eg_app_support+eg2",
     "//ios/chrome/browser/ui/toolbar:toolbar_ui",
     "//ios/chrome/browser/ui/toolbar/public:constants",
@@ -221,10 +220,7 @@ source_set("eg_app_support+eg2") {
 }
 
 source_set("eg_test_support+eg2") {
-  configs += [
-    "//build/config/compiler:enable_arc",
-    "//build/config/ios:xctest_config",
-  ]
+  configs += [ "//build/config/ios:xctest_config" ]
   testonly = true
 
   sources = [
@@ -258,6 +254,8 @@ source_set("eg_test_support+eg2") {
     "scoped_allow_crash_on_startup.mm",
     "scoped_block_popups_pref.h",
     "scoped_block_popups_pref.mm",
+    "scoped_disable_timer_tracking.h",
+    "scoped_disable_timer_tracking.mm",
     "web_http_server_chrome_test_case.h",
     "web_http_server_chrome_test_case.mm",
   ]
@@ -274,6 +272,7 @@ source_set("eg_test_support+eg2") {
     "//components/sync/base",
     "//ios/chrome/app/strings",
     "//ios/chrome/browser/policy:eg_test_support+eg2",
+    "//ios/chrome/browser/shared/model/prefs:pref_names",
     "//ios/chrome/browser/shared/ui/table_view:constants",
     "//ios/chrome/browser/ui/browser_container:eg_test_support+eg2",
     "//ios/chrome/browser/ui/ntp:feature_flags",
@@ -306,7 +305,6 @@ source_set("eg_test_support+eg2") {
 
 source_set("chrome_egtest_bundle_main+eg2") {
   configs += [
-    "//build/config/compiler:enable_arc",
     "//build/config/ios:xctest_config",
 
     # Adding this config to exempt from the style check:
@@ -332,8 +330,6 @@ source_set("chrome_egtest_bundle_main+eg2") {
 
 source_set("chrome_egtest_plugin_client") {
   configs += [
-    "//build/config/compiler:enable_arc",
-
     # Adding this config to exempt from the style check:
     # "cannot use 'try' with exceptions disabled". This cannot be fixed because
     # it's part of the gRPC library.
@@ -355,7 +351,6 @@ source_set("chrome_egtest_plugin_client") {
 
 source_set("switches") {
   testonly = true
-  configs += [ "//build/config/compiler:enable_arc" ]
   sources = [
     "test_switches.h",
     "test_switches.mm",

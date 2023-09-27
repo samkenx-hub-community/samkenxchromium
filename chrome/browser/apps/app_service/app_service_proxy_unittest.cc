@@ -16,6 +16,7 @@
 #include "chrome/browser/apps/app_service/publishers/app_publisher.h"
 #include "chrome/browser/web_applications/test/fake_web_app_provider.h"
 #include "chrome/browser/web_applications/test/web_app_install_test_utils.h"
+#include "chrome/common/chrome_features.h"
 #include "chrome/test/base/testing_profile.h"
 #include "components/services/app_service/public/cpp/app_launch_util.h"
 #include "components/services/app_service/public/cpp/app_types.h"
@@ -27,6 +28,7 @@
 #include "components/services/app_service/public/cpp/intent_test_util.h"
 #include "components/services/app_service/public/cpp/intent_util.h"
 #include "components/services/app_service/public/cpp/preferred_app.h"
+#include "components/services/app_service/public/cpp/shortcut/shortcut_registry_cache.h"
 #include "content/public/test/browser_task_environment.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
@@ -157,8 +159,7 @@ class AppServiceProxyTest : public testing::Test {
 
    private:
     std::unique_ptr<Releaser> LoadIconFromIconKey(
-        AppType app_type,
-        const std::string& app_id,
+        const std::string& id,
         const IconKey& icon_key,
         IconType icon_type,
         int32_t size_hint_in_dip,
@@ -189,8 +190,9 @@ class AppServiceProxyTest : public testing::Test {
 
 class AppServiceProxyIconTest : public AppServiceProxyTest {
  protected:
-  UniqueReleaser LoadIcon(apps::IconLoader* loader, const std::string& app_id) {
-    return loader->LoadIcon(
+  UniqueReleaser LoadIcon(apps::AppServiceProxy* proxy,
+                          const std::string& app_id) {
+    return proxy->LoadIcon(
         AppType::kWeb, app_id, IconType::kUncompressed, /*size_hint_in_dip=*/1,
         /*allow_placeholder_icon=*/false,
         base::BindOnce([](int* num_callbacks,
@@ -298,6 +300,182 @@ TEST_F(AppServiceProxyIconTest, IconCoalescer) {
   EXPECT_EQ(3, fake.NumInnerFinishedCallbacks());
   EXPECT_EQ(6, NumOuterFinishedCallbacks());
 }
+
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+class AppServiceProxyShortcutIconTest : public AppServiceProxyTest {
+  void SetUp() override {
+    scoped_feature_list_.InitAndEnableFeature(
+        features::kCrosWebAppShortcutUiUpdate);
+  }
+
+ protected:
+  UniqueReleaser LoadShortcutIcon(AppServiceProxy* proxy,
+                                  const std::string& shortcut_id) {
+    return proxy->LoadShortcutIcon(
+        ShortcutId(shortcut_id), IconType::kUncompressed,
+        /*size_hint_in_dip=*/1,
+        /*allow_placeholder_icon=*/false,
+        base::BindOnce([](int* num_callbacks,
+                          apps::IconValuePtr icon) { ++(*num_callbacks); },
+                       &num_outer_finished_callbacks_));
+  }
+  UniqueReleaser LoadShortcutIconWithBadge(AppServiceProxy* proxy,
+                                           const ShortcutId& shortcut_id) {
+    return proxy->LoadShortcutIconWithBadge(
+        shortcut_id, IconType::kUncompressed,
+        /*size_hint_in_dip=*/1,
+        /*badge_size_hint_in_dip=*/1,
+        /*allow_placeholder_icon=*/false,
+        base::BindOnce(
+            [](int* num_callbacks, apps::IconValuePtr shortcut_icon,
+               apps::IconValuePtr badge_icon) { ++(*num_callbacks); },
+            &num_outer_finished_callbacks_));
+  }
+  void OverrideAppServiceProxyShortcutInnerIconLoader(
+      AppServiceProxy* proxy,
+      apps::IconLoader* icon_loader) {
+    proxy->OverrideShortcutInnerIconLoaderForTesting(icon_loader);
+  }
+};
+
+TEST_F(AppServiceProxyShortcutIconTest, IconCache) {
+  // This is mostly a sanity check. For an isolated, comprehensive unit test of
+  // the IconCache code, see icon_cache_unittest.cc.
+  //
+  // This tests an AppServiceProxy as a 'black box', which uses an
+  // IconCache but also other IconLoader filters, such as an IconCoalescer.
+
+  AppServiceProxy proxy(nullptr);
+  FakeIconLoader fake;
+  OverrideAppServiceProxyShortcutInnerIconLoader(&proxy, &fake);
+
+  // The next LoadShortcutIcon call should be a cache miss.
+  UniqueReleaser c0 = LoadShortcutIcon(&proxy, "cromulent");
+  EXPECT_EQ(1, fake.NumPendingCallbacks());
+  EXPECT_EQ(0, fake.NumInnerFinishedCallbacks());
+  EXPECT_EQ(0, NumOuterFinishedCallbacks());
+
+  // After a cache miss, manually trigger the inner callback.
+  fake.FlushPendingCallbacks();
+  EXPECT_EQ(0, fake.NumPendingCallbacks());
+  EXPECT_EQ(1, fake.NumInnerFinishedCallbacks());
+  EXPECT_EQ(1, NumOuterFinishedCallbacks());
+
+  // The next LoadShortcutIcon call should be a cache hit.
+  UniqueReleaser c1 = LoadShortcutIcon(&proxy, "cromulent");
+  EXPECT_EQ(0, fake.NumPendingCallbacks());
+  EXPECT_EQ(1, fake.NumInnerFinishedCallbacks());
+  EXPECT_EQ(2, NumOuterFinishedCallbacks());
+
+  // Destroy the IconLoader::Releaser's, clearing the cache.
+  c0.reset();
+  c1.reset();
+
+  // The next LoadShortcutIcon call should be a cache miss.
+  UniqueReleaser c2 = LoadShortcutIcon(&proxy, "cromulent");
+  EXPECT_EQ(1, fake.NumPendingCallbacks());
+  EXPECT_EQ(1, fake.NumInnerFinishedCallbacks());
+  EXPECT_EQ(2, NumOuterFinishedCallbacks());
+
+  // After a cache miss, manually trigger the inner callback.
+  fake.FlushPendingCallbacks();
+  EXPECT_EQ(0, fake.NumPendingCallbacks());
+  EXPECT_EQ(2, fake.NumInnerFinishedCallbacks());
+  EXPECT_EQ(3, NumOuterFinishedCallbacks());
+}
+
+TEST_F(AppServiceProxyShortcutIconTest, IconCoalescer) {
+  // This is mostly a sanity check. For an isolated, comprehensive unit test of
+  // the IconCoalescer code, see icon_coalescer_unittest.cc.
+  //
+  // This tests an AppServiceProxy as a 'black box', which uses an
+  // IconCoalescer but also other IconLoader filters, such as an IconCache.
+
+  AppServiceProxy proxy(nullptr);
+
+  FakeIconLoader fake;
+  OverrideAppServiceProxyShortcutInnerIconLoader(&proxy, &fake);
+
+  // Issue 4 LoadShortcutIcon requests, 2 after de-duplication.
+  UniqueReleaser a0 = LoadShortcutIcon(&proxy, "avocet");
+  UniqueReleaser a1 = LoadShortcutIcon(&proxy, "avocet");
+  UniqueReleaser b2 = LoadShortcutIcon(&proxy, "brolga");
+  UniqueReleaser a3 = LoadShortcutIcon(&proxy, "avocet");
+  EXPECT_EQ(2, fake.NumPendingCallbacks());
+  EXPECT_EQ(0, fake.NumInnerFinishedCallbacks());
+  EXPECT_EQ(0, NumOuterFinishedCallbacks());
+
+  // Resolve their responses.
+  fake.FlushPendingCallbacks();
+  EXPECT_EQ(0, fake.NumPendingCallbacks());
+  EXPECT_EQ(2, fake.NumInnerFinishedCallbacks());
+  EXPECT_EQ(4, NumOuterFinishedCallbacks());
+
+  // Issue another request, that triggers neither IconCache nor IconCoalescer.
+  UniqueReleaser c4 = LoadShortcutIcon(&proxy, "curlew");
+  EXPECT_EQ(1, fake.NumPendingCallbacks());
+  EXPECT_EQ(2, fake.NumInnerFinishedCallbacks());
+  EXPECT_EQ(4, NumOuterFinishedCallbacks());
+
+  // Destroying the IconLoader::Releaser shouldn't affect the fact that there's
+  // an in-flight "curlew" request to the FakeIconLoader.
+  c4.reset();
+  EXPECT_EQ(1, fake.NumPendingCallbacks());
+  EXPECT_EQ(2, fake.NumInnerFinishedCallbacks());
+  EXPECT_EQ(4, NumOuterFinishedCallbacks());
+
+  // Issuing another "curlew" request should coalesce with the in-flight one.
+  UniqueReleaser c5 = LoadShortcutIcon(&proxy, "curlew");
+  EXPECT_EQ(1, fake.NumPendingCallbacks());
+  EXPECT_EQ(2, fake.NumInnerFinishedCallbacks());
+  EXPECT_EQ(4, NumOuterFinishedCallbacks());
+
+  // Resolving the in-flight request to the inner IconLoader, |fake|, should
+  // resolve the two coalesced requests to the outer IconLoader, |proxy|.
+  fake.FlushPendingCallbacks();
+  EXPECT_EQ(0, fake.NumPendingCallbacks());
+  EXPECT_EQ(3, fake.NumInnerFinishedCallbacks());
+  EXPECT_EQ(6, NumOuterFinishedCallbacks());
+}
+
+TEST_F(AppServiceProxyShortcutIconTest, LoadShortcutIconWithBadge) {
+  TestingProfile profile;
+  AppServiceProxy* const proxy =
+      AppServiceProxyFactory::GetForProfile(&profile);
+
+  FakeIconLoader fake_shortcut_loader;
+  FakeIconLoader fake_app_loader;
+  OverrideAppServiceProxyShortcutInnerIconLoader(proxy, &fake_shortcut_loader);
+  OverrideAppServiceProxyInnerIconLoader(proxy, &fake_app_loader);
+
+  auto shortcut = std::make_unique<Shortcut>("host_app_id", "local_id");
+  ShortcutId shortcut_id = shortcut->shortcut_id;
+  proxy->ShortcutRegistryCache()->UpdateShortcut(std::move(shortcut));
+
+  UniqueReleaser c0 = LoadShortcutIconWithBadge(proxy, shortcut_id);
+  EXPECT_EQ(1, fake_shortcut_loader.NumPendingCallbacks());
+  EXPECT_EQ(0, fake_shortcut_loader.NumInnerFinishedCallbacks());
+  EXPECT_EQ(0, NumOuterFinishedCallbacks());
+
+  // After a cache miss, manually trigger the inner callback.
+  fake_shortcut_loader.FlushPendingCallbacks();
+  EXPECT_EQ(0, fake_shortcut_loader.NumPendingCallbacks());
+  EXPECT_EQ(1, fake_shortcut_loader.NumInnerFinishedCallbacks());
+  EXPECT_EQ(0, NumOuterFinishedCallbacks());
+
+  // Should start loading icon for the host app.
+  EXPECT_EQ(1, fake_app_loader.NumPendingCallbacks());
+  EXPECT_EQ(0, fake_app_loader.NumInnerFinishedCallbacks());
+  EXPECT_EQ(0, NumOuterFinishedCallbacks());
+
+  // After a cache miss, manually trigger the inner callback.
+  fake_app_loader.FlushPendingCallbacks();
+  EXPECT_EQ(0, fake_app_loader.NumPendingCallbacks());
+  EXPECT_EQ(1, fake_app_loader.NumInnerFinishedCallbacks());
+  EXPECT_EQ(1, NumOuterFinishedCallbacks());
+}
+
+#endif
 
 TEST_F(AppServiceProxyTest, ProxyAccessPerProfile) {
   TestingProfile::Builder profile_builder;
@@ -424,7 +602,7 @@ TEST_F(AppServiceProxyPreferredAppsTest, UpdatedOnUninstall) {
     apps.push_back(std::move(app));
 
     OnApps(std::move(apps), AppType::kWeb);
-    proxy()->AddPreferredApp(kTestAppId, kTestUrl);
+    proxy()->SetSupportedLinksPreference(kTestAppId);
 
     absl::optional<std::string> preferred_app =
         proxy()->PreferredAppsList().FindPreferredAppForUrl(kTestUrl);
@@ -516,78 +694,6 @@ TEST_F(AppServiceProxyPreferredAppsTest, SetPreferredApp) {
 
   ASSERT_EQ(absl::nullopt,
             proxy()->PreferredAppsList().FindPreferredAppForUrl(kTestUrl1));
-}
-
-// Using AddPreferredApp to set a supported link should enable all supported
-// links for that app.
-TEST_F(AppServiceProxyPreferredAppsTest, AddPreferredAppForLink) {
-  constexpr char kTestAppId[] = "aaa";
-  const GURL kTestUrl1 = GURL("https://www.foo.com/");
-  const GURL kTestUrl2 = GURL("https://www.bar.com/");
-  auto url_filter_1 = apps_util::MakeIntentFilterForUrlScope(kTestUrl1);
-  auto url_filter_2 = apps_util::MakeIntentFilterForUrlScope(kTestUrl2);
-
-  std::vector<AppPtr> apps;
-  AppPtr app1 = std::make_unique<App>(AppType::kWeb, kTestAppId);
-  app1->readiness = Readiness::kReady;
-  app1->intent_filters.push_back(url_filter_1->Clone());
-  app1->intent_filters.push_back(url_filter_2->Clone());
-  apps.push_back(std::move(app1));
-  OnApps(std::move(apps), AppType::kWeb);
-
-  proxy()->AddPreferredApp(kTestAppId, GURL("https://www.foo.com/something/"));
-
-  ASSERT_EQ(kTestAppId,
-            proxy()->PreferredAppsList().FindPreferredAppForUrl(kTestUrl1));
-  ASSERT_EQ(kTestAppId,
-            proxy()->PreferredAppsList().FindPreferredAppForUrl(kTestUrl2));
-}
-
-TEST_F(AppServiceProxyPreferredAppsTest, AddPreferredAppBrowser) {
-  constexpr char kTestAppId1[] = "aaa";
-  constexpr char kTestAppId2[] = "bbb";
-  const GURL kTestUrl1 = GURL("https://www.foo.com/");
-  const GURL kTestUrl2 = GURL("https://www.bar.com/");
-  const GURL kTestUrl3 = GURL("https://www.baz.com/");
-
-  auto url_filter_1 = apps_util::MakeIntentFilterForUrlScope(kTestUrl1);
-  auto url_filter_2 = apps_util::MakeIntentFilterForUrlScope(kTestUrl2);
-  auto url_filter_3 = apps_util::MakeIntentFilterForUrlScope(kTestUrl3);
-
-  std::vector<AppPtr> apps;
-  AppPtr app1 = std::make_unique<App>(AppType::kWeb, kTestAppId1);
-  app1->readiness = Readiness::kReady;
-  app1->intent_filters.push_back(url_filter_1->Clone());
-  app1->intent_filters.push_back(url_filter_2->Clone());
-  apps.push_back(std::move(app1));
-
-  AppPtr app2 = std::make_unique<App>(AppType::kWeb, kTestAppId2);
-  app2->readiness = Readiness::kReady;
-  app2->intent_filters.push_back(url_filter_3->Clone());
-  apps.push_back(std::move(app2));
-
-  OnApps(std::move(apps), AppType::kWeb);
-
-  proxy()->AddPreferredApp(kTestAppId1, kTestUrl1);
-
-  // Setting "use browser" for a URL currently handled by App 1 should unset
-  // both of App 1's links.
-  proxy()->AddPreferredApp(apps_util::kUseBrowserForLink, kTestUrl1);
-
-  ASSERT_EQ(apps_util::kUseBrowserForLink,
-            proxy()->PreferredAppsList().FindPreferredAppForUrl(kTestUrl1));
-  ASSERT_EQ(absl::nullopt,
-            proxy()->PreferredAppsList().FindPreferredAppForUrl(kTestUrl2));
-
-  proxy()->AddPreferredApp(apps_util::kUseBrowserForLink, kTestUrl3);
-  ASSERT_EQ(apps_util::kUseBrowserForLink,
-            proxy()->PreferredAppsList().FindPreferredAppForUrl(kTestUrl3));
-
-  // Changing the setting back from "use browser" to App 1 should only update
-  // that "use-browser" setting, settings for other URLs are unchanged.
-  proxy()->AddPreferredApp(kTestAppId1, kTestUrl1);
-  ASSERT_EQ(apps_util::kUseBrowserForLink,
-            proxy()->PreferredAppsList().FindPreferredAppForUrl(kTestUrl3));
 }
 
 // Tests that writing a preferred app value before the PreferredAppsList is
@@ -732,13 +838,13 @@ TEST_F(AppServiceProxyPreferredAppsTest, PreferredAppsOverlapSupportedLink) {
   auto intent_filter_1 = apps_util::MakeIntentFilterForUrlScope(filter_url_1);
   apps_util::AddConditionValue(ConditionType::kScheme, filter_url_2.scheme(),
                                PatternMatchType::kLiteral, intent_filter_1);
-  apps_util::AddConditionValue(ConditionType::kHost, filter_url_2.host(),
+  apps_util::AddConditionValue(ConditionType::kAuthority, filter_url_2.host(),
                                PatternMatchType::kLiteral, intent_filter_1);
 
   auto intent_filter_2 = apps_util::MakeIntentFilterForUrlScope(filter_url_3);
   apps_util::AddConditionValue(ConditionType::kScheme, filter_url_2.scheme(),
                                PatternMatchType::kLiteral, intent_filter_2);
-  apps_util::AddConditionValue(ConditionType::kHost, filter_url_2.host(),
+  apps_util::AddConditionValue(ConditionType::kAuthority, filter_url_2.host(),
                                PatternMatchType::kLiteral, intent_filter_2);
 
   auto intent_filter_3 = apps_util::MakeIntentFilterForUrlScope(filter_url_1);

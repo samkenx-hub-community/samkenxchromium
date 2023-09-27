@@ -17,7 +17,6 @@
 #include "chrome/browser/apps/app_service/publisher_host.h"
 #include "chrome/browser/ash/login/users/chrome_user_manager.h"
 #include "chrome/browser/ash/login/users/fake_chrome_user_manager.h"
-#include "chrome/browser/web_applications/test/fake_install_finalizer.h"
 #include "chrome/browser/web_applications/test/fake_web_app_provider.h"
 #include "chrome/browser/web_applications/test/web_app_test_utils.h"
 #include "chrome/browser/web_applications/web_app.h"
@@ -30,6 +29,7 @@
 #include "components/session_manager/core/session_manager.h"
 #include "components/sync_preferences/testing_pref_service_syncable.h"
 #include "components/user_manager/scoped_user_manager.h"
+#include "components/webapps/common/web_app_id.h"
 #include "content/public/test/browser_task_environment.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
@@ -228,7 +228,7 @@ class AppInfoGeneratorTest : public ::testing::Test {
   }
 
   void RegisterApp(std::unique_ptr<web_app::WebApp> web_app) {
-    web_app::AppId app_id = web_app->app_id();
+    webapps::AppId app_id = web_app->app_id();
     DCHECK(!app_registrar_->GetAppById(app_id));
     app_registrar_->registry().emplace(std::move(app_id), std::move(web_app));
   }
@@ -269,7 +269,8 @@ class AppInfoGeneratorTest : public ::testing::Test {
   AccountId account_id_;
   std::unique_ptr<TestingProfile> profile_;
   raw_ptr<web_app::WebAppRegistrarMutable, ExperimentalAsh> app_registrar_;
-  raw_ptr<ash::FakeChromeUserManager, ExperimentalAsh> user_manager_;
+  raw_ptr<ash::FakeChromeUserManager, DanglingUntriaged | ExperimentalAsh>
+      user_manager_;
   std::unique_ptr<user_manager::ScopedUserManager> user_manager_enabler_;
   TestingPrefServiceSimple pref_service_;
 
@@ -303,7 +304,7 @@ TEST_F(AppInfoGeneratorTest, GenerateInventoryList) {
 TEST_F(AppInfoGeneratorTest, GenerateWebApp) {
   user_manager()->LoginUser(account_id(), true);
   auto generator = GetReadyGenerator();
-  web_app::AppId app_id;
+  webapps::AppId app_id;
   {
     auto web_app = web_app::test::CreateWebApp(
         GURL("http://app.com/app/path"), web_app::WebAppManagement::kDefault);
@@ -338,7 +339,7 @@ TEST_F(AppInfoGeneratorTest, GenerateWebApp) {
 TEST_F(AppInfoGeneratorTest, GenerateSystemWebApp) {
   user_manager()->LoginUser(account_id(), true);
   auto generator = GetReadyGenerator();
-  web_app::AppId app_id;
+  webapps::AppId app_id;
   {
     auto web_app = web_app::test::CreateWebApp(
         GURL("http://app.com/app/path"), web_app::WebAppManagement::kDefault);

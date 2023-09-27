@@ -25,7 +25,7 @@
 #endif
 
 #if BUILDFLAG(IS_APPLE) && !BUILDFLAG(USE_PARTITION_ALLOC_AS_MALLOC)
-#include "base/allocator/partition_allocator/shim/allocator_interception_mac.h"
+#include "base/allocator/partition_allocator/shim/allocator_interception_apple.h"
 #endif
 
 using base::allocator::dispatcher::AllocationSubsystem;
@@ -121,7 +121,7 @@ void InitAllocationRecorder(mojom::ProfilingParamsPtr params) {
     case mojom::StackMode::NATIVE_WITH_THREAD_NAMES:
     case mojom::StackMode::NATIVE_WITHOUT_THREAD_NAMES:
       // This would track task contexts only.
-      AllocationContextTracker::SetCaptureMode(CaptureMode::NATIVE_STACK);
+      AllocationContextTracker::SetCaptureMode(CaptureMode::kNativeStack);
       break;
   }
 }

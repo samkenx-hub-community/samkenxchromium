@@ -8,6 +8,7 @@
 #include "base/metrics/histogram_functions.h"
 #include "base/rand_util.h"
 #include "base/task/sequenced_task_runner.h"
+#include "chrome/browser/content_settings/cookie_settings_factory.h"
 #include "chrome/browser/content_settings/host_content_settings_map_factory.h"
 #include "chrome/browser/ui/hats/hats_service.h"
 #include "chrome/browser/ui/hats/hats_service_factory.h"
@@ -23,6 +24,7 @@
 #include "components/password_manager/core/common/password_manager_pref_names.h"
 #include "components/prefs/pref_service.h"
 #include "components/privacy_sandbox/privacy_sandbox_prefs.h"
+#include "components/privacy_sandbox/tracking_protection_prefs.h"
 #include "components/safe_browsing/core/common/safe_browsing_prefs.h"
 #include "components/signin/public/base/signin_pref_names.h"
 #include "components/unified_consent/pref_names.h"
@@ -147,6 +149,21 @@ std::map<std::string, bool> GetPrivacySettingsProductSpecificData(
       HasNonDefaultPrivacySetting(profile);
   product_specific_data["Ran safety check"] = ran_safety_check;
   return product_specific_data;
+}
+
+// Returns true if the threat_type is not in the phishing, malware, unwanted
+// software, or billing threat categories.
+bool IsOtherSBInterstitialCategory(safe_browsing::SBThreatType threat_type) {
+  switch (threat_type) {
+    case safe_browsing::SB_THREAT_TYPE_URL_PHISHING:
+    case safe_browsing::SB_THREAT_TYPE_URL_CLIENT_SIDE_PHISHING:
+    case safe_browsing::SB_THREAT_TYPE_URL_MALWARE:
+    case safe_browsing::SB_THREAT_TYPE_URL_UNWANTED:
+    case safe_browsing::SB_THREAT_TYPE_BILLING:
+      return false;
+    default:
+      return true;
+  }
 }
 
 }  // namespace
@@ -365,17 +382,16 @@ void TrustSafetySentimentService::InteractedWithPrivacySandbox3(
   std::map<std::string, bool> product_specific_data;
   product_specific_data["Stable channel"] =
       (chrome::GetChannel() == version_info::Channel::STABLE) ? true : false;
-  bool blockCookies =
-      HostContentSettingsMapFactory::GetForProfile(profile_)
-          ->GetDefaultContentSetting(ContentSettingsType::COOKIES,
-                                     /*provider_id=*/nullptr) ==
-      ContentSetting::CONTENT_SETTING_BLOCK;
-  blockCookies =
-      blockCookies ||
+  scoped_refptr<content_settings::CookieSettings> cookie_settings =
+      CookieSettingsFactory::GetForProfile(profile_);
+  bool block_cookies = cookie_settings->GetDefaultCookieSetting() ==
+                       ContentSetting::CONTENT_SETTING_BLOCK;
+  block_cookies =
+      block_cookies ||
       (static_cast<content_settings::CookieControlsMode>(
            profile_->GetPrefs()->GetInteger(prefs::kCookieControlsMode)) ==
        content_settings::CookieControlsMode::kBlockThirdParty);
-  product_specific_data["3P cookies blocked"] = blockCookies ? true : false;
+  product_specific_data["3P cookies blocked"] = block_cookies ? true : false;
   product_specific_data["Privacy Sandbox enabled"] =
       profile_->GetPrefs()->GetBoolean(prefs::kPrivacySandboxApisEnabledV2)
           ? true
@@ -386,6 +402,64 @@ void TrustSafetySentimentService::InteractedWithPrivacySandbox3(
 void TrustSafetySentimentService::InteractedWithPrivacySandbox4(
     FeatureArea feature_area) {
   TriggerOccurred(feature_area, {});
+}
+
+void TrustSafetySentimentService::InteractedWithSafeBrowsingInterstitial(
+    bool did_proceed,
+    safe_browsing::SBThreatType threat_type) {
+  std::map<std::string, bool> product_specific_data;
+  product_specific_data["User proceeded past interstitial"] = did_proceed;
+  product_specific_data["Enhanced protection enabled"] =
+      safe_browsing::IsEnhancedProtectionEnabled(*profile_->GetPrefs());
+  product_specific_data["Threat is phishing"] =
+      threat_type == safe_browsing::SB_THREAT_TYPE_URL_PHISHING ||
+      threat_type == safe_browsing::SB_THREAT_TYPE_URL_CLIENT_SIDE_PHISHING;
+  product_specific_data["Threat is malware"] =
+      threat_type == safe_browsing::SB_THREAT_TYPE_URL_MALWARE;
+  product_specific_data["Threat is unwanted software"] =
+      threat_type == safe_browsing::SB_THREAT_TYPE_URL_UNWANTED;
+  product_specific_data["Threat is billing"] =
+      threat_type == safe_browsing::SB_THREAT_TYPE_BILLING;
+  DCHECK(!IsOtherSBInterstitialCategory(threat_type));
+  TriggerOccurred(FeatureArea::kSafeBrowsingInterstitial,
+                  product_specific_data);
+}
+
+void TrustSafetySentimentService::InteractedWithDownloadWarningUI(
+    DownloadItemWarningData::WarningSurface surface,
+    DownloadItemWarningData::WarningAction action) {
+  std::map<std::string, bool> product_specific_data;
+  product_specific_data["Is mainpage UI"] = false;
+  product_specific_data["Is downloads page UI"] = false;
+  product_specific_data["Is download prompt UI"] = false;
+  product_specific_data["User proceeded past warning"] = false;
+  switch (surface) {
+    case DownloadItemWarningData::WarningSurface::BUBBLE_MAINPAGE:
+      product_specific_data["Is mainpage UI"] = true;
+      break;
+    case DownloadItemWarningData::WarningSurface::BUBBLE_SUBPAGE:
+      product_specific_data["Is subpage UI"] = true;
+      break;
+    case DownloadItemWarningData::WarningSurface::DOWNLOADS_PAGE:
+      product_specific_data["Is downloads page UI"] = true;
+      break;
+    case DownloadItemWarningData::WarningSurface::DOWNLOAD_PROMPT:
+      product_specific_data["Is download prompt UI"] = true;
+      break;
+    default:
+      NOTREACHED();
+  }
+  switch (action) {
+    case DownloadItemWarningData::WarningAction::PROCEED:
+      product_specific_data["User proceeded past warning"] = true;
+      break;
+    case DownloadItemWarningData::WarningAction::DISCARD:
+      product_specific_data["User proceeded past warning"] = false;
+      break;
+    default:
+      NOTREACHED();
+  }
+  TriggerOccurred(FeatureArea::kDownloadWarningUI, product_specific_data);
 }
 
 void TrustSafetySentimentService::OnOffTheRecordProfileCreated(
@@ -480,6 +554,9 @@ void TrustSafetySentimentService::SettingsWatcherComplete() {
 void TrustSafetySentimentService::TriggerOccurred(
     FeatureArea feature_area,
     const std::map<std::string, bool>& product_specific_data) {
+  // Log histogram that verifies infrastructure works as intended.
+  base::UmaHistogramEnumeration(
+      "Feedback.TrustSafetySentiment.CallTriggerOccurred", feature_area);
   if (!ProbabilityCheck(feature_area))
     return;
 
@@ -527,6 +604,8 @@ bool TrustSafetySentimentService::VersionCheck(FeatureArea feature_area) {
     case (FeatureArea::kBrowsingData):
     case (FeatureArea::kPrivacyGuide):
     case (FeatureArea::kControlGroup):
+    case (FeatureArea::kSafeBrowsingInterstitial):
+    case (FeatureArea::kDownloadWarningUI):
       return isV2 == true;
     // Both Versions
     case (FeatureArea::kTrustedSurface):
@@ -569,6 +648,10 @@ std::string TrustSafetySentimentService::GetHatsTriggerForFeatureArea(
         return kHatsSurveyTriggerTrustSafetyV2PrivacySandbox4NoticeOk;
       case (FeatureArea::kPrivacySandbox4NoticeSettings):
         return kHatsSurveyTriggerTrustSafetyV2PrivacySandbox4NoticeSettings;
+      case (FeatureArea::kSafeBrowsingInterstitial):
+        return kHatsSurveyTriggerTrustSafetyV2SafeBrowsingInterstitial;
+      case (FeatureArea::kDownloadWarningUI):
+        return kHatsSurveyTriggerTrustSafetyV2DownloadWarningUI;
       default:
         NOTREACHED();
         return "";
@@ -658,6 +741,16 @@ bool TrustSafetySentimentService::ProbabilityCheck(FeatureArea feature_area) {
         return base::RandDouble() <
                features::
                    kTrustSafetySentimentSurveyV2PrivacySandbox4NoticeSettingsProbability
+                       .Get();
+      case (FeatureArea::kSafeBrowsingInterstitial):
+        return base::RandDouble() <
+               features::
+                   kTrustSafetySentimentSurveyV2SafeBrowsingInterstitialProbability
+                       .Get();
+      case (FeatureArea::kDownloadWarningUI):
+        return base::RandDouble() <
+               features::
+                   kTrustSafetySentimentSurveyV2DownloadWarningUIProbability
                        .Get();
       default:
         NOTREACHED();

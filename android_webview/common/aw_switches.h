@@ -19,13 +19,11 @@ extern const char kFinchSeedNoChargingRequirement[];
 extern const char kFinchSeedMinDownloadPeriod[];
 extern const char kFinchSeedMinUpdatePeriod[];
 extern const char kWebViewEnableModernCookieSameSite[];
-extern const char kWebViewDisablePackageAllowlistThrottling[];
 extern const char kWebViewSelectiveImageInversionDarkening[];
 extern const char kWebViewFencedFrames[];
 extern const char kWebViewDisableAppRecovery[];
 extern const char kWebViewEnableAppRecovery[];
 extern const char kWebViewEnableTrustTokensComponent[];
-extern const char kWebViewEnableUserAgentClientHints[];
 
 }  // namespace switches
 

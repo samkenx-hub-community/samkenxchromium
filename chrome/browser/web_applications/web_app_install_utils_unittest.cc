@@ -1065,7 +1065,6 @@ TEST(WebAppInstallUtils, UpdateWebAppInfoFromManifest_TabStrip) {
   {
     TabStrip tab_strip;
     tab_strip.home_tab = TabStrip::Visibility::kAbsent;
-    tab_strip.new_tab_button = TabStrip::Visibility::kAuto;
     manifest.tab_strip = std::move(tab_strip);
 
     const GURL kAppManifestUrl("http://www.chromium.org/manifest.json");
@@ -1075,9 +1074,7 @@ TEST(WebAppInstallUtils, UpdateWebAppInfoFromManifest_TabStrip) {
     EXPECT_EQ(absl::get<TabStrip::Visibility>(
                   web_app_info.tab_strip.value().home_tab),
               TabStrip::Visibility::kAbsent);
-    EXPECT_EQ(absl::get<TabStrip::Visibility>(
-                  web_app_info.tab_strip.value().new_tab_button),
-              TabStrip::Visibility::kAuto);
+    EXPECT_FALSE(web_app_info.tab_strip.value().new_tab_button.url.has_value());
   }
 
   {
@@ -1109,9 +1106,7 @@ TEST(WebAppInstallUtils, UpdateWebAppInfoFromManifest_TabStrip) {
                   .icons[0]
                   .src,
               kAppIcon);
-    EXPECT_EQ(absl::get<blink::Manifest::NewTabButtonParams>(
-                  web_app_info.tab_strip.value().new_tab_button)
-                  .url,
+    EXPECT_EQ(web_app_info.tab_strip.value().new_tab_button.url,
               GURL("https://www.example.com/"));
   }
 }
@@ -1692,7 +1687,7 @@ TEST_F(RegisterOsSettingsTest, MaybeRegisterOsUninstall) {
   // removed source: kPolicy
   // check web_app.CanUserUninstallWebApp is false
   // check RegisterWebAppOsUninstallation is called
-  const AppId app_id = "test";
+  const webapps::AppId app_id = "test";
   testing::StrictMock<MockOsIntegrationManager> manager;
   // InstallOsHooks from MaybeRegisterOsUninstall
   // sets only kUninstallationViaOsSettings that will async call from
@@ -1731,7 +1726,7 @@ TEST_F(RegisterOsSettingsTest, MaybeRegisterOsSettings_NoRegistration) {
   // removed source: kSync
   // check web_app.CanUserUninstallWebApp is true
   // check RegisterWebAppOsUninstallation is not called
-  const AppId app_id = "test";
+  const webapps::AppId app_id = "test";
   testing::StrictMock<MockOsIntegrationManager> manager;
   // InstallOsHooks from MaybeRegisterOsUninstall
   // sets only kUninstallationViaOsSettings that will async call from
@@ -1771,7 +1766,7 @@ TEST_F(RegisterOsSettingsTest, MaybeUnregisterOsUninstall) {
   // added source: kPolicy
   // check web_app.CanUserUninstallWebApp is false
   // check UnregisterWebAppOsUninstallation is called
-  const AppId app_id = "test";
+  const webapps::AppId app_id = "test";
   testing::StrictMock<MockOsIntegrationManager> manager;
   // InstallOsHooks from MaybeRegisterOsUninstall
   // sets only kUninstallationViaOsSettings that will async call from
@@ -1800,7 +1795,7 @@ TEST_F(RegisterOsSettingsTest, MaybeUnregisterOsSettings_NoUnregistration) {
   // added source: kSync
   // check web_app.CanUserUninstallWebApp is true
   // check UnregisterWebAppOsUninstallation is not called
-  const AppId app_id = "test";
+  const webapps::AppId app_id = "test";
   testing::StrictMock<MockOsIntegrationManager> manager;
   // InstallOsHooks from MaybeRegisterOsUninstall
   // sets only kUninstallationViaOsSettings that will async call from
@@ -1835,7 +1830,7 @@ TEST(WebAppInstallUtils, SetWebAppManifestFields_Summary) {
   web_app_info.background_color = SK_ColorMAGENTA;
   web_app_info.dark_mode_background_color = SK_ColorBLACK;
 
-  const AppId app_id =
+  const webapps::AppId app_id =
       GenerateAppId(/*manifest_id=*/absl::nullopt, web_app_info.start_url);
   auto web_app = std::make_unique<WebApp>(app_id);
   SetWebAppManifestFields(web_app_info, *web_app);
@@ -1869,7 +1864,7 @@ TEST(WebAppInstallUtils, SetWebAppManifestFields_ShareTarget) {
   web_app_info.scope = web_app_info.start_url.GetWithoutFilename();
   web_app_info.title = u"App Name";
 
-  const AppId app_id =
+  const webapps::AppId app_id =
       GenerateAppId(/*manifest_id=*/absl::nullopt, web_app_info.start_url);
   auto web_app = std::make_unique<WebApp>(app_id);
 

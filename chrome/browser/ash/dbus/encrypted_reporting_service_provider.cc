@@ -16,10 +16,12 @@
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/task/thread_pool.h"
+#include "build/chromeos_buildflags.h"
 #include "chrome/browser/policy/messaging_layer/upload/event_upload_size_controller.h"
 #include "chrome/browser/policy/messaging_layer/upload/file_upload_impl.h"
 #include "chrome/browser/policy/messaging_layer/upload/upload_client.h"
 #include "chrome/browser/policy/messaging_layer/upload/upload_provider.h"
+#include "chromeos/dbus/missive/history_tracker.h"
 #include "chromeos/dbus/missive/missive_client.h"
 #include "components/reporting/proto/synced/interface.pb.h"
 #include "components/reporting/proto/synced/status.pb.h"
@@ -31,6 +33,10 @@
 #include "dbus/exported_object.h"
 #include "dbus/message.h"
 #include "third_party/cros_system_api/dbus/service_constants.h"
+
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+#include "chromeos/dbus/missive/history_tracker.h"
+#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 
 namespace ash {
 
@@ -51,6 +57,12 @@ void SendStatusAsResponse(
   dbus::MessageWriter writer(response.get());
   writer.AppendProtoAsArrayOfBytes(response_message);
 
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+  // Turn on/off the debug state flag (for Ash only).
+  response_message.set_health_data_logging_enabled(
+      ::reporting::HistoryTracker::Get()->debug_state());
+#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
+
   // Send `response`
   std::move(response_sender).Run(std::move(response));
 }
@@ -67,7 +79,7 @@ EncryptedReportingServiceProvider::EncryptedReportingServiceProvider(
       memory_resource_(base::MakeRefCounted<::reporting::ResourceManager>(
           kDefaultMemoryAllocation)),
       upload_provider_(std::move(upload_provider)) {
-  DCHECK(upload_provider_.get());
+  CHECK(upload_provider_.get());
 }
 
 EncryptedReportingServiceProvider::~EncryptedReportingServiceProvider() =
@@ -75,7 +87,7 @@ EncryptedReportingServiceProvider::~EncryptedReportingServiceProvider() =
 
 void EncryptedReportingServiceProvider::Start(
     scoped_refptr<dbus::ExportedObject> exported_object) {
-  DCHECK(OnOriginThread());
+  CHECK(OnOriginThread());
 
   if (!::reporting::StorageSelector::is_uploader_required()) {
     // We should never get to here, since the provider is only exported
@@ -140,10 +152,27 @@ EncryptedReportingServiceProvider::GetEncryptionKeyAttachedCallback() {
           missive_client->GetWeakPtr()));
 }
 
+// static
+::reporting::UploadClient::UpdateConfigInMissiveCallback
+EncryptedReportingServiceProvider::GetUpdateConfigInMissiveCallback() {
+  chromeos::MissiveClient* const missive_client =
+      chromeos::MissiveClient::Get();
+  return base::BindPostTask(
+      missive_client->origin_task_runner(),
+      base::BindRepeating(
+          [](base::WeakPtr<chromeos::MissiveClient> missive_client,
+             ::reporting::ListOfBlockedDestinations destinations) {
+            if (missive_client) {
+              missive_client->UpdateConfigInMissive(std::move(destinations));
+            }
+          },
+          missive_client->GetWeakPtr()));
+}
+
 void EncryptedReportingServiceProvider::RequestUploadEncryptedRecords(
     dbus::MethodCall* method_call,
     dbus::ExportedObject::ResponseSender response_sender) {
-  DCHECK(OnOriginThread());
+  CHECK(OnOriginThread());
   auto response = dbus::Response::FromMethodCall(method_call);
   ::reporting::UploadEncryptedRecordResponse response_message;
 
@@ -222,7 +251,7 @@ void EncryptedReportingServiceProvider::RequestUploadEncryptedRecords(
           remaining_storage_capacity,
           ::reporting::FileUploadDelegate::kMaxUploadBufferSize))};
 
-  DCHECK(upload_provider_);
+  CHECK(upload_provider_);
   chromeos::MissiveClient* const missive_client =
       chromeos::MissiveClient::Get();
   if (!missive_client) {
@@ -243,6 +272,14 @@ void EncryptedReportingServiceProvider::RequestUploadEncryptedRecords(
                          std::move(response_message), status);
     return;
   }
+
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+  // Accept health data if present (ChromeOS only)
+  if (request.has_health_data()) {
+    ::reporting::HistoryTracker::Get()->set_data(
+        std::move(request.health_data()), base::DoNothing());
+  }
+#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 
   upload_provider_->RequestUploadEncryptedRecords(
       request.need_encryption_keys(), std::move(records),

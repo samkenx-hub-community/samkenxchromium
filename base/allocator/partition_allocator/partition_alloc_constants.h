@@ -16,17 +16,20 @@
 #include "base/allocator/partition_allocator/partition_alloc_buildflags.h"
 #include "base/allocator/partition_allocator/partition_alloc_config.h"
 #include "base/allocator/partition_allocator/partition_alloc_forward.h"
-#include "base/allocator/partition_allocator/tagging.h"
 #include "build/build_config.h"
 
 #if BUILDFLAG(IS_APPLE) && defined(ARCH_CPU_64_BITS)
 #include <mach/vm_page_size.h>
 #endif
 
+#if PA_CONFIG(HAS_MEMORY_TAGGING)
+#include "base/allocator/partition_allocator/tagging.h"
+#endif
+
 namespace partition_alloc {
 
-// Bit flag constants used as `flag` argument of PartitionRoot::AllocWithFlags,
-// AlignedAllocWithFlags, etc.
+// Bit flag constants used as `flag` argument of PartitionRoot::Alloc<flags>,
+// AlignedAlloc, etc.
 struct AllocFlags {
   static constexpr unsigned int kReturnNull = 1 << 0;
   static constexpr unsigned int kZeroFill = 1 << 1;
@@ -42,16 +45,21 @@ struct AllocFlags {
   // allocations return nullptr, such as direct-mapped ones, and even for
   // smaller ones, a nullptr value is common.
   static constexpr unsigned int kFastPathOrReturnNull = 1 << 5;  // Internal.
+  // An allocation override hook should tag the allocated memory for MTE.
+  static constexpr unsigned int kMemoryShouldBeTaggedForMte =
+      1 << 6;  // Internal.
 
-  static constexpr unsigned int kLastFlag = kFastPathOrReturnNull;
+  static constexpr unsigned int kLastFlag = kMemoryShouldBeTaggedForMte;
 };
 
-// Bit flag constants used as `flag` argument of PartitionRoot::FreeWithFlags.
+// Bit flag constants used as `flag` argument of PartitionRoot::Free<flags>.
 struct FreeFlags {
   // See AllocFlags::kNoMemoryToolOverride.
   static constexpr unsigned int kNoMemoryToolOverride = 1 << 0;
+  // Don't allow any hooks (override or observers).
+  static constexpr unsigned int kNoHooks = 1 << 1;  // Internal.
 
-  static constexpr unsigned int kLastFlag = kNoMemoryToolOverride;
+  static constexpr unsigned int kLastFlag = kNoHooks;
 };
 
 namespace internal {
@@ -417,7 +425,7 @@ PA_ALWAYS_INLINE constexpr size_t MaxDirectMapped() {
   return (1UL << 31) - kSuperPageSize;
 }
 
-// Max alignment supported by AlignedAllocWithFlags().
+// Max alignment supported by AlignedAlloc().
 // kSuperPageSize alignment can't be easily supported, because each super page
 // starts with guard pages & metadata.
 constexpr size_t kMaxSupportedAlignment = kSuperPageSize / 2;

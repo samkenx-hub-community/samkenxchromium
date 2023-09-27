@@ -9,6 +9,7 @@
 #include "base/rand_util.h"
 #include "base/strings/strcat.h"
 #include "content/browser/preloading/prefetch/no_vary_search_helper.h"
+#include "content/browser/preloading/prefetch/prefetch_container.h"
 #include "content/browser/preloading/prefetch/prefetch_document_manager.h"
 #include "content/browser/preloading/preloading.h"
 #include "content/browser/preloading/preloading_attempt_impl.h"
@@ -82,10 +83,10 @@ PreloadingDataImpl::GetSameURLAndNoVarySearchURLMatcher(
           return true;
         }
 
-        const absl::optional<GURL> match_url =
-            prefetch_doc_manager->GetNoVarySearchHelper().MatchUrl(
-                navigated_url);
-        return match_url == predicted_url;
+        base::WeakPtr<PrefetchContainer> prefetch_container =
+            prefetch_doc_manager->MatchUrl(navigated_url);
+        return prefetch_container &&
+               prefetch_container->GetURL() == predicted_url;
       },
       manager, destination_url);
 }
@@ -109,16 +110,10 @@ PreloadingDataImpl* PreloadingDataImpl::GetOrCreateForWebContents(
 PreloadingAttempt* PreloadingDataImpl::AddPreloadingAttempt(
     PreloadingPredictor predictor,
     PreloadingType preloading_type,
-    PreloadingURLMatchCallback url_match_predicate) {
-  // We want to log the metrics for user visible primary pages to measure the
-  // impact of PreloadingAttempt on the page user is viewing.
-  // TODO(crbug.com/1330783): Extend this for non-primary page and inner
-  // WebContents preloading attempts.
-  ukm::SourceId triggered_primary_page_source_id =
-      web_contents()->GetPrimaryMainFrame()->GetPageUkmSourceId();
-
+    PreloadingURLMatchCallback url_match_predicate,
+    ukm::SourceId triggering_primary_page_source_id) {
   auto attempt = std::make_unique<PreloadingAttemptImpl>(
-      predictor, preloading_type, triggered_primary_page_source_id,
+      predictor, preloading_type, triggering_primary_page_source_id,
       std::move(url_match_predicate), sampling_seed_);
   preloading_attempts_.push_back(std::move(attempt));
 
@@ -143,6 +138,19 @@ void PreloadingDataImpl::AddPreloadingPrediction(
       predictor, confidence, triggered_primary_page_source_id,
       std::move(url_match_predicate));
   preloading_predictions_.push_back(std::move(prediction));
+}
+
+void PreloadingDataImpl::AddExperimentalPreloadingPrediction(
+    base::StringPiece name,
+    PreloadingURLMatchCallback url_match_predicate,
+    float score,
+    float min_score,
+    float max_score,
+    size_t buckets) {
+  experimental_predictions_.push_back(
+      std::make_unique<ExperimentalPreloadingPrediction>(
+          name, std::move(url_match_predicate), score, min_score, max_score,
+          buckets));
 }
 
 void PreloadingDataImpl::SetIsNavigationInDomainCallback(
@@ -222,6 +230,11 @@ void PreloadingDataImpl::WebContentsDestroyed() {
   // avoid the UKM associated to wrong page.
   RecordMetricsForPreloadingAttempts(ukm::kInvalidSourceId);
   RecordUKMForPreloadingPredictions(ukm::kInvalidSourceId);
+
+  for (const auto& experimental_prediction : experimental_predictions_) {
+    experimental_prediction->RecordToUMA();
+  }
+  experimental_predictions_.clear();
 
   // Delete the user data after logging.
   web_contents()->RemoveUserData(UserDataKey());
@@ -308,6 +321,12 @@ void PreloadingDataImpl::RecordRecallStatsToUMA(
 
 void PreloadingDataImpl::SetIsAccurateTriggeringAndPrediction(
     const GURL& navigated_url) {
+  for (auto& experimental_prediction : experimental_predictions_) {
+    experimental_prediction->SetIsAccuratePrediction(navigated_url);
+    experimental_prediction->RecordToUMA();
+  }
+  experimental_predictions_.clear();
+
   for (auto& attempt : preloading_attempts_) {
     attempt->SetIsAccurateTriggering(navigated_url);
     RecordPreloadingAttemptPrecisionToUMA(*attempt);

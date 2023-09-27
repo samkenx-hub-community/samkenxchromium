@@ -10,6 +10,7 @@
 #include <content-type-v1-server-protocol.h>
 #include <cursor-shapes-unstable-v1-server-protocol.h>
 #include <extended-drag-unstable-v1-server-protocol.h>
+#include <fractional-scale-v1-server-protocol.h>
 #include <gaming-input-unstable-v2-server-protocol.h>
 #include <grp.h>
 #include <idle-inhibit-unstable-v1-server-protocol.h>
@@ -59,6 +60,7 @@
 #include "build/build_config.h"
 #include "components/exo/display.h"
 #include "components/exo/security_delegate.h"
+#include "components/exo/wayland/client_tracker.h"
 #include "components/exo/wayland/content_type.h"
 #include "components/exo/wayland/overlay_prioritizer.h"
 #include "components/exo/wayland/serial_tracker.h"
@@ -67,7 +69,6 @@
 #include "components/exo/wayland/wayland_display_output.h"
 #include "components/exo/wayland/wayland_dmabuf_feedback_manager.h"
 #include "components/exo/wayland/wayland_watcher.h"
-#include "components/exo/wayland/weston_test.h"
 #include "components/exo/wayland/wl_compositor.h"
 #include "components/exo/wayland/wl_data_device_manager.h"
 #include "components/exo/wayland/wl_output.h"
@@ -75,6 +76,7 @@
 #include "components/exo/wayland/wl_shell.h"
 #include "components/exo/wayland/wl_shm.h"
 #include "components/exo/wayland/wl_subcompositor.h"
+#include "components/exo/wayland/wp_fractional_scale.h"
 #include "components/exo/wayland/wp_presentation.h"
 #include "components/exo/wayland/wp_single_pixel_buffer.h"
 #include "components/exo/wayland/wp_viewporter.h"
@@ -136,6 +138,9 @@ const char kWaylandSocketGroup[] = "wayland";
 // (see `man 2 listen`).
 constexpr int kMaxPendingConnections = 128;
 
+// Callback used to find a Server instance for a given wl_display.
+Server::ServerGetter g_server_getter;
+
 bool IsDrmAtomicAvailable() {
 #if BUILDFLAG(IS_OZONE)
   auto& host_properties =
@@ -156,11 +161,25 @@ int GetTextInputExtensionV1Version() {
   if (base::FeatureList::IsEnabled(
           ash::features::kExoExtendedConfirmComposition) &&
       base::FeatureList::IsEnabled(ash::features::kExoSurroundingTextOffset)) {
-    return 11;
+    // set_surrounding_text_offset_utf16 + new surrounding_text_support
+    // strategy enabled once at version 10 was reverted (crbug.com/1451324).
+    // Unfortunately, we have to disable confirm-composition in version 11
+    // together, because of wayland's versioning system.
+    //
+    // Now, the new API to fix the issue is introduced in version 12.
+    // We cannot enable confirm-composition only, because it will be hitting
+    // the same issue at version 10. Thus, we'll set version 12 (including
+    // all fixes + confirm-composition), or 9 (before everything).
+
+    // If GIF support is also enabled, we need version 13.
+    if (base::FeatureList::IsEnabled(
+            ash::features::kImeSystemEmojiPickerGIFSupport)) {
+      return 13;
+    }
+
+    return 12;
   }
-  if (base::FeatureList::IsEnabled(ash::features::kExoSurroundingTextOffset)) {
-    return 10;
-  }
+
   return 9;
 }
 
@@ -256,10 +275,13 @@ Server::Server(Display* display,
 
   wl_display_.reset(wl_display_create());
   SetSecurityDelegate(wl_display_.get(), security_delegate_.get());
+
+  client_tracker_ = std::make_unique<ClientTracker>(wl_display_.get());
 }
 
 void Server::Initialize() {
   serial_tracker_ = std::make_unique<SerialTracker>(wl_display_.get());
+  rotation_serial_tracker_ = std::make_unique<SerialTracker>(wl_display_.get());
   wl_global_create(wl_display_.get(), &wl_compositor_interface,
                    kWlCompositorVersion, this, bind_compositor);
   wl_global_create(wl_display_.get(), &wl_shm_interface, 1, display_, bind_shm);
@@ -299,6 +321,9 @@ void Server::Initialize() {
       kSinglePixelBufferVersion, display_, bind_single_pixel_buffer);
   wl_global_create(wl_display_.get(), &overlay_prioritizer_interface, 1,
                    display_, bind_overlay_prioritizer);
+  wl_global_create(wl_display_.get(), &wp_fractional_scale_manager_v1_interface,
+                   kFractionalScaleVersion, display_,
+                   bind_fractional_scale_manager);
   wl_global_create(wl_display_.get(), &wp_viewporter_interface, 1, display_,
                    bind_viewporter);
   wl_global_create(wl_display_.get(), &wp_presentation_interface, 1, display_,
@@ -373,7 +398,6 @@ void Server::Initialize() {
   wl_global_create(wl_display_.get(), &zwp_idle_inhibit_manager_v1_interface, 1,
                    display_, bind_zwp_idle_inhibit_manager);
 
-  weston_test_holder_ = std::make_unique<WestonTest>(this);
   ui_controls_holder_ = std::make_unique<UiControls>(this);
 
   zcr_keyboard_extension_data_ =
@@ -397,8 +421,8 @@ void Server::Initialize() {
                    zcr_text_input_extension_data_.get(),
                    bind_text_input_extension);
 
-  xdg_shell_data_ =
-      std::make_unique<WaylandXdgShell>(display_, serial_tracker_.get());
+  xdg_shell_data_ = std::make_unique<WaylandXdgShell>(
+      display_, serial_tracker_.get(), rotation_serial_tracker_.get());
   wl_global_create(wl_display_.get(), &xdg_wm_base_interface, 3,
                    xdg_shell_data_.get(), bind_xdg_shell);
 
@@ -435,6 +459,17 @@ std::unique_ptr<Server> Server::Create(
       new Server(display, std::move(security_delegate)));
   server->Initialize();
   return server;
+}
+
+// static.
+Server* Server::GetServerForDisplay(wl_display* display) {
+  return g_server_getter ? g_server_getter.Run(display) : nullptr;
+}
+
+// static.
+void Server::SetServerGetter(Server::ServerGetter server_getter) {
+  CHECK(!server_getter || !g_server_getter);
+  g_server_getter = std::move(server_getter);
 }
 
 void Server::StartWithDefaultPath(StartCallback callback) {
@@ -498,6 +533,10 @@ wl_resource* Server::GetOutputResource(wl_client* client, int64_t display_id) {
     return nullptr;
   }
   return iter->second.get()->GetOutputResourceForClient(client);
+}
+
+bool Server::IsClientDestroyed(wl_client* client) const {
+  return client_tracker_->IsClientDestroyed(client);
 }
 
 void Server::AddWaylandOutput(int64_t id,

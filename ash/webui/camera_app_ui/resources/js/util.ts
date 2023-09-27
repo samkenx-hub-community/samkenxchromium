@@ -3,9 +3,10 @@
 // found in the LICENSE file.
 
 import * as animate from './animation.js';
-import {assert, assertInstanceof} from './assert.js';
+import {assertEnumVariant, assertInstanceof} from './assert.js';
 import * as dom from './dom.js';
 import {I18nString} from './i18n_string.js';
+import * as localDev from './local_dev.js';
 import * as loadTimeData from './models/load_time_data.js';
 import * as state from './state.js';
 import {AspectRatioSet, Facing, FpsRange, Resolution} from './type.js';
@@ -16,7 +17,6 @@ import {AspectRatioSet, Facing, FpsRange, Resolution} from './type.js';
  * @param params Size of the canvas.
  * @param params.width Width of the canvas.
  * @param params.height Height of the canvas.
- * @return Returns canvas element and the context for 2D drawing.
  */
 export function newDrawingCanvas(
     {width, height}: {width: number, height: number}):
@@ -115,7 +115,6 @@ export type KeyboardShortcut =
 /**
  * Returns a shortcut string, such as Ctrl-Alt-A.
  *
- * @param event Keyboard event.
  * @return Shortcut identifier.
  */
 export function getKeyboardShortcut(event: KeyboardEvent): KeyboardShortcut {
@@ -249,7 +248,7 @@ export function setInkdropEffect(el: HTMLElement): void {
   const ripple =
       assertInstanceof(tpl.querySelector('.inkdrop-ripple'), HTMLElement);
   el.appendChild(tpl);
-  el.addEventListener('click', async (e) => {
+  el.addEventListener('click', (e) => {
     const tRect =
         assertInstanceof(e.target, HTMLElement).getBoundingClientRect();
     const elRect = el.getBoundingClientRect();
@@ -261,7 +260,7 @@ export function setInkdropEffect(el: HTMLElement): void {
     el.style.setProperty('--drop-x', `${dropX}px`);
     el.style.setProperty('--drop-y', `${dropY}px`);
     el.style.setProperty('--drop-radius', `${radius}px`);
-    await animate.play(ripple);
+    animate.play(ripple);
   });
 }
 
@@ -343,39 +342,6 @@ export async function share(file: File): Promise<void> {
     // share target, share abort... with right treatment like toast
     // message.
   }
-}
-
-/**
- * Check if a string value is a variant of an enum.
- *
- * @param enumType The enum type to be checked.
- * @param value Value to be checked.
- * @return The value if it's an enum variant, null otherwise.
- */
-export function checkEnumVariant<T extends string>(
-    enumType: {[key: string]: T}, value: string|null|undefined): T|null {
-  if (value === null || value === undefined ||
-      !Object.values<string>(enumType).includes(value)) {
-    return null;
-  }
-  // The value is already checked that it's a member of the enum above, so it's
-  // safe to cast it to the enum.
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-  return value as T;
-}
-
-/**
- * Asserts that a string value is a variant of an enum.
- *
- * @param enumType The enum type to be checked.
- * @param value Value to be checked.
- * @return The value if it's an enum variant, throws assertion error otherwise.
- */
-export function assertEnumVariant<T extends string>(
-    enumType: {[key: string]: T}, value: string|null|undefined): T {
-  const ret = checkEnumVariant(enumType, value);
-  assert(ret !== null, `${value} is not a valid enum variant`);
-  return ret;
 }
 
 /**
@@ -539,4 +505,25 @@ export function isFileSystemFileHandle(handle: FileSystemHandle):
 export function isFileSystemDirectoryHandle(handle: FileSystemHandle):
     handle is FileSystemDirectoryHandle {
   return handle.kind === 'directory';
+}
+
+/**
+ * Expands a path to full absolute path.
+ *
+ * This is a no-op for CCA on CrOS, but is needed for local dev since it might
+ * be served in a subpath.
+ */
+export const expandPath = localDev.overridableFunction((path: string) => path);
+
+/**
+ * Lazily initialize a singleton.
+ */
+export function lazySingleton<T>(fn: () => T): () => T {
+  let val: T|null = null;
+  return () => {
+    if (val === null) {
+      val = fn();
+    }
+    return val;
+  };
 }

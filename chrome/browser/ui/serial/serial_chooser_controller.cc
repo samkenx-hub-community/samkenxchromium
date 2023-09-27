@@ -152,8 +152,7 @@ std::u16string SerialChooserController::GetOption(size_t index) const {
   std::u16string display_path = port.path.BaseName().LossyDisplayName();
 
   if (!port.display_name || port.display_name->empty()) {
-    return l10n_util::GetStringFUTF16(IDS_SERIAL_PORT_CHOOSER_PATH_ONLY,
-                                      display_path);
+    return display_path;
   }
 
   if (port.type == device::mojom::SerialPortType::BLUETOOTH_CLASSIC_RFCOMM) {
@@ -166,8 +165,7 @@ std::u16string SerialChooserController::GetOption(size_t index) const {
           base::UTF8ToUTF16(*port.display_name),
           base::UTF8ToUTF16(device_uuid.canonical_value()));
     }
-    return l10n_util::GetStringFUTF16(IDS_SERIAL_PORT_CHOOSER_PATH_ONLY,
-                                      base::UTF8ToUTF16(*port.display_name));
+    return base::UTF8ToUTF16(*port.display_name);
   }
 
   return l10n_util::GetStringFUTF16(IDS_SERIAL_PORT_CHOOSER_NAME_WITH_PATH,
@@ -261,18 +259,29 @@ void SerialChooserController::OnGetDevices(
 
 bool SerialChooserController::DisplayDevice(
     const device::mojom::SerialPortInfo& port) const {
-  // TODO(b/276945831): Extend this to include protected Bluetooth services.
   if (SerialBlocklist::Get().IsExcluded(port)) {
-    DCHECK(port.has_vendor_id && port.has_product_id);
-    AddMessageToConsole(
-        blink::mojom::ConsoleMessageLevel::kInfo,
-        base::StringPrintf(
-            "Chooser dialog is not displaying a port blocked by "
-            "the Serial blocklist: vendorId=%d, "
-            "productId=%d, name='%s', serial='%s'",
-            port.vendor_id, port.product_id,
-            port.display_name ? port.display_name.value().c_str() : "",
-            port.serial_number ? port.serial_number.value().c_str() : ""));
+    if (port.has_vendor_id && port.has_product_id) {
+      AddMessageToConsole(
+          blink::mojom::ConsoleMessageLevel::kInfo,
+          base::StringPrintf(
+              "Chooser dialog is not displaying a port blocked by "
+              "the Serial blocklist: vendorId=%d, "
+              "productId=%d, name='%s', serial='%s'",
+              port.vendor_id, port.product_id,
+              port.display_name ? port.display_name.value().c_str() : "",
+              port.serial_number ? port.serial_number.value().c_str() : ""));
+    } else if (port.bluetooth_service_class_id) {
+      AddMessageToConsole(
+          blink::mojom::ConsoleMessageLevel::kInfo,
+          base::StringPrintf(
+              "Chooser dialog is not displaying a port blocked by "
+              "the Serial blocklist: bluetoothServiceClassId=%s, "
+              "name='%s'",
+              port.bluetooth_service_class_id->value().c_str(),
+              port.display_name ? port.display_name.value().c_str() : ""));
+    } else {
+      NOTREACHED();
+    }
     return false;
   }
 

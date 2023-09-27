@@ -6,10 +6,12 @@ import {TestRunner} from 'test_runner';
 import {SourcesTestRunner} from 'sources_test_runner';
 import {ElementsTestRunner} from 'elements_test_runner';
 
+import * as Root from 'devtools/core/root/root.js';
+import * as UIModule from 'devtools/ui/legacy/legacy.js';
+
 (async function() {
   TestRunner.addResult(`Tests selected call frame does not change when pretty-print is toggled.\n`);
   await TestRunner.loadLegacyModule('sources');
-  await TestRunner.loadLegacyModule('elements');
   await TestRunner.showPanel('sources');
   await TestRunner.evaluateInPagePromise(`
       function testFunction()
@@ -30,7 +32,7 @@ import {ElementsTestRunner} from 'elements_test_runner';
   var sourceFrame;
 
   function step1() {
-    var testName = Root.Runtime.queryParam('test');
+    var testName = Root.Runtime.Runtime.queryParam('test');
     testName = testName.substring(testName.lastIndexOf('/') + 1);
     SourcesTestRunner.showScriptSource(testName, step2);
   }
@@ -48,7 +50,7 @@ import {ElementsTestRunner} from 'elements_test_runner';
   }
 
   function step4() {
-    TestRunner.assertEquals('testFunction', UI.context.flavor(SDK.DebuggerModel.CallFrame).functionName);
+    TestRunner.assertEquals('testFunction', UIModule.Context.Context.instance().flavor(SDK.DebuggerModel.CallFrame).functionName);
     sourceFrame.toggleFormatSource(step5);
   }
 

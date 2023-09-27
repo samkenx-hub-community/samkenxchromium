@@ -11,15 +11,22 @@
 #include <iosfwd>
 #include <list>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "base/time/time.h"
 #include "components/autofill/core/browser/autofill_type.h"
+#include "components/autofill/core/browser/country_type.h"
 #include "components/autofill/core/browser/data_model/address.h"
 #include "components/autofill/core/browser/data_model/autofill_data_model.h"
 #include "components/autofill/core/browser/data_model/birthdate.h"
 #include "components/autofill/core/browser/data_model/contact_info.h"
 #include "components/autofill/core/browser/data_model/phone_number.h"
+#include "components/autofill/core/browser/profile_token_quality.h"
+
+#if BUILDFLAG(IS_ANDROID)
+#include "base/android/scoped_java_ref.h"
+#endif
 
 namespace autofill {
 
@@ -43,7 +50,7 @@ class AutofillProfile : public AutofillDataModel {
   };
 
   // Describes where the profile is stored and how it is synced.
-  // GENERATED_JAVA_ENUM_PACKAGE: org.chromium.chrome.browser.autofill
+  // GENERATED_JAVA_ENUM_PACKAGE: org.chromium.components.autofill
   enum class Source {
     // Not synced at all or synced through the `AutofillProfileSyncBridge`. This
     // corresponds to profiles that local to Autofill only.
@@ -59,9 +66,13 @@ class AutofillProfile : public AutofillDataModel {
   static constexpr int kInitialCreatorOrModifierChrome = 70073;
 
   AutofillProfile();
-  explicit AutofillProfile(const std::string& guid,
-                           Source source = Source::kLocalOrSyncable);
-  explicit AutofillProfile(Source source);
+  explicit AutofillProfile(
+      const std::string& guid,
+      Source source = Source::kLocalOrSyncable,
+      AddressCountryCode country_code = AddressCountryCode(""));
+  explicit AutofillProfile(
+      Source source,
+      AddressCountryCode country_code = AddressCountryCode(""));
 
   // Server profile constructor. The type must be SERVER_PROFILE (this serves
   // to differentiate this constructor). |server_id| can be empty. If empty,
@@ -72,6 +83,29 @@ class AutofillProfile : public AutofillDataModel {
   ~AutofillProfile() override;
 
   AutofillProfile& operator=(const AutofillProfile& profile);
+
+  std::string guid() const { return guid_; }
+  void set_guid(std::string_view guid) { guid_ = guid; }
+
+  // Android/Java API.
+#if BUILDFLAG(IS_ANDROID)
+  // Create a new Java AutofillProfile instance.
+  base::android::ScopedJavaLocalRef<jobject> CreateJavaObject(
+      const std::string& app_locale) const;
+
+  // Given a Java AutofillProfile object, create an equivalent C++ instance.
+  // Java profile can represent either a new or an existing address profile
+  // depending on whether `existing_profile` is set or not. If this is a new
+  // address profile, Java fields are set to the newly created AutofillProfile.
+  // Otherwise, `existing_profile` is copied and Java fields are set to it.
+  // Setting fields to `existing_profile` is done to avoid loosing address
+  // substructure by creating AutofillProfile from scratch based only on the
+  // available Java fields.
+  static AutofillProfile CreateFromJavaObject(
+      const base::android::JavaParamRef<jobject>& jprofile,
+      const AutofillProfile* existing_profile,
+      const std::string& app_locale);
+#endif  // BUILDFLAG(IS_ANDROID)
 
   // AutofillDataModel:
   AutofillMetadata GetMetadata() const override;
@@ -192,7 +226,7 @@ class AutofillProfile : public AutofillDataModel {
   // least |minimal_fields_shown| fields, if possible.
   static void CreateInferredLabels(
       const std::vector<AutofillProfile*>& profiles,
-      const std::vector<ServerFieldType>* suggested_fields,
+      const absl::optional<ServerFieldTypeSet>& suggested_fields,
       ServerFieldType excluded_field,
       size_t minimal_fields_shown,
       const std::string& app_locale,
@@ -220,19 +254,14 @@ class AutofillProfile : public AutofillDataModel {
   // creates its own. The ID is a hash of the data contained in the profile.
   void GenerateServerProfileIdentifier();
 
-  // Logs the number of days since the profile was last used, records its
-  // use and updates |previous_use_date_| to the last value of |use_date_|.
+  // Logs the number of days since the profile was last used and records its
+  // use.
   // Also initiates the logging of the structured token verification statuses.
   void RecordAndLogUse();
 
   // Logs the verification status of non-empty structured name and address
   // tokens. Should be called when a profile is used to fill a form.
   void LogVerificationStatuses();
-
-  const base::Time& previous_use_date() const { return previous_use_date_; }
-  void set_previous_use_date(const base::Time& time) {
-    previous_use_date_ = time;
-  }
 
   // Valid only when |record_type()| == |SERVER_PROFILE|.
   bool has_converted() const { return has_converted_; }
@@ -256,6 +285,9 @@ class AutofillProfile : public AutofillDataModel {
 
   // Returns a constant reference to the |address_| field.
   const Address& GetAddress() const { return address_; }
+
+  // Returns the profile country code.
+  AddressCountryCode GetAddressCountryCode() const;
 
   // Returns the label of the profile.
   const std::string& profile_label() const { return profile_label_; }
@@ -289,6 +321,9 @@ class AutofillProfile : public AutofillDataModel {
 
   // Clears all specified |fields| from the profile.
   void ClearFields(const ServerFieldTypeSet& fields);
+
+  const ProfileTokenQuality& token_quality() const { return token_quality_; }
+  ProfileTokenQuality& token_quality() { return token_quality_; }
 
  private:
   // FormGroup:
@@ -329,6 +364,26 @@ class AutofillProfile : public AutofillDataModel {
   // Same as operator==, but ignores differences in GUID.
   bool EqualsSansGuid(const AutofillProfile& profile) const;
 
+  // Merging two AutofillProfiles is done by merging their `FormGroups()`. While
+  // doing so, the `token_quality_` needs to be merged too. This function is
+  // responsible for carring over or resetting the token quality of all
+  // supported types of the `merged_group`.
+  // `merged_group` represents the merged form group of `*this` with the same
+  // form group of `other_profile`.
+  // By calling this function, `token_quality_` is updated to match the
+  // information represented by the `merged_group`.
+  void MergeFormGroupTokenQuality(const FormGroup& merged_group,
+                                  const AutofillProfile& other_profile);
+
+  // A globally unique ID for this object. It identifies the profile across
+  // browser restarts and is used as the primary key in the database.
+  // The `guid_` is unique across profile sources.
+  // TODO(crbug.com/1177366): SERVER_PROFILEs still exist in the data model.
+  // This is a deprecated and essentially unused type of profile, which is
+  // identified by `server_id_` instead of `guid_`. For all practical purposes,
+  // this can be ignored and all relevant profiles are identified by `guid_`.
+  std::string guid_;
+
   // Personal information for this profile.
   NameInfo name_;
   EmailInfo email_;
@@ -348,10 +403,8 @@ class AutofillProfile : public AutofillDataModel {
 
   // ID used for identifying this profile. Only set for SERVER_PROFILEs. This is
   // a hash of the contents.
+  // TODO(crbug.com/1457187): Remove.
   std::string server_id_;
-
-  // Penultimate time model was used, not persisted to database.
-  base::Time previous_use_date_;
 
   RecordType record_type_;
 
@@ -371,6 +424,11 @@ class AutofillProfile : public AutofillDataModel {
   // represented by the value `kInitialCreatorOrModifierChrome`.
   int initial_creator_id_ = 0;
   int last_modifier_id_ = 0;
+
+  // Stores information about the quality of this profile's stored types.
+  // Only used when `kAutofillTrackProfileTokenQuality` is enabled.
+  // TODO(crbug.com/1453650): Clean-up comment.
+  ProfileTokenQuality token_quality_;
 };
 
 // So we can compare AutofillProfiles with EXPECT_EQ().

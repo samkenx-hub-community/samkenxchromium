@@ -18,6 +18,10 @@ BASE_FEATURE(kEnableCrdAdminRemoteAccessV2,
 
 BASE_FEATURE(kEnableCrdFileTransferForKiosk,
              "EnableCrdFileTransferForKiosk",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
+BASE_FEATURE(kForceEnableEnterpriseCrdFileTransfer,
+             "ForceEnableEnterpriseCrdFileTransfer",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 }  // namespace remoting::features

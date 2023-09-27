@@ -80,11 +80,11 @@ bool IsFormInteresting(const FormData& form, bool has_autofillable_form_field) {
                               &FormFieldData::autocomplete_attribute);
 }
 
-void ClearSelectOrSelectMenuElement(
+void ClearSelectOrSelectListElement(
     WebFormControlElement& element,
     const std::map<FieldRendererId, std::u16string>& initial_values) {
-  auto initial_value_iter = initial_values.find(
-      FieldRendererId(element.UniqueRendererFormControlId()));
+  auto initial_value_iter =
+      initial_values.find(form_util::GetFieldRendererId(element));
   if (initial_value_iter != initial_values.end() &&
       element.Value().Utf16() != initial_value_iter->second) {
     element.SetAutofillValue(
@@ -112,7 +112,7 @@ FormCache::UpdateFormCacheResult FormCache::UpdateFormCache(
     const FieldDataManager* field_data_manager) {
   initial_checked_state_.clear();
   initial_select_values_.clear();
-  initial_selectmenu_values_.clear();
+  initial_selectlist_values_.clear();
 
   std::set<FieldRendererId> observed_unique_renderer_ids;
 
@@ -233,8 +233,9 @@ void FormCache::ClearElement(WebFormControlElement& control_element,
     return;
 
   if (!form_util::IsAutofillableElement(control_element)) {
-    // TODO(crbug.com/1336051): Handle selectmenu case and make this NOTREACHED.
-    CHECK(form_util::IsSelectMenuElement(control_element));
+    // TODO(crbug.com/1427153): Make NOTREACHED() once AutofillEnableSelectList
+    // feature flag is removed.
+    CHECK(form_util::IsSelectListElement(control_element));
     return;
   }
 
@@ -255,13 +256,13 @@ void FormCache::ClearElement(WebFormControlElement& control_element,
     control_element.SetAutofillValue(blink::WebString(),
                                      WebAutofillState::kNotFilled);
   } else if (form_util::IsSelectElement(control_element)) {
-    ClearSelectOrSelectMenuElement(control_element, initial_select_values_);
-  } else if (form_util::IsSelectMenuElement(control_element)) {
-    ClearSelectOrSelectMenuElement(control_element, initial_selectmenu_values_);
+    ClearSelectOrSelectListElement(control_element, initial_select_values_);
+  } else if (form_util::IsSelectListElement(control_element)) {
+    ClearSelectOrSelectListElement(control_element, initial_selectlist_values_);
   } else if (form_util::IsCheckableElement(web_input_element)) {
     WebInputElement input_element = control_element.To<WebInputElement>();
     auto checkable_element_it = initial_checked_state_.find(
-        FieldRendererId(input_element.UniqueRendererFormControlId()));
+        form_util::GetFieldRendererId(input_element));
     if (checkable_element_it != initial_checked_state_.end() &&
         input_element.IsChecked() != checkable_element_it->second) {
       input_element.SetChecked(checkable_element_it->second, true,
@@ -333,8 +334,8 @@ bool FormCache::ShowPredictions(const FormDataPredictions& form,
         form_util::GetUnownedAutofillableFormFieldElements(document);
   } else {
     for (const WebFormElement& form_element : frame_->GetDocument().Forms()) {
-      FormRendererId form_id(form_element.UniqueRendererFormId());
-      if (form_id == form.data.unique_renderer_id) {
+      if (form_util::GetFormRendererId(form_element) ==
+          form.data.unique_renderer_id) {
         control_elements =
             form_util::ExtractAutofillableElementsInForm(form_element);
         break;
@@ -353,9 +354,10 @@ bool FormCache::ShowPredictions(const FormDataPredictions& form,
     WebFormControlElement& element = control_elements[i];
 
     const FormFieldData& field_data = form.data.fields[i];
-    FieldRendererId field_id(element.UniqueRendererFormControlId());
-    if (field_id != field_data.unique_renderer_id)
+    if (form_util::GetFieldRendererId(element) !=
+        field_data.unique_renderer_id) {
       continue;
+    }
     const FormFieldDataPredictions& field = form.fields[i];
 
     element.SetFormElementPiiType(
@@ -397,6 +399,9 @@ bool FormCache::ShowPredictions(const FormDataPredictions& form,
           form.signature,
           "\nform signature in host form: ",
           field.host_form_signature,
+          "\nalternative form signature: ",
+          base::NumberToString(
+              CalculateAlternativeFormSignature(form.data).value()),
           "\nfield frame token: ",
           frame_token.ToString(),
           "\nform renderer id: ",
@@ -423,14 +428,21 @@ bool FormCache::ShowPredictions(const FormDataPredictions& form,
                  element.GetAttribute(kAutocomplete).Utf8().substr(0, 100);
       }
 
-      // Set this debug string to the title so that a developer can easily debug
-      // by hovering the mouse over the input field.
-      element.SetAttribute("title", WebString::FromUTF8(title));
-
       // Set the same debug string to an attribute that does not get mangled if
       // Google Translate is triggered for the site. This is useful for
       // automated processing of the data.
       element.SetAttribute("autofill-information", WebString::FromUTF8(title));
+
+      //  If the field has password manager's annotation, add it as well.
+      if (element.HasAttribute("pm_parser_annotation")) {
+        title =
+            base::StrCat({title, "\npm_parser_annotation: ",
+                          element.GetAttribute("pm_parser_annotation").Utf8()});
+      }
+
+      // Set this debug string to the title so that a developer can easily debug
+      // by hovering the mouse over the input field.
+      element.SetAttribute("title", WebString::FromUTF8(title));
 
       element.SetAttribute("autofill-prediction",
                            WebString::FromUTF8(field.overall_type));
@@ -462,16 +474,14 @@ void FormCache::SaveInitialValues(
   for (const WebFormControlElement& element : control_elements) {
     if (form_util::IsSelectElement(element)) {
       initial_select_values_.insert(
-          {FieldRendererId(element.UniqueRendererFormControlId()),
-           element.Value().Utf16()});
-    } else if (form_util::IsSelectMenuElement(element)) {
-      initial_selectmenu_values_.insert(
-          {FieldRendererId(element.UniqueRendererFormControlId()),
-           element.Value().Utf16()});
+          {form_util::GetFieldRendererId(element), element.Value().Utf16()});
+    } else if (form_util::IsSelectListElement(element)) {
+      initial_selectlist_values_.insert(
+          {form_util::GetFieldRendererId(element), element.Value().Utf16()});
     } else if (form_util::IsCheckableElement(element)) {
       const WebInputElement input_element = element.To<WebInputElement>();
       initial_checked_state_.insert(
-          {FieldRendererId(input_element.UniqueRendererFormControlId()),
+          {form_util::GetFieldRendererId(input_element),
            input_element.IsChecked()});
     }
   }
@@ -483,7 +493,7 @@ void FormCache::PruneInitialValueCaches(
     return !base::Contains(ids_to_retain, p.first);
   };
   base::EraseIf(initial_select_values_, should_not_retain);
-  base::EraseIf(initial_selectmenu_values_, should_not_retain);
+  base::EraseIf(initial_selectlist_values_, should_not_retain);
   base::EraseIf(initial_checked_state_, should_not_retain);
 }
 

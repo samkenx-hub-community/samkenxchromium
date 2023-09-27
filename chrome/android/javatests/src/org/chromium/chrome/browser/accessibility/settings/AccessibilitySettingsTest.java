@@ -30,10 +30,10 @@ import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.base.task.PostTask;
 import org.chromium.base.task.TaskTraits;
 import org.chromium.base.test.util.CriteriaHelper;
+import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.Feature;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.settings.SettingsActivityTestRule;
-import org.chromium.chrome.browser.util.ChromeAccessibilityUtil;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.util.browser.Features.DisableFeatures;
@@ -44,6 +44,7 @@ import org.chromium.components.browser_ui.settings.ChromeSwitchPreference;
 import org.chromium.content_public.browser.ContentFeatureList;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
 import org.chromium.content_public.browser.test.util.UiUtils;
+import org.chromium.ui.accessibility.AccessibilityState;
 
 import java.text.NumberFormat;
 
@@ -63,10 +64,8 @@ public class AccessibilitySettingsTest {
 
     @After
     public void tearDown() {
-        TestThreadUtils.runOnUiThreadBlocking(() -> {
-            ChromeAccessibilityUtil.get().setAccessibilityEnabledForTesting(false);
-            ChromeAccessibilityUtil.get().setTouchExplorationEnabledForTesting(false);
-        });
+        TestThreadUtils.runOnUiThreadBlocking(
+                () -> { AccessibilityState.setIsScreenReaderEnabledForTesting(false); });
     }
 
     /**
@@ -76,7 +75,7 @@ public class AccessibilitySettingsTest {
     @Test
     @SmallTest
     @Feature({"Accessibility"})
-    @DisableFeatures({ContentFeatureList.ACCESSIBILITY_PAGE_ZOOM})
+    @DisableFeatures(ContentFeatureList.ACCESSIBILITY_PAGE_ZOOM)
     public void testAccessibilitySettings() throws Exception {
         mSettingsActivityTestRule.startSettingsActivity();
         AccessibilitySettings accessibilitySettings = mSettingsActivityTestRule.getFragment();
@@ -126,7 +125,7 @@ public class AccessibilitySettingsTest {
     @Test
     @SmallTest
     @Feature({"Accessibility"})
-    @DisableFeatures({ContentFeatureList.ACCESSIBILITY_PAGE_ZOOM})
+    @DisableFeatures(ContentFeatureList.ACCESSIBILITY_PAGE_ZOOM)
     public void testChangedFontPrefSavedOnStop() {
         mSettingsActivityTestRule.startSettingsActivity();
         AccessibilitySettings accessibilitySettings = mSettingsActivityTestRule.getFragment();
@@ -156,7 +155,7 @@ public class AccessibilitySettingsTest {
     @Test
     @SmallTest
     @Feature({"Accessibility"})
-    @DisableFeatures({ContentFeatureList.ACCESSIBILITY_PAGE_ZOOM})
+    @DisableFeatures(ContentFeatureList.ACCESSIBILITY_PAGE_ZOOM)
     public void testUnchangedFontPrefNotSavedOnStop() {
         mSettingsActivityTestRule.startSettingsActivity();
         AccessibilitySettings accessibilitySettings = mSettingsActivityTestRule.getFragment();
@@ -197,14 +196,40 @@ public class AccessibilitySettingsTest {
     @Test
     @SmallTest
     @Feature({"Accessibility"})
+    @DisabledTest(message = "https://crbug.com/1480116")
+    public void testZoomInfoPreference() {
+        mSettingsActivityTestRule.startSettingsActivity();
+        AccessibilitySettings accessibilitySettings = mSettingsActivityTestRule.getFragment();
+
+        Preference zoomInfoPref =
+                accessibilitySettings.findPreference(AccessibilitySettings.PREF_ZOOM_INFO);
+        Assert.assertNotNull(zoomInfoPref);
+        Assert.assertNotNull(zoomInfoPref.getOnPreferenceClickListener());
+
+        Instrumentation.ActivityMonitor monitor =
+                InstrumentationRegistry.getInstrumentation().addMonitor(
+                        new IntentFilter(), null, false);
+
+        // First scroll to the Zoom preference, then click.
+        onView(withId(R.id.recycler_view))
+                .perform(RecyclerViewActions.scrollTo(
+                        hasDescendant(withText(R.string.zoom_info_preference_title))));
+        onView(withText(R.string.zoom_info_preference_title)).perform(click());
+        monitor.waitForActivityWithTimeout(CriteriaHelper.DEFAULT_MAX_TIME_TO_POLL);
+        Assert.assertEquals("Monitor for has not been called", 1, monitor.getHits());
+        InstrumentationRegistry.getInstrumentation().removeMonitor(monitor);
+    }
+
+    @Test
+    @SmallTest
+    @Feature({"Accessibility"})
     public void testImageDescriptionsPreferences_Enabled() {
-        // Enable touch exploration to display settings option.
-        TestThreadUtils.runOnUiThreadBlocking(() -> {
-            ChromeAccessibilityUtil.get().setAccessibilityEnabledForTesting(true);
-            ChromeAccessibilityUtil.get().setTouchExplorationEnabledForTesting(true);
-        });
+        // Enable screen reader to display settings option.
+        TestThreadUtils.runOnUiThreadBlocking(
+                () -> { AccessibilityState.setIsScreenReaderEnabledForTesting(true); });
 
         mSettingsActivityTestRule.startSettingsActivity();
+
         AccessibilitySettings accessibilitySettings = mSettingsActivityTestRule.getFragment();
 
         Preference imageDescriptionsPref =

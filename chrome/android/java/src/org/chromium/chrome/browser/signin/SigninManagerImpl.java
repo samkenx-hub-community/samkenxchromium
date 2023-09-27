@@ -33,7 +33,6 @@ import org.chromium.chrome.browser.preferences.SharedPreferencesManager;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.signin.services.SigninManager;
 import org.chromium.chrome.browser.signin.services.SigninPreferencesManager;
-import org.chromium.chrome.browser.sync.SyncService;
 import org.chromium.components.externalauth.ExternalAuthUtils;
 import org.chromium.components.signin.base.CoreAccountId;
 import org.chromium.components.signin.base.CoreAccountInfo;
@@ -47,6 +46,7 @@ import org.chromium.components.signin.metrics.SigninAccessPoint;
 import org.chromium.components.signin.metrics.SigninReason;
 import org.chromium.components.signin.metrics.SignoutDelete;
 import org.chromium.components.signin.metrics.SignoutReason;
+import org.chromium.components.sync.SyncService;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -76,6 +76,7 @@ class SigninManagerImpl implements IdentityManager.Observer, SigninManager {
     private final AccountTrackerService mAccountTrackerService;
     private final IdentityManager mIdentityManager;
     private final IdentityMutator mIdentityMutator;
+    private final SyncService mSyncService;
     private final ObserverList<SignInStateObserver> mSignInStateObservers = new ObserverList<>();
     private final List<Runnable> mCallbacksWaitingForPendingOperation = new ArrayList<>();
     private boolean mSigninAllowedByPolicy;
@@ -104,13 +105,13 @@ class SigninManagerImpl implements IdentityManager.Observer, SigninManager {
     @VisibleForTesting
     static SigninManager create(long nativeSigninManagerAndroid,
             AccountTrackerService accountTrackerService, IdentityManager identityManager,
-            IdentityMutator identityMutator) {
+            IdentityMutator identityMutator, SyncService syncService) {
         assert nativeSigninManagerAndroid != 0;
         assert accountTrackerService != null;
         assert identityManager != null;
         assert identityMutator != null;
         final SigninManagerImpl signinManager = new SigninManagerImpl(nativeSigninManagerAndroid,
-                accountTrackerService, identityManager, identityMutator);
+                accountTrackerService, identityManager, identityMutator, syncService);
 
         identityManager.addObserver(signinManager);
         AccountInfoServiceProvider.init(identityManager, accountTrackerService);
@@ -122,12 +123,13 @@ class SigninManagerImpl implements IdentityManager.Observer, SigninManager {
 
     private SigninManagerImpl(long nativeSigninManagerAndroid,
             AccountTrackerService accountTrackerService, IdentityManager identityManager,
-            IdentityMutator identityMutator) {
+            IdentityMutator identityMutator, SyncService syncService) {
         ThreadUtils.assertOnUiThread();
         mNativeSigninManagerAndroid = nativeSigninManagerAndroid;
         mAccountTrackerService = accountTrackerService;
         mIdentityManager = identityManager;
         mIdentityMutator = identityMutator;
+        mSyncService = syncService;
 
         mSigninAllowedByPolicy =
                 SigninManagerImplJni.get().isSigninAllowedByPolicy(mNativeSigninManagerAndroid);
@@ -335,7 +337,7 @@ class SigninManagerImpl implements IdentityManager.Observer, SigninManager {
             SigninPreferencesManager.getInstance().setLegacySyncAccountEmail(
                     mSignInState.mCoreAccountInfo.getEmail());
 
-            SyncService.get().setSyncRequested();
+            mSyncService.setSyncRequested();
 
             RecordUserAction.record("Signin_Signin_Succeed");
             RecordHistogram.recordEnumeratedHistogram("Signin.SigninCompletedAccessPoint",
@@ -443,8 +445,6 @@ class SigninManagerImpl implements IdentityManager.Observer, SigninManager {
             boolean forceWipeUserData) {
         // Only one signOut at a time!
         assert mSignOutState == null;
-        // User data should not be wiped if the user is not syncing.
-        assert mIdentityManager.hasPrimaryAccount(ConsentLevel.SYNC) || !forceWipeUserData;
 
         // Grab the management domain before nativeSignOut() potentially clears it.
         String managementDomain = getManagementDomain();
@@ -557,18 +557,32 @@ class SigninManagerImpl implements IdentityManager.Observer, SigninManager {
      * Wipes the user's bookmarks and sync data.
      *
      * @param wipeDataCallback A callback which will be called once the data is wiped.
-     *
-     * TODO(crbug.com/1272911): this function and disableSyncAndWipeData() have very similar
-     * functionality, but with different implementations.  Consider merging them.
-     *
-     * TODO(crbug.com/1272911): add test coverage for this function (including its effect on
-     * notifyCallbacksWaitingForOperation()), after resolving the TODO above.
+     * @param dataWipeOption What kind of data to delete.
      */
     @Override
-    public void wipeSyncUserData(Runnable wipeDataCallback) {
+    public void wipeSyncUserData(Runnable wipeDataCallback, @DataWipeOption int dataWipeOption) {
         assert !mWipeUserDataInProgress;
         mWipeUserDataInProgress = true;
 
+        switch (dataWipeOption) {
+            case DataWipeOption.WIPE_SYNC_DATA:
+                wipeSyncUserDataOnly(wipeDataCallback);
+                break;
+            case DataWipeOption.WIPE_ALL_PROFILE_DATA:
+                SigninManagerImplJni.get().wipeProfileData(mNativeSigninManagerAndroid, () -> {
+                    mWipeUserDataInProgress = false;
+                    wipeDataCallback.run();
+                    notifyCallbacksWaitingForOperation();
+                });
+                break;
+        }
+    }
+
+    // TODO(crbug.com/1272911): this function and disableSyncAndWipeData() have very similar
+    // functionality, but with different implementations.  Consider merging them.
+    // TODO(crbug.com/1272911): add test coverage for this function (including its effect on
+    // notifyCallbacksWaitingForOperation()), after resolving the TODO above.
+    private void wipeSyncUserDataOnly(Runnable wipeDataCallback) {
         final BookmarkModel model =
                 BookmarkModel.getForProfile(Profile.getLastUsedRegularProfile());
         model.finishLoadingBookmarkModel(new Runnable() {
@@ -622,14 +636,12 @@ class SigninManagerImpl implements IdentityManager.Observer, SigninManager {
                         mNativeSigninManagerAndroid, wipeDataCallback);
                 break;
             case SignOutState.DataWipeAction.WIPE_SYNC_DATA_ONLY:
-                wipeSyncUserData(wipeDataCallback);
+                wipeSyncUserData(wipeDataCallback, DataWipeOption.WIPE_SYNC_DATA);
                 break;
             case SignOutState.DataWipeAction.WIPE_ALL_PROFILE_DATA:
-                SigninManagerImplJni.get().wipeProfileData(
-                        mNativeSigninManagerAndroid, wipeDataCallback);
+                wipeSyncUserData(wipeDataCallback, DataWipeOption.WIPE_ALL_PROFILE_DATA);
                 break;
         }
-        ThreadUtils.postOnUiThread(mAccountTrackerService::onAccountsChanged);
     }
 
     /**

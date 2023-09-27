@@ -6,6 +6,7 @@
 
 #include "base/functional/callback.h"
 #include "base/metrics/histogram_functions.h"
+#include "base/notreached.h"
 #include "base/ranges/algorithm.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/time/time.h"
@@ -449,6 +450,10 @@ class WebBundleURLLoaderFactory::BundleDataSource
     std::move(callback).Run(false);
   }
 
+  void Close(CloseCallback callback) override {
+    NOTIMPLEMENTED() << "Close() is not implemented";
+  }
+
   // Implements mojo::DataPipeDrainer::Client.
   void OnDataAvailable(const void* data, size_t num_bytes) override {
     DCHECK(!finished_loading_);
@@ -593,9 +598,10 @@ void WebBundleURLLoaderFactory::SetBundleStream(
                      weak_ptr_factory_.GetWeakPtr()),
       base::BindOnce(&WebBundleURLLoaderFactory::OnDataCompleted,
                      weak_ptr_factory_.GetWeakPtr()));
-  // WebBundleParser will self-destruct on remote mojo ends' disconnection.
-  new web_package::WebBundleParser(parser_.BindNewPipeAndPassReceiver(),
-                                   std::move(data_source), bundle_url_);
+
+  mojo::MakeSelfOwnedReceiver(std::make_unique<web_package::WebBundleParser>(
+                                  std::move(data_source), bundle_url_),
+                              parser_.BindNewPipeAndPassReceiver());
 
   parser_->ParseMetadata(
       /*offset=*/absl::nullopt,
@@ -908,9 +914,9 @@ void WebBundleURLLoaderFactory::SendResponseToLoader(
   }
 
   auto corb_analyzer = corb::ResponseAnalyzer::Create(corb_state_);
-  auto decision =
-      corb_analyzer->Init(loader->url(), loader->request_initiator(),
-                          loader->request_mode(), *response_head);
+  auto decision = corb_analyzer->Init(
+      loader->url(), loader->request_initiator(), loader->request_mode(),
+      loader->request_destination(), *response_head);
   switch (decision) {
     case network::corb::ResponseAnalyzer::Decision::kBlock:
       loader->BlockResponseForCorb(std::move(response_head));

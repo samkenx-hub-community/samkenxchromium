@@ -1,4 +1,4 @@
-// Copyright 2019 The Chromium Authors. All rights reserved.
+// Copyright 2019 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -30,7 +30,7 @@ import {AxeCoreTestRunner} from 'axe_core_test_runner';
     let errorMessage;
 
     TestRunner.addResult(`Invalidating the ${nameInput.getAttribute('aria-label')} input`);
-    nameInput.blur();
+    nameInput.dispatchEvent(new Event('input'));
     errorMessage = locationsEditor.errorMessageContainer.textContent;
     TestRunner.addResult(`Error message: ${errorMessage}`);
 

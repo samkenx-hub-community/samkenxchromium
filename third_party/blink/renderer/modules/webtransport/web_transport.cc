@@ -294,7 +294,7 @@ class WebTransport::DatagramUnderlyingSource final
   }
 
   ScriptPromise Cancel(v8::Local<v8::Value> reason, ExceptionState&) override {
-    uint8_t code = 0;
+    uint32_t code = 0;
     WebTransportError* exception =
         V8WebTransportError::ToWrappable(script_state_->GetIsolate(), reason);
     if (exception) {
@@ -639,7 +639,8 @@ class WebTransport::ReceiveStreamVendor final
         script_state_, web_transport_, stream_id, std::move(readable));
     auto* isolate = script_state_->GetIsolate();
     ExceptionState exception_state(
-        isolate, ExceptionState::kConstructionContext, "ReceiveStream");
+        isolate, ExceptionContextType::kConstructorOperationInvoke,
+        "ReceiveStream");
     v8::MicrotasksScope microtasks_scope(
         isolate, ToMicrotaskQueue(script_state_),
         v8::MicrotasksScope::kDoNotRunMicrotasks);
@@ -707,7 +708,8 @@ class WebTransport::BidirectionalStreamVendor final
 
     auto* isolate = script_state_->GetIsolate();
     ExceptionState exception_state(
-        isolate, ExceptionState::kConstructionContext, "BidirectionalStream");
+        isolate, ExceptionContextType::kConstructorOperationInvoke,
+        "BidirectionalStream");
     v8::MicrotasksScope microtasks_scope(
         isolate, ToMicrotaskQueue(script_state_),
         v8::MicrotasksScope::kDoNotRunMicrotasks);
@@ -997,9 +999,10 @@ void WebTransport::OnIncomingStreamClosed(uint32_t stream_id,
   stream->OnIncomingStreamClosed(fin_received);
 }
 
-void WebTransport::OnReceivedResetStream(uint32_t stream_id, uint8_t code) {
+void WebTransport::OnReceivedResetStream(uint32_t stream_id,
+                                         uint32_t stream_error_code) {
   DVLOG(1) << "WebTransport::OnReceivedResetStream(" << stream_id << ", "
-           << static_cast<uint32_t>(code) << ") this=" << this;
+           << stream_error_code << ") this=" << this;
   auto it = incoming_stream_map_.find(stream_id);
   if (it == incoming_stream_map_.end()) {
     return;
@@ -1008,15 +1011,15 @@ void WebTransport::OnReceivedResetStream(uint32_t stream_id, uint8_t code) {
 
   ScriptState::Scope scope(script_state_);
   v8::Local<v8::Value> error = WebTransportError::Create(
-      script_state_->GetIsolate(),
-      /*stream_error_code=*/code, "Received RESET_STREAM.",
+      script_state_->GetIsolate(), stream_error_code, "Received RESET_STREAM.",
       WebTransportError::Source::kStream);
   stream->Error(ScriptValue(script_state_->GetIsolate(), error));
 }
 
-void WebTransport::OnReceivedStopSending(uint32_t stream_id, uint8_t code) {
-  DVLOG(1) << "WebTransport::OnReceivedResetStream(" << stream_id << ", "
-           << static_cast<uint32_t>(code) << ") this=" << this;
+void WebTransport::OnReceivedStopSending(uint32_t stream_id,
+                                         uint32_t stream_error_code) {
+  DVLOG(1) << "WebTransport::OnReceivedStopSending(" << stream_id << ", "
+           << stream_error_code << ") this=" << this;
 
   auto it = outgoing_stream_map_.find(stream_id);
   if (it == outgoing_stream_map_.end()) {
@@ -1026,8 +1029,7 @@ void WebTransport::OnReceivedStopSending(uint32_t stream_id, uint8_t code) {
 
   ScriptState::Scope scope(script_state_);
   v8::Local<v8::Value> error = WebTransportError::Create(
-      script_state_->GetIsolate(),
-      /*stream_error_code=*/code, "Received STOP_SENDING.",
+      script_state_->GetIsolate(), stream_error_code, "Received STOP_SENDING.",
       WebTransportError::Source::kStream);
   stream->Error(ScriptValue(script_state_->GetIsolate(), error));
 }
@@ -1098,15 +1100,15 @@ void WebTransport::SendFin(uint32_t stream_id) {
   transport_remote_->SendFin(stream_id);
 }
 
-void WebTransport::ResetStream(uint32_t stream_id, uint8_t code) {
+void WebTransport::ResetStream(uint32_t stream_id, uint32_t code) {
   VLOG(0) << "WebTransport::ResetStream(" << stream_id << ", "
           << static_cast<uint32_t>(code) << ") this = " << this;
   transport_remote_->AbortStream(stream_id, code);
 }
 
-void WebTransport::StopSending(uint32_t stream_id, uint8_t code) {
-  DVLOG(1) << "WebTransport::StopSending(" << stream_id << ", "
-           << static_cast<uint32_t>(code) << ") this = " << this;
+void WebTransport::StopSending(uint32_t stream_id, uint32_t code) {
+  DVLOG(1) << "WebTransport::StopSending(" << stream_id << ", " << code
+           << ") this = " << this;
   transport_remote_->StopSending(stream_id, code);
 }
 
@@ -1249,10 +1251,19 @@ void WebTransport::Init(const String& url_for_diagnostics,
   }
 
   if (auto* scheduler = execution_context->GetScheduler()) {
+    // Two features are registered with `DisableBackForwardCache` policy here:
+    // - `kWebTransport`: a non-sticky feature that will disable BFCache for any
+    // page. It will be reset after the `WebTransport` is disposed.
+    // - `kWebTransportSticky`: a sticky feature that will only disable BFCache
+    // for the page containing "Cache-Control: no-store" header. It won't be
+    // reset even if the `WebTransport` is disposed.
     feature_handle_for_scheduler_ = scheduler->RegisterFeature(
         SchedulingPolicy::Feature::kWebTransport,
         SchedulingPolicy{SchedulingPolicy::DisableAggressiveThrottling(),
                          SchedulingPolicy::DisableBackForwardCache()});
+    scheduler->RegisterStickyFeature(
+        SchedulingPolicy::Feature::kWebTransportSticky,
+        SchedulingPolicy{SchedulingPolicy::DisableBackForwardCache()});
   }
 
   if (DoesSubresourceFilterBlockConnection(url_)) {
@@ -1435,8 +1446,8 @@ void WebTransport::OnCreateSendStreamResponse(
       script_state_, this, stream_id, std::move(producer));
 
   auto* isolate = script_state_->GetIsolate();
-  ExceptionState exception_state(isolate, ExceptionState::kConstructionContext,
-                                 "SendStream");
+  ExceptionState exception_state(
+      isolate, ExceptionContextType::kConstructorOperationInvoke, "SendStream");
   v8::MicrotasksScope microtasks_scope(
       isolate, ToMicrotaskQueue(script_state_),
       v8::MicrotasksScope::kDoNotRunMicrotasks);
@@ -1484,8 +1495,9 @@ void WebTransport::OnCreateBidirectionalStreamResponse(
       script_state_, this, stream_id, std::move(outgoing_producer),
       std::move(incoming_consumer));
 
-  ExceptionState exception_state(isolate, ExceptionState::kConstructionContext,
-                                 "BidirectionalStream");
+  ExceptionState exception_state(
+      isolate, ExceptionContextType::kConstructorOperationInvoke,
+      "BidirectionalStream");
   v8::MicrotasksScope microtasks_scope(
       isolate, ToMicrotaskQueue(script_state_),
       v8::MicrotasksScope::kDoNotRunMicrotasks);

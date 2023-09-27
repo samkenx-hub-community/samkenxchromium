@@ -25,10 +25,10 @@
 #include "components/feed/core/v2/feed_network.h"
 #include "components/feed/core/v2/feed_store.h"
 #include "components/feed/core/v2/feed_stream.h"
+#include "components/feed/core/v2/feed_stream_surface.h"
 #include "components/feed/core/v2/image_fetcher.h"
 #include "components/feed/core/v2/metrics_reporter.h"
 #include "components/feed/core/v2/prefs.h"
-#include "components/feed/core/v2/public/feed_stream_surface.h"
 #include "components/feed/core/v2/public/reliability_logging_bridge.h"
 #include "components/feed/core/v2/public/types.h"
 #include "components/feed/core/v2/stream_model.h"
@@ -39,7 +39,9 @@
 #include "components/feed/core/v2/wire_response_translator.h"
 #include "components/prefs/pref_registry_simple.h"
 #include "components/prefs/testing_pref_service.h"
+#include "components/search_engines/template_url_service.h"
 #include "components/signin/public/base/signin_pref_names.h"
+#include "components/sync_preferences/testing_pref_service_syncable.h"
 #include "net/http/http_status_code.h"
 #include "services/network/test/test_url_loader_factory.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -125,7 +127,7 @@ class TestReliabilityLoggingBridge : public ReliabilityLoggingBridge {
   std::vector<std::string> events_;
 };
 
-class TestSurfaceBase : public FeedStreamSurface {
+class TestSurfaceBase : public feed::SurfaceRenderer {
  public:
   // Provide some helper functionality to attach/detach the surface.
   // This way we can auto-detach in the destructor.
@@ -133,9 +135,19 @@ class TestSurfaceBase : public FeedStreamSurface {
       const StreamType& stream_type,
       FeedStream* stream = nullptr,
       SingleWebFeedEntryPoint entry_point = SingleWebFeedEntryPoint::kOther);
-
   ~TestSurfaceBase() override;
 
+  SurfaceId GetSurfaceId() const;
+  const StreamType GetStreamType() const { return stream_type_; }
+  SingleWebFeedEntryPoint GetSingleWebFeedEntryPoint() const {
+    return entry_point_;
+  }
+
+  // Create the surface with FeedApi::CreateSurface, but don't attach it.
+  void CreateWithoutAttach(FeedStream* stream);
+
+  // Calls FeedApi::CreateSurface if it hasn't been created yet, and attaches
+  // the surface for rendering.
   void Attach(FeedStream* stream);
 
   void Detach();
@@ -148,7 +160,6 @@ class TestSurfaceBase : public FeedStreamSurface {
   ReliabilityLoggingBridge& GetReliabilityLoggingBridge() override;
 
   // Test functions.
-
   void Clear();
 
   // Returns a description of the updates this surface received. Each update
@@ -179,8 +190,14 @@ class TestSurfaceBase : public FeedStreamSurface {
 
   bool IsInitialLoadSpinnerUpdate(const feedui::StreamUpdate& stream_update);
 
-  // The stream if it was attached using the constructor.
+  const StreamType stream_type_;
+  SingleWebFeedEntryPoint entry_point_;
+  SurfaceId surface_id_ = {};
+
+  // The stream if this surface was attached at least once.
   base::WeakPtr<FeedStream> stream_;
+  // The stream if this surface is attached.
+  base::WeakPtr<FeedStream> bound_stream_;
   std::vector<std::string> described_updates_;
   std::map<std::string, std::string> data_store_entries_;
   std::vector<std::string> described_datastore_updates_;
@@ -201,6 +218,10 @@ class TestSingleWebFeedSurface : public TestSurfaceBase {
       FeedStream* stream = nullptr,
       std::string = "",
       SingleWebFeedEntryPoint entry_point = SingleWebFeedEntryPoint::kOther);
+};
+class TestSupervisedFeedSurface : public TestSurfaceBase {
+ public:
+  explicit TestSupervisedFeedSurface(FeedStream* stream = nullptr);
 };
 
 class TestImageFetcher : public ImageFetcher {
@@ -243,6 +264,14 @@ class TestFeedNetwork : public FeedNetwork {
       std::string request_bytes,
       const AccountInfo& account_info,
       absl::optional<RequestMetadata> request_metadata,
+      base::OnceCallback<void(RawResponse)> callback) override;
+
+  void SendAsyncDataRequest(
+      const GURL& url,
+      base::StringPiece request_method,
+      net::HttpRequestHeaders request_headers,
+      std::string request_body,
+      const AccountInfo& account_info,
       base::OnceCallback<void(RawResponse)> callback) override;
 
   void CancelRequests() override;
@@ -303,6 +332,9 @@ class TestFeedNetwork : public FeedNetwork {
   }
   void InjectListWebFeedsResponse(const FeedNetwork::RawResponse& response) {
     InjectApiRawResponse<ListWebFeedsDiscoverApi>(response);
+  }
+  void InjectRawResponse(const FeedNetwork::RawResponse& response) {
+    injected_raw_response_ = response;
   }
 
   void InjectEmptyActionRequestResult();
@@ -387,6 +419,7 @@ class TestFeedNetwork : public FeedNetwork {
   std::map<NetworkRequestType, int> api_request_count_;
   std::vector<NetworkRequestType> sent_request_types_;
   absl::optional<feedwire::Response> injected_response_;
+  absl::optional<RawResponse> injected_raw_response_;
 };
 
 // Forwards to |FeedStream::WireResponseTranslator| unless a response is
@@ -473,6 +506,8 @@ class TestMetricsReporter : public MetricsReporter {
   StreamMetrics for_you;
 };
 
+// Base text fixture for feed API tests.
+// Note: The web-feeds feature (kWebFeed) is enabled by default for these tests.
 class FeedApiTest : public testing::Test, public FeedStream::Delegate {
  public:
   FeedApiTest();
@@ -485,12 +520,10 @@ class FeedApiTest : public testing::Test, public FeedStream::Delegate {
   bool IsOffline() override;
   DisplayMetrics GetDisplayMetrics() override;
   std::string GetLanguageTag() override;
-  bool IsAutoplayEnabled() override;
   TabGroupEnabledState GetTabGroupEnabledState() override;
   void ClearAll() override;
   AccountInfo GetAccountInfo() override;
   bool IsSigninAllowed() override;
-  bool IsSyncOn() override;
   void PrefetchImage(const GURL& url) override;
   void RegisterExperiments(const Experiments& experiments) override {}
   void RegisterFollowingFeedFollowCountFieldTrial(size_t follow_count) override;
@@ -500,7 +533,8 @@ class FeedApiTest : public testing::Test, public FeedStream::Delegate {
 
   // Replace stream_.
   void CreateStream(bool wait_for_initialization = true,
-                    bool start_surface = false);
+                    bool start_surface = false,
+                    bool is_new_tab_search_engine_url_android_enabled = false);
   std::unique_ptr<StreamModel> CreateStreamModel();
   bool IsTaskQueueIdle() const;
   void WaitForIdleTaskQueue();
@@ -521,7 +555,7 @@ class FeedApiTest : public testing::Test, public FeedStream::Delegate {
  protected:
   base::test::TaskEnvironment task_environment_{
       base::test::TaskEnvironment::TimeSource::MOCK_TIME};
-  TestingPrefServiceSimple profile_prefs_;
+  sync_preferences::TestingPrefServiceSyncable profile_prefs_;
   std::unique_ptr<TestMetricsReporter> metrics_reporter_;
   TestFeedNetwork network_;
   TestWireResponseTranslator response_translator_;
@@ -542,6 +576,8 @@ class FeedApiTest : public testing::Test, public FeedStream::Delegate {
               /*db_dir=*/{},
               task_environment_.GetMainThreadTaskRunner()));
 
+  std::unique_ptr<TemplateURLService> template_url_service_;
+
   FakeRefreshTaskScheduler refresh_scheduler_;
   StreamModel::Context stream_model_context_;
   std::unique_ptr<FeedStream> stream_;
@@ -549,7 +585,6 @@ class FeedApiTest : public testing::Test, public FeedStream::Delegate {
   bool is_offline_ = false;
   AccountInfo account_info_ = TestAccountInfo();
   bool is_signin_allowed_ = true;
-  bool is_sync_on_ = false;
   int prefetch_image_call_count_ = 0;
   std::vector<GURL> prefetched_images_;
   base::RepeatingClosure on_clear_all_;

@@ -40,10 +40,10 @@ import org.chromium.components.content_settings.ContentSettingValues;
 import org.chromium.components.content_settings.ContentSettingsType;
 import org.chromium.components.embedder_support.util.Origin;
 import org.chromium.content_public.browser.BrowserContextHandle;
-import org.chromium.content_public.browser.ContentFeatureList;
 
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -205,9 +205,13 @@ public class SingleWebsiteSettings extends SiteSettingsPreferenceFragment
     // The Preference key for chooser object permissions.
     private static final String CHOOSER_PERMISSION_PREFERENCE_KEY = "chooser_permission_list";
 
+    // The Preference key for embedded permissions such as StorageAccess.
+    private static final String EMBEDDED_PERMISSION_PREFERENCE_KEY = "embedded_permission_list";
+
     // The number of user and policy chosen object permissions displayed.
     private int mObjectUserPermissionCount;
     private int mObjectPolicyPermissionCount;
+    private int mEmbeddedPermissionCount;
 
     // Records previous notification permission on Android O+ to allow detection of permission
     // revocation within the Android system permission activity.
@@ -424,6 +428,16 @@ public class SingleWebsiteSettings extends SiteSettingsPreferenceFragment
                     merged.setPermissionInfo(info);
                 }
             }
+            for (var exceptionList : other.getEmbeddedPermissions().values()) {
+                for (var exception : exceptionList) {
+                    boolean matchesOrigin = other.getEmbedder() != null
+                            && WebsitePreferenceBridgeJni.get().urlMatchesContentSettingsPattern(
+                                    origin, exception.getSecondaryPattern());
+                    if (matchesOrigin) {
+                        merged.addEmbeddedPermission(exception);
+                    }
+                }
+            }
             if (merged.getLocalStorageInfo() == null && other.getLocalStorageInfo() != null
                     && origin.equals(other.getLocalStorageInfo().getOrigin())) {
                 merged.setLocalStorageInfo(other.getLocalStorageInfo());
@@ -431,6 +445,11 @@ public class SingleWebsiteSettings extends SiteSettingsPreferenceFragment
             for (StorageInfo storageInfo : other.getStorageInfo()) {
                 if (host.equals(storageInfo.getHost())) {
                     merged.addStorageInfo(storageInfo);
+                }
+            }
+            for (SharedDictionaryInfo sharedDictionaryInfo : other.getSharedDictionaryInfo()) {
+                if (origin.equals(sharedDictionaryInfo.getOrigin())) {
+                    merged.addSharedDictionaryInfo(sharedDictionaryInfo);
                 }
             }
             if (merged.getFPSCookieInfo() == null && other.getFPSCookieInfo() != null
@@ -487,6 +506,7 @@ public class SingleWebsiteSettings extends SiteSettingsPreferenceFragment
 
         findPreference(PREF_SITE_TITLE).setTitle(mSite.getTitle());
         setupContentSettingsPreferences();
+        setUpEmbeddedContentSettingPreferences();
         setUpChosenObjectPreferences();
         setupResetSitePreference();
         setUpClearDataPreference();
@@ -529,8 +549,6 @@ public class SingleWebsiteSettings extends SiteSettingsPreferenceFragment
                 setUpLocationPreference(preference);
             } else if (type == ContentSettingsType.NOTIFICATIONS) {
                 setUpNotificationsPreference(preference, mSite.isEmbargoed(type));
-            } else if (type == ContentSettingsType.REQUEST_DESKTOP_SITE) {
-                setUpDesktopSitePreference(preference);
             } else {
                 setupContentSettingsPreference(preference,
                         mSite.getContentSetting(
@@ -825,6 +843,40 @@ public class SingleWebsiteSettings extends SiteSettingsPreferenceFragment
         }
     }
 
+    private void setUpEmbeddedContentSettingPreferences() {
+        PreferenceScreen preferenceScreen = getPreferenceScreen();
+        BrowserContextHandle handle = getSiteSettingsDelegate().getBrowserContextHandle();
+
+        for (List<ContentSettingException> entries : mSite.getEmbeddedPermissions().values()) {
+            for (ContentSettingException info : entries) {
+                var preference = new ChromeSwitchPreference(getStyledContext());
+                preference.setKey(EMBEDDED_PERMISSION_PREFERENCE_KEY);
+                preference.setIcon(getContentSettingsIcon(info.getContentSettingType(), null));
+                preference.setTitle(ContentSettingsResources.getTitle(
+                        info.getContentSettingType(), getSiteSettingsDelegate()));
+                var pattern = WebsiteAddress.create(info.getPrimaryPattern());
+                preference.setSummary(pattern.getHost());
+                preference.setChecked(info.getContentSetting() == ContentSettingValues.ALLOW);
+                preference.setOnPreferenceChangeListener((pref, newValue) -> {
+                    info.setContentSetting(handle,
+                            (boolean) newValue ? ContentSettingValues.ALLOW
+                                               : ContentSettingValues.BLOCK);
+                    if (mWebsiteSettingsObserver != null) {
+                        mWebsiteSettingsObserver.onPermissionChanged();
+                    }
+                    return true;
+                });
+                if (info.getContentSettingType() == mHighlightedPermission) {
+                    preference.setBackgroundColor(mHighlightColor);
+                }
+
+                mEmbeddedPermissionCount++;
+                preference.setOrder(++mMaxPermissionOrder);
+                preferenceScreen.addPreference(preference);
+            }
+        }
+    }
+
     private Context getStyledContext() {
         return getPreferenceManager().getContext();
     }
@@ -942,7 +994,10 @@ public class SingleWebsiteSettings extends SiteSettingsPreferenceFragment
     }
 
     private boolean hasPermissionsPreferences() {
-        if (mObjectUserPermissionCount > 0 || mObjectPolicyPermissionCount > 0) return true;
+        if (mObjectUserPermissionCount > 0 || mObjectPolicyPermissionCount > 0
+                || mEmbeddedPermissionCount > 0) {
+            return true;
+        }
         PreferenceScreen preferenceScreen = getPreferenceScreen();
         for (int i = 0; i < preferenceScreen.getPreferenceCount(); i++) {
             String key = preferenceScreen.getPreference(i).getKey();
@@ -1102,19 +1157,6 @@ public class SingleWebsiteSettings extends SiteSettingsPreferenceFragment
         setupContentSettingsPreference(preference, permission, false /* isEmbargoed */);
     }
 
-    private void setUpDesktopSitePreference(Preference preference) {
-        // Skip adding the desktop site preference if RDS exceptions support is removed.
-        if (!ContentFeatureList.isEnabled(ContentFeatureList.REQUEST_DESKTOP_SITE_EXCEPTIONS)
-                && SiteSettingsFeatureList.isEnabled(
-                        SiteSettingsFeatureList.REQUEST_DESKTOP_SITE_EXCEPTIONS_DOWNGRADE)) {
-            return;
-        }
-        setupContentSettingsPreference(preference,
-                mSite.getContentSetting(getSiteSettingsDelegate().getBrowserContextHandle(),
-                        ContentSettingsType.REQUEST_DESKTOP_SITE),
-                mSite.isEmbargoed(ContentSettingsType.REQUEST_DESKTOP_SITE));
-    }
-
     private String getDSECategorySummary(@ContentSettingValues int value) {
         return value == ContentSettingValues.ALLOW
                 ? getString(R.string.website_settings_permissions_allowed_dse)
@@ -1202,13 +1244,18 @@ public class SingleWebsiteSettings extends SiteSettingsPreferenceFragment
                 removePreferenceSafely(key);
             }
         }
+        var preference = findPreference(EMBEDDED_PERMISSION_PREFERENCE_KEY);
+        while (preference != null) {
+            getPreferenceScreen().removePreference(preference);
+            preference = findPreference(EMBEDDED_PERMISSION_PREFERENCE_KEY);
+        }
 
         // Clearing stored data implies popping back to parent menu if there is nothing left to
         // show. Therefore, we only need to explicitly close the activity if there's no stored data
         // to begin with. The only exception to this is if there are policy managed permissions as
         // those cannot be reset and will always show.
-        boolean finishActivityImmediately =
-                mSite.getTotalUsage() == 0 && mObjectPolicyPermissionCount == 0;
+        boolean finishActivityImmediately = mSite.getTotalUsage() == 0
+                && mObjectPolicyPermissionCount == 0 && mEmbeddedPermissionCount == 0;
 
         SiteDataCleaner.resetPermissions(
                 getSiteSettingsDelegate().getBrowserContextHandle(), mSite);

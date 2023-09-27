@@ -195,8 +195,8 @@ NGInlineItemsBuilderTemplate<OffsetMappingBuilder>::BoxInfo::BoxInfo(
     : style(*item.Style()),
       item_index(item_index),
       should_create_box_fragment(item.ShouldCreateBoxFragment()),
-      text_metrics(style.GetFontHeight()) {
-  DCHECK(&style);
+      text_metrics(style->GetFontHeight()) {
+  DCHECK(style);
 }
 
 // True if this inline box should create a box fragment when it has |child|.
@@ -205,7 +205,7 @@ bool NGInlineItemsBuilderTemplate<OffsetMappingBuilder>::BoxInfo::
     ShouldCreateBoxFragmentForChild(const BoxInfo& child) const {
   // When a child inline box has margins, the parent has different width/height
   // from the union of children.
-  const ComputedStyle& child_style = child.style;
+  const ComputedStyle& child_style = *child.style;
   if (child_style.MayHaveMargin())
     return true;
 
@@ -278,14 +278,33 @@ void NGInlineItemsBuilderTemplate<OffsetMappingBuilder>::AppendEmptyTextItem(
 template <typename OffsetMappingBuilder>
 void NGInlineItemsBuilderTemplate<OffsetMappingBuilder>::
     AppendGeneratedBreakOpportunity(LayoutObject* layout_object) {
-  if (block_flow_->IsNGSVGText())
+  if (block_flow_->IsSVGText()) {
     return;
+  }
   DCHECK(layout_object);
   typename OffsetMappingBuilder::SourceNodeScope scope(&mapping_builder_,
                                                        nullptr);
   NGInlineItem& item = AppendBreakOpportunity(layout_object);
   item.SetIsGeneratedForLineBreak();
   item.SetEndCollapseType(NGInlineItem::kOpaqueToCollapsing);
+}
+
+template <typename OffsetMappingBuilder>
+inline void
+NGInlineItemsBuilderTemplate<OffsetMappingBuilder>::DidAppendForcedBreak() {
+  // Bisecting available widths can't handle multiple logical paragraphs, so
+  // forced break should disable it. See `NGParagraphLineBreaker`.
+  is_bisect_line_break_disabled_ = true;
+}
+
+template <typename OffsetMappingBuilder>
+inline void
+NGInlineItemsBuilderTemplate<OffsetMappingBuilder>::DidAppendTextReusing(
+    const NGInlineItem& item) {
+  is_block_level_ &= item.IsBlockLevel();
+  if (item.IsForcedLineBreak()) {
+    DidAppendForcedBreak();
+  }
 }
 
 template <typename OffsetMappingBuilder>
@@ -435,7 +454,7 @@ bool NGInlineItemsBuilderTemplate<OffsetMappingBuilder>::AppendTextReusing(
     // itself may be reused.
     if (item.StartOffset() == start) {
       items_->push_back(item);
-      is_block_level_ &= item.IsBlockLevel();
+      DidAppendTextReusing(item);
       continue;
     }
 
@@ -465,7 +484,7 @@ bool NGInlineItemsBuilderTemplate<OffsetMappingBuilder>::AppendTextReusing(
 #endif
 
     items_->push_back(adjusted_item);
-    is_block_level_ &= adjusted_item.IsBlockLevel();
+    DidAppendTextReusing(adjusted_item);
   }
   return true;
 }
@@ -956,9 +975,7 @@ void NGInlineItemsBuilderTemplate<OffsetMappingBuilder>::AppendForcedBreak(
     }
   }
 
-  // Bisecting available widths can't handle multiple logical paragraphs, so
-  // forced break should disable it. See `NGParagraphLineBreaker`.
-  is_bisect_line_break_disabled_ = true;
+  DidAppendForcedBreak();
 }
 
 template <typename OffsetMappingBuilder>
@@ -985,7 +1002,7 @@ NGInlineItemsBuilderTemplate<OffsetMappingBuilder>::AppendBreakOpportunity(
 template <typename OffsetMappingBuilder>
 void NGInlineItemsBuilderTemplate<
     OffsetMappingBuilder>::ExitAndEnterSvgTextChunk(LayoutText& layout_text) {
-  DCHECK(block_flow_->IsNGSVGText());
+  DCHECK(block_flow_->IsSVGText());
   DCHECK(text_chunk_offsets_);
 
   if (bidi_context_.empty())
@@ -1005,8 +1022,9 @@ void NGInlineItemsBuilderTemplate<
 template <typename OffsetMappingBuilder>
 void NGInlineItemsBuilderTemplate<OffsetMappingBuilder>::EnterSvgTextChunk(
     const ComputedStyle* style) {
-  if (LIKELY(!block_flow_->IsNGSVGText() || !text_chunk_offsets_))
+  if (LIKELY(!block_flow_->IsSVGText() || !text_chunk_offsets_)) {
     return;
+  }
   EnterBidiContext(nullptr, style, kLeftToRightIsolateCharacter,
                    kRightToLeftIsolateCharacter,
                    kPopDirectionalIsolateCharacter);
@@ -1038,7 +1056,7 @@ void NGInlineItemsBuilderTemplate<OffsetMappingBuilder>::AppendAtomicInline(
   RestoreTrailingCollapsibleSpaceIfRemoved();
   Append(NGInlineItem::kAtomicInline, kObjectReplacementCharacter,
          layout_object);
-  has_ruby_ = has_ruby_ || layout_object->IsRubyRun();
+  has_ruby_ = has_ruby_ || layout_object->IsRubyColumn();
 
   // When this atomic inline is inside of an inline box, the height of the
   // inline box can be different from the height of the atomic inline. Ensure
@@ -1083,10 +1101,11 @@ void NGInlineItemsBuilderTemplate<OffsetMappingBuilder>::AppendFloating(
     LayoutObject* layout_object) {
   AppendOpaque(NGInlineItem::kFloating, kObjectReplacementCharacter,
                layout_object);
+  has_floats_ = true;
   // Floats/exclusions require computing line heights, which is currently
   // skipped during the bisect. See `NGParagraphLineBreaker`.
   is_bisect_line_break_disabled_ = true;
-  is_score_line_break_disabled_ = true;
+  // `NGScoreLineBreaker` supports "simple" floats. See`NGLineWidths`.
 }
 
 template <typename OffsetMappingBuilder>
@@ -1413,6 +1432,7 @@ void NGInlineItemsBuilderTemplate<
   // |SegmentText()| will analyze the text and reset |is_bidi_enabled_| if it
   // doesn't contain any RTL characters.
   data->is_bidi_enabled_ = MayBeBidiEnabled();
+  data->has_floats_ = has_floats_;
   data->has_initial_letter_box_ = has_initial_letter_box_;
   data->has_ruby_ = has_ruby_;
   data->is_block_level_ = IsBlockLevel();

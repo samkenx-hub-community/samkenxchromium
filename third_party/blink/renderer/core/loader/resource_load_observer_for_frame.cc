@@ -6,7 +6,6 @@
 
 #include "base/metrics/histogram_macros.h"
 #include "base/types/optional_util.h"
-#include "components/power_scheduler/power_mode_arbiter.h"
 #include "services/network/public/cpp/cors/cors_error_status.h"
 #include "services/network/public/mojom/cors.mojom-forward.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
@@ -14,6 +13,7 @@
 #include "third_party/blink/public/mojom/frame/frame.mojom-blink.h"
 #include "third_party/blink/renderer/core/core_probes_inl.h"
 #include "third_party/blink/renderer/core/dom/events/event_target.h"
+#include "third_party/blink/renderer/core/execution_context/agent.h"
 #include "third_party/blink/renderer/core/frame/attribution_src_loader.h"
 #include "third_party/blink/renderer/core/frame/deprecation/deprecation.h"
 #include "third_party/blink/renderer/core/frame/frame_console.h"
@@ -106,10 +106,7 @@ ResourceLoadObserverForFrame::ResourceLoadObserverForFrame(
     DocumentLoader& loader,
     Document& document,
     const ResourceFetcherProperties& fetcher_properties)
-    : power_mode_voter_(
-          power_scheduler::PowerModeArbiter::GetInstance()->NewVoter(
-              "PowerModeVoter.ResourceLoads")),
-      document_loader_(loader),
+    : document_loader_(loader),
       document_(document),
       fetcher_properties_(fetcher_properties) {}
 ResourceLoadObserverForFrame::~ResourceLoadObserverForFrame() = default;
@@ -123,11 +120,12 @@ void ResourceLoadObserverForFrame::DidStartRequest(
       !params.IsSpeculativePreload()) {
     V8DOMActivityLogger* activity_logger = nullptr;
     const AtomicString& initiator_name = params.Options().initiator_info.name;
+    v8::Isolate* isolate = document_->GetAgent().isolate();
     if (initiator_name == fetch_initiator_type_names::kXmlhttprequest) {
-      activity_logger = V8DOMActivityLogger::CurrentActivityLogger();
+      activity_logger = V8DOMActivityLogger::CurrentActivityLogger(isolate);
     } else {
       activity_logger =
-          V8DOMActivityLogger::CurrentActivityLoggerIfIsolatedWorld();
+          V8DOMActivityLogger::CurrentActivityLoggerIfIsolatedWorld(isolate);
     }
     if (activity_logger) {
       Vector<String> argv = {
@@ -173,7 +171,6 @@ void ResourceLoadObserverForFrame::WillSendRequest(
     idleness_detector->OnWillSendRequest(document_->Fetcher());
   if (auto* interactive_detector = InteractiveDetector::From(*document_))
     interactive_detector->OnResourceLoadBegin(absl::nullopt);
-  UpdatePowerModeVote();
 }
 
 void ResourceLoadObserverForFrame::DidChangePriority(
@@ -361,14 +358,12 @@ void ResourceLoadObserverForFrame::DidFinishLoading(
     uint64_t identifier,
     base::TimeTicks finish_time,
     int64_t encoded_data_length,
-    int64_t decoded_body_length,
-    bool should_report_corb_blocking) {
+    int64_t decoded_body_length) {
   LocalFrame* frame = document_->GetFrame();
   DCHECK(frame);
   frame->Loader().Progress().CompleteProgress(identifier);
   probe::DidFinishLoading(GetProbe(), identifier, document_loader_, finish_time,
-                          encoded_data_length, decoded_body_length,
-                          should_report_corb_blocking);
+                          encoded_data_length, decoded_body_length);
 
   if (auto* interactive_detector = InteractiveDetector::From(*document_)) {
     interactive_detector->OnResourceLoadEnd(finish_time);
@@ -376,7 +371,6 @@ void ResourceLoadObserverForFrame::DidFinishLoading(
   if (IdlenessDetector* idleness_detector = frame->GetIdlenessDetector()) {
     idleness_detector->OnDidLoadResource();
   }
-  UpdatePowerModeVote();
   document_->CheckCompleted();
 }
 
@@ -406,7 +400,6 @@ void ResourceLoadObserverForFrame::DidFailLoading(
   if (IdlenessDetector* idleness_detector = frame->GetIdlenessDetector()) {
     idleness_detector->OnDidLoadResource();
   }
-  UpdatePowerModeVote();
   document_->CheckCompleted();
 }
 
@@ -438,24 +431,6 @@ CoreProbeSink* ResourceLoadObserverForFrame::GetProbe() {
 
 void ResourceLoadObserverForFrame::CountUsage(WebFeature feature) {
   document_loader_->GetUseCounter().Count(feature, document_->GetFrame());
-}
-
-void ResourceLoadObserverForFrame::UpdatePowerModeVote() {
-  // Vote for loading as long as there are at least three pending requests.
-  int request_count = document_->Fetcher()->ActiveRequestCount();
-  bool should_vote_loading = request_count > 2;
-
-  if (should_vote_loading == power_mode_vote_is_loading_)
-    return;
-
-  if (should_vote_loading) {
-    power_mode_voter_->VoteFor(power_scheduler::PowerMode::kLoading);
-  } else {
-    power_mode_voter_->ResetVoteAfterTimeout(
-        power_scheduler::PowerModeVoter::kLoadingTimeout);
-  }
-
-  power_mode_vote_is_loading_ = should_vote_loading;
 }
 
 }  // namespace blink

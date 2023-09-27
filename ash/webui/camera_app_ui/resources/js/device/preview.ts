@@ -2,7 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {assert, assertExists, assertInstanceof} from '../assert.js';
+import {
+  assert,
+  assertEnumVariant,
+  assertExists,
+  assertInstanceof,
+} from '../assert.js';
+import {queuedAsyncCallback} from '../async_job_queue.js';
 import * as dom from '../dom.js';
 import {reportError} from '../error.js';
 import * as expert from '../expert.js';
@@ -93,7 +99,7 @@ export class Preview {
   private isSupportPTZInternal = false;
 
   /**
-   * Device id to constraints to reset default PTZ setting.
+   * Map from device id to constraints to reset default PTZ setting.
    */
   private readonly deviceDefaultPTZ =
       new Map<string, MediaTrackConstraintSet>();
@@ -102,12 +108,15 @@ export class Preview {
 
   private onPreviewExpired: WaitableEvent|null = null;
 
+  private enableFaceOverlay = false;
+
   /**
    * @param onNewStreamNeeded Callback to request new stream.
    */
   constructor(private readonly onNewStreamNeeded: () => Promise<void>) {
     expert.addObserver(
-        expert.ExpertOption.SHOW_METADATA, () => this.updateShowMetadata());
+        expert.ExpertOption.SHOW_METADATA,
+        queuedAsyncCallback('keepLatest', () => this.updateShowMetadata()));
   }
 
   getVideo(): PreviewVideo {
@@ -130,7 +139,7 @@ export class Preview {
   }
 
   getFacing(): Facing {
-    return util.assertEnumVariant(Facing, this.facing);
+    return assertEnumVariant(Facing, this.facing);
   }
 
   getDeviceId(): string|null {
@@ -151,7 +160,7 @@ export class Preview {
     return this.constraints;
   }
 
-  private async updateFacing() {
+  private updateFacing() {
     const {facingMode} = this.getVideoTrack().getSettings();
     switch (facingMode) {
       case 'user':
@@ -170,7 +179,7 @@ export class Preview {
     const deviceOperator = DeviceOperator.getInstance();
     const {pan, tilt, zoom} = this.getVideoTrack().getCapabilities();
 
-    this.isSupportPTZInternal = await (async () => {
+    this.isSupportPTZInternal = (() => {
       if (pan === undefined && tilt === undefined && zoom === undefined) {
         return false;
       }
@@ -257,7 +266,6 @@ export class Preview {
    * Sets video element's source.
    *
    * @param stream Stream to be the source.
-   * @return Promise for the operation.
    */
   private async setSource(stream: MediaStream): Promise<void> {
     const tpl = util.instantiateTemplate('#preview-video-template');
@@ -276,12 +284,10 @@ export class Preview {
     this.video.srcObject = null;
     this.video = video;
     video.addEventListener('resize', () => this.onIntrinsicSizeChanged());
-    video.addEventListener(
-        'click',
-        (event) => this.onFocusClicked(assertInstanceof(event, MouseEvent)));
+    video.addEventListener('click', (event) => this.onFocusClicked(event));
     // Disable right click on video which let user show video control.
     video.addEventListener('contextmenu', (event) => event.preventDefault());
-    return this.onIntrinsicSizeChanged();
+    this.onIntrinsicSizeChanged();
   }
 
   private isStreamAlive(): boolean {
@@ -311,21 +317,24 @@ export class Preview {
       await this.setSource(this.streamInternal);
       // Use a watchdog since the stream.onended event is unreliable in the
       // recent version of Chrome. As of 55, the event is still broken.
-      this.watchdog = setInterval(() => {
+      // TODO(pihsun): Check if the comment above is still true.
+      // Using async function in setInterval here should be fine, since only
+      // the last callback will contain asynchronous code.
+      this.watchdog = setInterval(async () => {
         if (!this.isStreamAlive()) {
           this.clearWatchdog();
           const deviceOperator = DeviceOperator.getInstance();
           if (deviceOperator !== null && this.deviceId !== null) {
-            deviceOperator.dropConnection(this.deviceId);
+            await deviceOperator.dropConnection(this.deviceId);
           }
-          this.onNewStreamNeeded();
+          await this.onNewStreamNeeded();
         }
       }, 100);
-      await this.updateFacing();
+      this.updateFacing();
       this.deviceId = getVideoTrackSettings(this.getVideoTrack()).deviceId;
-      this.updateShowMetadata();
       await this.updatePTZ();
 
+      this.enableFaceOverlay = false;
       const deviceOperator = DeviceOperator.getInstance();
       if (deviceOperator !== null) {
         const {deviceId} = getVideoTrackSettings(this.getVideoTrack());
@@ -338,9 +347,12 @@ export class Preview {
               new Error(
                   'Cannot disable camera frame rotation. ' +
                   'The camera is probably being used by another app.'));
+        } else {
+          this.enableFaceOverlay = true;
         }
         this.vidPid = await deviceOperator.getVidPid(deviceId);
       }
+      await this.updateShowMetadata();
 
       assert(
           this.onPreviewExpired === null || this.onPreviewExpired.isSignaled());
@@ -361,14 +373,13 @@ export class Preview {
     // Pause video element to avoid black frames during transition.
     this.video.pause();
     this.disableShowMetadata();
+    this.enableFaceOverlay = false;
     if (this.streamInternal !== null && this.isStreamAlive()) {
       const track = this.getVideoTrack();
       const {deviceId} = getVideoTrackSettings(track);
       track.stop();
       const deviceOperator = DeviceOperator.getInstance();
-      if (deviceOperator !== null) {
-        deviceOperator.dropConnection(deviceId);
-      }
+      await deviceOperator?.dropConnection(deviceId);
       assert(this.onPreviewExpired !== null);
     }
     this.streamInternal = null;
@@ -380,11 +391,11 @@ export class Preview {
   }
 
   /**
-   * Checks preview whether to show preview metadata or not.
+   * Updates preview whether to show preview metadata or not.
    */
-  private updateShowMetadata() {
+  private async updateShowMetadata() {
     if (expert.isEnabled(expert.ExpertOption.SHOW_METADATA)) {
-      this.enableShowMetadata();
+      await this.enableShowMetadata();
     } else {
       this.disableShowMetadata();
     }
@@ -392,8 +403,6 @@ export class Preview {
 
   /**
    * Creates an image blob of the current frame.
-   *
-   * @return Promise for the result.
    */
   toImage(): Promise<Blob> {
     const {canvas, ctx} = util.newDrawingCanvas(
@@ -404,8 +413,6 @@ export class Preview {
 
   /**
    * Displays preview metadata on preview screen.
-   *
-   * @return Promise for the operation.
    */
   private async enableShowMetadata(): Promise<void> {
     if (this.streamInternal === null) {
@@ -550,25 +557,25 @@ export class Preview {
     const activeArraySize = await deviceOperator.getActiveArraySize(deviceId);
     const cameraFrameRotation =
         await deviceOperator.getCameraFrameRotation(deviceId);
-    this.faceOverlay =
-        new FaceOverlay(activeArraySize, cameraFrameRotation, deviceId);
-
+    if (this.enableFaceOverlay) {
+      this.faceOverlay =
+          new FaceOverlay(activeArraySize, cameraFrameRotation, deviceId);
+    }
     const updateFace =
         (mode: AndroidStatisticsFaceDetectMode, rects: number[]) => {
-          assert(this.faceOverlay !== null);
           if (mode ===
               AndroidStatisticsFaceDetectMode
                   .ANDROID_STATISTICS_FACE_DETECT_MODE_OFF) {
             dom.get('#preview-num-faces', HTMLDivElement).style.display =
                 'none';
-            this.faceOverlay.clearRects();
+            this.faceOverlay?.clearRects();
             return;
           }
           assert(rects.length % 4 === 0);
           const numFaces = rects.length / 4;
           const label = numFaces >= 2 ? 'Faces' : 'Face';
           showValue('#preview-num-faces', `${numFaces} ${label}`);
-          this.faceOverlay.show(rects);
+          this.faceOverlay?.show(rects);
         };
 
     const callback = (metadata: CameraMetadata) => {
@@ -627,11 +634,9 @@ export class Preview {
   }
 
   /**
-   * Hide display preview metadata on preview screen.
-   *
-   * @return Promise for the operation.
+   * Hides display preview metadata on preview screen.
    */
-  private async disableShowMetadata(): Promise<void> {
+  private disableShowMetadata(): void {
     if (this.streamInternal === null || this.metadataObserver === null) {
       return;
     }
@@ -653,7 +658,7 @@ export class Preview {
   /**
    * Handles changed intrinsic size (first loaded or orientation changes).
    */
-  private async onIntrinsicSizeChanged(): Promise<void> {
+  private onIntrinsicSizeChanged(): void {
     if (this.video.videoWidth !== 0 && this.video.videoHeight !== 0) {
       nav.layoutShownViews();
     }
@@ -661,7 +666,7 @@ export class Preview {
   }
 
   /**
-   * Apply point of interest to the stream.
+   * Applies point of interest to the stream.
    *
    * @param point The point in normalize coordidate system, which means both
    *     |x| and |y| are in range [0, 1).
@@ -683,7 +688,17 @@ export class Preview {
     this.cancelFocus();
     const marker = Symbol();
     this.focusMarker = marker;
-    (async () => {
+    // We don't use AsyncJobQueue here since we want to call setPointOfInterest
+    // (applyConstraints) as soon as possible when user click a new focus, and
+    // applyConstraints handles multiple calls internally.
+    // From testing, all parallel applyConstraints calls resolve together when
+    // the last constraint is applied, but it's still faster than calling
+    // multiple applyConstraints sequentially.
+    //
+    // TODO(pihsun): add utility for this kind of "cooperated cancellation" (to
+    // AsyncJobQueue or as separate utility function) if there's some other
+    // place that has similar requirement.
+    void (async () => {
       try {
         // Normalize to square space coordinates by W3C spec.
         const x = event.offsetX / this.video.offsetWidth;
@@ -708,7 +723,7 @@ export class Preview {
   }
 
   /**
-   * Cancels the current applying focus.
+   * Cancels the currently applied focus.
    */
   private cancelFocus() {
     this.focusMarker = null;

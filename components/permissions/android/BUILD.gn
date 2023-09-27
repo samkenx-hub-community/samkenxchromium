@@ -4,6 +4,7 @@
 
 import("//build/config/android/rules.gni")
 import("//build/config/locales.gni")
+import("//third_party/jni_zero/jni_zero.gni")
 import("//tools/grit/grit_rule.gni")
 
 generate_jni("jni_headers") {
@@ -13,8 +14,6 @@ generate_jni("jni_headers") {
     "java/src/org/chromium/components/permissions/BluetoothScanningPermissionDialog.java",
     "java/src/org/chromium/components/permissions/PermissionDialogController.java",
     "java/src/org/chromium/components/permissions/PermissionDialogDelegate.java",
-    "java/src/org/chromium/components/permissions/PermissionUtil.java",
-    "java/src/org/chromium/components/permissions/PermissionsAndroidFeatureList.java",
     "java/src/org/chromium/components/permissions/nfc/NfcSystemLevelSetting.java",
   ]
 }
@@ -71,6 +70,7 @@ android_resources("java_resources") {
     "res/drawable/ic_signal_cellular_2_bar.xml",
     "res/drawable/ic_signal_cellular_3_bar.xml",
     "res/drawable/ic_signal_cellular_4_bar.xml",
+    "res/drawable/ic_storage_access_24.xml",
     "res/drawable/tenancy.xml",
     "res/layout/bluetooth_scanning_permission_dialog.xml",
     "res/layout/bluetooth_scanning_permission_dialog_row.xml",
@@ -99,6 +99,7 @@ java_strings_grd("permissions_strings_grd") {
 }
 
 android_library("java") {
+  srcjar_deps = [ ":jni_headers" ]
   sources = [
     "java/src/org/chromium/components/permissions/AndroidPermissionRequester.java",
     "java/src/org/chromium/components/permissions/BluetoothChooserAndroidDelegate.java",
@@ -131,15 +132,24 @@ android_library("java") {
     "//third_party/androidx:androidx_vectordrawable_vectordrawable_java",
     "//ui/android:ui_java",
   ]
-  annotation_processor_deps = [ "//base/android/jni_generator:jni_processor" ]
+
   resources_package = "org.chromium.components.permissions"
+}
+
+generate_jni("core_jni") {
+  sources = [
+    "java/src/org/chromium/components/permissions/PermissionUtil.java",
+    "java/src/org/chromium/components/permissions/PermissionsAndroidFeatureMap.java",
+  ]
 }
 
 # Contains sources that do no depend on //content.
 android_library("core_java") {
+  srcjar_deps = [ ":core_jni" ]
   sources = [
     "java/src/org/chromium/components/permissions/PermissionUtil.java",
     "java/src/org/chromium/components/permissions/PermissionsAndroidFeatureList.java",
+    "java/src/org/chromium/components/permissions/PermissionsAndroidFeatureMap.java",
   ]
   deps = [
     "//base:base_java",
@@ -150,7 +160,6 @@ android_library("core_java") {
     "//third_party/androidx:androidx_core_core_java",
     "//ui/android:ui_no_recycler_view_java",
   ]
-  annotation_processor_deps = [ "//base/android/jni_generator:jni_processor" ]
 }
 
 robolectric_library("components_permissions_junit_tests") {

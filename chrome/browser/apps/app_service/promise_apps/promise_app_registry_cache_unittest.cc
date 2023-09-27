@@ -8,6 +8,7 @@
 #include "chrome/browser/apps/app_service/package_id.h"
 #include "chrome/browser/apps/app_service/promise_apps/promise_app.h"
 #include "chrome/browser/apps/app_service/promise_apps/promise_app_update.h"
+#include "chrome/browser/apps/app_service/promise_apps/promise_app_utils.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
@@ -44,8 +45,7 @@ TEST_F(PromiseAppRegistryCacheTest, OnPromiseApp_UpdatesPromiseAppProgress) {
   // Pre-register a promise app with no installation progress value.
   auto promise_app = std::make_unique<PromiseApp>(kTestPackageId);
   cache()->OnPromiseApp(std::move(promise_app));
-  EXPECT_FALSE(
-      cache()->GetPromiseAppForTesting(kTestPackageId)->progress.has_value());
+  EXPECT_FALSE(cache()->GetPromiseApp(kTestPackageId)->progress.has_value());
   EXPECT_EQ(cache()->GetAllPromiseApps().size(), 1u);
 
   // Update the progress value for the correct app and confirm the progress
@@ -53,15 +53,13 @@ TEST_F(PromiseAppRegistryCacheTest, OnPromiseApp_UpdatesPromiseAppProgress) {
   auto promise_delta = std::make_unique<PromiseApp>(kTestPackageId);
   promise_delta->progress = progress_initial;
   cache()->OnPromiseApp(std::move(promise_delta));
-  EXPECT_EQ(cache()->GetPromiseAppForTesting(kTestPackageId)->progress,
-            progress_initial);
+  EXPECT_EQ(cache()->GetPromiseApp(kTestPackageId)->progress, progress_initial);
 
   // Update the progress value again and check if it is the correct value.
   auto promise_delta_next = std::make_unique<PromiseApp>(kTestPackageId);
   promise_delta_next->progress = progress_next;
   cache()->OnPromiseApp(std::move(promise_delta_next));
-  EXPECT_EQ(cache()->GetPromiseAppForTesting(kTestPackageId)->progress,
-            progress_next);
+  EXPECT_EQ(cache()->GetPromiseApp(kTestPackageId)->progress, progress_next);
 
   // All these changes should have applied to the same promise app instead
   // of creating new ones.
@@ -88,6 +86,64 @@ TEST_F(PromiseAppRegistryCacheTest, GetAllPromiseApps) {
   EXPECT_EQ(promise_app_list[1]->package_id, package_id_2);
 }
 
+TEST_F(PromiseAppRegistryCacheTest, GetPromiseAppForStringPackageId) {
+  // There should be no promise apps registered yet.
+  EXPECT_EQ(cache()->GetAllPromiseApps().size(), 0u);
+
+  std::string valid_package_id_1 = "android:something.example.test";
+  std::string valid_package_id_2 = "android:other.example.test";
+  std::string invalid_package_id = "invalid";
+  apps::PackageId package_id =
+      PackageId::FromString(valid_package_id_1).value();
+
+  // Register a promise app.
+  auto promise_app = std::make_unique<PromiseApp>(package_id);
+  cache()->OnPromiseApp(std::move(promise_app));
+
+  // Expect nullptr result for invalid string Package ID or when a Package ID
+  // isn't registered.
+  EXPECT_FALSE(cache()->GetPromiseAppForStringPackageId(invalid_package_id));
+  EXPECT_FALSE(cache()->GetPromiseAppForStringPackageId(valid_package_id_2));
+
+  const PromiseApp* promise_app_result =
+      cache()->GetPromiseAppForStringPackageId(valid_package_id_1);
+  EXPECT_EQ(promise_app_result->package_id, package_id);
+}
+
+TEST_F(PromiseAppRegistryCacheTest, RemoveSuccessfullyInstalledPromiseApp) {
+  // Register a promise app.
+  auto promise_app = std::make_unique<PromiseApp>(kTestPackageId);
+  cache()->OnPromiseApp(std::move(promise_app));
+
+  // Confirm that the promise app is registered.
+  EXPECT_TRUE(cache()->HasPromiseApp(kTestPackageId));
+
+  // Update the promise app with a kSuccess status.
+  auto delta = std::make_unique<PromiseApp>(kTestPackageId);
+  delta->status = PromiseStatus::kSuccess;
+  cache()->OnPromiseApp(std::move(delta));
+
+  // Confirm that the promise app was removed.
+  EXPECT_FALSE(cache()->HasPromiseApp(kTestPackageId));
+}
+
+TEST_F(PromiseAppRegistryCacheTest, RemoveCancelledPromiseApp) {
+  // Register a promise app.
+  auto promise_app = std::make_unique<PromiseApp>(kTestPackageId);
+  cache()->OnPromiseApp(std::move(promise_app));
+
+  // Confirm that the promise app is registered.
+  EXPECT_TRUE(cache()->HasPromiseApp(kTestPackageId));
+
+  // Update the promise app with a kCancelled status.
+  auto delta = std::make_unique<PromiseApp>(kTestPackageId);
+  delta->status = PromiseStatus::kCancelled;
+  cache()->OnPromiseApp(std::move(delta));
+
+  // Confirm that the promise app was removed.
+  EXPECT_FALSE(cache()->HasPromiseApp(kTestPackageId));
+}
+
 class PromiseAppRegistryCacheObserverTest : public testing::Test,
                                             PromiseAppRegistryCache::Observer {
  public:
@@ -99,6 +155,19 @@ class PromiseAppRegistryCacheObserverTest : public testing::Test,
   void OnPromiseAppUpdate(const PromiseAppUpdate& update) override {
     EXPECT_EQ(update, *expected_update_);
     on_promise_app_updated_called_ = true;
+
+    // Verify that the data in promise app registry cache is already updated.
+    if (IsPromiseAppCompleted(update.Status())) {
+      ASSERT_FALSE(cache()->HasPromiseApp(update.PackageId()));
+    } else {
+      ASSERT_TRUE(cache()->HasPromiseApp(update.PackageId()));
+      const PromiseApp* promise_app_in_cache =
+          cache()->GetPromiseApp(update.PackageId());
+      EXPECT_EQ(promise_app_in_cache->package_id, update.PackageId());
+      EXPECT_EQ(promise_app_in_cache->progress, update.Progress());
+      EXPECT_EQ(promise_app_in_cache->status, update.Status());
+      EXPECT_EQ(promise_app_in_cache->should_show, update.ShouldShow());
+    }
   }
 
   void OnPromiseAppRegistryCacheWillBeDestroyed(
@@ -131,7 +200,6 @@ class PromiseAppRegistryCacheObserverTest : public testing::Test,
 
 TEST_F(PromiseAppRegistryCacheObserverTest, OnPromiseAppUpdate_NewPromiseApp) {
   auto promise_app = std::make_unique<PromiseApp>(kTestPackageId);
-  promise_app->name = "Test";
   promise_app->progress = 0;
   promise_app->status = PromiseStatus::kPending;
   promise_app->should_show = false;
@@ -159,7 +227,6 @@ TEST_F(PromiseAppRegistryCacheObserverTest,
   // Check that we get the appropriate update when going from pending to
   // installing.
   auto promise_app_installing = std::make_unique<PromiseApp>(kTestPackageId);
-  promise_app_installing->name = "Test";
   promise_app_installing->progress = 0.4;
   promise_app_installing->status = PromiseStatus::kInstalling;
   promise_app_installing->should_show = true;

@@ -64,6 +64,7 @@
 #include "third_party/blink/public/mojom/frame/media_player_action.mojom-blink.h"
 #include "third_party/blink/public/mojom/frame/reporting_observer.mojom-blink.h"
 #include "third_party/blink/public/mojom/frame/user_activation_notification_type.mojom-shared.h"
+#include "third_party/blink/public/mojom/lcp_critical_path_predictor/lcp_critical_path_predictor.mojom-blink.h"
 #include "third_party/blink/public/mojom/scroll/scrollbar_mode.mojom-blink.h"
 #include "third_party/blink/public/platform/interface_registry.h"
 #include "third_party/blink/public/platform/platform.h"
@@ -93,6 +94,7 @@
 #include "third_party/blink/renderer/core/dom/document_type.h"
 #include "third_party/blink/renderer/core/dom/dom_node_ids.h"
 #include "third_party/blink/renderer/core/dom/events/event.h"
+#include "third_party/blink/renderer/core/dom/focus_params.h"
 #include "third_party/blink/renderer/core/dom/ignore_opens_during_unload_count_incrementer.h"
 #include "third_party/blink/renderer/core/editing/editing_utilities.h"
 #include "third_party/blink/renderer/core/editing/editor.h"
@@ -154,10 +156,11 @@
 #include "third_party/blink/renderer/core/inspector/inspector_task_runner.h"
 #include "third_party/blink/renderer/core/inspector/inspector_trace_events.h"
 #include "third_party/blink/renderer/core/intersection_observer/intersection_observer_controller.h"
-#include "third_party/blink/renderer/core/layout/anchor_scroll_data.h"
+#include "third_party/blink/renderer/core/layout/anchor_position_scroll_data.h"
 #include "third_party/blink/renderer/core/layout/hit_test_result.h"
 #include "third_party/blink/renderer/core/layout/layout_view.h"
 #include "third_party/blink/renderer/core/layout/text_autosizer.h"
+#include "third_party/blink/renderer/core/lcp_critical_path_predictor/lcp_critical_path_predictor.h"
 #include "third_party/blink/renderer/core/loader/document_loader.h"
 #include "third_party/blink/renderer/core/loader/frame_load_request.h"
 #include "third_party/blink/renderer/core/loader/idleness_detector.h"
@@ -186,7 +189,6 @@
 #include "third_party/blink/renderer/platform/bindings/script_forbidden_scope.h"
 #include "third_party/blink/renderer/platform/bindings/source_location.h"
 #include "third_party/blink/renderer/platform/bindings/v8_binding.h"
-#include "third_party/blink/renderer/platform/bindings/v8_per_isolate_data.h"
 #include "third_party/blink/renderer/platform/blob/blob_data.h"
 #include "third_party/blink/renderer/platform/graphics/paint/drawing_recorder.h"
 #include "third_party/blink/renderer/platform/graphics/paint/paint_canvas.h"
@@ -306,6 +308,32 @@ mojom::blink::BlockingDetailsPtr CreateBlockingDetailsMojom(
   feature_location_to_report->url = blocking_details.Url();
   feature_location_to_report->function_name = blocking_details.Function();
   return feature_location_to_report;
+}
+
+bool IsNavigationBlockedByCoopRestrictProperties(
+    const LocalFrame& accessing_frame,
+    const Frame& target_frame) {
+  // If the two windows are not in the same CoopRelatedGroup, we should not
+  // block one window from navigating the other. This prevents restricting
+  // things that were not meant to. These are the cross browsing context group
+  // accesses that already existed before COOP: restrict-properties.
+  // TODO(https://crbug.com/1464618): Is there actually any scenario where cross
+  // browsing context group was allowed before COOP: restrict-properties? Verify
+  // that we need to have this check.
+  if (accessing_frame.GetPage()->CoopRelatedGroupToken() !=
+      target_frame.GetPage()->CoopRelatedGroupToken()) {
+    return false;
+  }
+
+  // If we're dealing with an actual COOP: restrict-properties case, then
+  // compare the browsing context group tokens. If they are different, the
+  // navigation should not be permitted.
+  if (accessing_frame.GetPage()->BrowsingContextGroupToken() !=
+      target_frame.GetPage()->BrowsingContextGroupToken()) {
+    return true;
+  }
+
+  return false;
 }
 
 }  // namespace
@@ -434,6 +462,7 @@ void LocalFrame::Trace(Visitor* visitor) const {
   visitor->Trace(box_shadow_paint_image_generator_);
   visitor->Trace(clip_path_paint_image_generator_);
   visitor->Trace(resource_cache_);
+  visitor->Trace(lcpp_);
 #if !BUILDFLAG(IS_ANDROID)
   visitor->Trace(window_controls_overlay_changed_delegate_);
 #endif
@@ -755,6 +784,22 @@ ClipPathPaintImageGenerator* LocalFrame::GetClipPathPaintImageGenerator() {
   return local_root.clip_path_paint_image_generator_.Get();
 }
 
+LCPCriticalPathPredictor* LocalFrame::GetLCPP() {
+  if (!base::FeatureList::IsEnabled(features::kLCPCriticalPathPredictor)) {
+    return nullptr;
+  }
+
+  // For now, we only attach LCPP to the outermost main frames.
+  if (!IsOutermostMainFrame()) {
+    return nullptr;
+  }
+
+  if (!lcpp_) {
+    lcpp_ = MakeGarbageCollected<LCPCriticalPathPredictor>(*this);
+  }
+  return lcpp_.Get();
+}
+
 const SecurityContext* LocalFrame::GetSecurityContext() const {
   return DomWindow() ? &DomWindow()->GetSecurityContext() : nullptr;
 }
@@ -811,6 +856,8 @@ void LocalFrame::DidAttachDocument() {
   GetEventHandler().Clear();
   Selection().DidAttachDocument(document);
   notified_color_scheme_ = false;
+
+  smooth_scroll_sequencer_.Clear();
 
 #if !BUILDFLAG(IS_ANDROID)
   // For PWAs with display_override "window-controls-overlay", titlebar area
@@ -1202,22 +1249,26 @@ scoped_refptr<InspectorTaskRunner> LocalFrame::GetInspectorTaskRunner() {
   return inspector_task_runner_;
 }
 
-void LocalFrame::StartPrinting(const gfx::SizeF& page_size,
-                               const gfx::SizeF& aspect_ratio,
-                               float maximum_shrink_ratio) {
+void LocalFrame::StartPrinting(
+    const WebPrintPageDescription& default_page_description,
+    float maximum_shrink_ratio) {
   DCHECK(!saved_scroll_offsets_);
-  SetPrinting(true, page_size, aspect_ratio, maximum_shrink_ratio);
+  LayoutView* layout_view = GetDocument()->GetLayoutView();
+  layout_view->SetDefaultPageDescription(default_page_description);
+  SetPrinting(true, maximum_shrink_ratio);
+}
+
+void LocalFrame::StartPrinting(const gfx::SizeF& page_size,
+                               float maximum_shrink_ratio) {
+  StartPrinting(WebPrintPageDescription(page_size), maximum_shrink_ratio);
 }
 
 void LocalFrame::EndPrinting() {
   RestoreScrollOffsets();
-  SetPrinting(false, gfx::SizeF(), gfx::SizeF(), 0);
+  SetPrinting(false, 0);
 }
 
-void LocalFrame::SetPrinting(bool printing,
-                             const gfx::SizeF& page_size,
-                             const gfx::SizeF& aspect_ratio,
-                             float maximum_shrink_ratio) {
+void LocalFrame::SetPrinting(bool printing, float maximum_shrink_ratio) {
   // In setting printing, we should not validate resources already cached for
   // the document.  See https://bugs.webkit.org/show_bug.cgi?id=43704
   ResourceCacheValidationSuppressor validation_suppressor(
@@ -1231,8 +1282,7 @@ void LocalFrame::SetPrinting(bool printing,
     text_autosizer->UpdatePageInfo();
 
   if (ShouldUsePrintingLayout()) {
-    View()->ForceLayoutForPagination(page_size, aspect_ratio,
-                                     maximum_shrink_ratio);
+    View()->ForceLayoutForPagination(maximum_shrink_ratio);
   } else {
     if (LayoutView* layout_view = View()->GetLayoutView()) {
       layout_view->SetIntrinsicLogicalWidthsDirty();
@@ -1351,30 +1401,6 @@ void LocalFrame::RestoreScrollOffsets() {
   saved_scroll_offsets_ = nullptr;
 }
 
-gfx::SizeF LocalFrame::ResizePageRectsKeepingRatio(
-    const gfx::SizeF& aspect_ratio,
-    const gfx::SizeF& expected_size) const {
-  auto* layout_object = ContentLayoutObject();
-  if (!layout_object)
-    return gfx::SizeF();
-
-  bool is_horizontal = layout_object->StyleRef().IsHorizontalWritingMode();
-  float numerator =
-      is_horizontal ? aspect_ratio.height() : aspect_ratio.width();
-  float denominator =
-      is_horizontal ? aspect_ratio.width() : aspect_ratio.height();
-  DCHECK_GT(fabs(denominator), std::numeric_limits<float>::epsilon());
-  float ratio = numerator / denominator;
-
-  float inline_size =
-      floorf(is_horizontal ? expected_size.width() : expected_size.height());
-  float block_size = floorf(inline_size * ratio);
-  if (!is_horizontal) {
-    return gfx::SizeF(block_size, inline_size);
-  }
-  return gfx::SizeF(inline_size, block_size);
-}
-
 void LocalFrame::SetPageZoomFactor(float factor) {
   SetPageAndTextZoomFactors(factor, text_zoom_factor_);
 }
@@ -1444,8 +1470,9 @@ void LocalFrame::MediaQueryAffectingValueChangedForLocalSubtree(
 
 void LocalFrame::WindowSegmentsChanged(
     const WebVector<gfx::Rect>& window_segments) {
-  if (!RuntimeEnabledFeatures::CSSFoldablesEnabled())
+  if (!RuntimeEnabledFeatures::ViewportSegmentsEnabled()) {
     return;
+  }
 
   DCHECK(IsLocalRoot());
 
@@ -1460,7 +1487,7 @@ void LocalFrame::WindowSegmentsChanged(
 
 void LocalFrame::UpdateViewportSegmentCSSEnvironmentVariables(
     const WebVector<gfx::Rect>& window_segments) {
-  DCHECK(RuntimeEnabledFeatures::CSSFoldablesEnabled());
+  DCHECK(RuntimeEnabledFeatures::ViewportSegmentsEnabled());
 
   // Update the variable values on the root instance so that documents that
   // are created after the values change automatically have the right values.
@@ -1616,7 +1643,9 @@ LocalFrame::LocalFrame(LocalFrameClient* client,
             insert_type,
             frame_token,
             client->GetDevToolsFrameToken(),
-            MakeGarbageCollected<LocalWindowProxyManager>(*this),
+            MakeGarbageCollected<LocalWindowProxyManager>(
+                page.GetAgentGroupScheduler().Isolate(),
+                *this),
             inheriting_agent_factory),
       frame_scheduler_(page.GetPageScheduler()->CreateFrameScheduler(
           this,
@@ -1644,9 +1673,19 @@ LocalFrame::LocalFrame(LocalFrameClient* client,
   auto frame_tracking_result =
       GetLocalFramesMap().insert(FrameToken::Hasher()(GetFrameToken()), this);
   CHECK(frame_tracking_result.stored_value) << "Inserting a duplicate item.";
-  v8::Isolate* isolate = V8PerIsolateData::MainThreadIsolate();
+  v8::Isolate* isolate = page.GetAgentGroupScheduler().Isolate();
+
+  // There is generally one probe sink per local frame tree, so for root frames
+  // we create a new child sink and for child frames we propagate one from root.
+  // However, if local frame swap is performed, we don't want both frames to be
+  // active at once, so a dummy probe sink is created for provisional frame and
+  // swapped for that of the frame being swapped on in `SwapIn()`. Since we can
+  // only know whether the frame is provisional upon `Initialize()` call which
+  // does a lot of things that may potentially lead to instrumentation calls,
+  // we set provisional probe sink unconditionally here, then possibly replace
+  // it with that of the local root after `Initialize()`.
+  probe_sink_ = MakeGarbageCollected<CoreProbeSink>();
   if (IsLocalRoot()) {
-    probe_sink_ = MakeGarbageCollected<CoreProbeSink>();
     performance_monitor_ =
         MakeGarbageCollected<PerformanceMonitor>(this, isolate);
     inspector_issue_reporter_ = MakeGarbageCollected<InspectorIssueReporter>(
@@ -1663,7 +1702,6 @@ LocalFrame::LocalFrame(LocalFrameClient* client,
     // it will be updated later.
     UpdateInertIfPossible();
     UpdateInheritedEffectiveTouchActionIfPossible();
-    probe_sink_ = LocalFrameRoot().probe_sink_;
     ad_tracker_ = LocalFrameRoot().ad_tracker_;
     performance_monitor_ = LocalFrameRoot().performance_monitor_;
   }
@@ -1679,16 +1717,21 @@ LocalFrame::LocalFrame(LocalFrameClient* client,
   DCHECK(ad_tracker_ ? RuntimeEnabledFeatures::AdTaggingEnabled()
                      : !RuntimeEnabledFeatures::AdTaggingEnabled());
 
-  absl::optional<AdScriptIdentifier> ad_script_on_stack;
   // See SubresourceFilterAgent::Initialize for why we don't set this here for
   // fenced frames.
   is_frame_created_by_ad_script_ =
       !IsMainFrame() && ad_tracker_ &&
-      ad_tracker_->IsAdScriptInStack(AdTracker::StackType::kBottomAndTop,
-                                     /*out_ad_script=*/&ad_script_on_stack);
-  Initialize();
+      ad_tracker_->IsAdScriptInStack(
+          AdTracker::StackType::kBottomAndTop,
+          /*out_ad_script=*/&ad_script_from_frame_creation_stack_);
 
-  probe::FrameAttachedToParent(this, ad_script_on_stack);
+  Initialize();
+  // Now that we know whether the frame is provisional, inherit the probe
+  // sink from parent if appropriate. See comment above for more details.
+  if (!IsLocalRoot() && !IsProvisional()) {
+    probe_sink_ = LocalFrameRoot().probe_sink_;
+    probe::FrameAttachedToParent(this, ad_script_from_frame_creation_stack_);
+  }
 }
 
 FrameScheduler* LocalFrame::GetFrameScheduler() {
@@ -1751,6 +1794,12 @@ bool LocalFrame::CanNavigate(const Frame& target_frame,
           SecurityOrigin::Create(destination_url).get())) {
     UseCounter::Count(GetDocument(),
                       WebFeature::kOpenerNavigationWithoutGesture);
+  }
+
+  // Frames from different browsing context groups in the same CoopRelatedGroup
+  // should not be able navigate one another.
+  if (IsNavigationBlockedByCoopRestrictProperties(*this, target_frame)) {
+    return false;
   }
 
   if (destination_url.ProtocolIsJavaScript() &&
@@ -1963,7 +2012,7 @@ ContentCaptureManager* LocalFrame::GetOrResetContentCaptureManager() {
   // It is a little bit odd that ContentCaptureManager is created or released on
   // demand, and that this is something that could be improved with an explicit
   // signal for creating / destroying content capture managers.
-  if (auto* content_capture_client = Client()->GetWebContentCaptureClient()) {
+  if (Client()->GetWebContentCaptureClient()) {
     if (!content_capture_manager_) {
       content_capture_manager_ =
           MakeGarbageCollected<ContentCaptureManager>(*this);
@@ -2359,12 +2408,39 @@ void LocalFrame::AnimateSnapFling(base::TimeTicks monotonic_time) {
   GetEventHandler().AnimateSnapFling(monotonic_time);
 }
 
-SmoothScrollSequencer& LocalFrame::GetSmoothScrollSequencer() {
+SmoothScrollSequencer* LocalFrame::CreateNewSmoothScrollSequence() {
+  if (!IsLocalRoot()) {
+    return LocalFrameRoot().CreateNewSmoothScrollSequence();
+  }
+
+  SmoothScrollSequencer* old_sequencer = smooth_scroll_sequencer_;
+  smooth_scroll_sequencer_ = MakeGarbageCollected<SmoothScrollSequencer>(*this);
+  return old_sequencer;
+}
+
+void LocalFrame::ReinstateSmoothScrollSequence(
+    SmoothScrollSequencer* sequencer) {
+  if (!IsLocalRoot()) {
+    LocalFrameRoot().ReinstateSmoothScrollSequence(sequencer);
+    return;
+  }
+
+  smooth_scroll_sequencer_ = sequencer;
+}
+
+void LocalFrame::FinishedScrollSequence() {
+  if (!IsLocalRoot()) {
+    LocalFrameRoot().FinishedScrollSequence();
+    return;
+  }
+
+  smooth_scroll_sequencer_.Clear();
+}
+
+SmoothScrollSequencer* LocalFrame::GetSmoothScrollSequencer() const {
   if (!IsLocalRoot())
     return LocalFrameRoot().GetSmoothScrollSequencer();
-  if (!smooth_scroll_sequencer_)
-    smooth_scroll_sequencer_ = MakeGarbageCollected<SmoothScrollSequencer>();
-  return *smooth_scroll_sequencer_;
+  return smooth_scroll_sequencer_;
 }
 
 ukm::UkmRecorder* LocalFrame::GetUkmRecorder() {
@@ -2399,11 +2475,11 @@ BlockingDetailsList LocalFrame::ConvertFeatureAndLocationToMojomStruct(
     const BFCacheBlockingFeatureAndLocations& non_sticky,
     const BFCacheBlockingFeatureAndLocations& sticky) {
   BlockingDetailsList blocking_details_list;
-  for (auto feature : non_sticky) {
+  for (auto feature : non_sticky.details_list) {
     auto blocking_details = CreateBlockingDetailsMojom(feature);
     blocking_details_list.push_back(std::move(blocking_details));
   }
-  for (auto feature : sticky) {
+  for (auto feature : sticky.details_list) {
     auto blocking_details = CreateBlockingDetailsMojom(feature);
     blocking_details_list.push_back(std::move(blocking_details));
   }
@@ -2629,16 +2705,26 @@ void LocalFrame::SetContextPaused(bool is_paused) {
   GetFrameScheduler()->SetPaused(is_paused);
 }
 
+LocalFrame* LocalFrame::GetPreviousLocalFrameForLocalSwap() {
+  CHECK(IsProvisional());
+  if (auto* previous_main_frame =
+          GetPage()->GetPreviousMainFrameForLocalSwap()) {
+    return previous_main_frame;
+  }
+  return DynamicTo<LocalFrame>(GetProvisionalOwnerFrame());
+}
+
 bool LocalFrame::SwapIn() {
   DCHECK(IsProvisional());
   WebLocalFrameClient* client = Client()->GetWebFrame()->Client();
   // Swap in `this`, which is a provisional frame to an existing frame.
   Frame* provisional_owner_frame = GetProvisionalOwnerFrame();
 
+
   // First, check if there's a previous main frame to be used for a main frame
   // LocalFrame <-> LocalFrame swap.
   Frame* previous_local_main_frame =
-      GetPage()->TakePreviousMainFrameForLocalSwap();
+      GetPage()->GetPreviousMainFrameForLocalSwap();
   if (previous_local_main_frame && !previous_local_main_frame->IsDetached()) {
     // We're about to do a LocalFrame <-> LocalFrame swap for a provisional
     // main frame, where the previous main frame and the provisional main frame
@@ -2659,6 +2745,7 @@ bool LocalFrame::SwapIn() {
     CHECK(provisional_owner_frame->IsRemoteFrame());
     CHECK(!DynamicTo<RemoteFrame>(provisional_owner_frame)
                ->IsRemoteFrameHostRemoteBound());
+    GetPage()->SetPreviousMainFrameForLocalSwap(nullptr);
     return client->SwapIn(WebFrame::FromCoreFrame(previous_local_main_frame));
   }
 
@@ -2667,6 +2754,38 @@ bool LocalFrame::SwapIn() {
   // frame can be a RemoteFrame or a LocalFrame (for non-main frame
   // LocalFrame <-> LocalFrame swap cases).
   CHECK_EQ(provisional_owner_frame->GetPage(), GetPage());
+
+  // When creating a provisional LocalFrame, a new provisional probe sink is
+  // created. Whether that probe sink is going to be used differs depending
+  // on the situation:
+  // - For local roots, that provisional probe sink should be used, as
+  //   local roots needs new probe sinks. So nothing needs to be done here.
+  // - For non-local-root LocalFrame <-> LocalFrame swap, reuse the previous
+  //   LocalFrame's probe sink.
+  // - For other cases, reuse the local root's probe sink.
+  // Note that the probes dispatched to provisional sink are lost, so no
+  // events are sent before swap in or after swap out.
+  if (!IsLocalRoot()) {
+    if (auto* local_provisional_owner =
+            DynamicTo<LocalFrame>(provisional_owner_frame)) {
+      // This is doing a LocalFrame <-> LocalFrame swap, so reuse the previous
+      // LocalFrame's probe sink through swapping below. The detaching/unloading
+      // of the previous document is done before we swap the probe sinks. This
+      // is to ensure that resources from the old document won't stay around and
+      // thus won't be be captured in the newly committed document's probe sink.
+      bool swap_result =
+          client->SwapIn(WebFrame::FromCoreFrame(provisional_owner_frame));
+      std::swap(probe_sink_, local_provisional_owner->probe_sink_);
+      return swap_result;
+    }
+
+    // This is a remote -> local swap, so just use the local root's probe sink.
+    probe_sink_ = LocalFrameRoot().probe_sink_;
+    // For remote -> local swap, Send a frameAttached event to keep the legacy
+    // behavior where we fire the frameAttached event on cross-site navigations.
+    probe::FrameAttachedToParent(this, ad_script_from_frame_creation_stack_);
+  }
+
   return client->SwapIn(WebFrame::FromCoreFrame(provisional_owner_frame));
 }
 
@@ -2674,8 +2793,12 @@ void LocalFrame::LoadJavaScriptURL(const KURL& url) {
   // Protect privileged pages against bookmarklets and other JavaScript
   // manipulations.
   if (SchemeRegistry::ShouldTreatURLSchemeAsNotAllowingJavascriptURLs(
-          GetDocument()->Url().Protocol()))
+          GetSecurityContext()
+              ->GetSecurityOrigin()
+              ->GetOriginOrPrecursorOriginIfOpaque()
+              ->Protocol())) {
     return;
+  }
 
   // TODO(mustaq): This is called only through the user typing a javascript URL
   // into the omnibox.  See https://crbug.com/1082900
@@ -2698,6 +2821,7 @@ void LocalFrame::RequestExecuteScript(
     mojom::blink::PromiseResultOption promise_behavior) {
   scoped_refptr<DOMWrapperWorld> world;
   ExecuteScriptPolicy execute_script_policy;
+  CHECK(!IsProvisional());
   if (world_id == DOMWrapperWorld::kMainWorldId) {
     world = &DOMWrapperWorld::MainWorld();
     execute_script_policy =
@@ -2720,10 +2844,12 @@ void LocalFrame::RequestExecuteScript(
   script_sources.Append(sources.data(),
                         base::checked_cast<wtf_size_t>(sources.size()));
 
+  ScriptState* script_state = ToScriptState(this, *world);
+  CHECK(script_state);
   PausableScriptExecutor::CreateAndRun(
-      ToScriptState(DomWindow(), *world), std::move(script_sources),
-      execute_script_policy, user_gesture, evaluation_timing, blocking_option,
-      want_result_option, promise_behavior, std::move(callback));
+      script_state, std::move(script_sources), execute_script_policy,
+      user_gesture, evaluation_timing, blocking_option, want_result_option,
+      promise_behavior, std::move(callback));
 }
 
 void LocalFrame::SetEvictCachedSessionStorageOnFreezeOrUnload() {
@@ -2871,7 +2997,8 @@ void LocalFrame::UpdateFaviconURL() {
   urls.reserve(icon_urls.size());
   for (const auto& icon_url : icon_urls) {
     urls.push_back(mojom::blink::FaviconURL::New(
-        icon_url.icon_url_, icon_url.icon_type_, icon_url.sizes_));
+        icon_url.icon_url_, icon_url.icon_type_, icon_url.sizes_,
+        icon_url.is_default_icon_));
   }
   DCHECK_EQ(icon_urls.size(), urls.size());
 
@@ -2915,6 +3042,7 @@ void LocalFrame::DidBufferLoadWhileInBackForwardCache(size_t num_bytes) {
 }
 
 void LocalFrame::SetScaleFactor(float scale_factor) {
+  DCHECK(!GetDocument() || !GetDocument()->Printing());
   DCHECK(IsMainFrame());
 
   const PageScaleConstraints& constraints =
@@ -3015,7 +3143,7 @@ HitTestResult LocalFrame::HitTestResultForVisualViewportPos(
   HitTestLocation location(View()->ConvertFromRootFrame(root_frame_point));
   HitTestResult result = GetEventHandler().HitTestResultAtLocation(
       location, HitTestRequest::kReadOnly | HitTestRequest::kActive);
-  result.SetToShadowHostIfInRestrictedShadowRoot();
+  result.SetToShadowHostIfInUAShadowRoot();
   return result;
 }
 
@@ -3134,20 +3262,21 @@ void LocalFrame::MediaPlayerActionAtViewportPoint(
 
   auto* media_element = To<HTMLMediaElement>(node);
   switch (type) {
-    case mojom::blink::MediaPlayerActionType::kPlay:
-      if (enable)
-        media_element->Play();
-      else
-        media_element->pause();
-      break;
-    case mojom::blink::MediaPlayerActionType::kMute:
-      media_element->setMuted(enable);
-      break;
     case mojom::blink::MediaPlayerActionType::kLoop:
       media_element->SetLoop(enable);
       break;
     case mojom::blink::MediaPlayerActionType::kControls:
       media_element->SetUserWantsControlsVisible(enable);
+      break;
+    case mojom::blink::MediaPlayerActionType::kCopyVideoFrame:
+      DCHECK(IsA<HTMLVideoElement>(media_element));
+      {
+        auto* video_element = To<HTMLVideoElement>(media_element);
+        auto image = video_element->CreateStaticBitmapImage();
+        if (image) {
+          GetEditor().CopyImage(result, image);
+        }
+      }
       break;
     case mojom::blink::MediaPlayerActionType::kPictureInPicture:
       DCHECK(IsA<HTMLVideoElement>(media_element));
@@ -3224,7 +3353,7 @@ void LocalFrame::AdvanceFocusForIME(mojom::blink::FocusType focus_type) {
     return;
 
   next_element->scrollIntoViewIfNeeded(true /*centerIfNeeded*/);
-  next_element->Focus();
+  next_element->Focus(FocusParams(FocusTrigger::kUserGesture));
 }
 
 void LocalFrame::PostMessageEvent(
@@ -3495,11 +3624,11 @@ void LocalFrame::ScheduleNextServiceForScrollSnapshotClients() {
   }
 }
 
-void LocalFrame::CollectAnchorScrollContainerIds(
+void LocalFrame::CollectAnchorPositionScrollerIds(
     Vector<cc::ElementId>* ids) const {
   for (const auto& client : scroll_snapshot_clients_) {
-    if (const AnchorScrollData* data =
-            DynamicTo<AnchorScrollData>(client.Get());
+    if (const AnchorPositionScrollData* data =
+            DynamicTo<AnchorPositionScrollData>(client.Get());
         data && data->IsActive()) {
       ids->AppendVector(data->ScrollContainerIds());
     }

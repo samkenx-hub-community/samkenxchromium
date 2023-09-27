@@ -38,6 +38,7 @@
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "ui/accessibility/accessibility_features.h"
 #include "ui/base/l10n/l10n_util.h"
+#include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/models/image_model.h"
 #include "ui/gfx/paint_vector_icon.h"
 #include "ui/gfx/vector_icon_types.h"
@@ -133,9 +134,6 @@ void UpdateFeatureState(bool enabled,
 ////////////////////////////////////////////////////////////////////////////////
 // AccessibilityDetailedView
 
-constexpr char AccessibilityDetailedView::kClassName[] =
-    "AccessibilityDetailedView";
-
 AccessibilityDetailedView::AccessibilityDetailedView(
     DetailedViewDelegate* delegate)
     : TrayDetailedView(delegate),
@@ -189,6 +187,16 @@ void AccessibilityDetailedView::OnAccessibilityStatusChanged() {
   if (controller->IsDictationSettingVisibleInTray()) {
     bool checked = controller->dictation().enabled();
     UpdateFeatureState(checked, dictation_view_, dictation_top_view_);
+  }
+
+  if (controller->IsColorCorrectionSettingVisibleInTray()) {
+    if (!::features::
+            AreExperimentalAccessibilityColorEnhancementSettingsEnabled()) {
+      return;
+    }
+    bool checked = controller->color_correction().enabled();
+    UpdateFeatureState(checked, color_correction_view_,
+                       color_correction_top_view_);
   }
 
   if (controller->IsHighContrastSettingVisibleInTray()) {
@@ -263,10 +271,6 @@ void AccessibilityDetailedView::OnAccessibilityStatusChanged() {
   }
 }
 
-const char* AccessibilityDetailedView::GetClassName() const {
-  return kClassName;
-}
-
 void AccessibilityDetailedView::AppendAccessibilityList() {
   CreateScrollableList();
 
@@ -304,6 +308,10 @@ void AccessibilityDetailedView::AddEnabledFeatures(views::View* container) {
   if (controller->IsDictationSettingVisibleInTray() &&
       controller->dictation().enabled()) {
     dictation_top_view_ = AddDictationView(container);
+  }
+  if (controller->IsColorCorrectionSettingVisibleInTray() &&
+      controller->color_correction().enabled()) {
+    color_correction_top_view_ = AddColorCorrectionView(container);
   }
   if (controller->IsHighContrastSettingVisibleInTray() &&
       controller->high_contrast().enabled()) {
@@ -374,6 +382,10 @@ void AccessibilityDetailedView::AddAllFeatures(views::View* container) {
 
   if (controller->IsDictationSettingVisibleInTray()) {
     dictation_view_ = AddDictationView(container);
+  }
+
+  if (controller->IsColorCorrectionSettingVisibleInTray()) {
+    color_correction_view_ = AddColorCorrectionView(container);
   }
 
   if (controller->IsHighContrastSettingVisibleInTray()) {
@@ -475,6 +487,17 @@ HoverHighlightView* AccessibilityDetailedView::AddDictationView(
       container, kDictationMenuIcon,
       l10n_util::GetStringUTF16(IDS_ASH_STATUS_TRAY_ACCESSIBILITY_DICTATION),
       checked, controller->IsEnterpriseIconVisibleForDictation());
+}
+
+HoverHighlightView* AccessibilityDetailedView::AddColorCorrectionView(
+    views::View* container) {
+  auto* controller = Shell::Get()->accessibility_controller();
+  bool checked = controller->color_correction().enabled();
+  return AddScrollListFeatureItem(
+      container, kColorCorrectionIcon,
+      l10n_util::GetStringUTF16(
+          IDS_ASH_STATUS_TRAY_ACCESSIBILITY_COLOR_CORRECTION),
+      checked, controller->IsEnterpriseIconVisibleForColorCorrection());
 }
 
 HoverHighlightView* AccessibilityDetailedView::AddHighContrastView(
@@ -712,6 +735,14 @@ void AccessibilityDetailedView::HandleViewClicked(views::View* view) {
     RecordAction(new_state ? UserMetricsAction("StatusArea_DictationEnabled")
                            : UserMetricsAction("StatusArea_DictationDisabled"));
     controller->dictation().SetEnabled(new_state);
+  } else if ((view == color_correction_view_ ||
+              view == color_correction_top_view_) &&
+             !controller->IsEnterpriseIconVisibleForColorCorrection()) {
+    bool new_state = !controller->color_correction().enabled();
+    RecordAction(new_state
+                     ? UserMetricsAction("StatusArea_ColorCorrectionEnabled")
+                     : UserMetricsAction("StatusArea_ColorCorrectionDisabled"));
+    controller->color_correction().SetEnabled(new_state);
   } else if ((view == high_contrast_top_view_ || view == high_contrast_view_) &&
              !controller->IsEnterpriseIconVisibleForHighContrast()) {
     bool new_state = !controller->high_contrast().enabled();
@@ -923,5 +954,8 @@ void AccessibilityDetailedView::SetSodaFeatureSubtext(SodaFeature feature,
       break;
   }
 }
+
+BEGIN_METADATA(AccessibilityDetailedView, TrayDetailedView)
+END_METADATA
 
 }  // namespace ash

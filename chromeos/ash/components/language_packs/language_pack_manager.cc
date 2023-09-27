@@ -4,6 +4,8 @@
 
 #include "chromeos/ash/components/language_packs/language_pack_manager.h"
 
+#include <string_view>
+
 #include "base/containers/contains.h"
 #include "base/containers/flat_map.h"
 #include "base/functional/bind.h"
@@ -15,12 +17,117 @@
 #include "base/no_destructor.h"
 #include "chromeos/ash/components/dbus/dlcservice/dlcservice.pb.h"
 #include "chromeos/ash/components/dbus/dlcservice/dlcservice_client.h"
+#include "chromeos/ash/components/language_packs/handwriting.h"
 #include "chromeos/ash/components/language_packs/language_packs_util.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/cros_system_api/dbus/dlcservice/dbus-constants.h"
 
 namespace ash::language_packs {
 namespace {
+
+const base::flat_map<std::string, std::string>& GetAllBasePackDlcIds() {
+  // Map of all features and corresponding Base Pack DLC IDs.
+  static const base::NoDestructor<base::flat_map<std::string, std::string>>
+      all_dlc_ids({
+          {kHandwritingFeatureId, "handwriting-base"},
+      });
+
+  return *all_dlc_ids;
+}
+
+// Finds the ID of the DLC corresponding to the Base Pack for a feature.
+// Returns the DLC ID if the feature has a Base Pack or absl::nullopt
+// otherwise.
+absl::optional<std::string> GetDlcIdForBasePack(const std::string& feature_id) {
+  // We search in the static list for the given |feature_id|.
+  const auto it = GetAllBasePackDlcIds().find(feature_id);
+
+  if (it == GetAllBasePackDlcIds().end()) {
+    return absl::nullopt;
+  }
+
+  return it->second;
+}
+
+void InstallDlc(const std::string& dlc_id,
+                DlcserviceClient::InstallCallback install_callback) {
+  dlcservice::InstallRequest install_request;
+  install_request.set_id(dlc_id);
+  DlcserviceClient::Get()->Install(install_request, std::move(install_callback),
+                                   base::DoNothing());
+}
+
+void OnInstallDlcComplete(OnInstallCompleteCallback callback,
+                          const std::string& feature_id,
+                          const std::string& locale,
+                          const DlcserviceClient::InstallResult& dlc_result) {
+  PackResult result = ConvertDlcInstallResultToPackResult(dlc_result);
+  result.feature_id = feature_id;
+  result.language_code = locale;
+
+  const bool success = result.operation_error == PackResult::ErrorCode::kNone;
+  if (!success) {
+    if (feature_id == kHandwritingFeatureId) {
+      base::UmaHistogramEnumeration(
+          "ChromeOS.LanguagePacks.InstallError.Handwriting",
+          GetDlcErrorTypeForUma(dlc_result.error));
+    } else if (feature_id == kTtsFeatureId) {
+      base::UmaHistogramEnumeration("ChromeOS.LanguagePacks.InstallError.Tts",
+                                    GetDlcErrorTypeForUma(dlc_result.error));
+    }
+  }
+
+  base::UmaHistogramEnumeration("ChromeOS.LanguagePacks.InstallPack.Success",
+                                GetSuccessValueForUma(feature_id, success));
+
+  std::move(callback).Run(result);
+}
+
+void OnUninstallDlcComplete(OnUninstallCompleteCallback callback,
+                            std::string_view feature_id,
+                            const std::string& locale,
+                            const std::string& err) {
+  PackResult result;
+  result.feature_id = feature_id;
+  result.language_code = locale;
+  result.operation_error = ConvertDlcErrorToErrorCode(err);
+
+  const bool success = err == dlcservice::kErrorNone;
+  if (success) {
+    result.pack_state = PackResult::StatusCode::kNotInstalled;
+  } else {
+    result.pack_state = PackResult::StatusCode::kUnknown;
+  }
+
+  base::UmaHistogramBoolean("ChromeOS.LanguagePacks.UninstallComplete.Success",
+                            success);
+
+  std::move(callback).Run(result);
+}
+
+void OnGetDlcState(GetPackStateCallback callback,
+                   std::string_view feature_id,
+                   const std::string& locale,
+                   const std::string& err,
+                   const dlcservice::DlcState& dlc_state) {
+  PackResult result;
+  // GetDlcState() returns 2 errors:
+  // one for the DBus call and one for the actual DLC.
+  // If the first error is set we can ignore the DLC state.
+  if (err.empty() || err == dlcservice::kErrorNone) {
+    result = ConvertDlcStateToPackResult(dlc_state);
+  } else {
+    result.operation_error = ConvertDlcErrorToErrorCode(err);
+    result.pack_state = PackResult::StatusCode::kUnknown;
+  }
+
+  result.feature_id = feature_id;
+  result.language_code = locale;
+
+  std::move(callback).Run(result);
+}
+
+}  // namespace
 
 const base::flat_map<PackSpecPair, std::string>& GetAllLanguagePackDlcIds() {
   // Map of all DLCs and corresponding IDs.
@@ -100,56 +207,51 @@ const base::flat_map<PackSpecPair, std::string>& GetAllLanguagePackDlcIds() {
           {{kHandwritingFeatureId, "zh-HK"}, "handwriting-zh-HK"},
 
           // Text-To-Speech.
-          {{kTtsFeatureId, "bn-bd"}, "tts-bn-bd"},
-          {{kTtsFeatureId, "cs-cz"}, "tts-cs-cz"},
-          {{kTtsFeatureId, "da-dk"}, "tts-da-dk"},
-          {{kTtsFeatureId, "de-de"}, "tts-de-de"},
-          {{kTtsFeatureId, "el-gr"}, "tts-el-gr"},
-          {{kTtsFeatureId, "en-au"}, "tts-en-au"},
-          {{kTtsFeatureId, "en-gb"}, "tts-en-gb"},
-          {{kTtsFeatureId, "en-us"}, "tts-en-us"},
-          {{kTtsFeatureId, "es-es"}, "tts-es-es"},
-          {{kTtsFeatureId, "es-us"}, "tts-es-us"},
-          {{kTtsFeatureId, "fi-fi"}, "tts-fi-fi"},
-          {{kTtsFeatureId, "fil-ph"}, "tts-fil-ph"},
-          {{kTtsFeatureId, "fr-fr"}, "tts-fr-fr"},
-          {{kTtsFeatureId, "hi-in"}, "tts-hi-in"},
-          {{kTtsFeatureId, "hu-hu"}, "tts-hu-hu"},
-          {{kTtsFeatureId, "id-id"}, "tts-id-id"},
-          {{kTtsFeatureId, "it-it"}, "tts-it-it"},
-          {{kTtsFeatureId, "ja-jp"}, "tts-ja-jp"},
-          {{kTtsFeatureId, "km-kh"}, "tts-km-kh"},
-          {{kTtsFeatureId, "ko-kr"}, "tts-ko-kr"},
-          {{kTtsFeatureId, "nb-no"}, "tts-nb-no"},
-          {{kTtsFeatureId, "ne-np"}, "tts-ne-np"},
-          {{kTtsFeatureId, "nl-nl"}, "tts-nl-nl"},
-          {{kTtsFeatureId, "pl-pl"}, "tts-pl-pl"},
-          {{kTtsFeatureId, "pt-br"}, "tts-pt-br"},
-          {{kTtsFeatureId, "si-lk"}, "tts-si-lk"},
-          {{kTtsFeatureId, "sk-sk"}, "tts-sk-sk"},
-          {{kTtsFeatureId, "sv-se"}, "tts-sv-se"},
-          {{kTtsFeatureId, "th-th"}, "tts-th-th"},
-          {{kTtsFeatureId, "tr-tr"}, "tts-tr-tr"},
-          {{kTtsFeatureId, "uk-ua"}, "tts-uk-ua"},
-          {{kTtsFeatureId, "vi-vn"}, "tts-vi-vn"},
-          {{kTtsFeatureId, "yue-hk"}, "tts-yue-hk"},
+          {{kTtsFeatureId, "bn"}, "tts-bn-bd-b"},
+          {{kTtsFeatureId, "cs"}, "tts-cs-cz-b"},
+          {{kTtsFeatureId, "da"}, "tts-da-dk-b"},
+          {{kTtsFeatureId, "de"}, "tts-de-de-b"},
+          {{kTtsFeatureId, "el"}, "tts-el-gr-b"},
+          {{kTtsFeatureId, "en-au"}, "tts-en-au-b"},
+          {{kTtsFeatureId, "en-gb"}, "tts-en-gb-b"},
+          {{kTtsFeatureId, "en-us"}, "tts-en-us-b"},
+          {{kTtsFeatureId, "es-es"}, "tts-es-es-b"},
+          {{kTtsFeatureId, "es-us"}, "tts-es-us-b"},
+          {{kTtsFeatureId, "fi"}, "tts-fi-fi-b"},
+          {{kTtsFeatureId, "fil"}, "tts-fil-ph-b"},
+          {{kTtsFeatureId, "fr"}, "tts-fr-fr-b"},
+          {{kTtsFeatureId, "hi"}, "tts-hi-in-b"},
+          {{kTtsFeatureId, "hu"}, "tts-hu-hu-b"},
+          {{kTtsFeatureId, "id"}, "tts-id-id-b"},
+          {{kTtsFeatureId, "it"}, "tts-it-it-b"},
+          {{kTtsFeatureId, "ja"}, "tts-ja-jp-b"},
+          {{kTtsFeatureId, "km"}, "tts-km-kh-b"},
+          {{kTtsFeatureId, "ko"}, "tts-ko-kr-b"},
+          {{kTtsFeatureId, "nb"}, "tts-nb-no-b"},
+          {{kTtsFeatureId, "ne"}, "tts-ne-np-b"},
+          {{kTtsFeatureId, "nl"}, "tts-nl-nl-b"},
+          {{kTtsFeatureId, "pl"}, "tts-pl-pl-b"},
+          {{kTtsFeatureId, "pt"}, "tts-pt-br-b"},
+          {{kTtsFeatureId, "si"}, "tts-si-lk-b"},
+          {{kTtsFeatureId, "sk"}, "tts-sk-sk-b"},
+          {{kTtsFeatureId, "sv"}, "tts-sv-se-b"},
+          {{kTtsFeatureId, "th"}, "tts-th-th-b"},
+          {{kTtsFeatureId, "tr"}, "tts-tr-tr-b"},
+          {{kTtsFeatureId, "uk"}, "tts-uk-ua-b"},
+          {{kTtsFeatureId, "vi"}, "tts-vi-vn-b"},
+          {{kTtsFeatureId, "yue"}, "tts-yue-hk-b"},
       });
 
   return *all_dlc_ids;
 }
 
-const base::flat_map<std::string, std::string>& GetAllBasePackDlcIds() {
-  // Map of all features and corresponding Base Pack DLC IDs.
-  static const base::NoDestructor<base::flat_map<std::string, std::string>>
-      all_dlc_ids({
-          {kHandwritingFeatureId, "handwriting-base"},
-      });
-
-  return *all_dlc_ids;
-}
-
-// Finds the ID of the DLC corresponding to the given spec.
-// Returns the DLC ID if the DLC exists or absl::nullopt otherwise.
+// TODO: b/294162606 - Calling this function with a `std::string_view` or a
+// `const char*` argument causes two string copies per argument - one to call
+// the function, and one to create the `PackSpecPair` to look up in the map.
+// Either refactor this function to take in a `std::string_view` to reduce it
+// down to one string copy per argument, use heterogeneous lookup
+// (https://abseil.io/tips/144) to reduce it down to zero string copies, or
+// rewrite this function completely.
 absl::optional<std::string> GetDlcIdForLanguagePack(
     const std::string& feature_id,
     const std::string& locale) {
@@ -164,123 +266,30 @@ absl::optional<std::string> GetDlcIdForLanguagePack(
   return it->second;
 }
 
-// Finds the ID of the DLC corresponding to the Base Pack for a feature.
-// Returns the DLC ID if the feature has a Base Pack or absl::nullopt
-// otherwise.
-absl::optional<std::string> GetDlcIdForBasePack(const std::string& feature_id) {
-  // We search in the static list for the given |feature_id|.
-  const auto it = GetAllBasePackDlcIds().find(feature_id);
-
-  if (it == GetAllBasePackDlcIds().end()) {
-    return absl::nullopt;
-  }
-
-  return it->second;
-}
-
-void InstallDlc(const std::string& dlc_id,
-                DlcserviceClient::InstallCallback install_callback) {
-  dlcservice::InstallRequest install_request;
-  install_request.set_id(dlc_id);
-  DlcserviceClient::Get()->Install(install_request, std::move(install_callback),
-                                   base::DoNothing());
-}
-
-void OnInstallDlcComplete(OnInstallCompleteCallback callback,
-                          const std::string& feature_id,
-                          const std::string& locale,
-                          const DlcserviceClient::InstallResult& dlc_result) {
-  PackResult result;
-  result.operation_error = dlc_result.error;
-  result.language_code = locale;
-
-  const bool success = dlc_result.error == dlcservice::kErrorNone;
-  if (success) {
-    result.pack_state = PackResult::INSTALLED;
-    result.path = dlc_result.root_path;
-  } else {
-    result.pack_state = PackResult::UNKNOWN;
-    if (feature_id == kHandwritingFeatureId) {
-      base::UmaHistogramEnumeration(
-          "ChromeOS.LanguagePacks.InstallError.Handwriting",
-          GetDlcErrorTypeForUma(dlc_result.error));
-    } else if (feature_id == kTtsFeatureId) {
-      base::UmaHistogramEnumeration("ChromeOS.LanguagePacks.InstallError.Tts",
-                                    GetDlcErrorTypeForUma(dlc_result.error));
-    }
-  }
-
-  base::UmaHistogramEnumeration("ChromeOS.LanguagePacks.InstallPack.Success",
-                                GetSuccessValueForUma(feature_id, success));
-
-  std::move(callback).Run(result);
-}
-
-void OnUninstallDlcComplete(OnUninstallCompleteCallback callback,
-                            const std::string& locale,
-                            const std::string& err) {
-  PackResult result;
-  result.operation_error = err;
-  result.language_code = locale;
-
-  const bool success = err == dlcservice::kErrorNone;
-  if (success) {
-    result.pack_state = PackResult::NOT_INSTALLED;
-  } else {
-    result.pack_state = PackResult::UNKNOWN;
-  }
-
-  base::UmaHistogramBoolean("ChromeOS.LanguagePacks.UninstallComplete.Success",
-                            success);
-
-  std::move(callback).Run(result);
-}
-
-void OnGetDlcState(GetPackStateCallback callback,
-                   const std::string& locale,
-                   const std::string& err,
-                   const dlcservice::DlcState& dlc_state) {
-  PackResult result;
-
-  if (err == dlcservice::kErrorNone) {
-    result = ConvertDlcStateToPackResult(dlc_state);
-  } else {
-    result.pack_state = PackResult::UNKNOWN;
-  }
-
-  result.language_code = locale;
-  result.operation_error = err;
-
-  std::move(callback).Run(result);
-}
-
-}  // namespace
-
 ///////////////////////////////////////////////////////////
 // PackResult constructors and destructors.
 PackResult::PackResult() {
-  this->pack_state = PackResult::UNKNOWN;
+  this->pack_state = PackResult::StatusCode::kUnknown;
 }
 
 PackResult::~PackResult() = default;
 
-PackResult::PackResult(const PackResult& pr)
-    : operation_error(pr.operation_error),
-      pack_state(pr.pack_state),
-      language_code(pr.language_code),
-      path(pr.path) {}
+PackResult::PackResult(const PackResult&) = default;
 ///////////////////////////////////////////////////////////
 
 bool LanguagePackManager::IsPackAvailable(const std::string& feature_id,
-                                          const std::string& locale) {
+                                          const std::string& input_locale) {
+  const std::string locale = ResolveLocale(feature_id, input_locale);
+
   // We search in the static list for the given Pack spec.
   const PackSpecPair spec(feature_id, locale);
   return base::Contains(GetAllLanguagePackDlcIds(), spec);
 }
 
 void LanguagePackManager::InstallPack(const std::string& feature_id,
-                                      const std::string& locale,
+                                      const std::string& input_locale,
                                       OnInstallCompleteCallback callback) {
+  const std::string locale = ResolveLocale(feature_id, input_locale);
   const absl::optional<std::string> dlc_id =
       GetDlcIdForLanguagePack(feature_id, locale);
 
@@ -296,8 +305,9 @@ void LanguagePackManager::InstallPack(const std::string& feature_id,
 }
 
 void LanguagePackManager::GetPackState(const std::string& feature_id,
-                                       const std::string& locale,
+                                       const std::string& input_locale,
                                        GetPackStateCallback callback) {
+  const std::string locale = ResolveLocale(feature_id, input_locale);
   const absl::optional<std::string> dlc_id =
       GetDlcIdForLanguagePack(feature_id, locale);
 
@@ -314,12 +324,14 @@ void LanguagePackManager::GetPackState(const std::string& feature_id,
                                 GetFeatureIdValueForUma(feature_id));
 
   DlcserviceClient::Get()->GetDlcState(
-      *dlc_id, base::BindOnce(&OnGetDlcState, std::move(callback), locale));
+      *dlc_id,
+      base::BindOnce(&OnGetDlcState, std::move(callback), feature_id, locale));
 }
 
 void LanguagePackManager::RemovePack(const std::string& feature_id,
-                                     const std::string& locale,
+                                     const std::string& input_locale,
                                      OnUninstallCompleteCallback callback) {
+  const std::string locale = ResolveLocale(feature_id, input_locale);
   const absl::optional<std::string> dlc_id =
       GetDlcIdForLanguagePack(feature_id, locale);
 
@@ -331,8 +343,8 @@ void LanguagePackManager::RemovePack(const std::string& feature_id,
   }
 
   DlcserviceClient::Get()->Uninstall(
-      *dlc_id,
-      base::BindOnce(&OnUninstallDlcComplete, std::move(callback), locale));
+      *dlc_id, base::BindOnce(&OnUninstallDlcComplete, std::move(callback),
+                              feature_id, locale));
 }
 
 void LanguagePackManager::InstallBasePack(
@@ -355,7 +367,9 @@ void LanguagePackManager::InstallBasePack(
                                      feature_id, ""));
 }
 
-void LanguagePackManager::UpdatePacksForOobe(const std::string& locale) {
+void LanguagePackManager::UpdatePacksForOobe(
+    const std::string& input_locale,
+    OnUpdatePacksForOobeCallback callback) {
   if (!IsOobe()) {
     DLOG(ERROR) << "Language Packs: UpdatePackForOobe called while not in OOBE";
     return;
@@ -364,13 +378,19 @@ void LanguagePackManager::UpdatePacksForOobe(const std::string& locale) {
   // For now, TTS is the only feature we want to install during OOBE.
   // In the future we'll have a function that returns the list of features to
   // install.
-  const std::string final_locale = ResolveLocaleForTts(locale);
+  const std::string locale = ResolveLocale(kTtsFeatureId, input_locale);
   const absl::optional<std::string> dlc_id =
-      GetDlcIdForLanguagePack(kTtsFeatureId, final_locale);
+      GetDlcIdForLanguagePack(kTtsFeatureId, locale);
 
   if (dlc_id) {
-    InstallDlc(*dlc_id, base::BindOnce(&OnInstallDlcComplete, base::DoNothing(),
-                                       kTtsFeatureId, locale));
+    base::UmaHistogramBoolean("ChromeOS.LanguagePacks.Oobe.ValidLocale", true);
+    InstallDlc(*dlc_id,
+               base::BindOnce(&OnInstallDlcComplete, std::move(callback),
+                              kTtsFeatureId, locale));
+  } else {
+    base::UmaHistogramBoolean("ChromeOS.LanguagePacks.Oobe.ValidLocale", false);
+    DLOG(ERROR) << "Language Packs: UpdatePacksForOobe locale does not exist";
+    std::move(callback).Run(CreateInvalidDlcPackResult());
   }
 }
 
@@ -383,8 +403,12 @@ void LanguagePackManager::RemoveObserver(Observer* const observer) {
 }
 
 void LanguagePackManager::NotifyPackStateChanged(
+    std::string_view feature_id,
+    std::string_view locale,
     const dlcservice::DlcState& dlc_state) {
   PackResult result = ConvertDlcStateToPackResult(dlc_state);
+  result.feature_id = feature_id;
+  result.language_code = locale;
   for (Observer& observer : observers_) {
     observer.OnPackStateChanged(result);
   }
@@ -394,11 +418,13 @@ void LanguagePackManager::OnDlcStateChanged(
     const dlcservice::DlcState& dlc_state) {
   // As of now, we only have Handwriting as a client.
   // We will check the full list once we have more than one DLC.
-  if (dlc_state.id() != kHandwritingFeatureId) {
+  const absl::optional<std::string> handwriting_locale =
+      DlcToHandwritingLocale(dlc_state.id());
+  if (!handwriting_locale.has_value()) {
     return;
   }
 
-  NotifyPackStateChanged(dlc_state);
+  NotifyPackStateChanged(kHandwritingFeatureId, *handwriting_locale, dlc_state);
 }
 
 LanguagePackManager::LanguagePackManager() = default;

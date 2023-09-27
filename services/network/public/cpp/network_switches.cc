@@ -6,8 +6,6 @@
 
 namespace network::switches {
 
-const char kBlockThirdPartyCookies[] = "block-third-party-cookies";
-
 // Forces Network Quality Estimator (NQE) to return a specific effective
 // connection type.
 const char kForceEffectiveConnectionType[] = "force-effective-connection-type";
@@ -37,23 +35,6 @@ const char kIgnoreUrlFetcherCertRequests[] = "ignore-urlfetcher-cert-requests";
 const char kIgnoreCertificateErrorsSPKIList[] =
     "ignore-certificate-errors-spki-list";
 
-// Specifies a proxy server for origins specified in
-// kIPAnonymizationProxyAllowList. This proxy will be used on a best-effort
-// basis when normal proxy resolution would result in trying direct connections
-// (possibly after trying some other proxy server).
-const char kIPAnonymizationProxyServer[] = "ip-anonymization-proxy-server";
-
-// Specifies a list of origins on which to use the server specified by
-// `kIPAnonymizationProxyServer`. if `kIPAnonymizationProxyServer` is empty this
-// list will be ignored. This is intended as a reverse bypass rules list.
-const char kIPAnonymizationProxyAllowList[] =
-    "ip-anonymization-proxy-allow-list";
-
-// Specifies a value for the "password" header to be passed to the proxy
-// specified by `kIPAnonymizationProxyServer`. if `kIPAnonymizationProxyServer`
-// is empty this list will be ignored.
-const char kIPAnonymizationProxyPassword[] = "ip-anonymization-proxy-password";
-
 // Enables saving net log events to a file. If a value is given, it used as the
 // path the the file, otherwise the file is named netlog.json and placed in the
 // user data directory.
@@ -69,11 +50,17 @@ const char kLogNetLog[] = "log-net-log";
 // description of their meanings.
 const char kNetLogCaptureMode[] = "net-log-capture-mode";
 
+// Sets the maximum size, in megabytes. The log file can grow to before older
+// data is overwritten. Do not use this flag if you want an unlimited file size.
+const char kNetLogMaxSizeMb[] = "net-log-max-size-mb";
+
 // Causes SSL key material to be logged to the specified file for debugging
 // purposes. See
 // https://developer.mozilla.org/en-US/docs/Mozilla/Projects/NSS/Key_Log_Format
 // for the format.
 const char kSSLKeyLogFile[] = "ssl-key-log-file";
+
+const char kTestThirdPartyCookiePhaseout[] = "test-third-party-cookie-phaseout";
 
 // Treat given (insecure) origins as secure origins. Multiple origins can be
 // supplied as a comma-separated list. For the definition of secure contexts,
@@ -131,8 +118,7 @@ const char kUseFirstPartySet[] = "use-first-party-set";
 // https://github.com/web-platform-tests/rfcs/blob/master/rfcs/address_space_overrides.md
 const char kIpAddressSpaceOverrides[] = "ip-address-space-overrides";
 
-// Enables running high priority tasks in the network services using
-// ThreadDelegate::GetHighPriorityTaskRunner().
-const char kNetworkServiceScheduler[] = "network-service-scheduler";
+// Enables register the empty network service in utility process.
+const char kRegisterEmptyNetworkService[] = "register-empty-network-service";
 
 }  // namespace network::switches

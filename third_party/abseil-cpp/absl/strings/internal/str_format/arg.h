@@ -31,7 +31,7 @@
 #include "absl/base/port.h"
 #include "absl/meta/type_traits.h"
 #include "absl/numeric/int128.h"
-#include "absl/strings/internal/has_absl_stringify.h"
+#include "absl/strings/has_absl_stringify.h"
 #include "absl/strings/internal/str_format/extension.h"
 #include "absl/strings/string_view.h"
 
@@ -279,14 +279,14 @@ FloatingConvertResult FormatConvertImpl(long double v,
 // Chars.
 CharConvertResult FormatConvertImpl(char v, FormatConversionSpecImpl conv,
                                     FormatSinkImpl* sink);
-CharConvertResult FormatConvertImpl(signed char v,
-                                    FormatConversionSpecImpl conv,
-                                    FormatSinkImpl* sink);
-CharConvertResult FormatConvertImpl(unsigned char v,
-                                    FormatConversionSpecImpl conv,
-                                    FormatSinkImpl* sink);
 
 // Ints.
+IntegralConvertResult FormatConvertImpl(signed char v,
+                                        FormatConversionSpecImpl conv,
+                                        FormatSinkImpl* sink);
+IntegralConvertResult FormatConvertImpl(unsigned char v,
+                                        FormatConversionSpecImpl conv,
+                                        FormatSinkImpl* sink);
 IntegralConvertResult FormatConvertImpl(short v,  // NOLINT
                                         FormatConversionSpecImpl conv,
                                         FormatSinkImpl* sink);
@@ -333,7 +333,7 @@ IntegralConvertResult FormatConvertImpl(T v, FormatConversionSpecImpl conv,
 template <typename T>
 typename std::enable_if<std::is_enum<T>::value &&
                             !HasUserDefinedConvert<T>::value &&
-                            !strings_internal::HasAbslStringify<T>::value,
+                            !HasAbslStringify<T>::value,
                         IntegralConvertResult>::type
 FormatConvertImpl(T v, FormatConversionSpecImpl conv, FormatSinkImpl* sink);
 
@@ -441,13 +441,13 @@ class FormatArgImpl {
   // For everything else:
   //   - Decay char* and char arrays into `const char*`
   //   - Decay any other pointer to `const void*`
-  //   - Decay all enums to their underlying type.
+  //   - Decay all enums to the integral promotion of their underlying type.
   //   - Decay function pointers to void*.
   template <typename T, typename = void>
   struct DecayType {
     static constexpr bool kHasUserDefined =
         str_format_internal::HasUserDefinedConvert<T>::value ||
-        strings_internal::HasAbslStringify<T>::value;
+        HasAbslStringify<T>::value;
     using type = typename std::conditional<
         !kHasUserDefined && std::is_convertible<T, const char*>::value,
         const char*,
@@ -456,12 +456,11 @@ class FormatArgImpl {
                                   VoidPtr, const T&>::type>::type;
   };
   template <typename T>
-  struct DecayType<T,
-                   typename std::enable_if<
-                       !str_format_internal::HasUserDefinedConvert<T>::value &&
-                       !strings_internal::HasAbslStringify<T>::value &&
-                       std::is_enum<T>::value>::type> {
-    using type = typename std::underlying_type<T>::type;
+  struct DecayType<
+      T, typename std::enable_if<
+             !str_format_internal::HasUserDefinedConvert<T>::value &&
+             !HasAbslStringify<T>::value && std::is_enum<T>::value>::type> {
+    using type = decltype(+typename std::underlying_type<T>::type());
   };
 
  public:

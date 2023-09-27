@@ -30,15 +30,11 @@ import org.chromium.chrome.R;
 import org.chromium.chrome.browser.LaunchIntentDispatcher;
 import org.chromium.chrome.browser.browserservices.intents.BrowserServicesIntentDataProvider.CustomTabsUiType;
 import org.chromium.chrome.browser.customtabs.CustomTabIntentDataProvider;
-import org.chromium.chrome.browser.flags.ChromeFeatureList;
-import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.signin.services.DisplayableProfileData;
-import org.chromium.chrome.browser.signin.services.IdentityServicesProvider;
-import org.chromium.chrome.browser.sync.SyncService;
 import org.chromium.chrome.browser.sync.TrustedVaultClient;
 import org.chromium.components.signin.base.CoreAccountInfo;
 import org.chromium.components.signin.base.GoogleServiceAuthError;
-import org.chromium.components.signin.identitymanager.ConsentLevel;
+import org.chromium.components.sync.SyncService;
 import org.chromium.components.sync.TrustedVaultUserActionTriggerForUMA;
 import org.chromium.ui.widget.Toast;
 
@@ -79,9 +75,7 @@ public class SyncSettingsUtils {
     }
 
     /** Returns the type of the sync error. */
-    @SyncError
-    public static int getSyncError() {
-        SyncService syncService = SyncService.get();
+    public static @SyncError int getSyncError(SyncService syncService) {
         if (syncService == null) {
             return SyncError.NO_ERROR;
         }
@@ -215,16 +209,13 @@ public class SyncSettingsUtils {
     /**
      * Return a short summary of the current sync status.
      */
-    public static String getSyncStatusSummary(Context context) {
-        if (!IdentityServicesProvider.get()
-                        .getIdentityManager(Profile.getLastUsedRegularProfile())
-                        .hasPrimaryAccount(ConsentLevel.SYNC)) {
-            // There is no account with sync consent available.
+    public static String getSyncStatusSummary(Context context, SyncService syncService) {
+        if (syncService == null) {
             return context.getString(R.string.sync_off);
         }
 
-        SyncService syncService = SyncService.get();
-        if (syncService == null) {
+        if (!syncService.hasSyncConsent()) {
+            // There is no account with sync consent available.
             return context.getString(R.string.sync_off);
         }
 
@@ -304,22 +295,14 @@ public class SyncSettingsUtils {
     /**
      * Returns an icon that represents the current sync state.
      */
-    public static @Nullable Drawable getSyncStatusIcon(Context context) {
-        if (!IdentityServicesProvider.get()
-                        .getIdentityManager(Profile.getLastUsedRegularProfile())
-                        .hasPrimaryAccount(ConsentLevel.SYNC)) {
+    public static @Nullable Drawable getSyncStatusIcon(Context context, SyncService syncService) {
+        if (syncService == null || !syncService.hasSyncConsent()
+                || syncService.getSelectedTypes().isEmpty()
+                || syncService.isSyncDisabledByEnterprisePolicy()) {
             return AppCompatResources.getDrawable(context, R.drawable.ic_sync_off_48dp);
         }
 
-        SyncService syncService = SyncService.get();
-        if (syncService == null || syncService.getSelectedTypes().isEmpty()) {
-            return AppCompatResources.getDrawable(context, R.drawable.ic_sync_off_48dp);
-        }
-        if (syncService.isSyncDisabledByEnterprisePolicy()) {
-            return AppCompatResources.getDrawable(context, R.drawable.ic_sync_off_48dp);
-        }
-
-        if (getSyncError() != SyncError.NO_ERROR) {
+        if (getSyncError(syncService) != SyncError.NO_ERROR) {
             return AppCompatResources.getDrawable(context, R.drawable.ic_sync_error_48dp);
         }
 
@@ -377,12 +360,12 @@ public class SyncSettingsUtils {
 
     /**
      * Opens web dashboard to manage google account in a custom tab.
+     *
+     * Callers should ensure the current account has sync consent prior to calling.
+     *
      * @param activity The activity to use for starting the intent.
      */
     public static void openGoogleMyAccount(Activity activity) {
-        assert IdentityServicesProvider.get()
-                .getIdentityManager(Profile.getLastUsedRegularProfile())
-                .hasPrimaryAccount(ConsentLevel.SYNC);
         RecordUserAction.record("SyncPreferences_ManageGoogleAccountClicked");
         openCustomTabWithURL(activity, MY_ACCOUNT_URL);
     }
@@ -502,9 +485,7 @@ public class SyncSettingsUtils {
         final String accountEmail = profileData.getAccountEmail();
         final String defaultString = context.getString(R.string.default_google_account_username);
         final boolean canShowFullName = !TextUtils.isEmpty(fullName);
-        final boolean canShowEmailAddress = profileData.hasDisplayableEmailAddress()
-                || !ChromeFeatureList.isEnabled(
-                        ChromeFeatureList.HIDE_NON_DISPLAYABLE_ACCOUNT_EMAIL);
+        final boolean canShowEmailAddress = profileData.hasDisplayableEmailAddress();
         // Both strings are not displayable, use generic string.
         if (!canShowFullName && !canShowEmailAddress) {
             return defaultString;

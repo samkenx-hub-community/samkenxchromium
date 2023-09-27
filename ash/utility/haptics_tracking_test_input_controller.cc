@@ -165,6 +165,11 @@ void HapticsTrackingTestInputController::GetTouchEventLog(
   std::move(reply).Run(std::vector<base::FilePath>());
 }
 
+void HapticsTrackingTestInputController::DescribeForLog(
+    DescribeForLogReply reply) const {
+  std::move(reply).Run(std::string());
+}
+
 void HapticsTrackingTestInputController::SetTouchEventLoggingEnabled(
     bool enabled) {
   NOTIMPLEMENTED_LOG_ONCE();
@@ -213,6 +218,10 @@ void HapticsTrackingTestInputController::SetInternalKeyboardFilter(
 void HapticsTrackingTestInputController::GetGesturePropertiesService(
     mojo::PendingReceiver<ui::ozone::mojom::GesturePropertiesService>
         receiver) {}
+
+bool HapticsTrackingTestInputController::AreAnyKeysPressed() {
+  return false;
+}
 
 int HapticsTrackingTestInputController::GetSentHapticCount(
     ui::HapticTouchpadEffect effect,

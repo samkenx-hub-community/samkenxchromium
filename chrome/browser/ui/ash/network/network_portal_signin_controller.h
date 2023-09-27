@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -77,7 +77,6 @@ class NetworkPortalSigninController : public NetworkPortalWebDialog::Delegate {
   // May be overridden in tests.
   virtual void ShowDialog(Profile* profile, const GURL& url);
   virtual void ShowTab(Profile* profile, const GURL& url);
-  virtual void ShowSingletonTab(Profile* profile, const GURL& url);
 
   SigninMode GetSigninMode() const;
 

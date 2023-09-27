@@ -6,15 +6,16 @@
 
 #include "ash/constants/ash_features.h"
 #include "ash/constants/ash_pref_names.h"
+#include "ash/webui/settings/public/constants/routes.mojom-forward.h"
 #include "base/feature_list.h"
 #include "base/no_destructor.h"
 #include "base/strings/utf_string_conversions.h"
+#include "chrome/browser/ash/input_method/editor_mediator.h"
 #include "chrome/browser/ash/input_method/input_method_settings.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/ash/keyboard/chrome_keyboard_controller_client.h"
+#include "chrome/browser/ui/webui/ash/settings/search/search_tag_registry.h"
 #include "chrome/browser/ui/webui/settings/ash/os_settings_features_util.h"
-#include "chrome/browser/ui/webui/settings/ash/search/search_tag_registry.h"
-#include "chrome/browser/ui/webui/settings/chromeos/constants/routes.mojom-forward.h"
 #include "chrome/browser/ui/webui/settings/languages_handler.h"
 #include "chrome/browser/ui/webui/webui_util.h"
 #include "chrome/common/url_constants.h"
@@ -39,7 +40,7 @@ using ::chromeos::settings::mojom::kInputSubpagePath;
 using ::chromeos::settings::mojom::kJapaneseManageUserDictionarySubpagePath;
 using ::chromeos::settings::mojom::kLanguagesAndInputSectionPath;
 using ::chromeos::settings::mojom::kLanguagesSubpagePath;
-using ::chromeos::settings::mojom::kSmartInputsSubpagePath;
+using ::chromeos::settings::mojom::kSystemPreferencesSectionPath;
 using ::chromeos::settings::mojom::Section;
 using ::chromeos::settings::mojom::Setting;
 using ::chromeos::settings::mojom::Subpage;
@@ -136,11 +137,11 @@ const std::vector<SearchConcept>& GetEditDictionarySearchConceptsV2() {
 const std::vector<SearchConcept>& GetSmartInputsSearchConcepts() {
   static const base::NoDestructor<std::vector<SearchConcept>> tags({
       {IDS_OS_SETTINGS_TAG_LANGUAGES_SUGGESTIONS,
-       mojom::kSmartInputsSubpagePath,
+       mojom::kInputSubpagePath,
        mojom::SearchResultIcon::kGlobe,
        mojom::SearchResultDefaultRank::kMedium,
        mojom::SearchResultType::kSubpage,
-       {.subpage = mojom::Subpage::kSmartInputs}},
+       {.subpage = mojom::Subpage::kInput}},
   });
   return *tags;
 }
@@ -148,7 +149,7 @@ const std::vector<SearchConcept>& GetSmartInputsSearchConcepts() {
 const std::vector<SearchConcept>& GetEmojiSuggestionSearchConcepts() {
   static const base::NoDestructor<std::vector<SearchConcept>> tags({
       {IDS_OS_SETTINGS_TAG_LANGUAGES_EMOJI_SUGGESTIONS,
-       mojom::kSmartInputsSubpagePath,
+       mojom::kInputSubpagePath,
        mojom::SearchResultIcon::kGlobe,
        mojom::SearchResultDefaultRank::kMedium,
        mojom::SearchResultType::kSetting,
@@ -165,14 +166,19 @@ void AddSmartInputsStrings(content::WebUIDataSource* html_source,
       {"smartInputsTitle", IDS_SETTINGS_SUGGESTIONS_TITLE},
       {"emojiSuggestionTitle", IDS_SETTINGS_SUGGESTIONS_EMOJI_SUGGESTION_TITLE},
       {"emojiSuggestionDescription",
-       IDS_SETTINGS_SUGGESTIONS_EMOJI_SUGGESTION_DESCRIPTION},
-  };
+       IDS_SETTINGS_SUGGESTIONS_EMOJI_SUGGESTION_DESCRIPTION}};
   html_source->AddLocalizedStrings(kLocalizedStrings);
 
+  html_source->AddBoolean(
+      "allowOrca", input_method::EditorMediator::HasInstance() &&
+                       input_method::EditorMediator::Get()->IsAllowedForUse());
   html_source->AddBoolean("allowEmojiSuggestion", is_emoji_suggestion_allowed);
 }
 
-void AddInputMethodOptionsStrings(content::WebUIDataSource* html_source) {
+void AddInputMethodOptionsStrings(
+    content::WebUIDataSource* html_source,
+    bool is_physical_keyboard_autocorrect_allowed,
+    bool is_physical_keyboard_predictive_writing_allowed) {
   static constexpr webui::LocalizedString kLocalizedStrings[] = {
       {"inputMethodOptionsBasicSectionTitle",
        IDS_SETTINGS_INPUT_METHOD_OPTIONS_BASIC},
@@ -192,6 +198,8 @@ void AddInputMethodOptionsStrings(content::WebUIDataSource* html_source) {
        IDS_SETTINGS_INPUT_METHOD_OPTIONS_USER_DICTIONARIES},
       {"inputMethodOptionsPrivacySectionTitle",
        IDS_SETTINGS_INPUT_METHOD_OPTIONS_PRIVACY},
+      {"inputMethodOptionsVietnameseShorthandTypingTitle",
+       IDS_SETTINGS_INPUT_METHOD_HEADING_SHORTHAND_TYPING},
       {"inputMethodOptionsJapaneseAutomaticallySwitchToHalfwidth",
        IDS_SETTINGS_INPUT_METHOD_OPTIONS_JAPANESE_AUTOMATICALLY_SWITCH_TO_HALFWIDTH},
       {"inputMethodOptionsJapaneseShiftKeyModeStyle",
@@ -336,11 +344,34 @@ void AddInputMethodOptionsStrings(content::WebUIDataSource* html_source) {
        IDS_SETTINGS_INPUT_METHOD_OPTIONS_KEYBOARD_DVORAK},
       {"inputMethodOptionsColemakKeyboard",
        IDS_SETTINGS_INPUT_METHOD_OPTIONS_KEYBOARD_COLEMAK},
+      {"inputMethodOptionsVietnameseModernToneMarkPlacement",
+       IDS_SETTINGS_INPUT_METHOD_OPTIONS_VIETNAMESE_MODERN_TONE_MARK_PLACEMENT},
+      {"inputMethodOptionsVietnameseModernToneMarkPlacementDescription",
+       IDS_SETTINGS_INPUT_METHOD_OPTIONS_DESCRIPTION_VIETNAMESE_MODERN_TONE_MARK_PLACEMENT},
+      {"inputMethodOptionsVietnameseFlexibleTyping",
+       IDS_SETTINGS_INPUT_METHOD_OPTIONS_VIETNAMESE_FLEXIBLE_TYPING},
+      {"inputMethodOptionsVietnameseTelexFlexibleTypingDescription",
+       IDS_SETTINGS_INPUT_METHOD_OPTIONS_VIETNAMESE_TELEX_FLEXIBLE_TYPING_DESCRIPTION},
+      {"inputMethodOptionsVietnameseVniFlexibleTypingDescription",
+       IDS_SETTINGS_INPUT_METHOD_OPTIONS_VIETNAMESE_VNI_FLEXIBLE_TYPING_DESCRIPTION},
+      {"inputMethodOptionsVietnameseVniUoHookShortcut",
+       IDS_SETTINGS_INPUT_METHOD_OPTIONS_VIETNAMESE_VNI_UO_HOOK_SHORTCUT},
+      {"inputMethodOptionsVietnameseTelexUoHookShortcut",
+       IDS_SETTINGS_INPUT_METHOD_OPTIONS_VIETNAMESE_TELEX_UO_HOOK_SHORTCUT},
+      {"inputMethodOptionsVietnameseTelexWShortcut",
+       IDS_SETTINGS_INPUT_METHOD_OPTIONS_VIETNAMESE_TELEX_W_SHORTCUT},
+      {"inputMethodOptionsVietnameseShowUnderline",
+       IDS_SETTINGS_INPUT_METHOD_OPTIONS_VIETNAMESE_SHOW_UNDERLINE},
+      {"inputMethodOptionsVietnameseShowUnderlineDescription",
+       IDS_SETTINGS_INPUT_METHOD_OPTIONS_DESCRIPTION_VIETNAMESE_SHOW_UNDERLINE},
   };
   html_source->AddLocalizedStrings(kLocalizedStrings);
+  html_source->AddBoolean("isPhysicalKeyboardAutocorrectAllowed",
+                          is_physical_keyboard_autocorrect_allowed);
   html_source->AddBoolean(
-      "allowPredictiveWriting",
-      base::FeatureList::IsEnabled(features::kAssistMultiWord));
+      "isPhysicalKeyboardPredictiveWritingAllowed",
+      base::FeatureList::IsEnabled(features::kAssistMultiWord) &&
+          is_physical_keyboard_predictive_writing_allowed);
   html_source->AddBoolean(
       "allowDiacriticsOnPhysicalKeyboardLongpress",
       base::FeatureList::IsEnabled(
@@ -351,6 +382,9 @@ void AddInputMethodOptionsStrings(content::WebUIDataSource* html_source) {
   html_source->AddBoolean(
       "autocorrectEnableByDefault",
       base::FeatureList::IsEnabled(features::kAutocorrectByDefault));
+  html_source->AddBoolean(
+      "allowFirstPartyVietnameseInput",
+      base::FeatureList::IsEnabled(features::kFirstPartyVietnameseInput));
 }
 
 void AddLanguagesPageStringsV2(content::WebUIDataSource* html_source) {
@@ -509,8 +543,9 @@ LanguagesSection::LanguagesSection(Profile* profile,
 
   if (IsEmojiSuggestionAllowed()) {
     updater.AddSearchTags(GetSmartInputsSearchConcepts());
-    if (IsEmojiSuggestionAllowed())
+    if (IsEmojiSuggestionAllowed()) {
       updater.AddSearchTags(GetEmojiSuggestionSearchConcepts());
+    }
   }
   updater.AddSearchTags(GetAutoCorrectionSearchConcepts());
 }
@@ -518,11 +553,15 @@ LanguagesSection::LanguagesSection(Profile* profile,
 LanguagesSection::~LanguagesSection() = default;
 
 void LanguagesSection::AddLoadTimeData(content::WebUIDataSource* html_source) {
-  static constexpr webui::LocalizedString kLocalizedStrings[] = {
+  const bool kIsRevampEnabled =
+      ash::features::IsOsSettingsRevampWayfindingEnabled();
+
+  webui::LocalizedString kLocalizedStrings[] = {
       {"osLanguagesPageTitle", IDS_OS_SETTINGS_LANGUAGES_AND_INPUT_PAGE_TITLE},
       {"languagesPageTitle", IDS_OS_SETTINGS_LANGUAGES_LANGUAGES_PAGE_TITLE},
-      {"inputPageTitle", IDS_OS_SETTINGS_LANGUAGES_INPUT_PAGE_TITLE},
-      {"inputPageTitleV2", IDS_OS_SETTINGS_LANGUAGES_INPUT_PAGE_TITLE_V2},
+      {"inputPageTitle", kIsRevampEnabled
+                             ? IDS_OS_SETTINGS_LANGUAGES_INPUT_PAGE_TITLE
+                             : IDS_OS_SETTINGS_LANGUAGES_INPUT_PAGE_TITLE_V2},
       {"inputMethodEnabled", IDS_SETTINGS_LANGUAGES_INPUT_METHOD_ENABLED},
       {"inputMethodsManagedbyPolicy",
        IDS_SETTINGS_LANGUAGES_INPUT_METHODS_MANAGED_BY_POLICY},
@@ -544,11 +583,13 @@ void LanguagesSection::AddLoadTimeData(content::WebUIDataSource* html_source) {
           IDS_SETTINGS_LANGUAGES_LANGUAGE_PACKS_NOTICE,
           base::ASCIIToUTF16(chrome::kLanguagePacksLearnMoreURL)));
   AddSmartInputsStrings(html_source, IsEmojiSuggestionAllowed());
-  AddInputMethodOptionsStrings(html_source);
+  AddInputMethodOptionsStrings(
+      html_source,
+      input_method::IsPhysicalKeyboardAutocorrectAllowed(*pref_service_),
+      input_method::IsPhysicalKeyboardPredictiveWritingAllowed(*pref_service_));
   AddLanguagesPageStringsV2(html_source);
   AddInputPageStringsV2(html_source);
 
-  html_source->AddBoolean("enableLanguageSettingsV2Update2", true);
   html_source->AddBoolean(
       "onDeviceGrammarCheckEnabled",
       base::FeatureList::IsEnabled(features::kOnDeviceGrammarCheck));
@@ -557,6 +598,9 @@ void LanguagesSection::AddLoadTimeData(content::WebUIDataSource* html_source) {
   html_source->AddBoolean(
       "systemJapanesePhysicalTyping",
       base::FeatureList::IsEnabled(features::kSystemJapanesePhysicalTyping));
+  html_source->AddBoolean(
+      "languagePacksInSettingsEnabled",
+      base::FeatureList::IsEnabled(features::kLanguagePacksInSettings));
 }
 
 void LanguagesSection::AddHandlers(content::WebUI* web_ui) {
@@ -569,15 +613,19 @@ int LanguagesSection::GetSectionNameMessageId() const {
 }
 
 mojom::Section LanguagesSection::GetSection() const {
-  return mojom::Section::kLanguagesAndInput;
+  return ash::features::IsOsSettingsRevampWayfindingEnabled()
+             ? mojom::Section::kSystemPreferences
+             : mojom::Section::kLanguagesAndInput;
 }
 
 mojom::SearchResultIcon LanguagesSection::GetSectionIcon() const {
   return mojom::SearchResultIcon::kGlobe;
 }
 
-std::string LanguagesSection::GetSectionPath() const {
-  return mojom::kLanguagesAndInputSectionPath;
+const char* LanguagesSection::GetSectionPath() const {
+  return ash::features::IsOsSettingsRevampWayfindingEnabled()
+             ? mojom::kSystemPreferencesSectionPath
+             : mojom::kLanguagesAndInputSectionPath;
 }
 
 bool LanguagesSection::LogMetric(mojom::Setting setting,
@@ -593,65 +641,60 @@ void LanguagesSection::RegisterHierarchy(HierarchyGenerator* generator) const {
       mojom::Subpage::kLanguages, mojom::SearchResultIcon::kGlobe,
       mojom::SearchResultDefaultRank::kMedium, mojom::kLanguagesSubpagePath);
   static constexpr mojom::Setting kLanguagesPageSettings[] = {
+      mojom::Setting::kAddLanguage,
       mojom::Setting::kChangeDeviceLanguage,
       mojom::Setting::kOfferTranslation,
   };
   RegisterNestedSettingBulk(mojom::Subpage::kLanguages, kLanguagesPageSettings,
                             generator);
 
-  // Input.
-  generator->RegisterTopLevelSubpage(
-      IDS_OS_SETTINGS_LANGUAGES_INPUT_PAGE_TITLE, mojom::Subpage::kInput,
-      mojom::SearchResultIcon::kGlobe, mojom::SearchResultDefaultRank::kMedium,
-      mojom::kInputSubpagePath);
-  static constexpr mojom::Setting kInputPageSettings[] = {
-      mojom::Setting::kAddInputMethod,
-      mojom::Setting::kSpellCheck,
-  };
-  RegisterNestedSettingBulk(mojom::Subpage::kInput, kInputPageSettings,
-                            generator);
+  // Input settings subpages are associated with the Device section when
+  // OsSettingsRevampWayfinding is enabled.
+  if (!ash::features::IsOsSettingsRevampWayfindingEnabled()) {
+    // Input subpage
+    generator->RegisterTopLevelSubpage(
+        IDS_OS_SETTINGS_LANGUAGES_INPUT_PAGE_TITLE_V2, mojom::Subpage::kInput,
+        mojom::SearchResultIcon::kGlobe,
+        mojom::SearchResultDefaultRank::kMedium, mojom::kInputSubpagePath);
+    static constexpr mojom::Setting kInputSubpageSettings[] = {
+        mojom::Setting::kAddInputMethod,
+        mojom::Setting::kShowEmojiSuggestions,
+        mojom::Setting::kShowInputOptionsInShelf,
+        mojom::Setting::kSpellCheck,
+    };
+    RegisterNestedSettingBulk(mojom::Subpage::kInput, kInputSubpageSettings,
+                              generator);
 
-  // Edit dictionary.
-  generator->RegisterNestedSubpage(
-      IDS_OS_SETTINGS_LANGUAGES_EDIT_DICTIONARY_LABEL,
-      mojom::Subpage::kEditDictionary, mojom::Subpage::kInput,
-      mojom::SearchResultIcon::kGlobe, mojom::SearchResultDefaultRank::kMedium,
-      mojom::kEditDictionarySubpagePath);
+    // Edit dictionary subpage
+    generator->RegisterNestedSubpage(
+        IDS_OS_SETTINGS_LANGUAGES_EDIT_DICTIONARY_LABEL,
+        mojom::Subpage::kEditDictionary, mojom::Subpage::kInput,
+        mojom::SearchResultIcon::kGlobe,
+        mojom::SearchResultDefaultRank::kMedium,
+        mojom::kEditDictionarySubpagePath);
 
-  // Japanese Manage User Dictionary
-  generator->RegisterNestedSubpage(
-      IDS_OS_SETTINGS_LANGUAGES_JAPANESE_MANAGE_USER_DICTIONARY_LABEL,
-      mojom::Subpage::kJapaneseManageUserDictionary, mojom::Subpage::kInput,
-      mojom::SearchResultIcon::kGlobe, mojom::SearchResultDefaultRank::kMedium,
-      mojom::kJapaneseManageUserDictionarySubpagePath);
+    // Japanese Manage User Dictionary subpage
+    generator->RegisterNestedSubpage(
+        IDS_OS_SETTINGS_LANGUAGES_JAPANESE_MANAGE_USER_DICTIONARY_LABEL,
+        mojom::Subpage::kJapaneseManageUserDictionary, mojom::Subpage::kInput,
+        mojom::SearchResultIcon::kGlobe,
+        mojom::SearchResultDefaultRank::kMedium,
+        mojom::kJapaneseManageUserDictionarySubpagePath);
 
-  generator->RegisterNestedSetting(mojom::Setting::kAddLanguage,
-                                   mojom::Subpage::kLanguages);
-  generator->RegisterNestedSetting(mojom::Setting::kShowInputOptionsInShelf,
-                                   mojom::Subpage::kInput);
-
-  // Input method options.
-  generator->RegisterNestedSubpage(
-      IDS_SETTINGS_LANGUAGES_INPUT_METHOD_OPTIONS_TITLE,
-      mojom::Subpage::kInputMethodOptions, mojom::Subpage::kInput,
-      mojom::SearchResultIcon::kGlobe, mojom::SearchResultDefaultRank::kMedium,
-      mojom::kInputMethodOptionsSubpagePath);
-
-  generator->RegisterNestedSetting(mojom::Setting::kShowPKAutoCorrection,
-                                   mojom::Subpage::kInputMethodOptions);
-  generator->RegisterNestedSetting(mojom::Setting::kShowVKAutoCorrection,
-                                   mojom::Subpage::kInputMethodOptions);
-
-  // Smart inputs.
-  generator->RegisterTopLevelSubpage(
-      IDS_SETTINGS_SUGGESTIONS_TITLE, mojom::Subpage::kSmartInputs,
-      mojom::SearchResultIcon::kGlobe, mojom::SearchResultDefaultRank::kMedium,
-      mojom::kSmartInputsSubpagePath);
-  static constexpr mojom::Setting kSmartInputsFeaturesSettings[] = {
-      mojom::Setting::kShowEmojiSuggestions,
-  };
-  RegisterNestedSettingBulk(mojom::Subpage::kSmartInputs,
-                            kSmartInputsFeaturesSettings, generator);
+    // Input method options subpage
+    generator->RegisterNestedSubpage(
+        IDS_SETTINGS_LANGUAGES_INPUT_METHOD_OPTIONS_TITLE,
+        mojom::Subpage::kInputMethodOptions, mojom::Subpage::kInput,
+        mojom::SearchResultIcon::kGlobe,
+        mojom::SearchResultDefaultRank::kMedium,
+        mojom::kInputMethodOptionsSubpagePath);
+    static constexpr mojom::Setting kInputMethodOptionsSubpageSettings[] = {
+        mojom::Setting::kShowPKAutoCorrection,
+        mojom::Setting::kShowVKAutoCorrection,
+    };
+    RegisterNestedSettingBulk(mojom::Subpage::kInputMethodOptions,
+                              kInputMethodOptionsSubpageSettings, generator);
+  }
 }
 
 bool LanguagesSection::IsEmojiSuggestionAllowed() const {

@@ -24,6 +24,7 @@
 #include "base/ranges/algorithm.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "third_party/skia/include/core/SkScalar.h"
+#include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/chromeos/styles/cros_tokens_color_mappings.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/geometry/insets.h"
@@ -160,44 +161,20 @@ const gfx::RoundedCornersF& GetSubmitFeedbackButtonInkDropCorners() {
                              : kSubmitFeedbackButtonInkDropCornersLToR;
 }
 
-// A `HighlightPathGenerator` that uses caller-supplied rounded rect corners.
-class VIEWS_EXPORT RoundedCornerHighlightPathGenerator
-    : public views::HighlightPathGenerator {
- public:
-  explicit RoundedCornerHighlightPathGenerator(
-      const gfx::RoundedCornersF& corners)
-      : corners_(corners) {}
-
-  RoundedCornerHighlightPathGenerator(
-      const RoundedCornerHighlightPathGenerator&) = delete;
-  RoundedCornerHighlightPathGenerator& operator=(
-      const RoundedCornerHighlightPathGenerator&) = delete;
-
-  // views::HighlightPathGenerator:
-  absl::optional<gfx::RRectF> GetRoundRect(const gfx::RectF& rect) override {
-    return gfx::RRectF(rect, corners_);
-  }
-
- private:
-  // The user-supplied rounded rect corners.
-  const gfx::RoundedCornersF corners_;
-};
-
-void InstallRoundedCornerHighlightPathGenerator(
-    views::View* view,
-    const gfx::RoundedCornersF& corners) {
-  views::HighlightPathGenerator::Install(
-      view, std::make_unique<RoundedCornerHighlightPathGenerator>(corners));
-}
-
 // VersionButton is a base class that provides a styled button, for devices on a
 // non-stable release track, that has a label for the channel and ChromeOS
 // version.
 class VersionButton : public views::LabelButton {
  public:
+  METADATA_HEADER(VersionButton);
   VersionButton(version_info::Channel channel, bool allow_user_feedback)
       : LabelButton(
             base::BindRepeating([](const ui::Event& event) {
+              // Do nothing if it's shown on non-logged-in screen.
+              if (Shell::Get()->session_controller()->GetSessionState() !=
+                  session_manager::SessionState::ACTIVE) {
+                return;
+              }
               quick_settings_metrics_util::RecordQsButtonActivated(
                   QsButtonCatalogName::kVersionButton);
               Shell::Get()
@@ -222,13 +199,21 @@ class VersionButton : public views::LabelButton {
       SetImageLabelSpacing(kVersionButtonImageLabelSpacing);
       SetMinSize(gfx::Size(0, kVersionButtonHeight));
     }
-    views::InkDrop::Get(this)->SetMode(views::InkDropHost::InkDropMode::ON);
-    InstallRoundedCornerHighlightPathGenerator(
+    StyleUtil::InstallRoundedCornerHighlightPathGenerator(
         this, GetVersionButtonInkDropCorners(allow_user_feedback));
     views::FocusRing::Get(this)->SetColorId(
         features::IsQsRevampEnabled()
             ? cros_tokens::kCrosSysFocusRing
             : static_cast<ui::ColorId>(ui::kColorAshFocusRing));
+
+    // The button is not focusable and with no clickable effect if it's shown on
+    // non-logged-in screen.
+    if (Shell::Get()->session_controller()->GetSessionState() !=
+        session_manager::SessionState::ACTIVE) {
+      SetFocusBehavior(FocusBehavior::NEVER);
+      return;
+    }
+    views::InkDrop::Get(this)->SetMode(views::InkDropHost::InkDropMode::ON);
   }
   VersionButton(const VersionButton&) = delete;
   VersionButton& operator=(const VersionButton&) = delete;
@@ -284,6 +269,7 @@ class VersionButton : public views::LabelButton {
       label()->SetFontList(
           ash::TypographyProvider::Get()->ResolveTypographyToken(
               ash::TypographyToken::kCrosBody2));
+      label()->SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(0, 6)));
     } else {
       label()->SetFontList(
           gfx::FontList().DeriveWithWeight(gfx::Font::Weight::MEDIUM));
@@ -301,10 +287,14 @@ class VersionButton : public views::LabelButton {
   SkScalar content_corners_[kNumVersionButtonCornerRadii];
 };
 
+BEGIN_METADATA(VersionButton, views::LabelButton)
+END_METADATA
+
 // SubmitFeedbackButton provides a styled button, for devices on a
 // non-stable release track, that allows the user to submit feedback.
 class SubmitFeedbackButton : public IconButton {
  public:
+  METADATA_HEADER(SubmitFeedbackButton);
   // `content_corners` - an array of `SkScalar` used to generate the rounded
   // rect that's painted for the button, the same regardless of RTL/LTR.
   // `highlight_corners` - a `gfx::RoundedCornersF` used to generate the
@@ -341,7 +331,8 @@ class SubmitFeedbackButton : public IconButton {
     }
     // Icon colors are set in OnThemeChanged().
     views::InkDrop::Get(this)->SetMode(views::InkDropHost::InkDropMode::ON);
-    InstallRoundedCornerHighlightPathGenerator(this, highlight_corners);
+    StyleUtil::InstallRoundedCornerHighlightPathGenerator(this,
+                                                          highlight_corners);
   }
   SubmitFeedbackButton(const SubmitFeedbackButton&) = delete;
   SubmitFeedbackButton& operator=(const SubmitFeedbackButton&) = delete;
@@ -398,6 +389,9 @@ class SubmitFeedbackButton : public IconButton {
   SkScalar content_corners_[kNumVersionButtonCornerRadii];
 };
 
+BEGIN_METADATA(SubmitFeedbackButton, IconButton)
+END_METADATA
+
 }  // namespace
 
 ChannelIndicatorQuickSettingsView::ChannelIndicatorQuickSettingsView(
@@ -437,5 +431,8 @@ void ChannelIndicatorQuickSettingsView::SetNarrowLayout(bool narrow) {
   DCHECK(views::IsViewClass<VersionButton>(version_button_));
   views::AsViewClass<VersionButton>(version_button_)->SetNarrowLayout(narrow);
 }
+
+BEGIN_METADATA(ChannelIndicatorQuickSettingsView, views::View)
+END_METADATA
 
 }  // namespace ash

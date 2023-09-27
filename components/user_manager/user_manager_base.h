@@ -134,7 +134,7 @@ class USER_MANAGER_EXPORT UserManagerBase : public UserManager {
   bool IsUserLoggedIn() const override;
   bool IsLoggedInAsUserWithGaiaAccount() const override;
   bool IsLoggedInAsChildUser() const override;
-  bool IsLoggedInAsPublicAccount() const override;
+  bool IsLoggedInAsManagedGuestSession() const override;
   bool IsLoggedInAsGuest() const override;
   bool IsLoggedInAsKioskApp() const override;
   bool IsLoggedInAsArcKioskApp() const override;
@@ -145,6 +145,7 @@ class USER_MANAGER_EXPORT UserManagerBase : public UserManager {
       const AccountId& account_id) const override;
   bool IsUserCryptohomeDataEphemeral(
       const AccountId& account_id) const override;
+  bool IsEphemeralAccountId(const AccountId& account_id) const final;
   void AddObserver(UserManager::Observer* obs) override;
   void RemoveObserver(UserManager::Observer* obs) override;
   void AddSessionStateObserver(
@@ -165,11 +166,19 @@ class USER_MANAGER_EXPORT UserManagerBase : public UserManager {
   void NotifyUserToBeRemoved(const AccountId& account_id) override;
   void NotifyUserRemoved(const AccountId& account_id,
                          UserRemovalReason reason) override;
+  void NotifyUserNotAllowed(const std::string& user_email) final;
   PrefService* GetLocalState() const final;
   bool IsFirstExecAfterBoot() const final;
   bool HasBrowserRestarted() const final;
 
   void Initialize() override;
+
+  // Creates and adds a kiosk user for testing with a given `account_id`
+  // and `username_hash` to identify homedir mount point.
+  // Returns a pointer to the user.
+  // Note: call `UserLoggedIn` if the user needs to be logged-in.
+  const User* AddKioskAppUserForTesting(const AccountId& account_id,
+                                        const std::string& username_hash);
 
   // This method updates "User was added to the device in this session nad is
   // not full initialized yet" flag.
@@ -212,6 +221,9 @@ class USER_MANAGER_EXPORT UserManagerBase : public UserManager {
 
   // Notifies observers that active user has changed.
   void NotifyActiveUserChanged(User* active_user);
+
+  // Notifies observers that login state is changed.
+  void NotifyLoginStateUpdated();
 
   // Notifies that user has logged in.
   virtual void NotifyOnLogin();
@@ -282,10 +294,8 @@ class USER_MANAGER_EXPORT UserManagerBase : public UserManager {
   virtual void RegularUserLoggedInAsEphemeral(const AccountId& account_id,
                                               const UserType user_type);
 
-  // Update the global LoginState.
-  virtual void UpdateLoginState(const User* active_user,
-                                const User* primary_user,
-                                bool is_current_user_owner) const = 0;
+  virtual bool IsEphemeralAccountIdByPolicy(
+      const AccountId& account_id) const = 0;
 
   // Getters/setters for private members.
 
@@ -300,6 +310,11 @@ class USER_MANAGER_EXPORT UserManagerBase : public UserManager {
   virtual void SetPendingUserSwitchId(const AccountId& account_id);
 
   base::ObserverList<UserManager::Observer>::Unchecked observer_list_;
+
+  // A list of User instances taking their ownership.
+  // Following members can refer User instances in this vector.
+  // Thus, they must be listed below to deal with raw_ptr rule.
+  std::vector<std::unique_ptr<User>> user_storage_;
 
   // The logged-in user that is currently active in current session.
   // NULL until a user has logged in, then points to one
@@ -358,9 +373,6 @@ class USER_MANAGER_EXPORT UserManagerBase : public UserManager {
 
   // Notifies observers that merge session state had changed.
   void NotifyMergeSessionStateChanged();
-
-  // Call UpdateLoginState.
-  void CallUpdateLoginState();
 
   // Insert |user| at the front of the LRU user list.
   void SetLRUUser(User* user);
@@ -425,7 +437,7 @@ class USER_MANAGER_EXPORT UserManagerBase : public UserManager {
   // TaskRunner for UI thread.
   scoped_refptr<base::SingleThreadTaskRunner> task_runner_;
 
-  const raw_ptr<PrefService> local_state_;
+  const raw_ptr<PrefService, DanglingUntriaged> local_state_;
 
   base::WeakPtrFactory<UserManagerBase> weak_factory_{this};
 };

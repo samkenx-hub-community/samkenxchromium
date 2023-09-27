@@ -5,6 +5,7 @@
 #include "content/browser/webid/webid_utils.h"
 
 #include "base/strings/stringprintf.h"
+#include "content/browser/runtime_feature_state/runtime_feature_state_document_data.h"
 #include "content/browser/webid/fedcm_metrics.h"
 #include "content/browser/webid/flags.h"
 #include "content/public/browser/browser_context.h"
@@ -52,37 +53,40 @@ absl::optional<std::string> ComputeConsoleMessageForHttpResponseCode(
       endpoint_name, http_response_code);
 }
 
-bool IsEndpointUrlValid(const GURL& identity_provider_config_url,
-                        const GURL& endpoint_url) {
+bool IsEndpointSameOrigin(const GURL& identity_provider_config_url,
+                          const GURL& endpoint_url) {
   return url::Origin::Create(identity_provider_config_url)
       .IsSameOriginWith(endpoint_url);
 }
 
 bool ShouldFailAccountsEndpointRequestBecauseNotSignedInWithIdp(
+    RenderFrameHost& host,
     const GURL& identity_provider_config_url,
     FederatedIdentityPermissionContextDelegate* permission_delegate) {
-  if (GetFedCmIdpSigninStatusMode() == FedCmIdpSigninStatusMode::DISABLED) {
+  const url::Origin idp_origin =
+      url::Origin::Create(identity_provider_config_url);
+  if (webid::GetIdpSigninStatusMode(host, idp_origin) ==
+      FedCmIdpSigninStatusMode::DISABLED) {
     return false;
   }
 
-  const url::Origin idp_origin =
-      url::Origin::Create(identity_provider_config_url);
   const absl::optional<bool> idp_signin_status =
       permission_delegate->GetIdpSigninStatus(idp_origin);
   return !idp_signin_status.value_or(true);
 }
 
 void UpdateIdpSigninStatusForAccountsEndpointResponse(
+    RenderFrameHost& host,
     const GURL& identity_provider_config_url,
     IdpNetworkRequestManager::FetchStatus fetch_status,
     bool does_idp_have_failing_signin_status,
     FederatedIdentityPermissionContextDelegate* permission_delegate,
     FedCmMetrics* metrics) {
-  if (GetFedCmIdpSigninStatusMode() == FedCmIdpSigninStatusMode::DISABLED) {
+  url::Origin idp_origin = url::Origin::Create(identity_provider_config_url);
+  if (webid::GetIdpSigninStatusMode(host, idp_origin) ==
+      FedCmIdpSigninStatusMode::DISABLED) {
     return;
   }
-
-  url::Origin idp_origin = url::Origin::Create(identity_provider_config_url);
 
   // Record metrics on effect of IDP sign-in status API.
   const absl::optional<bool> idp_signin_status =
@@ -236,6 +240,28 @@ std::string GetConsoleErrorMessageFromResult(
       return "";
     }
   }
+}
+
+FedCmIdpSigninStatusMode GetIdpSigninStatusMode(RenderFrameHost& host,
+                                                const url::Origin& idp_origin) {
+  RuntimeFeatureStateDocumentData* rfs_document_data =
+      RuntimeFeatureStateDocumentData::GetForCurrentDocument(&host);
+  // Should not be null as this gets initialized when the host gets created.
+  DCHECK(rfs_document_data);
+  std::vector<url::Origin> third_party_origins = {idp_origin};
+  // This includes origin trials.
+  bool runtime_enabled =
+      rfs_document_data->runtime_feature_state_read_context()
+          .IsFedCmIdpSigninStatusEnabled() ||
+      rfs_document_data->runtime_feature_state_read_context()
+          .IsFedCmIdpSigninStatusEnabledForThirdParty(
+              host.GetLastCommittedOrigin(), third_party_origins);
+
+  FedCmIdpSigninStatusMode flag_mode = GetFedCmIdpSigninStatusFlag();
+  if (flag_mode == FedCmIdpSigninStatusMode::METRICS_ONLY && runtime_enabled) {
+    return FedCmIdpSigninStatusMode::ENABLED;
+  }
+  return flag_mode;
 }
 
 }  // namespace content::webid

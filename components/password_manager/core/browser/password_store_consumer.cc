@@ -4,7 +4,6 @@
 
 #include "components/password_manager/core/browser/password_store_consumer.h"
 
-#include "components/password_manager/core/browser/field_info_table.h"
 #include "components/password_manager/core/browser/password_form.h"
 #include "components/password_manager/core/browser/password_store_interface.h"
 #include "components/password_manager/core/browser/password_store_util.h"
@@ -30,10 +29,10 @@ void PasswordStoreConsumer::OnGetPasswordStoreResultsOrErrorFrom(
                                     std::move(results_or_error)));
 }
 
+void PasswordStoreConsumer::OnGetPasswordStoreResults(
+    std::vector<std::unique_ptr<PasswordForm>> results) {}
+
 void PasswordStoreConsumer::OnGetSiteStatistics(
     std::vector<InteractionsStats> stats) {}
-
-void PasswordStoreConsumer::OnGetAllFieldInfo(
-    std::vector<FieldInfo> field_info) {}
 
 }  // namespace password_manager

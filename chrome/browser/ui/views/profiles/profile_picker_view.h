@@ -13,7 +13,7 @@
 #include "build/buildflag.h"
 #include "build/chromeos_buildflags.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/ui/profile_picker.h"
+#include "chrome/browser/ui/profiles/profile_picker.h"
 #include "chrome/browser/ui/views/profiles/profile_picker_force_signin_dialog_host.h"
 #include "chrome/browser/ui/views/profiles/profile_picker_web_contents_host.h"
 #include "components/keep_alive_registry/scoped_keep_alive.h"
@@ -190,6 +190,13 @@ class ProfilePickerView : public views::WidgetDelegateView,
   void OnProfileForDiceForcedSigninCreated(
       base::OnceCallback<void(bool)> switch_finished_callback,
       Profile* new_profile);
+  // Switches the profile picker layout to display the reauth page to the main
+  // account of the given `profile` if needed. On success the `profile` is
+  // unlocked and a browser is opend. On failure the user is redirected to the
+  // profile picker main page with an popup error dialog displayed through
+  // `on_error_callback`.
+  void SwitchToReauth(Profile* profile,
+                      base::OnceCallback<void()> on_error_callback);
 #endif
 
 #if BUILDFLAG(IS_CHROMEOS_LACROS)
@@ -198,7 +205,7 @@ class ProfilePickerView : public views::WidgetDelegateView,
                             std::unique_ptr<content::WebContents> contents);
 #endif
 
-  // Builds the views hieararchy.
+  // Builds the views hierarchy.
   void BuildLayout();
 
   void ShowScreenFinished(

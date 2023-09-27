@@ -13,20 +13,16 @@
 #include "chrome/browser/ui/tabs/tab_group.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
-#include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
 #include "components/saved_tab_groups/saved_tab_group_model.h"
-
-namespace content {
-class WebContents;
-}
+#include "content/public/browser/web_contents.h"
 
 LocalTabGroupListener::LocalTabGroupListener(
     const tab_groups::TabGroupId local_id,
     const base::Uuid saved_guid,
     SavedTabGroupModel* const model,
-    std::vector<std::pair<content::WebContents*, base::Uuid>> mapping)
+    std::map<content::WebContents*, base::Uuid> web_contents_to_uuid)
     : model_(model), local_id_(local_id), saved_guid_(saved_guid) {
-  for (const auto& [contents, saved_tab_guid] : mapping) {
+  for (const auto& [contents, saved_tab_guid] : web_contents_to_uuid) {
     const base::Token local_tab_id = base::Token::CreateRandom();
 
     web_contents_to_tab_id_map_.try_emplace(contents, contents, local_tab_id,
@@ -70,6 +66,30 @@ void LocalTabGroupListener::ResumeTracking() {
   }
 }
 
+void LocalTabGroupListener::UpdateVisualDataFromLocal(
+    const TabGroupChange::VisualsChange* visual_change) {
+  if (paused_) {
+    return;
+  }
+
+  if (*(visual_change->old_visuals) != *(visual_change->new_visuals)) {
+    model_->UpdateVisualData(local_id_, visual_change->new_visuals);
+  }
+}
+
+void LocalTabGroupListener::OnReplaceWebContents(
+    content::WebContents* old_web_contents,
+    content::WebContents* new_web_contents) {
+  CHECK(web_contents_to_tab_id_map_.find(old_web_contents) !=
+        web_contents_to_tab_id_map_.end());
+  base::Token local_tab_id =
+      web_contents_to_tab_id_map_.at(old_web_contents).token();
+  web_contents_to_tab_id_map_.erase(old_web_contents);
+
+  web_contents_to_tab_id_map_.try_emplace(new_web_contents, new_web_contents,
+                                          local_tab_id, model_);
+}
+
 void LocalTabGroupListener::AddWebContentsFromLocal(
     content::WebContents* web_contents,
     TabStripModel* tab_strip_model,
@@ -95,6 +115,9 @@ void LocalTabGroupListener::AddWebContentsFromLocal(
   SavedTabGroupTab tab =
       SavedTabGroupUtils::CreateSavedTabGroupTabFromWebContents(web_contents,
                                                                 saved_guid_);
+  if (!SavedTabGroupUtils::IsURLValidForSavedTabGroups(tab.url())) {
+    tab.SetURL(GURL(chrome::kChromeUINewTabURL));
+  }
   tab.SetLocalTabID(token);
   tab.SetPosition(relative_index_of_tab_in_group);
   model_->AddTabToGroupLocally(saved_guid_, std::move(tab));
@@ -191,6 +214,13 @@ LocalTabGroupListener::Liveness LocalTabGroupListener::UpdateFromSync() {
       SavedTabGroupUtils::GetBrowserWithTabGroupId(local_id_)
           ->tab_strip_model();
 
+  // Update the group to use the saved title and color.
+  tab_groups::TabGroupVisualData visual_data(saved_group->title(),
+                                             saved_group->color(),
+                                             /*is_collapsed=*/false);
+  tab_strip_model->group_model()->GetTabGroup(local_id_)->SetVisualData(
+      visual_data, /*is_customized=*/true);
+
   std::unordered_map<base::Token, content::WebContents*, base::TokenHash>
       token_to_contents_map;
   for (auto& [contents, listener] : web_contents_to_tab_id_map_) {
@@ -252,8 +282,13 @@ void LocalTabGroupListener::MatchLocalTabToSavedTab(
 void LocalTabGroupListener::OpenWebContentsFromSync(SavedTabGroupTab tab,
                                                     Browser* browser,
                                                     int index_in_tabstrip) {
+  GURL url_to_open = tab.url();
+  if (!SavedTabGroupUtils::IsURLValidForSavedTabGroups(url_to_open)) {
+    url_to_open = GURL(chrome::kChromeUINewTabURL);
+  }
+
   content::WebContents* opened_contents = SavedTabGroupUtils::OpenTabInBrowser(
-      tab.url(), browser, browser->profile(),
+      url_to_open, browser, browser->profile(),
       WindowOpenDisposition::NEW_BACKGROUND_TAB, index_in_tabstrip, local_id_);
 
   // Listen to navigations.

@@ -6,25 +6,26 @@ import {isRTL} from 'chrome://resources/ash/common/util.js';
 import {CrButtonElement} from 'chrome://resources/cr_elements/cr_button/cr_button.js';
 
 import {maybeShowTooltip} from '../common/js/dom_utils.js';
-import {isEntryInsideComputers, isEntryInsideDrive, isEntryInsideMyDrive, isGrandRootEntryInDrives, isMyFilesEntry, isVolumeEntry} from '../common/js/entry_utils.js';
-import {EntryList, VolumeEntry} from '../common/js/files_app_entry_types.js';
-import {metrics} from '../common/js/metrics.js';
-import {strf} from '../common/js/util.js';
+import {isEntryInsideComputers, isEntryInsideDrive, isEntryInsideMyDrive, isGrandRootEntryInDrives, isMyFilesEntry, isTrashEntry, isVolumeEntry} from '../common/js/entry_utils.js';
+import {EntryList, FakeEntryImpl, VolumeEntry} from '../common/js/files_app_entry_types.js';
+import {recordEnum, recordUserAction} from '../common/js/metrics.js';
+import {str, strf, util} from '../common/js/util.js';
 import {VolumeManagerCommon} from '../common/js/volume_manager_types.js';
-import {FileData, NavigationKey, NavigationRoot, NavigationType, PropStatus, State} from '../externs/ts/state.js';
+import {FileData, FileKey, NavigationKey, NavigationRoot, NavigationType, PropStatus, State} from '../externs/ts/state.js';
 import {VolumeManager} from '../externs/volume_manager.js';
 import {constants} from '../foreground/js/constants.js';
 import {DirectoryModel} from '../foreground/js/directory_model.js';
 import {MetadataModel} from '../foreground/js/metadata/metadata_model.js';
 import {Command} from '../foreground/js/ui/command.js';
-import {changeDirectory} from '../state/actions/current_directory.js';
-import {refreshNavigationRoots, updateNavigationEntry} from '../state/actions/navigation.js';
-import {readSubDirectories} from '../state/actions_producers/all_entries.js';
-import {convertEntryToFileData} from '../state/reducers/all_entries.js';
-import {driveRootEntryListKey} from '../state/reducers/volumes.js';
-import {getEntry, getFileData, getStore, Store} from '../state/store.js';
-import {TreeSelectedChangedEvent, XfTree} from '../widgets/xf_tree.js';
-import {TreeItemCollapsedEvent, TreeItemExpandedEvent, XfTreeItem} from '../widgets/xf_tree_item.js';
+import {contextMenuHandler} from '../foreground/js/ui/context_menu_handler.js';
+import {Menu} from '../foreground/js/ui/menu.js';
+import {convertEntryToFileData, readSubDirectories} from '../state/ducks/all_entries.js';
+import {changeDirectory} from '../state/ducks/current_directory.js';
+import {refreshNavigationRoots, updateNavigationEntry} from '../state/ducks/navigation.js';
+import {driveRootEntryListKey} from '../state/ducks/volumes.js';
+import {getEntry, getFileData, getStore, getVolume, getVolumeType, type Store} from '../state/store.js';
+import {type TreeSelectedChangedEvent, XfTree} from '../widgets/xf_tree.js';
+import {type TreeItemCollapsedEvent, type TreeItemExpandedEvent, XfTreeItem} from '../widgets/xf_tree_item.js';
 
 /**
  * @fileoverview The Directory Tree aka Navigation Tree.
@@ -58,7 +59,7 @@ interface NavigationItemData {
 /**
  * The navigation root data structure, which includes:
  * * `element` and `fileData`.
- * * `androidApp`: the corresponding android app data which backs up this
+ * * `androidAppData`: the corresponding android app data which backs up this
  * navigation item, can be null if the navigation is not backed up by an
  * android app.
  */
@@ -69,6 +70,17 @@ interface NavigationRootItemData extends NavigationItemData {
 export class DirectoryTreeContainer {
   /** The root tree widget. */
   tree = document.createElement('xf-tree');
+  /** Context menu element for root navigation items. */
+  contextMenuForRootItems: Menu|null = null;
+  /** Context menu element for sub navigation items. */
+  contextMenuForSubitems: Menu|null = null;
+  /** Context menu element for disabled navigation items. */
+  contextMenuForDisabledItems: Menu|null = null;
+  /**
+   * Entry to be renamed. When this is set and the corresponding tree item is
+   * rendered, we will attach a rename input inside the item.
+   */
+  entryKeyToRename: FileKey|null = null;
 
   private store_: Store;
 
@@ -126,14 +138,6 @@ export class DirectoryTreeContainer {
     // For file watcher.
     chrome.fileManagerPrivate.onDirectoryChanged.addListener(
         this.onFileWatcherEntryChanged_.bind(this));
-    this.tree.addEventListener('click', () => {
-      // Chromevox triggers |click| without switching focus, we force the focus
-      // here so we can handle further keyboard/mouse events to expand/collapse
-      // directories.
-      if (document.activeElement === document.body) {
-        this.tree.focus();
-      }
-    });
 
     this.store_ = getStore();
     this.store_.subscribe(this);
@@ -261,7 +265,13 @@ export class DirectoryTreeContainer {
     // Handle navigation items backed up by an android app. Note: only
     // navigation root item can be backed up by an android app.
     if (isAndroidApp) {
+      if ((navigationData as NavigationRootItemData).androidAppData ===
+          newData) {
+        // Nothing changes, this render might be triggered by its parent.
+        return;
+      }
       const androidAppData = newData as chrome.fileManagerPrivate.AndroidApp;
+
       element.label = androidAppData.name;
       element.iconSet = androidAppData.iconSet || null;
       element.separator = navigationRoot.separator;
@@ -274,7 +284,16 @@ export class DirectoryTreeContainer {
     }
 
     // Handle navigation items backed up by a file entry.
+    if (navigationData.fileData === newData) {
+      // Nothing changes, this render might be triggered by its parent.
+      return;
+    }
     const fileData = newData as FileData;
+
+    // TODO(b/228139439): The current menu/command implementation requires a
+    // valid `.entry` existed on the tree item. We should remove this `.entry`
+    // when refactoring the command part.
+    (element as any).entry = fileData.entry;
 
     element.label = fileData.label;
     if (navigationRoot) {
@@ -320,20 +339,41 @@ export class DirectoryTreeContainer {
           });
         }
         const childFileData = getFileData(state, childKey);
+        const isRenaming = navigationItem.renaming;
         this.renderItem_(childKey, childFileData);
         // Always call insertBefore here even if the element already exists,
         // because the index can change. Calling insertBefore with existing
         // child element will move it to the correct position.
         element.insertBefore(
             navigationItem,
-            // Use `children` here because `items` is asynchronous.
+            // Use `.children` instead of `.items` here because `items` is
+            // asynchronous.
             element.children[index] || null);
+        // `insertBefore` here will be called multiple times because the private
+        // API `fileManagerPrivate.onDirectoryChanged` will be triggered more
+        // than once. If the current item in in renaming process, the call will
+        // blur the rename input, we need to resume the rename status here.
+        if (isRenaming) {
+          this.attachRename_(navigationItem);
+        }
 
         if (!exists) {
-          this.handleInitialRender_(
-              navigationItem, childFileData, navigationRoot);
+          this.handleInitialRender_(navigationItem, childFileData);
         }
       });
+    }
+
+    if (this.entryKeyToRename === navigationKey) {
+      this.entryKeyToRename = null;
+      this.attachRename_(element);
+    }
+
+    const isOdfs = util.isOneDriveId(
+        getVolume(this.store_.getState(), fileData)?.providerId);
+    if (isOdfs && fileData?.disabled) {
+      // The entries under ODFS are not disabled recursively. Collapse ODFS when
+      // it is disabled.
+      element.expanded = false;
     }
 
     // Update new data to the map.
@@ -429,12 +469,12 @@ export class DirectoryTreeContainer {
     if (!fileData) {
       return;
     }
+    this.setContextMenu_(element, fileData, navigationRoot);
     // Expand MyFiles by default.
     const entry = fileData.entry;
     if (isMyFilesEntry(entry)) {
       element.mayHaveChildren = true;
       element.expanded = true;
-      element.selected = true;
       this.store_.dispatch(updateNavigationEntry({
         key: entry.toURL(),
         expanded: true,
@@ -450,7 +490,8 @@ export class DirectoryTreeContainer {
       // For SMB shares, avoid prefetching sub directories to delay
       // authentication.
       if (isVolumeEntry(entry) && entry.volumeInfo.providerId !== '@smb' &&
-          fileData.volumeType !== VolumeManagerCommon.VolumeType.SMB) {
+          getVolumeType(this.store_.getState(), fileData) !==
+              VolumeManagerCommon.VolumeType.SMB) {
         this.store_.dispatch(readSubDirectories(entry));
       }
       return;
@@ -622,11 +663,22 @@ export class DirectoryTreeContainer {
 
   /** Handler for navigation item selected. */
   private onNavigationItemSelected_(event: TreeSelectedChangedEvent) {
-    const treeItem = event.detail.selectedItem;
-    if (!treeItem) {
+    const {previousSelectedItem, selectedItem} = event.detail;
+    if (previousSelectedItem) {
+      previousSelectedItem.removeAttribute('aria-description');
+    }
+    if (!selectedItem) {
       return;
     }
-    const navigationKey = treeItem.dataset['navigationKey']!;
+    selectedItem.setAttribute(
+        'aria-description', str('CURRENT_DIRECTORY_LABEL'));
+    const navigationKey = selectedItem.dataset['navigationKey']!;
+    // When the navigation item selection changed from the store (e.g. triggered
+    // by other parts of the UI), we don't want to activate the directory again
+    // because it's already activated.
+    if (this.isCurrentDirectoryActive_(navigationKey)) {
+      return;
+    }
     const navigationData = this.getNavigationDataFromKey(navigationKey);
     if (!navigationData) {
       console.warn(
@@ -640,7 +692,7 @@ export class DirectoryTreeContainer {
       this.recordUmaForItemSelected_(fileData);
     }
     this.activateDirectory_(
-        treeItem, isRoot, fileData,
+        selectedItem, isRoot, fileData,
         isRoot ? (navigationData as NavigationRootItemData).androidAppData :
                  null);
   }
@@ -724,8 +776,7 @@ export class DirectoryTreeContainer {
     const rootType = fileData.rootType ?? 'unknown';
     const level = fileData.isRootEntry ? 'TopLevel' : 'NonTopLevel';
     const metricName = `Location.OnEntryExpandedOrCollapsed.${level}`;
-    metrics.recordEnum(
-        metricName, rootType, VolumeManagerCommon.RootTypesForUMA);
+    recordEnum(metricName, rootType, VolumeManagerCommon.RootTypesForUMA);
   }
 
   /** Record UMA for tree item selected. */
@@ -733,8 +784,7 @@ export class DirectoryTreeContainer {
     const rootType = fileData.rootType ?? 'unknown';
     const level = fileData.isRootEntry ? 'TopLevel' : 'NonTopLevel';
     const metricName = `Location.OnEntrySelected.${level}`;
-    metrics.recordEnum(
-        metricName, rootType, VolumeManagerCommon.RootTypesForUMA);
+    recordEnum(metricName, rootType, VolumeManagerCommon.RootTypesForUMA);
   }
 
   /** Activate the directory behind the item. */
@@ -775,7 +825,7 @@ export class DirectoryTreeContainer {
 
         if (navigationRootData?.type === NavigationType.SHORTCUT) {
           const onEntryResolved = (resolvedEntry: Entry) => {
-            metrics.recordUserAction('FolderShortcut.Navigate');
+            recordUserAction('FolderShortcut.Navigate');
             this.store_.dispatch(
                 changeDirectory({toKey: resolvedEntry.toURL()}));
           };
@@ -833,8 +883,8 @@ export class DirectoryTreeContainer {
 
   /**
    * Updates tree by entry.
-   * `entry` A changed entry. Deleted entry is passed when watched directory
-   * is deleted.
+   * `entry` A changed entry. Changed directory entry is passed when watched
+   * directory is deleted.
    */
   private updateTreeByEntry_(entry: DirectoryEntry) {
     // TODO(b/271485133): Remove `getDirectory` call here and prevent
@@ -912,5 +962,63 @@ export class DirectoryTreeContainer {
     }
 
     return false;
+  }
+
+  /** Setup context menu for the given element. */
+  private setContextMenu_(
+      element: XfTreeItem, fileData: FileData,
+      navigationRoot?: NavigationRoot) {
+    // Trash is FakeEntry, but we still want to return menus for sub items.
+    if (isTrashEntry(fileData.entry)) {
+      if (this.contextMenuForSubitems) {
+        contextMenuHandler.setContextMenu(element, this.contextMenuForSubitems);
+      }
+      return;
+    }
+    // Disable menus for disabled items and FakeEntry items.
+    if (element.disabled || fileData.entry instanceof FakeEntryImpl) {
+      if (this.contextMenuForDisabledItems) {
+        contextMenuHandler.setContextMenu(
+            element, this.contextMenuForDisabledItems);
+        return;
+      }
+    }
+    if (navigationRoot) {
+      // For MyFiles, show normal file operations menu.
+      if (isMyFilesEntry(fileData.entry)) {
+        if (this.contextMenuForSubitems) {
+          contextMenuHandler.setContextMenu(
+              element, this.contextMenuForSubitems);
+        }
+        return;
+      }
+      // For other navigation roots, always show menus for root items, including
+      // the removable entry list.
+      if (this.contextMenuForRootItems) {
+        contextMenuHandler.setContextMenu(
+            element, this.contextMenuForRootItems);
+      }
+      return;
+    }
+    // For non-root navigation items, show menus for sub items.
+    if (this.contextMenuForSubitems) {
+      contextMenuHandler.setContextMenu(element, this.contextMenuForSubitems);
+    }
+  }
+
+  private async attachRename_(element: XfTreeItem) {
+    await element.updateComplete;
+    window.fileManager.directoryTreeNamingController.attachAndStart(
+        element, false, null);
+  }
+
+  /**
+   * Given a NavigationKey, check if the entry it represents is the current
+   * directory in the store or not.
+   */
+  private isCurrentDirectoryActive_(navigationKey: NavigationKey) {
+    const {currentDirectory} = this.store_.getState();
+    return currentDirectory?.key === navigationKey &&
+        currentDirectory.status === PropStatus.SUCCESS;
   }
 }

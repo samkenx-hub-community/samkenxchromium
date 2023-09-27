@@ -60,6 +60,11 @@ public final class DownloadForegroundServiceManagerTest {
         public MockDownloadForegroundServiceManager() {}
 
         @Override
+        boolean isEnabled() {
+            return true;
+        }
+
+        @Override
         void startAndBindService(Context context) {
             mIsServiceBound = true;
             super.startAndBindService(context);
@@ -90,6 +95,11 @@ public final class DownloadForegroundServiceManagerTest {
         // Skip waiting for delayed runnable in tests.
         @Override
         void postMaybeStopServiceRunnable() {}
+
+        @Override
+        protected boolean canStartForeground() {
+            return true;
+        }
 
         /**
          * Call for testing that mimics the onServiceConnected call in mConnection that ensures the

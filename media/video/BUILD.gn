@@ -72,6 +72,8 @@ source_set("video") {
       "h266_nalu_parser.h",
       "h266_parser.cc",
       "h266_parser.h",
+      "h266_poc.cc",
+      "h266_poc.h",
     ]
   }
 
@@ -113,6 +115,10 @@ source_set("video") {
       "openh264_video_encoder.h",
     ]
     deps += [ "//third_party/openh264:encoder" ]
+  }
+
+  if (is_apple) {
+    deps += [ "//media/base/mac:mac" ]
   }
 }
 
@@ -174,6 +180,7 @@ source_set("unit_tests") {
     sources += [
       "h266_nalu_parser_unittest.cc",
       "h266_parser_unittest.cc",
+      "h266_poc_unittest.cc",
     ]
   }
 

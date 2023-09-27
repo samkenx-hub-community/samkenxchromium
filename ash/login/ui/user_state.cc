@@ -17,9 +17,10 @@ UserState::UserState(const LoginUserInfo& user_info)
     force_online_sign_in = true;
   }
   show_pin_pad_for_password = user_info.show_pin_pad_for_password;
-  disable_auth = !user_info.is_multiprofile_allowed &&
+  disable_auth = !user_info.is_multi_user_sign_in_allowed &&
                  Shell::Get()->session_controller()->GetSessionState() ==
                      session_manager::SessionState::LOGIN_SECONDARY;
+  is_recovery_configured = user_info.is_recovery_configured;
 }
 
 UserState::UserState(UserState&&) = default;

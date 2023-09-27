@@ -9,31 +9,27 @@
 #include <vector>
 
 #include "base/metrics/histogram_functions.h"
-#include "base/task/sequenced_task_runner.h"
 #include "content/browser/indexed_db/indexed_db_callback_helpers.h"
 #include "content/browser/indexed_db/indexed_db_connection.h"
-#include "content/browser/indexed_db/indexed_db_context_impl.h"
-#include "content/browser/indexed_db/indexed_db_dispatcher_host.h"
-#include "content/browser/indexed_db/indexed_db_factory.h"
 #include "content/browser/indexed_db/indexed_db_transaction.h"
 #include "content/browser/indexed_db/indexed_db_value.h"
+#include "mojo/public/cpp/bindings/self_owned_associated_receiver.h"
 #include "storage/browser/blob/blob_storage_context.h"
 #include "third_party/blink/public/mojom/indexeddb/indexeddb.mojom.h"
 
 namespace content {
 
+// static
+void TransactionImpl::CreateAndBind(
+    mojo::PendingAssociatedReceiver<blink::mojom::IDBTransaction> pending,
+    base::WeakPtr<IndexedDBTransaction> transaction) {
+  mojo::MakeSelfOwnedAssociatedReceiver(
+      base::WrapUnique(new TransactionImpl(transaction)), std::move(pending));
+}
+
 TransactionImpl::TransactionImpl(
-    base::WeakPtr<IndexedDBTransaction> transaction,
-    const storage::BucketLocator& bucket_locator,
-    base::WeakPtr<IndexedDBDispatcherHost> dispatcher_host,
-    scoped_refptr<base::SequencedTaskRunner> idb_runner)
-    : dispatcher_host_(dispatcher_host),
-      indexed_db_context_(dispatcher_host->context()),
-      transaction_(std::move(transaction)),
-      bucket_locator_(bucket_locator),
-      idb_runner_(std::move(idb_runner)) {
-  DCHECK(idb_runner_->RunsTasksInCurrentSequence());
-  DCHECK(dispatcher_host_);
+    base::WeakPtr<IndexedDBTransaction> transaction)
+    : transaction_(std::move(transaction)) {
   DCHECK(transaction_);
 }
 
@@ -116,7 +112,6 @@ void TransactionImpl::Put(
     const std::vector<blink::IndexedDBIndexKeys>& index_keys,
     blink::mojom::IDBTransaction::PutCallback callback) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  CHECK(dispatcher_host_);
 
   if (!transaction_) {
     IndexedDBDatabaseError error(blink::mojom::IDBException::kUnknownError,
@@ -152,8 +147,11 @@ void TransactionImpl::Put(
     total_blob_size = CreateExternalObjects(input_value, &external_objects);
   }
 
-  transaction_->set_size(input_value->bits.size() + key.size_estimate() +
-                         total_blob_size);
+  // Increment the total transaction size by the size of this put.
+  size_ += input_value->bits.size() + key.size_estimate() + total_blob_size;
+  // Warm up the disk space cache.
+  transaction_->bucket_context()->CheckCanUseDiskSpace(size_, {});
+
   std::unique_ptr<IndexedDBDatabase::PutOperationParams> params(
       std::make_unique<IndexedDBDatabase::PutOperationParams>());
   IndexedDBValue& output_value = params->value;
@@ -244,19 +242,17 @@ void TransactionImpl::Commit(int64_t num_errors_handled) {
   transaction_->SetNumErrorsHandled(num_errors_handled);
 
   // Always allow empty or delete-only transactions.
-  if (transaction_->size() == 0) {
-    connection->database()->Commit(transaction_.get());
+  if (size_ == 0) {
+    transaction_->SetCommitFlag();
     return;
   }
 
-  indexed_db_context_->quota_manager_proxy()->GetBucketSpaceRemaining(
-      bucket_locator_, indexed_db_context_->IDBTaskRunner(),
-      base::BindOnce(&TransactionImpl::OnQuotaCheckDone,
-                     weak_factory_.GetWeakPtr()));
+  transaction_->bucket_context()->CheckCanUseDiskSpace(
+      size_, base::BindOnce(&TransactionImpl::OnQuotaCheckDone,
+                            weak_factory_.GetWeakPtr()));
 }
 
-void TransactionImpl::OnQuotaCheckDone(
-    storage::QuotaErrorOr<int64_t> space_left) {
+void TransactionImpl::OnQuotaCheckDone(bool allowed) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (!transaction_) {
     return;
@@ -268,8 +264,8 @@ void TransactionImpl::OnQuotaCheckDone(
     return;
   }
 
-  if (space_left.has_value() && space_left.value() >= transaction_->size()) {
-    connection->database()->Commit(transaction_.get());
+  if (allowed) {
+    transaction_->SetCommitFlag();
   } else {
     connection->AbortTransactionAndTearDownOnError(
         transaction_.get(),

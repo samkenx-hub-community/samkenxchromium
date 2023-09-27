@@ -147,8 +147,9 @@ void LayoutInline::UpdateFromStyle() {
   NOT_DESTROYED();
   LayoutBoxModelObject::UpdateFromStyle();
 
-  // FIXME: Is this still needed. Was needed for run-ins, since run-in is
-  // considered a block display type.
+  // This is needed (at a minimum) for LayoutSVGInline, which (including
+  // subclasses) is constructed for svg:a, svg:textPath, and svg:tspan,
+  // regardless of CSS 'display'.
   SetInline(true);
 
   // FIXME: Support transforms and reflections on inline flows someday.
@@ -403,7 +404,12 @@ template <typename PhysicalRectCollector>
 void LayoutInline::CollectLineBoxRects(
     const PhysicalRectCollector& yield) const {
   NOT_DESTROYED();
-  DCHECK(IsInLayoutNGInlineFormattingContext());
+  if (!IsInLayoutNGInlineFormattingContext()) {
+    // NGInlineCursor::MoveToIncludingCulledInline() below would fail DCHECKs in
+    // this situation, so just bail. This is most likely not a good situation to
+    // be in, though. See crbug.com/1448357
+    return;
+  }
   NGInlineCursor cursor;
   cursor.MoveToIncludingCulledInline(*this);
   for (; cursor; cursor.MoveToNextForSameLayoutObject()) {
@@ -596,7 +602,7 @@ bool LayoutInline::NodeAtPoint(HitTestResult& result,
     // Fragment traversal requires a target fragment to be specified,
     // unless there's only one.
     DCHECK(!CanTraversePhysicalFragments() || target_fragment_idx >= 0 ||
-           !FirstFragment().NextFragment());
+           !IsFragmented());
     // Convert from inline fragment index to container fragment index, as the
     // inline may not start in the first fragment generated for the inline
     // formatting context.
@@ -762,22 +768,6 @@ PhysicalRect LayoutInline::PhysicalVisualOverflowRect() const {
   return overflow_rect;
 }
 
-PhysicalRect LayoutInline::ReferenceBoxForClipPath() const {
-  NOT_DESTROYED();
-  // The spec just says to use the border box as clip-path reference box. It
-  // doesn't say what to do if there are multiple lines. Gecko uses the first
-  // fragment in that case. We'll do the same here (but correctly with respect
-  // to writing-mode - Gecko has some issues there).
-  // See crbug.com/641907
-  if (IsInLayoutNGInlineFormattingContext()) {
-    NGInlineCursor cursor;
-    cursor.MoveTo(*this);
-    if (cursor)
-      return cursor.Current().RectInContainerFragment();
-  }
-  return PhysicalRect();
-}
-
 bool LayoutInline::MapToVisualRectInAncestorSpaceInternal(
     const LayoutBoxModelObject* ancestor,
     TransformState& transform_state,
@@ -862,9 +852,7 @@ void LayoutInline::UpdateHitTestResult(HitTestResult& result,
   }
 }
 
-void LayoutInline::DirtyLinesFromChangedChild(
-    LayoutObject* child,
-    MarkingBehavior marking_behavior) {
+void LayoutInline::DirtyLinesFromChangedChild(LayoutObject* child) {
   NOT_DESTROYED();
   if (IsInLayoutNGInlineFormattingContext()) {
     if (const LayoutBlockFlow* container = FragmentItemsContainer())

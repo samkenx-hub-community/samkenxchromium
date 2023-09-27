@@ -12,7 +12,6 @@ import android.content.res.Configuration;
 import android.view.View;
 
 import androidx.annotation.Nullable;
-import androidx.annotation.VisibleForTesting;
 
 import org.chromium.base.Callback;
 import org.chromium.base.FeatureList;
@@ -77,8 +76,8 @@ public class AdaptiveToolbarButtonController
     private final AdaptiveButtonActionMenuCoordinator mMenuCoordinator;
     private int mScreenWidthDp;
 
-    @AdaptiveToolbarButtonVariant
-    private int mSessionButtonVariant = AdaptiveToolbarButtonVariant.UNKNOWN;
+    private @AdaptiveToolbarButtonVariant int mSessionButtonVariant =
+            AdaptiveToolbarButtonVariant.UNKNOWN;
     private CurrentTabObserver mPageLoadMetricsRecorder;
 
     /**
@@ -212,7 +211,9 @@ public class AdaptiveToolbarButtonController
                     receivedButtonSpec.getSupportsTinting(),
                     receivedButtonSpec.getIPHCommandBuilder(),
                     receivedButtonSpec.getButtonVariant(),
-                    receivedButtonSpec.getActionChipLabelResId()));
+                    receivedButtonSpec.getActionChipLabelResId(),
+                    receivedButtonSpec.getHoverTooltipTextId(),
+                    receivedButtonSpec.getShouldShowHoverHighlight()));
         }
         return mButtonData;
     }
@@ -273,7 +274,6 @@ public class AdaptiveToolbarButtonController
 
     /** Returns the {@link ButtonDataProvider} used in a single-variant mode. */
     @Nullable
-    @VisibleForTesting
     public ButtonDataProvider getSingleProviderForTesting() {
         return mSingleProvider;
     }

@@ -5,6 +5,7 @@
 #include "chrome/browser/web_applications/commands/manifest_update_check_command.h"
 
 #include "base/feature_list.h"
+#include "base/functional/callback_forward.h"
 #include "base/strings/to_string.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/values.h"
@@ -16,14 +17,17 @@
 #include "chrome/browser/web_applications/web_app_ui_manager.h"
 #include "chrome/browser/web_applications/web_contents/web_app_icon_downloader.h"
 #include "chrome/common/chrome_features.h"
+#include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/web_contents.h"
+#include "content/public/browser/web_contents_observer.h"
 #include "url/gurl.h"
+#include "url/origin.h"
 
 namespace web_app {
 
 ManifestUpdateCheckCommand::ManifestUpdateCheckCommand(
     const GURL& url,
-    const AppId& app_id,
+    const webapps::AppId& app_id,
     base::Time check_time,
     base::WeakPtr<content::WebContents> web_contents,
     CompletedCallback callback,
@@ -60,6 +64,13 @@ base::Value ManifestUpdateCheckCommand::ToDebugValue() const {
 void ManifestUpdateCheckCommand::StartWithLock(std::unique_ptr<AppLock> lock) {
   lock_ = std::move(lock);
 
+  if (IsWebContentsDestroyed()) {
+    CompleteCommandAndSelfDestruct(
+        ManifestUpdateCheckResult::kWebContentsDestroyed);
+    return;
+  }
+  Observe(web_contents_.get());
+
   // Runs a linear sequence of asynchronous and synchronous steps.
   // This sequence can be early exited at any point by a call to
   // CompleteCommandAndSelfDestruct().
@@ -77,6 +88,23 @@ void ManifestUpdateCheckCommand::StartWithLock(std::unique_ptr<AppLock> lock) {
                      GetWeakPtr()),
 
       base::BindOnce(&ManifestUpdateCheckCommand::CheckComplete, GetWeakPtr()));
+}
+
+void ManifestUpdateCheckCommand::DidFinishNavigation(
+    content::NavigationHandle* navigation_handle) {
+  if (!navigation_handle->IsInPrimaryMainFrame() ||
+      !navigation_handle->HasCommitted() ||
+      navigation_handle->IsSameDocument()) {
+    return;
+  }
+
+  if (url::IsSameOriginWith(navigation_handle->GetPreviousPrimaryMainFrameURL(),
+                            navigation_handle->GetURL())) {
+    return;
+  }
+
+  CompleteCommandAndSelfDestruct(
+      ManifestUpdateCheckResult::kCancelledDueToMainFrameNavigation);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -122,7 +150,8 @@ void ManifestUpdateCheckCommand::DownloadNewManifestJson(
 
   webapps::InstallableParams params;
   params.valid_primary_icon = true;
-  params.valid_manifest = true;
+  params.installable_criteria =
+      webapps::InstallableCriteria::kValidManifestWithIcons;
   params.check_webapp_manifest_display = false;
   data_retriever_->CheckInstallabilityAndRetrieveManifest(
       web_contents_.get(),
@@ -368,8 +397,7 @@ ManifestUpdateCheckCommand::MakeAppNameIdentityUpdateDecision() const {
     return IdentityUpdateDecision::kSilentlyAllow;
   }
 
-  if (CanShowIdentityUpdateConfirmationDialog(lock_->registrar(), web_app) &&
-      base::FeatureList::IsEnabled(features::kPwaUpdateDialogForName)) {
+  if (CanShowIdentityUpdateConfirmationDialog(lock_->registrar(), web_app)) {
     return IdentityUpdateDecision::kGetUserConfirmation;
   }
 
@@ -395,8 +423,8 @@ ManifestUpdateCheckCommand::MakeAppIconIdentityUpdateDecision() const {
           features::kWebAppSyncGeneratedIconUpdateFix) &&
       web_app.is_generated_icon() &&
       web_app.latest_install_source() == webapps::WebappInstallSource::SYNC &&
-      check_time_ <
-          (web_app.install_time() + kSyncGeneratedIconFixWindowDuration)) {
+      check_time_ < (web_app.first_install_time() +
+                     kSyncGeneratedIconFixWindowDuration)) {
     return IdentityUpdateDecision::kSilentlyAllow;
   }
 
@@ -448,9 +476,6 @@ void ManifestUpdateCheckCommand::ConfirmAppIdentityUpdate(
     return;
   }
 
-  // TODO(https://crbug.com/1378271): Pull this out of this command so the app
-  // lock is no longer held while a dialog is showing. We should not hold locks
-  // while waiting on user input.
   lock_->ui_manager().ShowWebAppIdentityUpdateDialog(
       app_id_,
       /*title_change=*/manifest_data_changes_.app_name_changed,
@@ -536,7 +561,7 @@ const WebApp& ManifestUpdateCheckCommand::GetWebApp() const {
   return *web_app;
 }
 
-bool ManifestUpdateCheckCommand::IsWebContentsDestroyed() const {
+bool ManifestUpdateCheckCommand::IsWebContentsDestroyed() {
   return !web_contents_ || web_contents_->IsBeingDestroyed();
 }
 
@@ -555,12 +580,14 @@ void ManifestUpdateCheckCommand::CompleteCommandAndSelfDestruct(
       case ManifestUpdateCheckResult::kIconDownloadFailed:
       case ManifestUpdateCheckResult::kIconReadFromDiskFailed:
       case ManifestUpdateCheckResult::kWebContentsDestroyed:
+      case ManifestUpdateCheckResult::kCancelledDueToMainFrameNavigation:
         return CommandResult::kFailure;
       case ManifestUpdateCheckResult::kSystemShutdown:
         return CommandResult::kShutdown;
     }
   }();
 
+  Observe(nullptr);
   SignalCompletionAndSelfDestruct(
       command_result,
       base::BindOnce(std::move(completed_callback_), check_result,

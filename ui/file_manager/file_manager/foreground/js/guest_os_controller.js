@@ -7,7 +7,7 @@ import {GuestOsPlaceholder} from '../../common/js/files_app_entry_types.js';
 import {util} from '../../common/js/util.js';
 import {VolumeManagerCommon} from '../../common/js/volume_manager_types.js';
 import {VolumeManager} from '../../externs/volume_manager.js';
-import {addUiEntry, removeUiEntry} from '../../state/actions/ui_entries.js';
+import {addUiEntry, removeUiEntry} from '../../state/ducks/ui_entries.js';
 import {getEntry, getStore} from '../../state/store.js';
 
 import {DirectoryModel} from './directory_model.js';
@@ -69,16 +69,7 @@ export class GuestOsController {
       }
     }
 
-    // Deduplicate GuestOSes with the same name/vmType to ignore issues from the
-    // backend. b/279378611. The instances that appear later prevail, assuming
-    // they're mounted/registered more recently.
-    const uniqGuests = new Map();
-    guests.forEach(guest => {
-      uniqGuests.set(`${guest.vmType}-${guest.displayName}`, guest);
-    });
-
-    this.directoryTree_.dataModel
-        .guestOsPlaceholders = Array.from(uniqGuests.values()).map(guest => {
+    const newGuestOsPlaceholders = guests.map(guest => {
       const guestOsEntry =
           new GuestOsPlaceholder(guest.displayName, guest.id, guest.vmType);
       const navigationModelItem = new NavigationModelFakeItem(
@@ -93,7 +84,12 @@ export class GuestOsController {
       return navigationModelItem;
     });
 
-    // Redraw the tree to ensure any newly added/removed roots are updated.
-    this.directoryTree_.redraw(false);
+    if (!util.isFilesAppExperimental()) {
+      this.directoryTree_.dataModel.guestOsPlaceholders =
+          newGuestOsPlaceholders;
+      // Redraw the tree to ensure any newly added/removed roots are
+      // updated.
+      this.directoryTree_.redraw(false);
+    }
   }
 }

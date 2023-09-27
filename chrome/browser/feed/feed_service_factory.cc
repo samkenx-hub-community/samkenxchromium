@@ -18,6 +18,7 @@
 #include "chrome/browser/metrics/chrome_metrics_service_accessor.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_key.h"
+#include "chrome/browser/search_engines/template_url_service_factory.h"
 #include "chrome/browser/signin/identity_manager_factory.h"
 #include "chrome/common/channel_info.h"
 #include "chrome/common/chrome_version.h"
@@ -93,13 +94,6 @@ class FeedServiceDelegateImpl : public FeedService::Delegate {
     metrics.width_pixels = 0;
     metrics.height_pixels = 0;
     return metrics;
-#endif
-  }
-  bool IsAutoplayEnabled() override {
-#if BUILDFLAG(IS_ANDROID)
-    return FeedServiceBridge::IsAutoplayEnabled();
-#else
-    return false;
 #endif
   }
   TabGroupEnabledState GetTabGroupEnabledState() override {
@@ -182,7 +176,8 @@ FeedServiceFactory::FeedServiceFactory()
 
 FeedServiceFactory::~FeedServiceFactory() = default;
 
-KeyedService* FeedServiceFactory::BuildServiceInstanceFor(
+std::unique_ptr<KeyedService>
+FeedServiceFactory::BuildServiceInstanceForBrowserContext(
     content::BrowserContext* context) const {
   // Currently feed service is only supported for kWebUiFeed on desktop.
   // TODO(jianli): Update all other places that depend on FeedServiceFactory
@@ -218,11 +213,15 @@ KeyedService* FeedServiceFactory::BuildServiceInstanceFor(
 #if BUILDFLAG(IS_ANDROID)
   chrome_info.start_surface =
       base::FeatureList::IsEnabled(chrome::android::kStartSurfaceAndroid);
+  chrome_info.is_new_tab_search_engine_url_android_enabled =
+      base::FeatureList::IsEnabled(
+          chrome::android::kNewTabSearchEngineUrlAndroid);
 #else
   chrome_info.start_surface = false;
+  chrome_info.is_new_tab_search_engine_url_android_enabled = false;
 #endif
 
-  return new FeedService(
+  return std::make_unique<FeedService>(
       std::make_unique<FeedServiceDelegateImpl>(),
 #if BUILDFLAG(IS_ANDROID)
       std::make_unique<RefreshTaskSchedulerImpl>(
@@ -242,7 +241,8 @@ KeyedService* FeedServiceFactory::BuildServiceInstanceFor(
       HistoryServiceFactory::GetForProfile(profile,
                                            ServiceAccessType::IMPLICIT_ACCESS),
       storage_partition->GetURLLoaderFactoryForBrowserProcess(),
-      background_task_runner, api_key, chrome_info);
+      background_task_runner, api_key, chrome_info,
+      TemplateURLServiceFactory::GetForProfile(profile));
 }
 
 bool FeedServiceFactory::ServiceIsNULLWhileTesting() const {

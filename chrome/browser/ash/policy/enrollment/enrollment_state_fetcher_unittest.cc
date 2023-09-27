@@ -8,6 +8,7 @@
 
 #include "ash/constants/ash_switches.h"
 #include "base/functional/bind.h"
+#include "base/i18n/time_formatting.h"
 #include "base/strings/strcat.h"
 #include "base/strings/stringprintf.h"
 #include "base/test/gmock_callback_support.h"
@@ -37,10 +38,12 @@
 #include "components/prefs/pref_service.h"
 #include "components/prefs/testing_pref_service.h"
 #include "content/public/test/browser_task_environment.h"
+#include "private_membership_rlwe.pb.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "services/network/public/cpp/weak_wrapper_shared_url_loader_factory.h"
 #include "services/network/test/test_url_loader_factory.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "third_party/icu/source/i18n/unicode/timezone.h"
 
 namespace policy {
 
@@ -76,16 +79,16 @@ class MockDeviceSettingsService : public ash::DeviceSettingsService {
 
 std::unique_ptr<EnrollmentStateFetcher::RlweClient> CreateRlweClientForTesting(
     const psm::testing::RlweTestCase& test_case,
+    private_membership::rlwe::RlweUseCase use_case,
     const private_membership::rlwe::RlwePlaintextId& plaintext_id) {
   // Below we use test_case.plaintext_id() instead of the computed plaintext_id
   // to ensure that Query/OPRF requests and responses match the ones in the
   // test_case. Hence we check that computed plaintext_id is correct here.
   EXPECT_EQ(plaintext_id.sensitive_id(), kTestPsmId);
-  EXPECT_TRUE(plaintext_id.non_sensitive_id().empty());
+  EXPECT_EQ(plaintext_id.non_sensitive_id(), kTestPsmId);
   auto client =
       private_membership::rlwe::PrivateMembershipRlweClient::CreateForTesting(
-          private_membership::rlwe::RlweUseCase::CROS_DEVICE_STATE,
-          {test_case.plaintext_id()}, test_case.ec_cipher_key(),
+          use_case, {test_case.plaintext_id()}, test_case.ec_cipher_key(),
           test_case.seed());
   return std::move(client.value());
 }
@@ -169,7 +172,6 @@ class EnrollmentStateFetcherTest : public testing::Test {
     DeviceCloudPolicyManagerAsh::RegisterPrefs(local_state_.registry());
     EnrollmentStateFetcher::RegisterPrefs(local_state_.registry());
 
-    ash::system::StatisticsProvider::SetTestProvider(&statistics_provider_);
     statistics_provider_.SetMachineStatistic(
         ash::system::kSerialNumberKeyForTest, kTestSerialNumber);
     statistics_provider_.SetMachineStatistic(ash::system::kRlzBrandCodeKey,
@@ -192,7 +194,8 @@ class EnrollmentStateFetcherTest : public testing::Test {
     EXPECT_CALL(device_settings_service_, GetOwnershipStatusAsync)
         .WillOnce(DoAll(
             InvokeWithoutArgs([=]() { task_environment_.AdvanceClock(time); }),
-            RunOnceCallback<0>(ash::DeviceSettingsService::OWNERSHIP_NONE)));
+            RunOnceCallback<0>(
+                ash::DeviceSettingsService::OwnershipStatus::kOwnershipNone)));
   }
 
   void ExpectStateKeysRequest(base::TimeDelta time = base::TimeDelta()) {
@@ -240,7 +243,7 @@ class EnrollmentStateFetcherTest : public testing::Test {
   base::test::ScopedCommandLine command_line_;
   TestingPrefServiceSimple local_state_;
   ash::FakeSystemClockClient system_clock_;
-  ash::system::FakeStatisticsProvider statistics_provider_;
+  ash::system::ScopedFakeStatisticsProvider statistics_provider_;
   ash::ScopedStubInstallAttributes install_attributes_;
   MockStateKeyBroker state_key_broker_;
   MockDeviceSettingsService device_settings_service_;
@@ -304,13 +307,11 @@ TEST_F(EnrollmentStateFetcherTest, SystemClockNotSyncronized) {
 }
 
 TEST_F(EnrollmentStateFetcherTest, EmbargoDateNotPassed) {
-  base::Time::Exploded exploded;
-  base::Time embargo_date = base::Time::Now() + base::Days(7);
-  embargo_date.UTCExplode(&exploded);
   statistics_provider_.SetMachineStatistic(
       ash::system::kRlzEmbargoEndDateKey,
-      base::StringPrintf("%04d-%02d-%02d", exploded.year, exploded.month,
-                         exploded.day_of_month));
+      base::UnlocalizedTimeFormatWithPattern(base::Time::Now() + base::Days(7),
+                                             "yyyy-MM-dd",
+                                             icu::TimeZone::getGMT()));
 
   AutoEnrollmentState state = FetchEnrollmentState();
 
@@ -355,8 +356,8 @@ TEST_F(EnrollmentStateFetcherTest, RlzBrandCodeAndSerialNumberMissing) {
 
 TEST_F(EnrollmentStateFetcherTest, OwnershipTaken) {
   EXPECT_CALL(device_settings_service_, GetOwnershipStatusAsync)
-      .WillOnce(
-          RunOnceCallback<0>(ash::DeviceSettingsService::OWNERSHIP_TAKEN));
+      .WillOnce(RunOnceCallback<0>(
+          ash::DeviceSettingsService::OwnershipStatus::kOwnershipTaken));
 
   AutoEnrollmentState state = FetchEnrollmentState();
 
@@ -365,8 +366,8 @@ TEST_F(EnrollmentStateFetcherTest, OwnershipTaken) {
 
 TEST_F(EnrollmentStateFetcherTest, OwnershipUnknown) {
   EXPECT_CALL(device_settings_service_, GetOwnershipStatusAsync)
-      .WillOnce(
-          RunOnceCallback<0>(ash::DeviceSettingsService::OWNERSHIP_UNKNOWN));
+      .WillOnce(RunOnceCallback<0>(
+          ash::DeviceSettingsService::OwnershipStatus::kOwnershipUnknown));
 
   AutoEnrollmentState state = FetchEnrollmentState();
 
@@ -439,10 +440,11 @@ TEST_F(EnrollmentStateFetcherTest, FailToCreateQueryRequest) {
   auto fetcher = EnrollmentStateFetcher::Create(
       future.GetCallback(), &local_state_,
       base::BindRepeating(
-          [](const private_membership::rlwe::RlwePlaintextId& plaintext_id) {
+          [](private_membership::rlwe::RlweUseCase use_case,
+             const private_membership::rlwe::RlwePlaintextId& plaintext_id) {
             return private_membership::rlwe::PrivateMembershipRlweClient::
                 CreateForTesting(
-                       private_membership::rlwe::RlweUseCase::CROS_DEVICE_STATE,
+                       use_case,
                        // Using fake ID, cipher key and seed will cause failure
                        // to create query request since it won't match the
                        // ecrypted ID in OPRF response from the psm_test_case_.
@@ -599,8 +601,9 @@ TEST_F(EnrollmentStateFetcherTest, UmaHistogramsCounts) {
   histograms.ExpectUniqueSample(kUMAStateDeterminationOnFlex, false, 1);
   histograms.ExpectUniqueSample(kUMAStateDeterminationSystemClockSynchronized,
                                 true, 1);
-  histograms.ExpectUniqueSample(kUMAStateDeterminationOwnershipStatus,
-                                ash::DeviceSettingsService::OWNERSHIP_NONE, 1);
+  histograms.ExpectUniqueSample(
+      kUMAStateDeterminationOwnershipStatus,
+      ash::DeviceSettingsService::OwnershipStatus::kOwnershipNone, 1);
   histograms.ExpectUniqueSample(kUMAStateDeterminationStateKeysRetrieved, true,
                                 1);
   histograms.ExpectUniqueSample(

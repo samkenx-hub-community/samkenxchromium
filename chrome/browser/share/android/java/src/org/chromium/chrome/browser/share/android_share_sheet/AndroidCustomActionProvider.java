@@ -31,8 +31,8 @@ import org.chromium.chrome.browser.share.long_screenshots.LongScreenshotsCoordin
 import org.chromium.chrome.browser.share.share_sheet.ChromeOptionShareCallback;
 import org.chromium.chrome.browser.share.share_sheet.ShareSheetLinkToggleCoordinator.LinkToggleState;
 import org.chromium.chrome.browser.tab.Tab;
-import org.chromium.chrome.browser.ui.signin.DeviceLockActivityLauncher;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
+import org.chromium.components.browser_ui.device_lock.DeviceLockActivityLauncher;
 import org.chromium.components.browser_ui.share.ShareParams;
 import org.chromium.components.feature_engagement.EventConstants;
 import org.chromium.components.feature_engagement.Tracker;
@@ -179,7 +179,9 @@ class AndroidCustomActionProvider extends ChromeProvidedSharingOptionsProviderBa
         // For Android's share sheet, only use copy image for web share.
         // TODO(crbug/1448944): Exclude the copy action from Context menu instead.
         if (mChromeShareExtras != null
-                && mChromeShareExtras.getDetailedContentType() == DetailedContentType.WEB_SHARE) {
+                && (mChromeShareExtras.getDetailedContentType() == DetailedContentType.WEB_SHARE
+                        || mChromeShareExtras.getDetailedContentType()
+                                == DetailedContentType.SCREENSHOT)) {
             mOrderedFirstPartyOptions.add(createCopyImageFirstPartyOption(false));
         }
         mOrderedFirstPartyOptions.add(createCopyImageWithLinkFirstPartyOption());

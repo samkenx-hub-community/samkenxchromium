@@ -24,10 +24,10 @@ const elementsStatus = new Map<HTMLAudioElement, Status>();
  * @param el Audio element to play.
  * @return Promise which will be resolved once the sound is stopped. The
  *     resolved value will be true if it is ended. Otherwise, it is just paused
- *     due to cancenlation.
+ *     due to cancellation.
  */
 export async function play(el: HTMLAudioElement): Promise<boolean> {
-  await cancel(el);
+  await cancel(el).wait();
 
   el.currentTime = 0;
   elementsStatus.set(el, Status.LOADING);
@@ -59,19 +59,24 @@ export async function play(el: HTMLAudioElement): Promise<boolean> {
  *
  * @param el Audio element to cancel.
  */
-export async function cancel(el: HTMLAudioElement): Promise<void> {
+export function cancel(el: HTMLAudioElement): WaitableEvent {
   // We can only pause the element which is currently playing.
   // (Please refer to https://goo.gl/LdLk22)
+  // TODO(pihsun): Check if we can just call el.pause() and handle the
+  // AbortError in play instead.
   const status = elementsStatus.get(el);
+  const canceled = new WaitableEvent();
   if (status === Status.PLAYING) {
     el.pause();
+    canceled.signal();
   } else if (status === Status.LOADING) {
-    const canceled = new WaitableEvent();
     function onPlaying() {
       el.pause();
       canceled.signal();
     }
     el.addEventListener('playing', onPlaying, {once: true});
-    await canceled.wait();
+  } else {
+    canceled.signal();
   }
+  return canceled;
 }

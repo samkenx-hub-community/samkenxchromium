@@ -11,8 +11,8 @@
 #include "base/time/time.h"
 #include "base/types/cxx23_to_underlying.h"
 #include "chrome/app/vector_icons/vector_icons.h"
-#include "chrome/browser/autofill/autofill_popup_controller_utils.h"
 #include "chrome/browser/ui/autofill/autofill_popup_controller.h"
+#include "components/autofill/core/browser/ui/autofill_resource_utils.h"
 #include "components/autofill/core/browser/ui/popup_item_ids.h"
 #include "components/autofill/core/browser/ui/popup_types.h"
 #include "components/autofill/core/browser/ui/suggestion.h"
@@ -97,9 +97,9 @@ NSImage* GetCreditCardTouchBarImage(int iconId) {
   for (int i = 0; i < _controller->GetLineCount() && i < maxTouchBarItems;
        i++) {
     const autofill::Suggestion& suggestion = _controller->GetSuggestionAt(i);
-    if (suggestion.frontend_id.as_popup_item_id() !=
-            autofill::PopupItemId::kAutocompleteEntry &&
-        !suggestion.frontend_id.is_an_address_or_card_popup_item_id()) {
+    if (suggestion.popup_item_id != autofill::PopupItemId::kAutocompleteEntry &&
+        suggestion.popup_item_id != autofill::PopupItemId::kAddressEntry &&
+        suggestion.popup_item_id != autofill::PopupItemId::kCreditCardEntry) {
       continue;
     }
 
@@ -189,13 +189,7 @@ NSImage* GetCreditCardTouchBarImage(int iconId) {
 }
 
 - (void)acceptCreditCard:(id)sender {
-  if (base::FeatureList::IsEnabled(
-          autofill::features::
-              kAutofillPopupUseThresholdForKeyboardAndMobileAccept)) {
-    _controller->AcceptSuggestion([sender tag]);
-  } else {
-    _controller->AcceptSuggestionWithoutThreshold([sender tag]);
-  }
+  _controller->AcceptSuggestion([sender tag], base::TimeTicks::Now());
 }
 
 - (void)setIsCreditCardPopup:(bool)is_credit_card_popup {

@@ -241,6 +241,10 @@ void SetupFragmentBuilderForFragmentation(
     const NGBlockBreakToken* previous_break_token,
     NGBoxFragmentBuilder*);
 
+// Return whether any block-end border+padding should be included in the
+// fragment being generated. Only one of the fragments should include this.
+bool ShouldIncludeBlockEndBorderPadding(const NGBoxFragmentBuilder&);
+
 // Outcome of considering (and possibly attempting) breaking before or inside a
 // child.
 enum class NGBreakStatus {
@@ -295,6 +299,13 @@ NGBreakStatus FinishFragmentation(NGBlockNode node,
 // Special rules apply for finishing fragmentation when building fragmentainers.
 NGBreakStatus FinishFragmentationForFragmentainer(const NGConstraintSpace&,
                                                   NGBoxFragmentBuilder*);
+
+// Return true if there's a valid class A/B breakpoint between the child
+// fragment that was just added to the builder, and the next sibling, if one is
+// added.
+bool HasBreakOpportunityBeforeNextChild(
+    const NGPhysicalFragment& child_fragment,
+    const NGBreakToken* incoming_child_break_token);
 
 // Insert a fragmentainer break before the child if necessary. In that case, the
 // previous in-flow position will be updated, we'll return |kBrokeBefore|. If we
@@ -367,7 +378,7 @@ void PropagateSpaceShortage(
     const NGConstraintSpace&,
     const NGLayoutResult*,
     LayoutUnit fragmentainer_block_offset,
-    NGBoxFragmentBuilder*,
+    NGFragmentBuilder*,
     absl::optional<LayoutUnit> block_size_override = absl::nullopt);
 // Calculate how much we would need to stretch the column block-size to fit the
 // current result (if applicable). |block_size_override| should only be supplied
@@ -390,6 +401,16 @@ void UpdateMinimalSpaceShortage(absl::optional<LayoutUnit> space_shortage,
 bool MovePastBreakpoint(
     const NGConstraintSpace& space,
     NGLayoutInputNode child,
+    const NGLayoutResult& layout_result,
+    LayoutUnit fragmentainer_block_offset,
+    NGBreakAppeal appeal_before,
+    NGBoxFragmentBuilder* builder,
+    bool is_row_item = false,
+    NGFlexColumnBreakInfo* flex_column_break_info = nullptr);
+
+// Same as above, but without the parts that require an NGLayoutInputNode.
+bool MovePastBreakpoint(
+    const NGConstraintSpace& space,
     const NGLayoutResult& layout_result,
     LayoutUnit fragmentainer_block_offset,
     NGBreakAppeal appeal_before,
@@ -458,7 +479,6 @@ NGConstraintSpace CreateConstraintSpaceForFragmentainer(
     NGFragmentationType fragmentation_type,
     LogicalSize fragmentainer_size,
     LogicalSize percentage_resolution_size,
-    bool allow_discard_start_margin,
     bool balance_columns,
     NGBreakAppeal min_break_appeal);
 

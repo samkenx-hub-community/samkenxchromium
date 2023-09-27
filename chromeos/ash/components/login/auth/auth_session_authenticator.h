@@ -182,8 +182,8 @@ class COMPONENT_EXPORT(CHROMEOS_ASH_COMPONENTS_LOGIN_AUTH)
 
   // Notifies `UserDirectoryIntegrityManager` that the newly created user
   // has added a first auth factor.
-  void RecordFirstAuthFactorAdded(std::unique_ptr<UserContext> context,
-                                  AuthOperationCallback callback);
+  virtual void RecordFirstAuthFactorAdded(std::unique_ptr<UserContext> context,
+                                          AuthOperationCallback callback);
 
   void PrepareForNewAttempt(const std::string& method_id,
                             const std::string& long_desc);
@@ -237,7 +237,6 @@ class COMPONENT_EXPORT(CHROMEOS_ASH_COMPONENTS_LOGIN_AUTH)
   std::unique_ptr<SafeModeDelegate> safe_mode_delegate_;
   std::unique_ptr<AuthFactorEditor> auth_factor_editor_;
   std::unique_ptr<AuthPerformer> auth_performer_;
-  std::unique_ptr<HibernateManager> hibernate_manager_;
   std::unique_ptr<MountPerformer> mount_performer_;
 
   const raw_ptr<PrefService, DanglingUntriaged> local_state_;

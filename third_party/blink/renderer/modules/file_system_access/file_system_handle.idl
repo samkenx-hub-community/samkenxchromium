@@ -66,4 +66,12 @@ enum FileSystemHandleKind {
         Measure,
         RuntimeEnabled=FileSystemAccessAPIExperimental
     ] Promise<USVString> getUniqueId();
+
+    [
+      CallWith=ScriptState,
+      RaisesException,
+      Measure,
+      RuntimeEnabled=FileSystemAccessGetCloudIdentifiers
+    ]
+    Promise<sequence<FileSystemCloudIdentifier>> getCloudIdentifiers();
 };

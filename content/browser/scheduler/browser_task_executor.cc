@@ -18,6 +18,7 @@
 #include "build/build_config.h"
 #include "content/browser/browser_process_io_thread.h"
 #include "content/browser/browser_thread_impl.h"
+#include "content/common/features.h"
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/common/content_features.h"
 
@@ -89,7 +90,7 @@ QueueType BaseBrowserTaskExecutor::GetQueueType(
 
     case BrowserTaskType::kNavigationNetworkResponse:
       if (base::FeatureList::IsEnabled(
-              ::features::kNavigationNetworkResponseQueue)) {
+              features::kNavigationNetworkResponseQueue)) {
         return QueueType::kNavigationNetworkResponse;
       }
       // Defer to traits.priority() below.
@@ -97,6 +98,13 @@ QueueType BaseBrowserTaskExecutor::GetQueueType(
 
     case BrowserTaskType::kServiceWorkerStorageControlResponse:
       return QueueType::kServiceWorkerStorageControlResponse;
+
+    case BrowserTaskType::kBeforeUnloadBrowserResponse:
+      if (base::FeatureList::IsEnabled(
+              features::kBeforeUnloadBrowserResponseQueue)) {
+        return QueueType::kBeforeUnloadBrowserResponse;
+      }
+      break;
 
     case BrowserTaskType::kDefault:
       // Defer to traits.priority() below.

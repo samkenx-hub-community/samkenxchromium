@@ -33,11 +33,13 @@ import {loadTimeData} from '../i18n_setup.js';
 import {routes} from '../route.js';
 import {Router} from '../router.js';
 
+import {AccessibilityBrowserProxy, AccessibilityBrowserProxyImpl} from './a11y_browser_proxy.js';
 import {getTemplate} from './a11y_page.html.js';
 
 // clang-format off
 // <if expr="not is_chromeos">
 import {LanguageHelper, LanguagesModel} from '../languages_page/languages_types.js';
+
 // </if>
 // clang-format on
 
@@ -154,8 +156,26 @@ class SettingsA11yPageElement extends SettingsA11yPageElementBase {
           return opensExternally;
         },
       },
+
+      /**
+       * Whether to show the overscroll history navigation setting.
+       */
+      showOverscrollHistoryNavigationToggle_: {
+        type: Boolean,
+        value: function() {
+          let showOverscroll = false;
+          // <if expr="is_win or is_linux or is_macosx">
+          showOverscroll = loadTimeData.getBoolean(
+              'overscrollHistoryNavigationSettingEnabled');
+          // </if>
+          return showOverscroll;
+        },
+      },
     };
   }
+
+  private accessibilityBrowserProxy: AccessibilityBrowserProxy =
+      AccessibilityBrowserProxyImpl.getInstance();
 
   // <if expr="not is_chromeos">
   languages: LanguagesModel;
@@ -168,6 +188,7 @@ class SettingsA11yPageElement extends SettingsA11yPageElementBase {
   private showAccessibilityLabelsSetting_: boolean;
   private showPdfOcrToggle_: boolean;
   private captionSettingsOpensExternally_: boolean;
+  private showOverscrollHistoryNavigationToggle_: boolean;
 
 
   override ready() {
@@ -212,8 +233,6 @@ class SettingsA11yPageElement extends SettingsA11yPageElementBase {
   private onPdfOcrChange_(event: Event) {
     const pdfOcrOn = (event.target as SettingsToggleButtonElement).checked;
     if (pdfOcrOn) {
-      // TODO(crbug.com/1393069): Downloads a pdf ocr model if not yet
-      // downloaded.
       console.error(
           'Need to check a pdf ocr model and download it if necessary');
     }
@@ -248,6 +267,20 @@ class SettingsA11yPageElement extends SettingsA11yPageElementBase {
       Router.getInstance().navigateTo(routes.CAPTIONS);
     }
   }
+
+  // <if expr="is_win or is_linux">
+  private onOverscrollHistoryNavigationChange_(event: Event) {
+    const enabled = (event.target as SettingsToggleButtonElement).checked;
+    this.accessibilityBrowserProxy.recordOverscrollHistoryNavigationChanged(
+        enabled);
+  }
+  // </if>
+
+  // <if expr="is_macosx">
+  private onMacTrackpadGesturesLinkClick_() {
+    this.accessibilityBrowserProxy.openTrackpadGesturesSettings();
+  }
+  // </if>
 }
 
 customElements.define(SettingsA11yPageElement.is, SettingsA11yPageElement);

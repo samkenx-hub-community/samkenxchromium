@@ -91,9 +91,9 @@ TEST(AttributionReportTest, ReportBody) {
                       SourceBuilder(base::Time::UnixEpoch())
                           .SetSourceEventId(100)
                           .SetSourceType(test_case.source_type)
+                          .SetRandomizedResponseRate(0.2)
                           .BuildStored())
             .SetTriggerData(5)
-            .SetRandomizedTriggerRate(0.2)
             .SetReportTime(base::Time::UnixEpoch() + base::Hours(1))
             .Build();
 
@@ -209,9 +209,9 @@ TEST(AttributionReportTest, ReportBody_DebugKeys) {
                       SourceBuilder(base::Time::UnixEpoch())
                           .SetSourceEventId(100)
                           .SetDebugKey(test_case.source_debug_key)
+                          .SetRandomizedResponseRate(0.2)
                           .BuildStored())
             .SetTriggerData(5)
-            .SetRandomizedTriggerRate(0.2)
             .SetReportTime(base::Time::UnixEpoch() + base::Hours(1))
             .Build();
 
@@ -226,9 +226,8 @@ TEST(AttributionReportTest, ReportBody_Aggregatable) {
   })json");
 
   AttributionReport report =
-      ReportBuilder(
-          AttributionInfoBuilder().Build(),
-          SourceBuilder(base::Time::FromJavaTime(1234483200000)).BuildStored())
+      ReportBuilder(AttributionInfoBuilder().Build(),
+                    SourceBuilder().BuildStored())
           .SetAggregatableHistogramContributions(
               {AggregatableHistogramContribution(/*key=*/1, /*value=*/2)})
           .BuildAggregatableAttribution();
@@ -280,15 +279,15 @@ TEST(AttributionReportTest, NullAggregatableReport) {
 
   auto& data =
       absl::get<AttributionReport::NullAggregatableData>(report.data());
-  data.common_data.assembled_report = AggregatableReport(
-      {AggregatableReport::AggregationServicePayload(
-          /*payload=*/kABCD1234AsBytes,
-          /*key_id=*/"key",
-          /*debug_cleartext_payload=*/absl::nullopt)},
-      "example_shared_info",
-      /*debug_key=*/absl::nullopt,
-      /*additional_fields=*/{},
-      ::aggregation_service::mojom::AggregationCoordinator::kDefault);
+  data.common_data.assembled_report =
+      AggregatableReport({AggregatableReport::AggregationServicePayload(
+                             /*payload=*/kABCD1234AsBytes,
+                             /*key_id=*/"key",
+                             /*debug_cleartext_payload=*/absl::nullopt)},
+                         "example_shared_info",
+                         /*debug_key=*/absl::nullopt,
+                         /*additional_fields=*/{},
+                         /*aggregation_coordinator_origin=*/absl::nullopt);
 
   EXPECT_THAT(report.ReportBody(), IsJson(expected));
 }

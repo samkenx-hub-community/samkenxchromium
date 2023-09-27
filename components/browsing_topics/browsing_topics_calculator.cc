@@ -184,13 +184,15 @@ BrowsingTopicsCalculator::BrowsingTopicsCalculator(
     content::BrowsingTopicsSiteDataManager* site_data_manager,
     Annotator* annotator,
     const base::circular_deque<EpochTopics>& epochs,
+    bool is_manually_triggered,
     CalculateCompletedCallback callback)
     : privacy_sandbox_settings_(privacy_sandbox_settings),
       history_service_(history_service),
       site_data_manager_(site_data_manager),
       annotator_(annotator),
       calculate_completed_callback_(std::move(callback)),
-      calculation_time_(base::Time::Now()) {
+      calculation_time_(base::Time::Now()),
+      is_manually_triggered_(is_manually_triggered) {
   history_data_start_time_ = DeriveHistoryDataStartTime(
       calculation_time_, epochs,
       privacy_sandbox_settings_->TopicsDataAccessibleSince());
@@ -239,18 +241,30 @@ void BrowsingTopicsCalculator::DeriveTopTopics(
 
   history_topics_count = topics_count.size();
 
+  std::map<Topic, std::pair<bool, size_t>> topics_priorities_and_counts;
+  for (const auto& [topic, count] : topics_count) {
+    bool priority = privacy_sandbox_settings_->IsTopicPrioritized(
+        privacy_sandbox::CanonicalTopic(
+            topic, blink::features::kBrowsingTopicsTaxonomyVersion.Get()));
+    topics_priorities_and_counts[topic] = {priority, count};
+  }
+
   // Get the top up to `kBrowsingTopicsNumberOfTopTopicsPerEpoch` topics,
   // sorted by decreasing count.
-  using TopicsCountValue = std::pair<Topic, size_t>;
+  using TopicsCountValue = std::pair<Topic, std::pair<bool, size_t>>;
   std::vector<TopicsCountValue> top_topics_count(std::min(
       static_cast<size_t>(
           blink::features::kBrowsingTopicsNumberOfTopTopicsPerEpoch.Get()),
-      topics_count.size()));
+      topics_priorities_and_counts.size()));
 
-  std::partial_sort_copy(
-      topics_count.begin(), topics_count.end(), top_topics_count.begin(),
-      top_topics_count.end(),
-      [](auto& left, auto& right) { return left.second > right.second; });
+  std::partial_sort_copy(topics_priorities_and_counts.begin(),
+                         topics_priorities_and_counts.end(),
+                         top_topics_count.begin(), top_topics_count.end(),
+                         [](auto& left, auto& right) {
+                           return (left.second.first > right.second.first) ||
+                                  (left.second.first == right.second.first &&
+                                   left.second.second > right.second.second);
+                         });
 
   base::ranges::transform(top_topics_count, std::back_inserter(top_topics),
                           &TopicsCountValue::first);
@@ -268,7 +282,7 @@ void BrowsingTopicsCalculator::DeriveTopTopics(
     do {
       int taxonomy_version =
           blink::features::kBrowsingTopicsTaxonomyVersion.Get();
-      int padded_topic_index_decision = GenerateRandUint64();
+      uint64_t padded_topic_index_decision = GenerateRandUint64();
       padded_topic = semantic_tree.GetRandomTopic(taxonomy_version,
                                                   padded_topic_index_decision);
     } while (base::Contains(top_topics, padded_topic));
@@ -461,9 +475,9 @@ void BrowsingTopicsCalculator::OnGetTopicsForHostsCompleted(
   OnCalculateCompleted(
       CalculatorResultStatus::kSuccess,
       EpochTopics(std::move(top_topics_and_observing_domains),
-                  padded_top_topics_start_index,
+                  padded_top_topics_start_index, CurrentConfigVersion(),
                   blink::features::kBrowsingTopicsTaxonomyVersion.Get(),
-                  model_version, calculation_time_));
+                  model_version, calculation_time_, is_manually_triggered_));
 }
 
 void BrowsingTopicsCalculator::OnCalculateCompleted(

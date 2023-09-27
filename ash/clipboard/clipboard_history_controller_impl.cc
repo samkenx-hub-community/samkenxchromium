@@ -10,26 +10,32 @@
 #include <vector>
 
 #include "ash/accelerators/accelerator_controller_impl.h"
+#include "ash/clipboard/clipboard_history_controller_delegate.h"
 #include "ash/clipboard/clipboard_history_item.h"
 #include "ash/clipboard/clipboard_history_menu_model_adapter.h"
 #include "ash/clipboard/clipboard_history_resource_manager.h"
+#include "ash/clipboard/clipboard_history_url_title_fetcher.h"
 #include "ash/clipboard/clipboard_history_util.h"
 #include "ash/clipboard/clipboard_nudge_constants.h"
 #include "ash/clipboard/clipboard_nudge_controller.h"
 #include "ash/clipboard/scoped_clipboard_history_pause_impl.h"
 #include "ash/constants/ash_features.h"
+#include "ash/constants/ash_pref_names.h"
 #include "ash/display/display_util.h"
 #include "ash/public/cpp/clipboard_image_model_factory.h"
 #include "ash/public/cpp/window_tree_host_lookup.h"
+#include "ash/session/session_controller_impl.h"
 #include "ash/shell.h"
 #include "ash/strings/grit/ash_strings.h"
 #include "ash/style/color_util.h"
 #include "ash/wm/window_util.h"
 #include "base/barrier_closure.h"
 #include "base/check.h"
+#include "base/check_is_test.h"
 #include "base/check_op.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_forward.h"
+#include "base/json/values_util.h"
 #include "base/memory/raw_ptr.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/user_metrics.h"
@@ -45,6 +51,7 @@
 #include "base/unguessable_token.h"
 #include "chromeos/constants/chromeos_features.h"
 #include "chromeos/crosapi/mojom/clipboard_history.mojom.h"
+#include "components/prefs/pref_service.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "ui/aura/window.h"
 #include "ui/aura/window_tree_host.h"
@@ -71,12 +78,6 @@ namespace ash {
 
 namespace {
 
-ui::ClipboardNonBacked* GetClipboard() {
-  auto* clipboard = ui::ClipboardNonBacked::GetForCurrentThread();
-  DCHECK(clipboard);
-  return clipboard;
-}
-
 // Encodes `bitmap` and maps the corresponding ClipboardHistoryItem ID, `id, to
 // the resulting PNG in `encoded_pngs`. This function should run on a background
 // thread.
@@ -93,6 +94,39 @@ void EncodeBitmapToPNG(
 
   encoded_pngs->emplace(id, std::move(png));
   std::move(barrier_callback).Run();
+}
+
+// Returns the clipboard instance for the current thread.
+ui::ClipboardNonBacked* GetClipboard() {
+  auto* clipboard = ui::ClipboardNonBacked::GetForCurrentThread();
+  DCHECK(clipboard);
+  return clipboard;
+}
+
+// Returns the last active user pref service or `nullptr` if one does not exist.
+PrefService* GetLastActiveUserPrefService() {
+  return Shell::Get()->session_controller()->GetLastActiveUserPrefService();
+}
+
+// Returns the time when the menu was last shown for the user associated with
+// the last active user pref service, or `absl::nullopt` if the menu was not
+// previously marked as having been shown.
+absl::optional<base::Time> GetMenuLastTimeShown() {
+  if (auto* prefs = GetLastActiveUserPrefService()) {
+    if (auto* pref = prefs->FindPreference(prefs::kMultipasteMenuLastTimeShown);
+        pref && !pref->IsDefaultValue()) {
+      return base::ValueToTime(pref->GetValue());
+    }
+  }
+  return absl::nullopt;
+}
+
+// Marks the time when the menu was last shown for the user associated with the
+// last active user pref service.
+void MarkMenuLastTimeShown() {
+  if (auto* prefs = GetLastActiveUserPrefService()) {
+    prefs->SetTime(prefs::kMultipasteMenuLastTimeShown, base::Time::Now());
+  }
 }
 
 // Emits a user action indicating that the clipboard history item at menu index
@@ -141,6 +175,42 @@ void RecordPasteItemIndex(int index) {
   RecordMenuIndexPastedUserAction(index);
 }
 
+void SyntheticPaste(
+    crosapi::mojom::ClipboardHistoryControllerShowSource paste_source) {
+  auto* host = GetWindowTreeHostForDisplay(
+      display::Screen::GetScreen()->GetDisplayForNewWindows().id());
+  CHECK(host);
+
+  // Because we do not require the user to release Ctrl+V before selecting a
+  // clipboard history item to paste, the Ctrl+V event we synthesize below may
+  // be discarded as a perceived continuation of the long press. Preempt this
+  // scenario by issuing a Ctrl+V release to ensure that the press and release
+  // below are handled as an independent paste.
+  // TODO(http://b/283533126): Replace this workaround with a long-term fix.
+  if (paste_source == crosapi::mojom::ClipboardHistoryControllerShowSource::
+                          kControlVLongpress) {
+    ui::KeyEvent v_release(ui::ET_KEY_RELEASED, ui::VKEY_V,
+                           ui::EF_CONTROL_DOWN);
+    host->DeliverEventToSink(&v_release);
+
+    ui::KeyEvent ctrl_release(ui::ET_KEY_RELEASED, ui::VKEY_CONTROL,
+                              ui::EF_NONE);
+    host->DeliverEventToSink(&ctrl_release);
+  }
+
+  ui::KeyEvent ctrl_press(ui::ET_KEY_PRESSED, ui::VKEY_CONTROL, ui::EF_NONE);
+  host->DeliverEventToSink(&ctrl_press);
+
+  ui::KeyEvent v_press(ui::ET_KEY_PRESSED, ui::VKEY_V, ui::EF_CONTROL_DOWN);
+  host->DeliverEventToSink(&v_press);
+
+  ui::KeyEvent v_release(ui::ET_KEY_RELEASED, ui::VKEY_V, ui::EF_CONTROL_DOWN);
+  host->DeliverEventToSink(&v_release);
+
+  ui::KeyEvent ctrl_release(ui::ET_KEY_RELEASED, ui::VKEY_CONTROL, ui::EF_NONE);
+  host->DeliverEventToSink(&ctrl_release);
+}
+
 using ClipboardHistoryPasteType =
     ClipboardHistoryControllerImpl::ClipboardHistoryPasteType;
 bool IsPlainTextPaste(ClipboardHistoryPasteType paste_type) {
@@ -150,12 +220,14 @@ bool IsPlainTextPaste(ClipboardHistoryPasteType paste_type) {
     case ClipboardHistoryPasteType::kPlainTextMouse:
     case ClipboardHistoryPasteType::kPlainTextTouch:
     case ClipboardHistoryPasteType::kPlainTextVirtualKeyboard:
+    case ClipboardHistoryPasteType::kPlainTextCtrlV:
       return true;
     case ClipboardHistoryPasteType::kRichTextAccelerator:
     case ClipboardHistoryPasteType::kRichTextKeystroke:
     case ClipboardHistoryPasteType::kRichTextMouse:
     case ClipboardHistoryPasteType::kRichTextTouch:
     case ClipboardHistoryPasteType::kRichTextVirtualKeyboard:
+    case ClipboardHistoryPasteType::kRichTextCtrlV:
       return false;
   }
 }
@@ -211,6 +283,14 @@ class ClipboardHistoryControllerImpl::AcceleratorTarget
         shift_tab_navigation_(ui::Accelerator(
             /*key_code=*/ui::VKEY_TAB,
             /*modifiers=*/ui::EF_SHIFT_DOWN,
+            /*key_state=*/ui::Accelerator::KeyState::PRESSED)),
+        paste_first_item_(ui::Accelerator(
+            /*key_code=*/ui::VKEY_V,
+            /*modifiers=*/ui::EF_CONTROL_DOWN,
+            /*key_state=*/ui::Accelerator::KeyState::PRESSED)),
+        paste_first_item_plaintext_(ui::Accelerator(
+            /*key_code=*/ui::VKEY_V,
+            /*modifiers=*/ui::EF_CONTROL_DOWN | ui::EF_SHIFT_DOWN,
             /*key_state=*/ui::Accelerator::KeyState::PRESSED)) {}
   AcceleratorTarget(const AcceleratorTarget&) = delete;
   AcceleratorTarget& operator=(const AcceleratorTarget&) = delete;
@@ -218,28 +298,30 @@ class ClipboardHistoryControllerImpl::AcceleratorTarget
 
   void OnMenuShown() {
     Shell::Get()->accelerator_controller()->Register(
-        {delete_selected_, tab_navigation_, shift_tab_navigation_},
-        /*accelerator_target=*/this);
+        {delete_selected_, tab_navigation_, shift_tab_navigation_,
+         paste_first_item_, paste_first_item_plaintext_},
+        /*target=*/this);
   }
 
   void OnMenuClosed() {
-    Shell::Get()->accelerator_controller()->Unregister(
-        delete_selected_, /*accelerator_target=*/this);
-    Shell::Get()->accelerator_controller()->Unregister(
-        tab_navigation_, /*accelerator_target=*/this);
-    Shell::Get()->accelerator_controller()->Unregister(
-        shift_tab_navigation_, /*accelerator_target=*/this);
+    Shell::Get()->accelerator_controller()->UnregisterAll(/*target=*/this);
   }
 
  private:
   // ui::AcceleratorTarget:
   bool AcceleratorPressed(const ui::Accelerator& accelerator) override {
+    CHECK(controller_->IsMenuShowing());
+
     if (accelerator == delete_selected_) {
-      HandleDeleteSelected(accelerator.modifiers());
+      HandleDeleteSelected();
     } else if (accelerator == tab_navigation_) {
       HandleTab();
     } else if (accelerator == shift_tab_navigation_) {
       HandleShiftTab();
+    } else if (accelerator == paste_first_item_) {
+      HandlePasteFirstItem(ClipboardHistoryPasteType::kRichTextCtrlV);
+    } else if (accelerator == paste_first_item_plaintext_) {
+      HandlePasteFirstItem(ClipboardHistoryPasteType::kPlainTextCtrlV);
     } else {
       NOTREACHED();
       return false;
@@ -253,33 +335,37 @@ class ClipboardHistoryControllerImpl::AcceleratorTarget
            controller_->HasAvailableHistoryItems();
   }
 
-  void HandleDeleteSelected(int event_flags) {
-    DCHECK(controller_->IsMenuShowing());
-    controller_->DeleteSelectedMenuItemIfAny();
+  void HandleDeleteSelected() { controller_->DeleteSelectedMenuItemIfAny(); }
+
+  void HandleTab() { controller_->AdvancePseudoFocus(/*reverse=*/false); }
+
+  void HandleShiftTab() { controller_->AdvancePseudoFocus(/*reverse=*/true); }
+
+  void HandlePasteFirstItem(ClipboardHistoryPasteType paste_type) {
+    const auto first_item_command_id =
+        controller_->context_menu_->GetFirstMenuItemCommand();
+    CHECK(first_item_command_id);
+    controller_->PasteClipboardItemByCommandId(*first_item_command_id,
+                                               paste_type);
   }
 
-  void HandleTab() {
-    DCHECK(controller_->IsMenuShowing());
-    controller_->AdvancePseudoFocus(/*reverse=*/false);
-  }
-
-  void HandleShiftTab() {
-    DCHECK(controller_->IsMenuShowing());
-    controller_->AdvancePseudoFocus(/*reverse=*/true);
-  }
-
-  // The controller responsible for showing the Clipboard History menu.
+  // The controller responsible for showing the clipboard history menu.
   const raw_ptr<ClipboardHistoryControllerImpl, ExperimentalAsh> controller_;
 
-  // The accelerator to delete the selected menu item. It is only registered
-  // while the menu is showing.
+  // Deletes the selected menu item.
   const ui::Accelerator delete_selected_;
 
-  // Move the pseudo focus forward.
+  // Moves the pseudo focus forward.
   const ui::Accelerator tab_navigation_;
 
   // Moves the pseudo focus backward.
   const ui::Accelerator shift_tab_navigation_;
+
+  // Pastes the first item in the clipboard history menu.
+  const ui::Accelerator paste_first_item_;
+
+  // Pastes the plain text data of the first item in the clipboard history menu.
+  const ui::Accelerator paste_first_item_plaintext_;
 };
 
 // ClipboardHistoryControllerImpl::MenuDelegate --------------------------------
@@ -304,14 +390,21 @@ class ClipboardHistoryControllerImpl::MenuDelegate
 
 // ClipboardHistoryControllerImpl ----------------------------------------------
 
-ClipboardHistoryControllerImpl::ClipboardHistoryControllerImpl()
-    : clipboard_history_(std::make_unique<ClipboardHistory>()),
+ClipboardHistoryControllerImpl::ClipboardHistoryControllerImpl(
+    std::unique_ptr<ClipboardHistoryControllerDelegate> delegate)
+    : delegate_(std::move(delegate)),
+      image_model_factory_(delegate_->CreateImageModelFactory()),
+      url_title_fetcher_(delegate_->CreateUrlTitleFetcher()),
+      clipboard_history_(std::make_unique<ClipboardHistory>()),
       resource_manager_(std::make_unique<ClipboardHistoryResourceManager>(
           clipboard_history_.get())),
       accelerator_target_(std::make_unique<AcceleratorTarget>(this)),
       nudge_controller_(
           std::make_unique<ClipboardNudgeController>(clipboard_history_.get())),
       menu_delegate_(std::make_unique<MenuDelegate>(this)) {
+  if (!image_model_factory_ || !url_title_fetcher_) {
+    CHECK_IS_TEST();
+  }
   clipboard_history_->AddObserver(this);
   resource_manager_->AddObserver(this);
   SessionController::Get()->AddObserver(this);
@@ -321,6 +414,13 @@ ClipboardHistoryControllerImpl::~ClipboardHistoryControllerImpl() {
   SessionController::Get()->RemoveObserver(this);
   resource_manager_->RemoveObserver(this);
   clipboard_history_->RemoveObserver(this);
+}
+
+// static
+void ClipboardHistoryControllerImpl::RegisterProfilePrefs(
+    PrefRegistrySimple* registry) {
+  ClipboardNudgeController::RegisterProfilePrefs(registry);
+  registry->RegisterTimePref(prefs::kMultipasteMenuLastTimeShown, base::Time());
 }
 
 void ClipboardHistoryControllerImpl::Shutdown() {
@@ -402,7 +502,9 @@ bool ClipboardHistoryControllerImpl::ShowMenu(
       base::BindRepeating(&ClipboardHistoryControllerImpl::OnMenuClosed,
                           base::Unretained(this)),
       clipboard_history_.get());
-  context_menu_->Run(anchor_rect, source_type, show_source);
+  context_menu_->Run(anchor_rect, source_type, show_source,
+                     GetMenuLastTimeShown(),
+                     nudge_controller_->GetNudgeLastTimeShown());
 
   CHECK(IsMenuShowing());
   accelerator_target_->OnMenuShown();
@@ -428,6 +530,7 @@ bool ClipboardHistoryControllerImpl::ShowMenu(
           },
           weak_ptr_factory_.GetWeakPtr()));
 
+  MarkMenuLastTimeShown();
   base::UmaHistogramEnumeration("Ash.ClipboardHistory.ContextMenu.ShowMenu",
                                 show_source);
 
@@ -640,13 +743,18 @@ void ClipboardHistoryControllerImpl::OnClipboardHistoryItemRemoved(
 }
 
 void ClipboardHistoryControllerImpl::OnClipboardHistoryCleared() {
-  // Prevent clipboard contents getting restored if the Clipboard is cleared
-  // soon after a `PasteMenuItemData()`.
+  // Prevent clipboard contents from being restored if the clipboard history is
+  // cleared shortly after pasting an item.
   weak_ptr_factory_.InvalidateWeakPtrs();
-  if (!IsMenuShowing())
-    return;
 
-  context_menu_->Cancel(/*will_paste_item=*/false);
+  // Notify observers of the history being cleared after invalidating weak
+  // pointers.
+  PostItemUpdateNotificationTask();
+
+  // Make sure the menu is closed now that there are no items to show.
+  if (IsMenuShowing()) {
+    context_menu_->Cancel(/*will_paste_item=*/false);
+  }
 }
 
 void ClipboardHistoryControllerImpl::OnOperationConfirmed(bool copy) {
@@ -866,40 +974,12 @@ void ClipboardHistoryControllerImpl::PasteClipboardHistoryItem(
         GetClipboard()->WriteClipboardData(std::move(data_to_paste));
   }
 
-  auto* host = GetWindowTreeHostForDisplay(
-      display::Screen::GetScreen()->GetDisplayForNewWindows().id());
-  DCHECK(host);
-
   ++pastes_to_be_confirmed_;
 
-  if (paste_source == crosapi::mojom::ClipboardHistoryControllerShowSource::
-                          kControlVLongpress) {
-    // Because we do not require the user to release Ctrl+V before selecting a
-    // clipboard history item to paste, the Ctrl+V event we synthesize below may
-    // be discarded as a perceived continuation of the long press. Preempt this
-    // scenario by issuing a Ctrl+V release to ensure that the press and release
-    // below are handled as an independent paste.
-    // TODO(http://b/283533126): Replace this workaround with a long-term fix.
-    ui::KeyEvent v_release(ui::ET_KEY_RELEASED, ui::VKEY_V,
-                           ui::EF_CONTROL_DOWN);
-    host->DeliverEventToSink(&v_release);
-
-    ui::KeyEvent ctrl_release(ui::ET_KEY_RELEASED, ui::VKEY_CONTROL,
-                              ui::EF_NONE);
-    host->DeliverEventToSink(&ctrl_release);
+  // Use synthetic pastes as a fallback solution.
+  if (!delegate_->Paste()) {
+    SyntheticPaste(paste_source);
   }
-
-  ui::KeyEvent ctrl_press(ui::ET_KEY_PRESSED, ui::VKEY_CONTROL, ui::EF_NONE);
-  host->DeliverEventToSink(&ctrl_press);
-
-  ui::KeyEvent v_press(ui::ET_KEY_PRESSED, ui::VKEY_V, ui::EF_CONTROL_DOWN);
-  host->DeliverEventToSink(&v_press);
-
-  ui::KeyEvent v_release(ui::ET_KEY_RELEASED, ui::VKEY_V, ui::EF_CONTROL_DOWN);
-  host->DeliverEventToSink(&v_release);
-
-  ui::KeyEvent ctrl_release(ui::ET_KEY_RELEASED, ui::VKEY_CONTROL, ui::EF_NONE);
-  host->DeliverEventToSink(&ctrl_release);
 
   clipboard_history_util::RecordClipboardHistoryItemPasted(item);
   base::UmaHistogramEnumeration("Ash.ClipboardHistory.PasteType", paste_type);

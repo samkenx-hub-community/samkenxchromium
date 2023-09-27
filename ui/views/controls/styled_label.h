@@ -65,6 +65,9 @@ class VIEWS_EXPORT StyledLabel : public View {
     // DEPRECATED: Use TextStyle.
     absl::optional<SkColor> override_color;
 
+    // Overrides the text color given by |text_style| for this range.
+    absl::optional<ui::ColorId> override_color_id;
+
     // A callback to be called when this link is clicked. Only used if
     // |text_style| is style::STYLE_LINK.
     Link::ClickedCallback callback;
@@ -137,6 +140,10 @@ class VIEWS_EXPORT StyledLabel : public View {
   // |text_style| must be a value from views::style::TextStyle.
   int GetDefaultTextStyle() const;
   void SetDefaultTextStyle(int text_style);
+
+  // Set the default enabled color id.
+  absl::optional<ui::ColorId> GetDefaultEnabledColorId() const;
+  void SetDefaultEnabledColorId(absl::optional<ui::ColorId> enabled_color_id);
 
   // Get or set the distance in pixels between baselines of multi-line text.
   // Default is 0, indicating the distance between lines should be the standard
@@ -237,6 +244,7 @@ class VIEWS_EXPORT StyledLabel : public View {
 
   int text_context_ = style::CONTEXT_LABEL;
   int default_text_style_ = style::STYLE_PRIMARY;
+  absl::optional<ui::ColorId> default_enabled_color_id_;
 
   absl::optional<int> line_height_;
 
@@ -278,6 +286,7 @@ VIEW_BUILDER_PROPERTY(int, LineHeight)
 VIEW_BUILDER_PROPERTY(StyledLabel::ColorVariant, DisplayedOnBackgroundColor)
 VIEW_BUILDER_PROPERTY(bool, AutoColorReadabilityEnabled)
 VIEW_BUILDER_PROPERTY(gfx::HorizontalAlignment, HorizontalAlignment)
+VIEW_BUILDER_PROPERTY(absl::optional<ui::ColorId>, DefaultEnabledColorId)
 VIEW_BUILDER_METHOD(SizeToFit, int)
 VIEW_BUILDER_METHOD(AddStyleRange, gfx::Range, StyledLabel::RangeStyleInfo)
 END_VIEW_BUILDER

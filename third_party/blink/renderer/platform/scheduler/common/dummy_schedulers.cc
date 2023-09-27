@@ -101,11 +101,12 @@ class DummyFrameScheduler : public FrameScheduler {
     return WebScopedVirtualTimePauser();
   }
   void DidStartProvisionalLoad() override {}
-  void DidCommitProvisionalLoad(bool, FrameScheduler::NavigationType) override {
-  }
+  void DidCommitProvisionalLoad(bool,
+                                FrameScheduler::NavigationType,
+                                DidCommitProvisionalLoadParams) override {}
   void OnFirstContentfulPaintInMainFrame() override {}
-  void OnFirstMeaningfulPaint() override {}
-  void OnLoad() override {}
+  void OnFirstMeaningfulPaint(base::TimeTicks timestamp) override {}
+  void OnDispatchLoadEvent() override {}
   void OnMainFrameInteractive() override {}
   bool IsExemptFromBudgetBasedThrottling() const override { return false; }
   std::unique_ptr<blink::mojom::blink::PauseSubresourceLoadingHandle>
@@ -168,6 +169,7 @@ class DummyPageScheduler : public PageScheduler {
 
   void OnTitleOrFaviconUpdated() override {}
   void SetPageVisible(bool) override {}
+  bool IsPageVisible() const override { return true; }
   void SetPageFrozen(bool) override {}
   void SetPageBackForwardCached(bool) override {}
   bool IsMainFrameLocal() const override { return true; }
@@ -296,6 +298,13 @@ class DummyWebMainThreadScheduler : public WebThreadScheduler,
   }
 
   void StartIdlePeriodForTesting() override {}
+
+  void ForEachMainThreadIsolate(
+      base::RepeatingCallback<void(v8::Isolate* isolate)> callback) override {
+    if (isolate_) {
+      callback.Run(isolate_);
+    }
+  }
 
  private:
   v8::Isolate* isolate_ = nullptr;

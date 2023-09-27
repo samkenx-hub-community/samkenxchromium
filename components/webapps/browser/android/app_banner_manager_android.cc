@@ -151,6 +151,12 @@ AppBannerManagerAndroid::ParamsToPerformInstallableWebAppCheck() {
       AppBannerManager::ParamsToPerformInstallableWebAppCheck();
   params.prefer_maskable_icon =
       WebappsIconUtils::DoesAndroidSupportMaskableIcons();
+  params.installable_criteria =
+      base::FeatureList::IsEnabled(features::kUniversalInstallManifest)
+          ? InstallableCriteria::kImplicitManifestFieldsHTML
+          : InstallableCriteria::kValidManifestWithIcons;
+  params.fetch_favicon =
+      base::FeatureList::IsEnabled(features::kUniversalInstallIcon);
   return params;
 }
 
@@ -186,10 +192,12 @@ bool AppBannerManagerAndroid::IsWebAppConsideredInstalled() const {
 }
 
 void AppBannerManagerAndroid::ResetCurrentPageData() {
+  // Reset |ambient_badge_manager_| to stop any running ambient badge pipeline
+  // before clearing installable data.
+  ambient_badge_manager_.reset();
   AppBannerManager::ResetCurrentPageData();
   native_app_data_.Reset();
   native_app_package_ = "";
-  ambient_badge_manager_.reset();
 }
 
 std::unique_ptr<AddToHomescreenParams>
@@ -484,10 +492,11 @@ void AppBannerManagerAndroid::OnNativeAppIconFetched(const SkBitmap& bitmap) {
 
 std::u16string AppBannerManagerAndroid::GetAppName() const {
   if (native_app_data_.is_null()) {
-    // Prefer the short name if it's available. It's guaranteed that at least
-    // one of these is non-empty.
-    std::u16string short_name = manifest().short_name.value_or(u"");
-    return short_name.empty() ? manifest().name.value_or(u"") : short_name;
+    // Prefer manifest short name if it's available, then manifest name, then
+    // application_name from metadata. It's guaranteed that at least one of
+    // these is non-empty.
+    return manifest().short_name.value_or(
+        manifest().name.value_or(GetNameFromMetadata()));
   }
 
   return native_app_title_;
@@ -567,11 +576,29 @@ bool AppBannerManagerAndroid::IsMlPromotionBlockedByHistoryGuardrail(
   return false;
 }
 
+void AppBannerManagerAndroid::OnMlInstallPrediction(
+    base::PassKey<MLInstallabilityPromoter>,
+    std::string result_label) {
+  // TODO(https://crbug.com/1449993): Implement.
+}
+
+segmentation_platform::SegmentationPlatformService*
+AppBannerManagerAndroid::GetSegmentationPlatformService() {
+  // TODO(https://crbug.com/1449993): Implement.
+  // Note: By returning a non-nullptr, all of the Ml code (after metrics
+  // gathering) in `MlInstallabilityPromoter` will execute, including requesting
+  // classifiction & eventually calling `OnMlInstallPrediction` above. Make sure
+  // that the contract of that class is being followed appropriately, and the ML
+  // parts are correct.
+  return nullptr;
+}
+
 void AppBannerManagerAndroid::RecordExtraMetricsForInstallEvent(
     AddToHomescreenInstaller::Event event,
     const AddToHomescreenParams& a2hs_params) {}
 
-base::WeakPtr<AppBannerManager> AppBannerManagerAndroid::GetWeakPtr() {
+base::WeakPtr<AppBannerManager>
+AppBannerManagerAndroid::GetWeakPtrForThisNavigation() {
   return weak_factory_.GetWeakPtr();
 }
 
@@ -580,7 +607,7 @@ AppBannerManagerAndroid::GetAndroidWeakPtr() {
   return weak_factory_.GetWeakPtr();
 }
 
-void AppBannerManagerAndroid::InvalidateWeakPtrs() {
+void AppBannerManagerAndroid::InvalidateWeakPtrsForThisNavigation() {
   weak_factory_.InvalidateWeakPtrs();
 }
 

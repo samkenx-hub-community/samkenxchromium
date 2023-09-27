@@ -103,7 +103,7 @@ class PLATFORM_EXPORT Color {
     kNone,
   };
 
-  static bool IsColorFunction(ColorSpace color_space) {
+  static bool IsPredefinedColorSpace(ColorSpace color_space) {
     return color_space == ColorSpace::kSRGB ||
            color_space == ColorSpace::kSRGBLinear ||
            color_space == ColorSpace::kDisplayP3 ||
@@ -130,6 +130,26 @@ class PLATFORM_EXPORT Color {
     return color_space == ColorSpace::kLab ||
            color_space == ColorSpace::kOklab ||
            color_space == ColorSpace::kLch || color_space == ColorSpace::kOklch;
+  }
+
+  static bool IsChromaSecondComponent(ColorSpace color_space) {
+    return color_space == ColorSpace::kLch || color_space == ColorSpace::kOklch;
+  }
+
+  // https://www.w3.org/TR/css-color-4/#legacy-color-syntax
+  // Returns true if the color is of a type that predates CSS Color 4. Includes
+  // rgb(), rgba(), hex color, named color, hsl() and hwb() types. These colors
+  // interpolate and serialize differently from other color types.
+  static bool IsLegacyColorSpace(ColorSpace color_space) {
+    return color_space == ColorSpace::kSRGBLegacy ||
+           color_space == ColorSpace::kHSL || color_space == ColorSpace::kHWB;
+  }
+
+  static bool ColorSpaceHasHue(ColorSpace color_space) {
+    return color_space == Color::ColorSpace::kLch ||
+           color_space == Color::ColorSpace::kOklch ||
+           color_space == Color::ColorSpace::kHSL ||
+           color_space == Color::ColorSpace::kHWB;
   }
 
   // The default constructor creates a transparent color.
@@ -183,6 +203,12 @@ class PLATFORM_EXPORT Color {
                               absl::optional<float> param1,
                               absl::optional<float> param2,
                               absl::optional<float> alpha);
+  static Color FromColorSpace(ColorSpace space,
+                              absl::optional<float> param0,
+                              absl::optional<float> param1,
+                              absl::optional<float> param2) {
+    return FromColorSpace(space, param0, param1, param2, 1.0f);
+  }
 
   // Create a color using the hsl() syntax.
   static Color FromHSLA(absl::optional<float> h,
@@ -271,6 +297,15 @@ class PLATFORM_EXPORT Color {
   float Param2() const { return param2_; }
   float Alpha() const { return alpha_; }
 
+  // Gradient interpolation needs to know if parameters are "none".
+  bool Param0IsNone() const { return param0_is_none_; }
+  bool Param1IsNone() const { return param1_is_none_; }
+  bool Param2IsNone() const { return param2_is_none_; }
+  bool AlphaIsNone() const { return alpha_is_none_; }
+  bool HasNoneParams() const {
+    return Param0IsNone() || Param1IsNone() || Param2IsNone() || AlphaIsNone();
+  }
+
   void SetAlpha(float alpha) { alpha_ = alpha; }
 
   // Access the color as though it were created using rgba syntax. This will
@@ -328,11 +363,6 @@ class PLATFORM_EXPORT Color {
   inline bool operator!=(const Color& other) const { return !(*this == other); }
 
   unsigned GetHash() const;
-  // Returns true if the color is of a type that predates CSS Color 4. Includes
-  // rgb(), rgba(), hex color, named color, hsl() and hwb() types. These colors
-  // are always assumed to be in the sRGB color space and interpolate and
-  // serialize differently from other color types.
-  bool IsLegacyColor() const;
 
   // What colorspace space a color wants to interpolate in. This is not
   // equivalent to the colorspace of the color itself.
@@ -342,15 +372,23 @@ class PLATFORM_EXPORT Color {
   ColorSpace GetColorSpace() const { return color_space_; }
   void ConvertToColorSpace(ColorSpace destination_color_space);
 
+  // Colors can parse calc(NaN) and calc(Infinity). At computed value time this
+  // function is called which resolves all NaNs to zero and +/-infinities to
+  // maximum/minimum values, if they exist. It leaves finite values unchanged.
+  // See https://github.com/w3c/csswg-drafts/issues/8629
+  void ResolveNonFiniteValues();
+
   FRIEND_TEST_ALL_PREFIXES(BlinkColor, ColorMixNone);
   FRIEND_TEST_ALL_PREFIXES(BlinkColor, ColorInterpolation);
   FRIEND_TEST_ALL_PREFIXES(BlinkColor, HueInterpolation);
   FRIEND_TEST_ALL_PREFIXES(BlinkColor, Premultiply);
   FRIEND_TEST_ALL_PREFIXES(BlinkColor, Unpremultiply);
+  FRIEND_TEST_ALL_PREFIXES(BlinkColor, ConvertToColorSpace);
   FRIEND_TEST_ALL_PREFIXES(BlinkColor, toSkColor4fValidation);
   FRIEND_TEST_ALL_PREFIXES(BlinkColor, ExportAsXYZD50Floats);
 
  private:
+  String SerializeLegacyColorAsCSSColor() const;
   constexpr explicit Color(RGBA32 color)
       : param0_is_none_(0),
         param1_is_none_(0),

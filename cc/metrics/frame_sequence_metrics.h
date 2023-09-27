@@ -86,11 +86,6 @@ class CC_EXPORT FrameSequenceMetrics {
         const ThroughputData& main,
         FrameInfo::SmoothEffectDrivingThread effective_thred);
 
-    static void ReportCheckerboardingHistogram(
-        FrameSequenceMetrics* metrics,
-        FrameInfo::SmoothEffectDrivingThread thread_type,
-        int percent);
-
     void Merge(const ThroughputData& data) {
       frames_expected += data.frames_expected;
       frames_produced += data.frames_produced;
@@ -131,10 +126,6 @@ class CC_EXPORT FrameSequenceMetrics {
 
   ThroughputData& impl_throughput() { return impl_throughput_; }
   ThroughputData& main_throughput() { return main_throughput_; }
-  void add_checkerboarded_frames(int64_t frames) {
-    frames_checkerboarded_ += frames;
-  }
-  uint32_t frames_checkerboarded() const { return frames_checkerboarded_; }
 
   FrameSequenceTrackerType type() const { return type_; }
 
@@ -142,7 +133,7 @@ class CC_EXPORT FrameSequenceMetrics {
   void ReportLeftoverData();
 
   void AdoptTrace(FrameSequenceMetrics* adopt_from);
-  void AdvanceTrace(base::TimeTicks timestamp);
+  void AdvanceTrace(base::TimeTicks timestamp, uint64_t sequence_number);
 
   void ComputeJank(FrameInfo::SmoothEffectDrivingThread thread_type,
                    uint32_t frame_token,
@@ -160,44 +151,67 @@ class CC_EXPORT FrameSequenceMetrics {
       base::TimeDelta frame_interval);
 
  private:
-  void CalculateCheckerboardingV3(const FrameInfo& frame_info);
+  // FrameInfo is a merger of two threads' frame production. We should only look
+  // at the `final_state`, `last_presented_termination_time` and
+  // `termination_time` for the GetEffectiveThread.
+  void CalculateCheckerboardingAndJankV3(
+      const viz::BeginFrameArgs& args,
+      const FrameInfo& frame_info,
+      FrameInfo::FrameFinalState final_state,
+      base::TimeTicks last_presented_termination_time,
+      base::TimeTicks termination_time);
+  void IncrementJankIdleTimeV3(base::TimeTicks last_presented_termination_time,
+                               base::TimeTicks termination_time);
+  void TraceJankV3(uint64_t sequence_number,
+                   base::TimeTicks last_termination_time,
+                   base::TimeTicks termination_time);
 
   const FrameSequenceTrackerType type_;
+
+  // Track state for measuring the various Graphics.Smoothness V3 metrics.
+  struct V3 {
+    V3();
+    ~V3();
+    uint32_t frames_expected = 0;
+    uint32_t frames_dropped = 0;
+    uint32_t frames_missing_content = 0;
+    uint32_t no_update_count = 0;
+    uint32_t jank_count = 0;
+    viz::BeginFrameArgs last_begin_frame_args;
+    FrameInfo last_frame;
+    FrameInfo last_presented_frame;
+    base::TimeDelta last_frame_delta;
+    base::TimeDelta no_update_duration;
+  } v3_;
 
   // Tracks some data to generate useful trace events.
   struct TraceData {
     explicit TraceData(FrameSequenceMetrics* metrics);
     ~TraceData();
     raw_ptr<FrameSequenceMetrics> metrics;
+    uint64_t last_presented_sequence_number = 0u;
     base::TimeTicks last_timestamp = base::TimeTicks::Now();
     int frame_count = 0;
     bool enabled = false;
     raw_ptr<void> trace_id = nullptr;
 
-    void Advance(base::TimeTicks new_timestamp,
+    void Advance(base::TimeTicks start_timestamp,
+                 base::TimeTicks new_timestamp,
                  uint32_t expected,
-                 uint32_t dropped);
+                 uint32_t dropped,
+                 uint64_t sequence_number,
+                 const char* histogram_name);
     void Terminate();
+    void TerminateV3(const V3& v3);
   } trace_data_{this};
 
-  // Track state for measuring the PercentDroppedFrames v3 metrics.
-  struct {
-    uint32_t frames_expected = 0;
-    uint32_t frames_dropped = 0;
-    uint32_t frames_missing_content = 0;
-    viz::BeginFrameArgs last_begin_frame_args;
-    FrameInfo last_presented_frame;
-  } v3_;
+  TraceData trace_data_v3_{this};
 
   ThroughputData impl_throughput_;
   ThroughputData main_throughput_;
 
   FrameInfo::SmoothEffectDrivingThread scrolling_thread_ =
       FrameInfo::SmoothEffectDrivingThread::kUnknown;
-
-  // Tracks the number of produced frames that had some amount of
-  // checkerboarding, and how many frames showed such checkerboarded frames.
-  uint32_t frames_checkerboarded_ = 0;
 
   // Callback invoked to report metrics for kCustom typed sequence.
   CustomReporter custom_reporter_;

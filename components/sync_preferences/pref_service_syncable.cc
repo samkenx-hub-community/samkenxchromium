@@ -36,7 +36,7 @@ PrefServiceSyncable::PrefServiceSyncable(
     scoped_refptr<PersistentPrefStore> user_prefs,
     scoped_refptr<PersistentPrefStore> standalone_browser_prefs,
     scoped_refptr<user_prefs::PrefRegistrySyncable> pref_registry,
-    const PrefModelAssociatorClient* pref_model_associator_client,
+    scoped_refptr<PrefModelAssociatorClient> pref_model_associator_client,
     base::RepeatingCallback<void(PersistentPrefStore::PrefReadError)>
         read_error_callback,
     bool async)
@@ -71,7 +71,7 @@ PrefServiceSyncable::PrefServiceSyncable(
     scoped_refptr<DualLayerUserPrefStore> dual_layer_user_prefs,
     scoped_refptr<PersistentPrefStore> standalone_browser_prefs,
     scoped_refptr<user_prefs::PrefRegistrySyncable> pref_registry,
-    const PrefModelAssociatorClient* pref_model_associator_client,
+    scoped_refptr<PrefModelAssociatorClient> pref_model_associator_client,
     base::RepeatingCallback<void(PersistentPrefStore::PrefReadError)>
         read_error_callback,
     bool async)
@@ -96,9 +96,10 @@ PrefServiceSyncable::PrefServiceSyncable(
                                         dual_layer_user_prefs,
                                         syncer::OS_PRIORITY_PREFERENCES),
 #endif
-      pref_registry_(std::move(pref_registry)) {
+      pref_registry_(std::move(pref_registry)),
+      dual_layer_user_prefs_(std::move(dual_layer_user_prefs)) {
   CHECK(base::FeatureList::IsEnabled(syncer::kEnablePreferencesAccountStorage));
-  CHECK(dual_layer_user_prefs);
+  CHECK(dual_layer_user_prefs_);
   ConnectAssociatorsAndRegisterPreferences();
 }
 
@@ -279,6 +280,13 @@ uint32_t PrefServiceSyncable::GetWriteFlags(
     const std::string& pref_name) const {
   const Preference* pref = FindPreference(pref_name);
   return PrefService::GetWriteFlags(pref);
+}
+
+void PrefServiceSyncable::OnSyncServiceInitialized(
+    syncer::SyncService* sync_service) {
+  if (dual_layer_user_prefs_) {
+    dual_layer_user_prefs_->OnSyncServiceInitialized(sync_service);
+  }
 }
 
 }  // namespace sync_preferences

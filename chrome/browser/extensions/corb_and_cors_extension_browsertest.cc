@@ -15,6 +15,7 @@
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/bind.h"
+#include "base/test/to_vector.h"
 #include "base/values.h"
 #include "build/build_config.h"
 #include "chrome/browser/apps/platform_apps/app_browsertest_util.h"
@@ -46,7 +47,6 @@
 #include "content/public/browser/service_worker_context.h"
 #include "content/public/browser/service_worker_context_observer.h"
 #include "content/public/browser/shared_cors_origin_access_list.h"
-#include "content/public/browser/storage_partition.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/content_client.h"
 #include "content/public/test/browser_test.h"
@@ -58,6 +58,7 @@
 #include "extensions/browser/browsertest_util.h"
 #include "extensions/browser/extension_util.h"
 #include "extensions/browser/permissions_manager.h"
+#include "extensions/browser/service_worker/service_worker_test_utils.h"
 #include "extensions/browser/url_loader_factory_manager.h"
 #include "extensions/common/extension_features.h"
 #include "extensions/common/manifest_handlers/incognito_info.h"
@@ -144,9 +145,8 @@ class ServiceWorkerConsoleObserver
  public:
   explicit ServiceWorkerConsoleObserver(
       content::BrowserContext* browser_context) {
-    content::StoragePartition* partition =
-        browser_context->GetDefaultStoragePartition();
-    scoped_observation_.Observe(partition->GetServiceWorkerContext());
+    scoped_observation_.Observe(
+        service_worker_test_utils::GetServiceWorkerContext(browser_context));
   }
   ~ServiceWorkerConsoleObserver() override = default;
 
@@ -252,15 +252,10 @@ class CorbAndCorsExtensionBrowserTest : public CorbAndCorsExtensionTestBase {
   // - content::WebContentsConsoleObserver
   template <typename TConsoleObserver>
   void VerifyFetchWasBlockedByCors(const TConsoleObserver& console_observer) {
-    using ConsoleMessage = typename TConsoleObserver::Message;
-    const std::vector<ConsoleMessage>& console_messages =
-        console_observer.messages();
-
-    std::vector<std::string> messages;
-    base::ranges::transform(console_messages, std::back_inserter(messages),
-                            [](const auto& console_message) {
-                              return base::UTF16ToUTF8(console_message.message);
-                            });
+    std::vector<std::string> messages = base::test::ToVector(
+        console_observer.messages(), [](const auto& console_message) {
+          return base::UTF16ToUTF8(console_message.message);
+        });
 
     // We allow more than 1 console message, because the test might flakily see
     // extra console messages - see https://crbug.com/1085629.
@@ -287,12 +282,12 @@ class CorbAndCorsExtensionBrowserTest : public CorbAndCorsExtensionTestBase {
     EXPECT_TRUE(resource_load_observer_->GetResource(url));
     EXPECT_EQ(0, (*resource_load_observer_->GetResource(url))->raw_body_bytes);
 
-    // For ORB "v0.2" the error code lets us determine precisely whether a
-    // fetch was blocked by ORB. For previous versions, we have to rely on
-    // circumstantial evidence (like an empty body, which could have other
-    // reasons).
+    // For later versions of ORB the error code lets us determine precisely
+    // whether a fetch was blocked by ORB. For "v0.1" and "v0.2" (for
+    // JS-initiated fetches), we have to rely on circumstantial evidence (like
+    // an empty body, which could have other reasons).
     if (base::FeatureList::IsEnabled(
-            network::features::kOpaqueResponseBlockingV02)) {
+            network::features::kOpaqueResponseBlockingErrorsForAllFetches)) {
       EXPECT_EQ(net::ERR_BLOCKED_BY_ORB,
                 (*resource_load_observer_->GetResource(url))->net_error);
     }
@@ -1677,10 +1672,13 @@ IN_PROC_BROWSER_TEST_F(CorbAndCorsExtensionBrowserTest,
     // URLLoaderFactoryParams::is_corb_enabled set to the default, secure value
     // of `true`.
     //
-    // ORB v0.2 (and higher): Error message, because the fetch failed.
+    // ORB ErrorsForAllFetches: Error message, because the fetch failed.
+    // ORB v0.2: Empty result. ORB v0.2 can result in either network errors
+    //   or empty results. But in this test all fetches are initiated by script,
+    //   for which ORB v0.2 delivers empty responses, like earlier versions.
     // CORB & ORB v0.1: Empty result, because of no-cors.
     if (base::FeatureList::IsEnabled(
-            network::features::kOpaqueResponseBlockingV02)) {
+            network::features::kOpaqueResponseBlockingErrorsForAllFetches)) {
       EXPECT_THAT(fetch_result, HasSubstr("TypeError: Failed to fetch"));
     } else {
       EXPECT_EQ(fetch_result, "");
@@ -1733,7 +1731,9 @@ IN_PROC_BROWSER_TEST_F(CorbAndCorsExtensionBrowserTest,
 
   // Grant the optional permissions to the extension.
   {
-    PermissionsRequestFunction::SetAutoConfirmForTests(true);
+    auto dialog_action_reset =
+        PermissionsRequestFunction::SetDialogActionForTests(
+            PermissionsRequestFunction::DialogAction::kAutoConfirm);
     const char kPermissionGrantingScriptTemplate[] = R"(
         new Promise(resolve => {
           chrome.permissions.request(
@@ -1744,7 +1744,6 @@ IN_PROC_BROWSER_TEST_F(CorbAndCorsExtensionBrowserTest,
     std::string script = content::JsReplace(kPermissionGrantingScriptTemplate,
                                             cross_site_origin.GetURL());
     ASSERT_EQ(true, content::EvalJs(test_frame, script));
-    PermissionsRequestFunction::SetAutoConfirmForTests(false);
   }
 
   // Performs a cross-origin fetch from the background page and verify that it

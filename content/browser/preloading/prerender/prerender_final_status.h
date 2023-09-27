@@ -23,6 +23,8 @@ namespace content {
 // https://docs.google.com/document/d/1PnrfowsZMt62PX1EvvTp2Nqs3ji1zrklrAEe1JYbkTk
 // to ensure failure reasons are correctly shown in the DevTools
 // frontend.
+//
+// LINT.IfChange
 enum class PrerenderFinalStatus {
   kActivated = 0,
   kDestroyed = 1,
@@ -46,7 +48,9 @@ enum class PrerenderFinalStatus {
   kNavigationBadHttpStatus = 18,
   kClientCertRequested = 19,
   kNavigationRequestNetworkError = 20,
-  kMaxNumOfRunningPrerendersExceeded = 21,
+  // This is split into
+  // kMaxNumOfRunning(Eager|NonEager|Embedder)PrerendersExceeded
+  // kMaxNumOfRunningPrerendersExceeded = 21,
   kCancelAllHostsForTesting = 22,
   kDidFailLoad = 23,
   kStop = 24,
@@ -54,7 +58,9 @@ enum class PrerenderFinalStatus {
   kLoginAuthRequested = 26,
   kUaChangeRequiresReload = 27,
   kBlockedByClient = 28,
-  kAudioOutputDeviceRequested = 29,
+  // Deprecate in favor of newly defined behavior to support Web Audio while
+  // prerendering. See https://github.com/WICG/nav-speculation/issues/165.
+  // kAudioOutputDeviceRequested = 29,
   kMixedContent = 30,
   kTriggerBackgrounded = 31,
   // Break down into kEmbedderTriggeredAndSameOriginRedirected and
@@ -63,14 +69,18 @@ enum class PrerenderFinalStatus {
   // Deprecate since same origin redirection is allowed considering that the
   // initial prerender origin is a safe site.
   // kEmbedderTriggeredAndSameOriginRedirected = 33,
-  kEmbedderTriggeredAndCrossOriginRedirected = 34,
+  // Deprecated. Use kCrossSiteRedirectInInitialNavigation instead.
+  // kEmbedderTriggeredAndCrossOriginRedirected = 34,
   // Deprecated. This has the same meaning as kTriggerDestroyed because the
   // metric's name includes trigger type.
   // kEmbedderTriggeredAndDestroyed = 35,
   kMemoryLimitExceeded = 36,
-  kFailToGetMemoryUsage = 37,
+
+  // Deprecated. Failure on query of current memory consumption is ignored.
+  // kFailToGetMemoryUsage = 37,
+
   kDataSaverEnabled = 38,
-  kHasEffectiveUrl = 39,
+  kTriggerUrlHasEffectiveUrl = 39,
   kActivatedBeforeStarted = 40,
   kInactivePageRestriction = 41,
   kStartFailed = 42,
@@ -121,8 +131,32 @@ enum class PrerenderFinalStatus {
 
   kPrerenderingDisabledByDevTools = 69,
 
-  kMaxValue = kPrerenderingDisabledByDevTools,
+  // Different from kBlockedByClient, which tracks the failure caused by main
+  // frame navigation, this status indicates that clients block some resource
+  // loading.
+  kResourceLoadBlockedByClient = 70,
+
+  // A trigger page removed a corresponding prerender rule from
+  // <script type="speculationrules">.
+  kSpeculationRuleRemoved = 71,
+
+  // A trigger page cannot activate a prerendered page when it has auxiliary
+  // browsing contexts that should be able to script each other (e.g., pop-up
+  // windows with openers). For details, see comments on the place where this
+  // status is specified.
+  kActivatedWithAuxiliaryBrowsingContexts = 72,
+
+  kMaxNumOfRunningEagerPrerendersExceeded = 73,
+  kMaxNumOfRunningNonEagerPrerendersExceeded = 74,
+  kMaxNumOfRunningEmbedderPrerendersExceeded = 75,
+
+  kPrerenderingUrlHasEffectiveUrl = 76,
+  kRedirectedPrerenderingUrlHasEffectiveUrl = 77,
+  kActivationUrlHasEffectiveUrl = 78,
+
+  kMaxValue = kActivationUrlHasEffectiveUrl,
 };
+// LINT.ThenChange()
 
 // Helper method to convert PrerenderFinalStatus to PreloadingFailureReason.
 PreloadingFailureReason CONTENT_EXPORT

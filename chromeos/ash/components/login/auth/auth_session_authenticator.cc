@@ -5,6 +5,7 @@
 #include "chromeos/ash/components/login/auth/auth_session_authenticator.h"
 
 #include "ash/constants/ash_features.h"
+#include "ash/constants/ash_switches.h"
 #include "base/check.h"
 #include "base/debug/crash_logging.h"
 #include "base/debug/dump_without_crashing.h"
@@ -52,10 +53,10 @@ AuthSessionAuthenticator::AuthSessionAuthenticator(
     : Authenticator(consumer),
       user_recorder_(std::move(user_recorder)),
       safe_mode_delegate_(std::move(safe_mode_delegate)),
-      auth_factor_editor_(std::make_unique<AuthFactorEditor>()),
+      auth_factor_editor_(
+          std::make_unique<AuthFactorEditor>(UserDataAuthClient::Get())),
       auth_performer_(
           std::make_unique<AuthPerformer>(UserDataAuthClient::Get())),
-      hibernate_manager_(std::make_unique<HibernateManager>()),
       mount_performer_(std::make_unique<MountPerformer>()),
       local_state_(local_state) {
   DCHECK(safe_mode_delegate_);
@@ -83,8 +84,7 @@ void AuthSessionAuthenticator::CompleteLoginImpl(
     std::unique_ptr<UserContext> context) {
   DCHECK(context);
   DCHECK(context->GetUserType() == user_manager::USER_TYPE_REGULAR ||
-         context->GetUserType() == user_manager::USER_TYPE_CHILD ||
-         context->GetUserType() == user_manager::USER_TYPE_ACTIVE_DIRECTORY);
+         context->GetUserType() == user_manager::USER_TYPE_CHILD);
   // For now we don't support empty passwords:
   if (context->GetKey()->GetKeyType() == Key::KEY_TYPE_PASSWORD_PLAIN) {
     bool has_knowledge_factor = !context->GetKey()->GetSecret().empty();
@@ -244,6 +244,7 @@ void AuthSessionAuthenticator::DoCompleteLogin(
   DCHECK(!user_exists || !ephemeral);
   LOGIN_LOG(EVENT) << "Regular user CompleteLogin " << user_exists;
   bool challenge_response_auth = !context->GetChallengeResponseKeys().empty();
+  const bool has_password = !context->GetKey()->GetSecret().empty();
   std::vector<AuthOperation> steps;
   if (!user_exists) {
     if (safe_mode_delegate_->IsSafeMode()) {
@@ -268,9 +269,6 @@ void AuthSessionAuthenticator::DoCompleteLogin(
                                      weak_factory_.GetWeakPtr()));
       steps.push_back(base::BindOnce(&MountPerformer::CreateNewUser,
                                      mount_performer_->AsWeakPtr()));
-      steps.push_back(base::BindOnce(
-          &HibernateManager::PrepareHibernateAndMaybeResumeAuthOp,
-          hibernate_manager_->AsWeakPtr()));
       steps.push_back(base::BindOnce(&MountPerformer::MountPersistentDirectory,
                                      mount_performer_->AsWeakPtr()));
     }
@@ -280,6 +278,18 @@ void AuthSessionAuthenticator::DoCompleteLogin(
           base::BindOnce(&AuthFactorEditor::AddContextChallengeResponseKey,
                          auth_factor_editor_->AsWeakPtr()));
     } else {
+      if (!ash::switches::AreEmptyPasswordsAllowedForForTesting()) {
+        // Empty passwords are currently not supported in ChromeOS, and
+        // upcoming work on local passwords would significantly change code
+        // behavior if empty password is used during initial login.
+        // Some older tests might still use empty string as a password.
+        // Such tests should be fixed by owners to use non-empty passwords.
+        // If such fix requires non-trivial changes, the following flag
+        // can be used as a short-term solution:
+        // `--allow-empty-passwords-in-tests`
+        CHECK(has_password)
+            << "Empty passwords are not supported during user creation";
+      }
       steps.push_back(base::BindOnce(&AuthFactorEditor::AddContextKnowledgeKey,
                                      auth_factor_editor_->AsWeakPtr()));
     }
@@ -314,11 +324,6 @@ void AuthSessionAuthenticator::DoCompleteLogin(
           base::BindOnce(&AuthPerformer::AuthenticateUsingKnowledgeKey,
                          auth_performer_->AsWeakPtr()));
     }
-    // TODO(b/233103309): Abort resume from hibernate here as the user just went
-    // through online login and may need auth tokens synced.
-    steps.push_back(
-        base::BindOnce(&HibernateManager::PrepareHibernateAndMaybeResumeAuthOp,
-                       hibernate_manager_->AsWeakPtr()));
     steps.push_back(base::BindOnce(&MountPerformer::MountPersistentDirectory,
                                    mount_performer_->AsWeakPtr()));
     if (safe_mode_delegate_->IsSafeMode()) {
@@ -343,7 +348,6 @@ void AuthSessionAuthenticator::AuthenticateToLogin(
   DCHECK(context);
   DCHECK(context->GetUserType() == user_manager::USER_TYPE_REGULAR ||
          context->GetUserType() == user_manager::USER_TYPE_CHILD ||
-         context->GetUserType() == user_manager::USER_TYPE_ACTIVE_DIRECTORY ||
          context->GetUserType() == user_manager::USER_TYPE_PUBLIC_ACCOUNT);
   PrepareForNewAttempt("AuthenticateToLogin", "Returning regular user");
 
@@ -368,8 +372,6 @@ void AuthSessionAuthenticator::AuthenticateToUnlock(
   DCHECK(user_context);
   DCHECK(user_context->GetUserType() == user_manager::USER_TYPE_REGULAR ||
          user_context->GetUserType() == user_manager::USER_TYPE_CHILD ||
-         user_context->GetUserType() ==
-             user_manager::USER_TYPE_ACTIVE_DIRECTORY ||
          user_context->GetUserType() == user_manager::USER_TYPE_PUBLIC_ACCOUNT);
   PrepareForNewAttempt("AuthenticateToUnlock", "Returning regular user");
 
@@ -443,9 +445,6 @@ void AuthSessionAuthenticator::DoLoginAsExistingUser(
         base::BindOnce(&AuthPerformer::AuthenticateUsingKnowledgeKey,
                        auth_performer_->AsWeakPtr()));
   }
-  steps.push_back(
-      base::BindOnce(&HibernateManager::PrepareHibernateAndMaybeResumeAuthOp,
-                     hibernate_manager_->AsWeakPtr()));
   steps.push_back(base::BindOnce(&MountPerformer::MountPersistentDirectory,
                                  mount_performer_->AsWeakPtr()));
   if (safe_mode_delegate_->IsSafeMode()) {
@@ -762,12 +761,6 @@ void AuthSessionAuthenticator::RecoverEncryptedData(
                                  auth_performer_->AsWeakPtr()));
   steps.push_back(base::BindOnce(&AuthFactorEditor::ReplaceContextKey,
                                  auth_factor_editor_->AsWeakPtr()));
-  // TODO(b/233103309): Abort resume from hibernate here as the user just went
-  // through the recovery flow and online login, so they may have tokens that
-  // need to be synced.
-  steps.push_back(
-      base::BindOnce(&HibernateManager::PrepareHibernateAndMaybeResumeAuthOp,
-                     hibernate_manager_->AsWeakPtr()));
   steps.push_back(base::BindOnce(&MountPerformer::MountPersistentDirectory,
                                  mount_performer_->AsWeakPtr()));
   if (safe_mode_delegate_->IsSafeMode()) {
@@ -906,6 +899,11 @@ bool AuthSessionAuthenticator::ResolveCryptohomeError(
       // would be detected by PinStorageCryptohome.
       error.ResolveToFailure(default_error);
       break;
+    case user_data_auth::CRYPTOHOME_ERROR_CREDENTIAL_EXPIRED:
+      // TODO(b/285459974): Decide how to deal with credential expired error
+      // from cryptohome.
+      error.ResolveToFailure(default_error);
+      break;
     case user_data_auth::CRYPTOHOME_ERROR_MOUNT_MOUNT_POINT_BUSY:
       // Assumption about system state is not correct
       error.ResolveToFailure(default_error);
@@ -1011,6 +1009,13 @@ void AuthSessionAuthenticator::HandleMigrationRequired(
 void AuthSessionAuthenticator::NotifyAuthSuccess(
     std::unique_ptr<UserContext> context) {
   LOGIN_LOG(EVENT) << "Logged in successfully";
+
+  if (HibernateManager::IsHibernateSupported()) {
+    // Pass the AuthSessionID to HibernateManager so once the user's profile is
+    // created we can notify hiberman.
+    HibernateManager::Get()->SetAuthSessionID(context->GetAuthSessionId());
+  }
+
   if (consumer_)
     consumer_->OnAuthSuccess(*context);
 }

@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -19,8 +19,7 @@ class HighEfficiencyBubbleDelegate : public ui::DialogModelDelegate {
                                         HighEfficiencyBubbleObserver* observer);
 
   void OnSettingsClicked();
-
-  void OnAddSiteToExclusionListButtonClicked();
+  void OnAddSiteToExceptionsListClicked();
 
   void OnDialogDestroy();
 

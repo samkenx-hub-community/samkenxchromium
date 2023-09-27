@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 source_set("clear_browsing_data") {
-  configs += [ "//build/config/compiler:enable_arc" ]
   sources = [
     "browsing_data_counter_wrapper_producer.h",
     "browsing_data_counter_wrapper_producer.mm",
@@ -32,16 +31,18 @@ source_set("clear_browsing_data") {
     "//components/signin/public/identity_manager/objc",
     "//components/strings",
     "//ios/chrome/app/strings",
-    "//ios/chrome/browser/browsing_data",
-    "//ios/chrome/browser/browsing_data:feature_flags",
+    "//ios/chrome/browser/browsing_data/model",
+    "//ios/chrome/browser/browsing_data/model:feature_flags",
     "//ios/chrome/browser/discover_feed",
     "//ios/chrome/browser/discover_feed:discover_feed_factory",
     "//ios/chrome/browser/feature_engagement",
     "//ios/chrome/browser/history",
+    "//ios/chrome/browser/intents:intents_donation_helper",
     "//ios/chrome/browser/net:crurl",
     "//ios/chrome/browser/search_engines",
     "//ios/chrome/browser/shared/coordinator/alert",
     "//ios/chrome/browser/shared/coordinator/chrome_coordinator",
+    "//ios/chrome/browser/shared/coordinator/scene:scene_state_header",
     "//ios/chrome/browser/shared/model/application_context",
     "//ios/chrome/browser/shared/model/browser",
     "//ios/chrome/browser/shared/model/browser_state",
@@ -66,11 +67,11 @@ source_set("clear_browsing_data") {
     "//ios/chrome/common/ui/table_view:cells_constants",
     "//ios/public/provider/chrome/browser/branded_images:branded_images_api",
     "//ui/base",
+    "//ui/strings",
   ]
 }
 
 source_set("unit_tests") {
-  configs += [ "//build/config/compiler:enable_arc" ]
   testonly = true
   sources = [
     "clear_browsing_data_manager_unittest.mm",
@@ -90,9 +91,9 @@ source_set("unit_tests") {
     "//components/sync_preferences",
     "//components/sync_preferences:test_support",
     "//ios/chrome/app/strings",
-    "//ios/chrome/browser/browsing_data:counters",
-    "//ios/chrome/browser/browsing_data:feature_flags",
-    "//ios/chrome/browser/browsing_data:test_support",
+    "//ios/chrome/browser/browsing_data/model:counters",
+    "//ios/chrome/browser/browsing_data/model:feature_flags",
+    "//ios/chrome/browser/browsing_data/model:test_support",
     "//ios/chrome/browser/net:crurl",
     "//ios/chrome/browser/search_engines",
     "//ios/chrome/browser/shared/model/application_context",
@@ -119,7 +120,6 @@ source_set("unit_tests") {
 }
 
 source_set("test_support") {
-  configs += [ "//build/config/compiler:enable_arc" ]
   testonly = true
   sources = [
     "fake_browsing_data_counter_wrapper_producer.h",
@@ -132,10 +132,7 @@ source_set("test_support") {
 }
 
 source_set("eg2_tests") {
-  configs += [
-    "//build/config/compiler:enable_arc",
-    "//build/config/ios:xctest_config",
-  ]
+  configs += [ "//build/config/ios:xctest_config" ]
   testonly = true
   sources = [ "clear_browsing_data_egtest.mm" ]
   deps = [

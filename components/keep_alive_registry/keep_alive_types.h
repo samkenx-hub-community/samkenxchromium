@@ -77,9 +77,13 @@ enum class KeepAliveOrigin {
   APP_GET_INFO,
   WEB_APP_LAUNCH,
   ISOLATED_WEB_APP_INSTALL,
+  ISOLATED_WEB_APP_UPDATE,
 
   // c/b/sessions
   SESSION_DATA_DELETER,
+
+  // components/metrics
+  UMA_LOG,
 };
 
 // Restart: Allow Chrome to restart when all the registered KeepAlives allow

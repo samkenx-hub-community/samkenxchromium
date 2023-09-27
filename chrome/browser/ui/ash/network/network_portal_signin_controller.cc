@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -211,15 +211,6 @@ void NetworkPortalSigninController::ShowDialog(Profile* profile,
       new NetworkPortalWebDialog(url, web_dialog_weak_factory_.GetWeakPtr());
   dialog_->SetWidget(views::Widget::GetWidgetForNativeWindow(
       chrome::ShowWebDialog(nullptr, profile, dialog_)));
-}
-
-void NetworkPortalSigninController::ShowSingletonTab(Profile* profile,
-                                                     const GURL& url) {
-  chrome::ScopedTabbedBrowserDisplayer displayer(profile);
-  if (!displayer.browser())
-    return;
-
-  ::ShowSingletonTab(displayer.browser(), url);
 }
 
 void NetworkPortalSigninController::ShowTab(Profile* profile, const GURL& url) {

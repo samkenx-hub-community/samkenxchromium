@@ -20,7 +20,7 @@
 #include "chrome/browser/ui/chrome_pages.h"
 #include "chrome/common/url_constants.h"
 #include "chrome/common/webui_url_constants.h"
-#include "chrome/grit/chromium_strings.h"
+#include "chrome/grit/branded_strings.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/password_manager/core/browser/affiliation/affiliation_utils.h"
 #include "components/password_manager/core/browser/leak_detection_dialog_utils.h"
@@ -223,11 +223,12 @@ GURL GetGooglePasswordManagerURL(ManagePasswordsReferrer referrer) {
       case ManagePasswordsReferrer::kSafetyCheck:
       case ManagePasswordsReferrer::kBiometricAuthenticationBeforeFillingDialog:
       case ManagePasswordsReferrer::kChromeMenuItem:
-        NOTREACHED();
+      case ManagePasswordsReferrer::kSharedPasswordsNotificationBubble:
+      case ManagePasswordsReferrer::kSearchPasswordsWidget:
+        NOTREACHED_NORETURN();
     }
 
-    NOTREACHED();
-    return "";
+    NOTREACHED_NORETURN();
   }();
 
   return net::AppendQueryParameter(url, "utm_campaign", campaign);
@@ -235,14 +236,6 @@ GURL GetGooglePasswordManagerURL(ManagePasswordsReferrer referrer) {
 
 // Navigation is handled differently on Android.
 #if !BUILDFLAG(IS_ANDROID)
-void NavigateToGooglePasswordManager(Profile* profile,
-                                     ManagePasswordsReferrer referrer) {
-  NavigateParams params(profile, GetGooglePasswordManagerURL(referrer),
-                        ui::PAGE_TRANSITION_LINK);
-  params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
-  Navigate(&params);
-}
-
 void NavigateToManagePasswordsPage(Browser* browser,
                                    ManagePasswordsReferrer referrer) {
   UMA_HISTOGRAM_ENUMERATION("PasswordManager.ManagePasswordsReferrer",

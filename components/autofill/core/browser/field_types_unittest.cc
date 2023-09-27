@@ -4,6 +4,7 @@
 
 #include "components/autofill/core/browser/field_types.h"
 
+#include "components/autofill/core/browser/field_type_utils.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
@@ -95,9 +96,6 @@ TEST(FieldTypesTest, IsValidServerFieldType) {
       NAME_LAST_CONJUNCTION,
       NAME_LAST_SECOND,
       NAME_HONORIFIC_PREFIX,
-      ADDRESS_HOME_PREMISE_NAME,
-      ADDRESS_HOME_DEPENDENT_STREET_NAME,
-      ADDRESS_HOME_STREET_AND_DEPENDENT_STREET_NAME,
       ADDRESS_HOME_ADDRESS,
       ADDRESS_HOME_ADDRESS_WITH_NAME,
       ADDRESS_HOME_FLOOR,
@@ -109,7 +107,15 @@ TEST(FieldTypesTest, IsValidServerFieldType) {
       ONE_TIME_CODE,
       ADDRESS_HOME_LANDMARK,
       ADDRESS_HOME_BETWEEN_STREETS,
-      ADDRESS_HOME_ADMIN_LEVEL2};
+      ADDRESS_HOME_ADMIN_LEVEL2,
+      DELIVERY_INSTRUCTIONS,
+      ADDRESS_HOME_OVERFLOW,
+      ADDRESS_HOME_STREET_LOCATION,
+      ADDRESS_HOME_BETWEEN_STREETS_1,
+      ADDRESS_HOME_BETWEEN_STREETS_2,
+      ADDRESS_HOME_BETWEEN_STREETS_OR_LANDMARK,
+      ADDRESS_HOME_OVERFLOW_AND_LANDMARK,
+      SINGLE_USERNAME_FORGOT_PASSWORD};
   ServerFieldType kInvalidValue = static_cast<ServerFieldType>(123456);
   ASSERT_FALSE(kValidFieldTypes.count(kInvalidValue));
   for (int i = -10; i < MAX_VALID_FIELD_TYPE + 10; ++i) {
@@ -117,6 +123,28 @@ TEST(FieldTypesTest, IsValidServerFieldType) {
     EXPECT_EQ(ToSafeServerFieldType(raw_value, kInvalidValue),
               kValidFieldTypes.count(raw_value) ? raw_value : kInvalidValue);
   }
+}
+
+TEST(FieldTypesTest, TestWith2DigitExpirationYear) {
+  FormFieldData field_data;
+  field_data.name = u"expiration_year";
+  field_data.value = u"23";
+  AutofillField field(field_data);
+  ServerFieldType assumed_field_type =
+      ToSafeServerFieldType(CREDIT_CARD_EXP_2_DIGIT_YEAR, NO_SERVER_DATA);
+  size_t result = DetermineExpirationYearLength(field, assumed_field_type);
+  EXPECT_EQ(result, static_cast<size_t>(2));
+}
+
+TEST(FieldTypesTest, TestWith4DigitExpirationYear) {
+  FormFieldData field_data;
+  field_data.name = u"expiration_year";
+  field_data.value = u"2023";
+  AutofillField field(field_data);
+  ServerFieldType assumed_field_type =
+      ToSafeServerFieldType(CREDIT_CARD_EXP_4_DIGIT_YEAR, NO_SERVER_DATA);
+  size_t result = DetermineExpirationYearLength(field, assumed_field_type);
+  EXPECT_EQ(result, static_cast<size_t>(4));
 }
 
 }  // namespace autofill

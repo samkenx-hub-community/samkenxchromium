@@ -28,10 +28,16 @@ BASE_DECLARE_FEATURE(kRunOnDedicatedThreadPoolThread);
 
 #if !BUILDFLAG(IS_ANDROID)
 
-#if BUILDFLAG(IS_CHROMEOS_ASH) || BUILDFLAG(IS_LINUX)
+#if BUILDFLAG(IS_LINUX)
 #define URGENT_DISCARDING_FROM_PERFORMANCE_MANAGER() false
 #else
 #define URGENT_DISCARDING_FROM_PERFORMANCE_MANAGER() true
+#endif
+
+// Enables urgent discarding of pages directly from PerformanceManager rather
+// than via TabManager on Ash Chrome.
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+BASE_DECLARE_FEATURE(kAshUrgentDiscardingFromPerformanceManager);
 #endif
 
 // Enable background tab loading of pages (restored via session restore)
@@ -150,6 +156,10 @@ BASE_DECLARE_FEATURE(kForceHeuristicMemorySaver);
 
 // This enables the UI for the multi-state version of high efficiency mode.
 BASE_DECLARE_FEATURE(kHighEfficiencyMultistateMode);
+// When true, a recommended badge will be shown next to the heuristic memory
+// saver option.
+extern const base::FeatureParam<bool> kHighEfficiencyShowRecommendedBadge;
+
 // This shows more information about discarded tabs in the tab strip and
 // hovercards.
 BASE_DECLARE_FEATURE(kDiscardedTabTreatment);
@@ -177,6 +187,7 @@ extern const base::FeatureParam<base::TimeDelta>
 extern const base::FeatureParam<int> kHighEfficiencyChartPmf25PercentileBytes;
 extern const base::FeatureParam<int> kHighEfficiencyChartPmf50PercentileBytes;
 extern const base::FeatureParam<int> kHighEfficiencyChartPmf75PercentileBytes;
+extern const base::FeatureParam<int> kHighEfficiencyChartPmf99PercentileBytes;
 
 // Final opacity of the favicon after the discard animation completes
 extern const base::FeatureParam<double> kDiscardedTabTreatmentOpacity;
@@ -187,13 +198,26 @@ extern const base::FeatureParam<int> kDiscardedTabTreatmentOption;
 // Threshold for when memory usage is labeled as "high".
 extern const base::FeatureParam<int> kMemoryUsageInHovercardsHighThresholdBytes;
 
-BASE_DECLARE_FEATURE(kUseDeviceBatterySaverChromeOS);
+// Options for when memory usage metrics are fetched for hovercards.
+enum class MemoryUsageInHovercardsUpdateTrigger {
+  kBackground,  // Metrics are fetched in the background every 2 minutes
+                // (default).
+  kNavigation,  // Metrics are also fetched after a navigation becomes idle.
+};
+
+// Sets when memory usage metrics will be fetched to display in hovercards.
+extern const base::FeatureParam<MemoryUsageInHovercardsUpdateTrigger>
+    kMemoryUsageInHovercardsUpdateTrigger;
 
 enum class DiscardTabTreatmentOptions {
   kNone = 0,
   kFadeFullsizedFavicon = 1,
   kFadeSmallFaviconWithRing = 2
 };
+
+// This enables the performance controls side panel for learning about and
+// configuring performance settings.
+BASE_DECLARE_FEATURE(kPerformanceControlsSidePanel);
 
 #endif
 
@@ -211,6 +235,10 @@ BASE_DECLARE_FEATURE(kPageTimelineMonitor);
 // Set the interval in seconds between calls of
 // PageTimelineMonitor::CollectSlice()
 extern const base::FeatureParam<base::TimeDelta> kPageTimelineStateIntervalTime;
+
+// Whether to use the resource_attribution::CPUMeasurementMonitor for logging
+// UKM.
+extern const base::FeatureParam<bool> kUseResourceAttributionCPUMonitor;
 
 }  // namespace performance_manager::features
 

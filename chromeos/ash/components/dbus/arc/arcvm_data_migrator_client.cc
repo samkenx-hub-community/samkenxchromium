@@ -75,7 +75,8 @@ class ArcVmDataMigratorClientImpl : public ArcVmDataMigratorClient {
     dbus::MessageWriter writer(&method_call);
     writer.AppendProtoAsArrayOfBytes(request);
     proxy_->CallMethod(
-        &method_call, dbus::ObjectProxy::TIMEOUT_USE_DEFAULT,
+        &method_call,
+        kArcVmDataMigratorGetAndroidDataInfoTimeout.InMilliseconds(),
         base::BindOnce(
             &ArcVmDataMigratorClientImpl::OnGetAndroidDataInfoResponse,
             weak_ptr_factory_.GetWeakPtr(), std::move(callback)));

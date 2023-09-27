@@ -11,13 +11,12 @@
 #import "ios/chrome/browser/ui/broadcaster/chrome_broadcast_observer_bridge.h"
 #import "ios/chrome/browser/ui/broadcaster/chrome_broadcaster.h"
 #import "ios/chrome/browser/ui/fullscreen/fullscreen_system_notification_observer.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
+#import "ios/web/common/features.h"
 
 // static
 FullscreenController* FullscreenController::FromBrowser(Browser* browser) {
+  // TODO(crbug.com/1469841): Do not create FullscreenController and
+  // FullscreenWebStateListObserver for an inactive browser.
   FullscreenController* fullscreen_controller =
       static_cast<FullscreenController*>(
           browser->GetUserData(FullscreenController::UserDataKey()));
@@ -40,19 +39,21 @@ FullscreenControllerImpl::FullscreenControllerImpl(Browser* browser)
                     mediator:&mediator_]) {
   DCHECK(broadcaster_);
   [broadcaster_ addObserver:bridge_
-                forSelector:@selector(broadcastScrollViewSize:)];
-  [broadcaster_ addObserver:bridge_
                 forSelector:@selector(broadcastScrollViewContentSize:)];
-  [broadcaster_ addObserver:bridge_
-                forSelector:@selector(broadcastScrollViewContentInset:)];
-  [broadcaster_ addObserver:bridge_
-                forSelector:@selector(broadcastContentScrollOffset:)];
-  [broadcaster_ addObserver:bridge_
-                forSelector:@selector(broadcastScrollViewIsScrolling:)];
-  [broadcaster_ addObserver:bridge_
-                forSelector:@selector(broadcastScrollViewIsZooming:)];
-  [broadcaster_ addObserver:bridge_
-                forSelector:@selector(broadcastScrollViewIsDragging:)];
+  if (base::FeatureList::IsEnabled(web::features::kSmoothScrollingDefault)) {
+    [broadcaster_ addObserver:bridge_
+                  forSelector:@selector(broadcastScrollViewSize:)];
+    [broadcaster_ addObserver:bridge_
+                  forSelector:@selector(broadcastScrollViewIsScrolling:)];
+    [broadcaster_ addObserver:bridge_
+                  forSelector:@selector(broadcastScrollViewIsDragging:)];
+    [broadcaster_ addObserver:bridge_
+                  forSelector:@selector(broadcastScrollViewIsZooming:)];
+    [broadcaster_ addObserver:bridge_
+                  forSelector:@selector(broadcastScrollViewContentInset:)];
+    [broadcaster_ addObserver:bridge_
+                  forSelector:@selector(broadcastContentScrollOffset:)];
+  }
   [broadcaster_ addObserver:bridge_
                 forSelector:@selector(broadcastCollapsedTopToolbarHeight:)];
   [broadcaster_ addObserver:bridge_
@@ -68,19 +69,21 @@ FullscreenControllerImpl::~FullscreenControllerImpl() {
   web_state_list_observer_.Disconnect();
   [notification_observer_ disconnect];
   [broadcaster_ removeObserver:bridge_
-                   forSelector:@selector(broadcastScrollViewSize:)];
-  [broadcaster_ removeObserver:bridge_
                    forSelector:@selector(broadcastScrollViewContentSize:)];
-  [broadcaster_ removeObserver:bridge_
-                   forSelector:@selector(broadcastScrollViewContentInset:)];
-  [broadcaster_ removeObserver:bridge_
-                   forSelector:@selector(broadcastContentScrollOffset:)];
-  [broadcaster_ removeObserver:bridge_
-                   forSelector:@selector(broadcastScrollViewIsScrolling:)];
-  [broadcaster_ removeObserver:bridge_
-                   forSelector:@selector(broadcastScrollViewIsZooming:)];
-  [broadcaster_ removeObserver:bridge_
-                   forSelector:@selector(broadcastScrollViewIsDragging:)];
+  if (base::FeatureList::IsEnabled(web::features::kSmoothScrollingDefault)) {
+    [broadcaster_ removeObserver:bridge_
+                     forSelector:@selector(broadcastScrollViewSize:)];
+    [broadcaster_ removeObserver:bridge_
+                     forSelector:@selector(broadcastScrollViewIsScrolling:)];
+    [broadcaster_ removeObserver:bridge_
+                     forSelector:@selector(broadcastScrollViewIsDragging:)];
+    [broadcaster_ removeObserver:bridge_
+                     forSelector:@selector(broadcastScrollViewIsZooming:)];
+    [broadcaster_ removeObserver:bridge_
+                     forSelector:@selector(broadcastScrollViewContentInset:)];
+    [broadcaster_ removeObserver:bridge_
+                     forSelector:@selector(broadcastContentScrollOffset:)];
+  }
   [broadcaster_ removeObserver:bridge_
                    forSelector:@selector(broadcastCollapsedTopToolbarHeight:)];
   [broadcaster_ removeObserver:bridge_
@@ -95,18 +98,6 @@ FullscreenControllerImpl::~FullscreenControllerImpl() {
 
 ChromeBroadcaster* FullscreenControllerImpl::broadcaster() {
   return broadcaster_;
-}
-
-void FullscreenControllerImpl::SetWebStateList(WebStateList* web_state_list) {
-  web_state_list_observer_.SetWebStateList(web_state_list);
-}
-
-const WebStateList* FullscreenControllerImpl::GetWebStateList() const {
-  return web_state_list_observer_.GetWebStateList();
-}
-
-WebStateList* FullscreenControllerImpl::GetWebStateList() {
-  return web_state_list_observer_.GetWebStateList();
 }
 
 void FullscreenControllerImpl::AddObserver(
@@ -165,6 +156,14 @@ void FullscreenControllerImpl::EnterFullscreen() {
 
 void FullscreenControllerImpl::ExitFullscreen() {
   mediator_.ExitFullscreen();
+}
+
+void FullscreenControllerImpl::ForceEnterFullscreen() {
+  mediator_.ForceEnterFullscreen();
+}
+
+void FullscreenControllerImpl::ExitFullscreenWithoutAnimation() {
+  mediator_.ExitFullscreenWithoutAnimation();
 }
 
 void FullscreenControllerImpl::ResizeHorizontalViewport() {

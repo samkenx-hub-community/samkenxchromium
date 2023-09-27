@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#import <Carbon/Carbon.h>
-
 #import "content/browser/web_contents/web_contents_view_mac.h"
+
+#import <Carbon/Carbon.h>
 
 #include <memory>
 #include <string>
@@ -12,7 +12,7 @@
 
 #import "base/mac/mac_util.h"
 #import "base/mac/scoped_sending_event.h"
-#import "base/message_loop/message_pump_mac.h"
+#import "base/message_loop/message_pump_apple.h"
 #include "base/task/current_thread.h"
 #include "base/task/thread_pool.h"
 #include "base/threading/thread_restrictions.h"
@@ -146,6 +146,7 @@ void WebContentsViewMac::FullscreenStateChanged(bool is_fullscreen) {}
 
 void WebContentsViewMac::UpdateWindowControlsOverlay(
     const gfx::Rect& bounding_rect) {
+  window_controls_overlay_bounding_rect_ = bounding_rect;
   if (remote_ns_view_) {
     remote_ns_view_->UpdateWindowControlsOverlay(bounding_rect);
   } else {
@@ -182,9 +183,7 @@ void WebContentsViewMac::StartDragging(
   // TODO(crbug.com/1302094): The param `drag_obj_rect` is unused.
 
   if (remote_ns_view_) {
-    // TODO(https://crbug.com/898608): Non-trivial gfx::ImageSkias fail to
-    // serialize.
-    remote_ns_view_->StartDrag(drop_data, mask, gfx::ImageSkia(), cursor_offset,
+    remote_ns_view_->StartDrag(drop_data, mask, image, cursor_offset,
                                is_privileged);
   } else {
     in_process_ns_view_bridge_->StartDrag(drop_data, mask, image, cursor_offset,
@@ -242,6 +241,11 @@ void WebContentsViewMac::FocusThroughTabTraversal(bool reverse) {
 
 DropData* WebContentsViewMac::GetDropData() const {
   return [drag_dest_ currentDropData];
+}
+
+// TODO(crbug.com/1482848): Investigate if this needs to be implemented.
+void WebContentsViewMac::CancelDragDropForPortalActivation() {
+  NOTIMPLEMENTED();
 }
 
 void WebContentsViewMac::UpdateDragCursor(ui::mojom::DragOperation operation) {
@@ -319,7 +323,7 @@ void WebContentsViewMac::CreateView(gfx::NativeView context) {
       std::make_unique<remote_cocoa::WebContentsNSViewBridge>(ns_view_id_,
                                                               this);
 
-  drag_dest_.reset([[WebDragDest alloc] initWithWebContentsImpl:web_contents_]);
+  drag_dest_ = [[WebDragDest alloc] initWithWebContentsImpl:web_contents_];
   if (delegate_)
     [drag_dest_ setDragDelegate:delegate_->GetDragDestDelegate()];
 }
@@ -409,8 +413,9 @@ void WebContentsViewMac::SetOverscrollControllerEnabled(bool enabled) {
 // would fire when the event-tracking loop polls for events.  So we need to
 // bounce the message via Cocoa, instead.
 bool WebContentsViewMac::CloseTabAfterEventTrackingIfNeeded() {
-  if (!base::MessagePumpMac::IsHandlingSendEvent())
+  if (!base::message_pump_apple::IsHandlingSendEvent()) {
     return false;
+  }
 
   deferred_close_weak_ptr_factory_.InvalidateWeakPtrs();
   auto weak_ptr = deferred_close_weak_ptr_factory_.GetWeakPtr();
@@ -642,6 +647,10 @@ void WebContentsViewMac::ViewsHostableAttach(
     remote_cocoa_application->CreateWebContentsNSView(
         ns_view_id_, std::move(stub_host), std::move(stub_ns_view_receiver));
     remote_ns_view_->SetParentNSView(views_host_->GetNSViewId());
+    if (!window_controls_overlay_bounding_rect_.IsEmpty()) {
+      remote_ns_view_->UpdateWindowControlsOverlay(
+          window_controls_overlay_bounding_rect_);
+    }
 
     // Because this view is being displayed from a remote process, reset the
     // in-process NSView's client pointer, so that the in-process NSView will

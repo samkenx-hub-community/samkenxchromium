@@ -33,8 +33,7 @@ BASE_DECLARE_FEATURE(kRestoreInterestingTopicsFeature);
 class INVALIDATION_EXPORT InvalidatorRegistrarWithMemory {
  public:
   InvalidatorRegistrarWithMemory(PrefService* prefs,
-                                 const std::string& sender_id,
-                                 bool migrate_old_prefs);
+                                 const std::string& sender_id);
   InvalidatorRegistrarWithMemory(const InvalidatorRegistrarWithMemory& other) =
       delete;
   InvalidatorRegistrarWithMemory& operator=(
@@ -50,6 +49,8 @@ class INVALIDATION_EXPORT InvalidatorRegistrarWithMemory {
   // unencrypted area.
   static void RegisterProfilePrefs(PrefRegistrySimple* registry);
   static void RegisterPrefs(PrefRegistrySimple* registry);
+
+  static void ClearDeprecatedPrefs(PrefService* prefs);
 
   // Starts sending notifications to |handler|.  |handler| must not be nullptr,
   // and it must not already be registered.
@@ -107,22 +108,11 @@ class INVALIDATION_EXPORT InvalidatorRegistrarWithMemory {
   // Notifies all handlers about the new instance ID.
   void UpdateInvalidatorInstanceId(const std::string& instance_id);
 
-  // Gets a new map from the name of invalidation handlers to their topics. This
-  // is used by the InvalidatorLogger to be able to display every registered
-  // handler and its topics.
-  std::map<std::string, Topics> GetHandlerNameToTopicsMap();
-
-  void RequestDetailedStatus(
-      base::RepeatingCallback<void(base::Value::Dict)> callback) const;
-
  private:
   // Checks if any of the |topics| is already registered for a *different*
   // handler than the given one.
   bool HasDuplicateTopicRegistration(InvalidationHandler* handler,
                                      const std::set<TopicData>& topics) const;
-
-  // Generate a Dictionary with all the debugging information.
-  base::Value::Dict CollectDebugData() const;
 
   void RemoveSubscribedTopics(const InvalidationHandler* handler,
                               const std::set<TopicData>& topics_to_unsubscribe);

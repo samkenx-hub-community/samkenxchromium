@@ -8,8 +8,10 @@
 #include "base/metrics/user_metrics.h"
 #include "base/metrics/user_metrics_action.h"
 #include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/browser_element_identifiers.h"
 #include "chrome/browser/ui/views/extensions/extensions_menu_coordinator.h"
 #include "chrome/browser/ui/views/extensions/extensions_menu_view.h"
+#include "chrome/browser/ui/views/extensions/extensions_request_access_button.h"
 #include "chrome/browser/ui/views/extensions/extensions_toolbar_container.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/vector_icons/vector_icons.h"
@@ -65,6 +67,9 @@ ExtensionsToolbarButton::ExtensionsToolbarButton(
   SetVectorIcon(GetIcon(state_));
 
   GetViewAccessibility().OverrideHasPopup(ax::mojom::HasPopup::kMenu);
+
+  // Set button for IPH.
+  SetProperty(views::kElementIdentifierKey, kExtensionsMenuButtonElementId);
 }
 
 ExtensionsToolbarButton::~ExtensionsToolbarButton() {
@@ -118,23 +123,14 @@ void ExtensionsToolbarButton::UpdateState(State state) {
   SetVectorIcon(GetIcon(state_));
 }
 
-void ExtensionsToolbarButton::UpdateIcon() {
-  if (browser_->app_controller()) {
-    // TODO(pbos): Remove this once PWAs have ThemeProvider color support for it
-    // and ToolbarButton can pick up icon sizes outside of a static lookup.
-    SetImageModel(views::Button::STATE_NORMAL,
-                  ui::ImageModel::FromVectorIcon(
-                      GetIcon(state_), extensions_container_->GetIconColor(),
-                      GetIconSize()));
-    return;
-  }
-  ToolbarButton::UpdateIcon();
-}
-
 void ExtensionsToolbarButton::OnWidgetDestroying(views::Widget* widget) {
   widget->RemoveObserver(this);
   pressed_lock_.reset();
   extensions_container_->OnMenuClosed();
+}
+
+bool ExtensionsToolbarButton::ShouldShowInkdropAfterIphInteraction() {
+  return false;
 }
 
 void ExtensionsToolbarButton::ToggleExtensionsMenu() {
@@ -153,6 +149,12 @@ void ExtensionsToolbarButton::ToggleExtensionsMenu() {
   views::Widget* menu;
   if (base::FeatureList::IsEnabled(
           extensions_features::kExtensionsMenuAccessControl)) {
+    if (extensions_container_->GetExtensionsToolbarControls()
+            ->request_access_button()
+            ->GetVisible()) {
+      base::RecordAction(base::UserMetricsAction(
+          "Extensions.Toolbar.MenuOpenedWhenExtensionsAreRequestingAccess"));
+    }
     extensions_menu_coordinator_->Show(this, extensions_container_);
     menu = extensions_menu_coordinator_->GetExtensionsMenuWidget();
   } else {
@@ -177,6 +179,23 @@ int ExtensionsToolbarButton::GetIconSize() const {
                      extensions_features::kExtensionsMenuAccessControl)
              ? kDefaultIconSizeChromeRefresh
              : kDefaultIconSize;
+}
+
+std::u16string ExtensionsToolbarButton::GetTooltipText(
+    const gfx::Point& p) const {
+  int message_id;
+  switch (state_) {
+    case ExtensionsToolbarButton::State::kDefault:
+      message_id = IDS_TOOLTIP_EXTENSIONS_BUTTON;
+      break;
+    case ExtensionsToolbarButton::State::kAllExtensionsBlocked:
+      message_id = IDS_TOOLTIP_EXTENSIONS_BUTTON_ALL_EXTENSIONS_BLOCKED;
+      break;
+    case ExtensionsToolbarButton::State::kAnyExtensionHasAccess:
+      message_id = IDS_TOOLTIP_EXTENSIONS_BUTTON_ANY_EXTENSION_HAS_ACCESS;
+      break;
+  }
+  return l10n_util::GetStringUTF16(message_id);
 }
 
 BEGIN_METADATA(ExtensionsToolbarButton, ToolbarButton)

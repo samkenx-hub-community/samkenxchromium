@@ -23,6 +23,7 @@
 #include "base/strings/stringprintf.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/trace_event/trace_event.h"
+#include "base/types/optional_util.h"
 #include "components/keyed_service/content/browser_context_keyed_service_shutdown_notifier_factory.h"
 #include "components/keyed_service/core/keyed_service_shutdown_notifier.h"
 #include "content/public/browser/browser_context.h"
@@ -34,6 +35,7 @@
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/storage_partition.h"
 #include "content/public/common/url_utils.h"
+#include "extensions/browser/api/web_request/extension_web_request_event_router.h"
 #include "extensions/browser/api/web_request/permission_helper.h"
 #include "extensions/browser/api/web_request/web_request_api.h"
 #include "extensions/browser/extension_navigation_ui_data.h"
@@ -98,6 +100,12 @@ class ShutdownNotifierFactory
     DependsOn(PermissionHelper::GetFactoryInstance());
   }
   ~ShutdownNotifierFactory() override {}
+
+  content::BrowserContext* GetBrowserContextToUse(
+      content::BrowserContext* context) const override {
+    return ExtensionsBrowserClient::Get()->GetContextOwnInstance(
+        context, /*force_guest_profile=*/true);
+  }
 };
 
 // Creates simulated net::RedirectInfo when an extension redirects a request,
@@ -1397,10 +1405,9 @@ bool WebRequestProxyingURLLoaderFactory::InProgressRequest::IsRedirectSafe(
         ExtensionRegistry::Get(factory_->browser_context_)
             ->enabled_extensions()
             .GetByID(to_url.host());
-    if (!extension)
-      return false;
-    return WebAccessibleResourcesInfo::IsResourceWebAccessible(
-        extension, to_url.path(), original_initiator_);
+    return extension && WebAccessibleResourcesInfo::IsResourceWebAccessible(
+                            extension, to_url.path(),
+                            base::OptionalToPtr(original_initiator_));
   }
   return content::IsSafeRedirectTarget(from_url, to_url);
 }

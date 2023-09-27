@@ -48,7 +48,7 @@ public class ChromeTabSwitcherTest {
     private IUi2Locator mTabSwitcherToolbar =
             Ui2Locators.withAnyResEntry(R.id.tab_switcher_toolbar);
 
-    private IUi2Locator mTabList = Ui2Locators.withAnyResEntry(R.id.tab_list_view);
+    private IUi2Locator mTabList = Ui2Locators.withAnyResEntry(R.id.tab_list_recycler_view);
 
     private FirstRunNavigator mFirstRunNavigator = new FirstRunNavigator();
 
@@ -84,7 +84,7 @@ public class ChromeTabSwitcherTest {
         IUi2Locator locatorChrome = Ui2Locators.withPackageName(mPackageName);
         // Wait until chrome shows up
         Log.i(TAG, "Attempting to navigate through FRE");
-        mFirstRunNavigator.waitUntilAnyVisible(locatorChrome);
+        UiAutomatorUtils.getInstance().waitUntilAnyVisible(locatorChrome);
 
         // Go through the FRE until you see ChromeTabbedActivity urlbar.
         Log.i(TAG, "Waiting for omnibox to show URL");

@@ -10,6 +10,7 @@
 
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
+#include "base/json/json_reader.h"
 #include "base/json/json_string_value_serializer.h"
 #include "base/path_service.h"
 #include "base/strings/string_util.h"
@@ -438,9 +439,16 @@ TEST_F(FileUtilTest, LoadExtensionGivesHelpfullErrorOnBadManifest) {
       install_dir, ManifestLocation::kUnpacked, Extension::NO_FLAGS, &error));
   ASSERT_TRUE(extension.get() == nullptr);
   ASSERT_FALSE(error.empty());
-  ASSERT_NE(std::string::npos,
-            error.find(manifest_errors::kManifestParseError +
-                       std::string("  Line: 2, column: 16,")));
+  if (base::JSONReader::UsingRust()) {
+    ASSERT_NE(
+        std::string::npos,
+        error.find(manifest_errors::kManifestParseError +
+                   std::string("  expected `,` or `}` at line 2 column 16")));
+  } else {
+    ASSERT_NE(std::string::npos,
+              error.find(manifest_errors::kManifestParseError +
+                         std::string("  Line: 2, column: 16,")));
+  }
 }
 
 TEST_F(FileUtilTest, ValidateThemeUTF8) {

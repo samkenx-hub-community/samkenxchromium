@@ -23,9 +23,6 @@
 
 namespace autofill {
 
-#if BUILDFLAG(IS_ANDROID)
-using features::kAutofillKeyboardAccessory;
-#endif
 using mojom::FocusedFieldType;
 using mojom::SubmissionIndicatorEvent;
 using mojom::SubmissionSource;
@@ -49,10 +46,6 @@ struct Compare : base::CaseInsensitiveCompareASCII<Char> {
 
 }  // namespace
 
-bool IsFeatureSubstringMatchEnabled() {
-  return base::FeatureList::IsEnabled(features::kAutofillTokenPrefixMatching);
-}
-
 bool IsShowAutofillSignaturesEnabled() {
   return base::CommandLine::ForCurrentProcess()->HasSwitch(
       switches::kShowAutofillSignatures);
@@ -60,26 +53,10 @@ bool IsShowAutofillSignaturesEnabled() {
 
 bool IsKeyboardAccessoryEnabled() {
 #if BUILDFLAG(IS_ANDROID)
-  return base::FeatureList::IsEnabled(kAutofillKeyboardAccessory);
+  return true;
 #else  // !BUILDFLAG(IS_ANDROID)
   return false;
 #endif
-}
-
-bool FieldIsSuggestionSubstringStartingOnTokenBoundary(
-    const std::u16string& suggestion,
-    const std::u16string& field_contents,
-    bool case_sensitive) {
-  if (!IsFeatureSubstringMatchEnabled()) {
-    return base::StartsWith(suggestion, field_contents,
-                            case_sensitive
-                                ? base::CompareCase::SENSITIVE
-                                : base::CompareCase::INSENSITIVE_ASCII);
-  }
-
-  return suggestion.length() >= field_contents.length() &&
-         GetTextSelectionStart(suggestion, field_contents, case_sensitive) !=
-             std::u16string::npos;
 }
 
 bool IsPrefixOfEmailEndingWithAtSign(const std::u16string& full_string,

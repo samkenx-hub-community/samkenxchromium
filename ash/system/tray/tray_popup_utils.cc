@@ -9,6 +9,7 @@
 #include <utility>
 
 #include "ash/constants/ash_constants.h"
+#include "ash/constants/ash_features.h"
 #include "ash/public/cpp/ash_view_ids.h"
 #include "ash/resources/vector_icons/vector_icons.h"
 #include "ash/session/session_controller_impl.h"
@@ -295,6 +296,13 @@ bool TrayPopupUtils::CanOpenWebUISettings() {
   return Shell::Get()->session_controller()->ShouldEnableSettings();
 }
 
+bool TrayPopupUtils::CanShowNightLightFeatureTile() {
+  CHECK(features::IsQsRevampEnabled());
+  return Shell::Get()->session_controller()->ShouldEnableSettings() ||
+         (Shell::Get()->session_controller()->GetSessionState() ==
+          session_manager::SessionState::LOCKED);
+}
+
 void TrayPopupUtils::InitializeAsCheckableRow(HoverHighlightView* container,
                                               bool checked,
                                               bool enterprise_managed) {
@@ -347,7 +355,11 @@ ui::ImageModel TrayPopupUtils::CreateCheckMark(ui::ColorId color_id) {
       GetDefaultSizeOfVectorIcon(kCheckCircleIcon));
 }
 
+// static
 void TrayPopupUtils::SetLabelFontList(views::Label* label, FontStyle style) {
+  // See function header comment.
+  DCHECK(!features::IsQsRevampEnabled() ||
+         !chromeos::features::IsJellyEnabled());
   label->SetAutoColorReadabilityEnabled(false);
   const gfx::FontList google_sans_font_list({"Google Sans"}, gfx::Font::NORMAL,
                                             16, gfx::Font::Weight::MEDIUM);

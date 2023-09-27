@@ -49,7 +49,7 @@
 #include "url/url_util.h"
 
 #if BUILDFLAG(IS_MAC)
-#include "base/mac/scoped_nsautorelease_pool.h"
+#include "base/apple/scoped_nsautorelease_pool.h"
 #endif
 
 const char kCreateWebSocketPath[] =
@@ -229,7 +229,7 @@ HttpHandler::HttpHandler(
       url_base_(url_base),
       received_shutdown_(false) {
 #if BUILDFLAG(IS_MAC)
-  base::mac::ScopedNSAutoreleasePool autorelease_pool;
+  base::apple::ScopedNSAutoreleasePool autorelease_pool;
 #endif
   context_getter_ = new URLRequestContextGetter(io_task_runner_);
   socket_factory_ = CreateSyncWebSocketFactory(context_getter_.get());
@@ -938,7 +938,7 @@ HttpHandler::HttpHandler(
                         base::BindRepeating(&ExecuteSetSPCTransactionMode))),
 
       // Extensions for the Federated Credential Management API:
-      // https://github.com/fedidcg/FedCM/blob/main/proposals/webdriver.md
+      // https://fedidcg.github.io/FedCM/#automation
       CommandMapping(kPost, "session/:sessionId/fedcm/canceldialog",
                      WrapToCommand("CancelDialog",
                                    base::BindRepeating(&ExecuteCancelDialog))),
@@ -946,6 +946,13 @@ HttpHandler::HttpHandler(
       CommandMapping(kPost, "session/:sessionId/fedcm/selectaccount",
                      WrapToCommand("SelectAccount",
                                    base::BindRepeating(&ExecuteSelectAccount))),
+
+      // This command is prefixed because standardization is still pending:
+      // https://github.com/fedidcg/FedCM/pull/436/files
+      VendorPrefixedCommandMapping(
+          kPost, "session/:sessionId/%s/fedcm/confirmidpsignin",
+          WrapToCommand("ConfirmIdpSignin",
+                        base::BindRepeating(&ExecuteConfirmIdpSignin))),
 
       CommandMapping(kGet, "session/:sessionId/fedcm/accountlist",
                      WrapToCommand("GetAccounts",

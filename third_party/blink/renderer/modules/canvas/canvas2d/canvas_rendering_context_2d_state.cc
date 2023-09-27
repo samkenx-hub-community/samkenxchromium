@@ -301,7 +301,6 @@ bool CanvasRenderingContext2DState::IsFontDirtyForFilter() const {
 }
 
 const Font& CanvasRenderingContext2DState::GetFont() const {
-  DCHECK(realized_font_);
   return font_;
 }
 
@@ -322,11 +321,44 @@ void CanvasRenderingContext2DState::SetFontKerning(
 }
 
 void CanvasRenderingContext2DState::SetFontStretch(
-    FontSelectionValue font_stretch,
+    V8CanvasFontStretch font_stretch,
     FontSelector* selector) {
   DCHECK(realized_font_);
+  FontSelectionValue stretch_value;
+  switch (font_stretch.AsEnum()) {
+    case (V8CanvasFontStretch::Enum::kUltraCondensed):
+      stretch_value = kUltraCondensedWidthValue;
+      break;
+    case (V8CanvasFontStretch::Enum::kExtraCondensed):
+      stretch_value = kExtraCondensedWidthValue;
+      break;
+    case (V8CanvasFontStretch::Enum::kCondensed):
+      stretch_value = kCondensedWidthValue;
+      break;
+    case (V8CanvasFontStretch::Enum::kSemiCondensed):
+      stretch_value = kSemiCondensedWidthValue;
+      break;
+    case (V8CanvasFontStretch::Enum::kNormal):
+      stretch_value = kNormalWidthValue;
+      break;
+    case (V8CanvasFontStretch::Enum::kUltraExpanded):
+      stretch_value = kUltraExpandedWidthValue;
+      break;
+    case (V8CanvasFontStretch::Enum::kExtraExpanded):
+      stretch_value = kExtraExpandedWidthValue;
+      break;
+    case (V8CanvasFontStretch::Enum::kExpanded):
+      stretch_value = kExpandedWidthValue;
+      break;
+    case (V8CanvasFontStretch::Enum::kSemiExpanded):
+      stretch_value = kSemiExpandedWidthValue;
+      break;
+    default:
+      NOTREACHED();
+  }
+
   FontDescription font_description(GetFontDescription());
-  font_description.SetStretch(font_stretch);
+  font_description.SetStretch(stretch_value);
   font_stretch_ = font_stretch;
   SetFont(font_description, selector);
 }
@@ -400,7 +432,8 @@ sk_sp<PaintFilter> CanvasRenderingContext2DState::GetFilterForOffscreenCanvas(
   FilterEffectBuilder filter_effect_builder(
       gfx::RectF(gfx::SizeF(canvas_size)),
       1.0f,  // Deliberately ignore zoom on the canvas element.
-      &fill_flags_for_filter, &stroke_flags_for_filter);
+      Color::kBlack, mojom::blink::ColorScheme::kLight, &fill_flags_for_filter,
+      &stroke_flags_for_filter);
 
   FilterEffect* last_effect = filter_effect_builder.BuildFilterEffect(
       operations, !context->OriginClean());
@@ -470,7 +503,8 @@ sk_sp<PaintFilter> CanvasRenderingContext2DState::GetFilter(
   FilterEffectBuilder filter_effect_builder(
       gfx::RectF(gfx::SizeF(canvas_size)),
       1.0f,  // Deliberately ignore zoom on the canvas element.
-      &fill_flags_for_filter, &stroke_flags_for_filter);
+      Color::kBlack, mojom::blink::ColorScheme::kLight, &fill_flags_for_filter,
+      &stroke_flags_for_filter);
 
   FilterEffect* last_effect = filter_effect_builder.BuildFilterEffect(
       operations, !context->OriginClean());
@@ -770,11 +804,28 @@ void CanvasRenderingContext2DState::SetWordSpacing(const String& word_spacing) {
 }
 
 void CanvasRenderingContext2DState::SetTextRendering(
-    TextRenderingMode text_rendering,
+    V8CanvasTextRendering text_rendering,
     FontSelector* selector) {
+  TextRenderingMode text_rendering_mode;
+  switch (text_rendering.AsEnum()) {
+    case (V8CanvasTextRendering::Enum::kAuto):
+      text_rendering_mode = TextRenderingMode::kAutoTextRendering;
+      break;
+    case (V8CanvasTextRendering::Enum::kOptimizeSpeed):
+      text_rendering_mode = TextRenderingMode::kAutoTextRendering;
+      break;
+    case (V8CanvasTextRendering::Enum::kOptimizeLegibility):
+      text_rendering_mode = TextRenderingMode::kAutoTextRendering;
+      break;
+    case (V8CanvasTextRendering::Enum::kGeometricPrecision):
+      text_rendering_mode = TextRenderingMode::kAutoTextRendering;
+      break;
+    default:
+      NOTREACHED();
+  }
   DCHECK(realized_font_);
   FontDescription font_description(GetFontDescription());
-  font_description.SetTextRendering(text_rendering);
+  font_description.SetTextRendering(text_rendering_mode);
   text_rendering_mode_ = text_rendering;
   SetFont(font_description, selector);
 }

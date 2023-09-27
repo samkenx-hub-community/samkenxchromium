@@ -37,9 +37,9 @@
 #import "ios/web_view/internal/cwv_ssl_status_internal.h"
 #import "ios/web_view/internal/cwv_ssl_util.h"
 #import "ios/web_view/internal/cwv_web_view_internal.h"
+#import "ios/web_view/internal/js_messaging/web_view_scripts_java_script_feature.h"
 #import "ios/web_view/internal/safe_browsing/cwv_unsafe_url_handler_internal.h"
 #import "ios/web_view/internal/web_view_browser_state.h"
-#import "ios/web_view/internal/web_view_early_page_script_provider.h"
 #import "ios/web_view/internal/web_view_message_handler_java_script_feature.h"
 #import "ios/web_view/internal/web_view_web_main_parts.h"
 #import "ios/web_view/public/cwv_navigation_delegate.h"
@@ -48,10 +48,6 @@
 #import "net/cert/cert_status_flags.h"
 #import "ui/base/l10n/l10n_util.h"
 #import "ui/base/resource/resource_bundle.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace ios_web_view {
 
@@ -105,14 +101,8 @@ std::vector<web::JavaScriptFeature*> WebViewWebClient::GetJavaScriptFeatures(
       security_interstitials::IOSSecurityInterstitialJavaScriptFeature::
           GetInstance(),
       translate::TranslateJavaScriptFeature::GetInstance(),
-      WebViewMessageHandlerJavaScriptFeature::FromBrowserState(browser_state)};
-}
-
-NSString* WebViewWebClient::GetDocumentStartScriptForMainFrame(
-    web::BrowserState* browser_state) const {
-  WebViewEarlyPageScriptProvider& provider =
-      WebViewEarlyPageScriptProvider::FromBrowserState(browser_state);
-  return provider.GetScript();
+      WebViewMessageHandlerJavaScriptFeature::FromBrowserState(browser_state),
+      WebViewScriptsJavaScriptFeature::FromBrowserState(browser_state)};
 }
 
 void WebViewWebClient::PrepareErrorPage(
@@ -166,16 +156,12 @@ void WebViewWebClient::PrepareErrorPage(
   } else if (info.has_value() &&
              [navigation_delegate respondsToSelector:@selector
                                   (webView:handleSSLErrorWithHandler:)]) {
-    __block base::OnceCallback<void(NSString*)> error_html_callback =
-        std::move(callback);
-    CWVSSLErrorHandler* handler =
-        [[CWVSSLErrorHandler alloc] initWithWebState:web_state
-                                                 URL:net::NSURLWithGURL(url)
-                                               error:error
-                                             SSLInfo:info.value()
-                               errorPageHTMLCallback:^(NSString* HTML) {
-                                 std::move(error_html_callback).Run(HTML);
-                               }];
+    CWVSSLErrorHandler* handler = [[CWVSSLErrorHandler alloc]
+             initWithWebState:web_state
+                          URL:net::NSURLWithGURL(url)
+                        error:error
+                      SSLInfo:info.value()
+        errorPageHTMLCallback:base::CallbackToBlock(std::move(callback))];
     [navigation_delegate webView:web_view handleSSLErrorWithHandler:handler];
   } else {
     std::move(callback).Run(error.localizedDescription);
@@ -184,6 +170,11 @@ void WebViewWebClient::PrepareErrorPage(
 
 bool WebViewWebClient::EnableLongPressUIContextMenu() const {
   return CWVWebView.chromeContextMenuEnabled;
+}
+
+bool WebViewWebClient::EnableWebInspector(
+    web::BrowserState* browser_state) const {
+  return CWVWebView.webInspectorEnabled;
 }
 
 bool WebViewWebClient::IsMixedContentAutoupgradeEnabled(

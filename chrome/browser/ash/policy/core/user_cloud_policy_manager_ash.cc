@@ -36,10 +36,10 @@
 #include "chrome/browser/invalidation/profile_invalidation_provider_factory.h"
 #include "chrome/browser/lifetime/application_lifetime.h"
 #include "chrome/browser/net/system_network_context_manager.h"
-#include "chrome/browser/policy/cloud/remote_commands_invalidator_impl.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/common/chrome_content_client.h"
 #include "chrome/common/chrome_features.h"
+#include "components/enterprise/browser/reporting/real_time_report_controller.h"
 #include "components/enterprise/browser/reporting/report_generator.h"
 #include "components/enterprise/browser/reporting/report_scheduler.h"
 #include "components/invalidation/impl/profile_invalidation_provider.h"
@@ -51,6 +51,7 @@
 #include "components/policy/core/common/policy_map.h"
 #include "components/policy/core/common/policy_pref_names.h"
 #include "components/policy/core/common/policy_types.h"
+#include "components/policy/core/common/remote_commands/remote_commands_invalidator_impl.h"
 #include "components/policy/policy_constants.h"
 #include "components/session_manager/core/session_manager.h"
 #include "components/user_manager/known_user.h"
@@ -413,9 +414,11 @@ void UserCloudPolicyManagerAsh::OnRegistrationStateChanged(
   if (waiting_for_policy_fetch_) {
     // If we're blocked on the policy fetch, now is a good time to issue it.
     if (client()->is_registered()) {
-      service()->RefreshPolicy(base::BindOnce(
-          &UserCloudPolicyManagerAsh::OnInitialPolicyFetchComplete,
-          base::Unretained(this)));
+      service()->RefreshPolicy(
+          base::BindOnce(
+              &UserCloudPolicyManagerAsh::OnInitialPolicyFetchComplete,
+              base::Unretained(this)),
+          PolicyFetchReason::kRegistrationChanged);
     } else {
       // If the client has switched to not registered, we bail out as this
       // indicates the cloud policy setup flow has been aborted.
@@ -721,13 +724,14 @@ void UserCloudPolicyManagerAsh::StartReportSchedulerIfReady(
   enterprise_reporting::ReportingDelegateFactoryDesktop delegate_factory;
   enterprise_reporting::ReportScheduler::CreateParams params;
   params.client = client();
-  params.delegate =
-      std::make_unique<enterprise_reporting::ReportSchedulerDesktop>(profile_);
+  params.delegate = delegate_factory.GetReportSchedulerDelegate();
   params.report_generator =
       std::make_unique<enterprise_reporting::ReportGenerator>(
           &delegate_factory);
-  params.real_time_report_generator =
-      std::make_unique<enterprise_reporting::RealTimeReportGenerator>(
+
+  delegate_factory.SetProfileForRealTimeController(profile_);
+  params.real_time_report_controller =
+      std::make_unique<enterprise_reporting::RealTimeReportController>(
           &delegate_factory);
 
   report_scheduler_ = std::make_unique<enterprise_reporting::ReportScheduler>(

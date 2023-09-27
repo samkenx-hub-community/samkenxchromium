@@ -5,7 +5,6 @@
 /** @fileoverview Test suite for theme-element component.  */
 
 import 'chrome://personalization/strings.m.js';
-import 'chrome://webui-test/mojo_webui_test_support.js';
 
 import {emptyState, PersonalizationThemeElement, SetDarkModeEnabledAction, ThemeActionName, ThemeObserver} from 'chrome://personalization/js/personalization_app.js';
 import {assertDeepEquals, assertEquals, assertFalse, assertTrue} from 'chrome://webui-test/chai_assert.js';
@@ -42,9 +41,9 @@ suite('PersonalizationThemeTest', function() {
     personalizationThemeElement = initElement(PersonalizationThemeElement);
     await waitAfterNextRender(personalizationThemeElement);
 
-    assertEquals(
-        personalizationThemeElement.i18n('themeLabel'),
-        personalizationThemeElement.shadowRoot!.querySelector('h2')!.innerText);
+    const radioButton =
+        personalizationThemeElement.shadowRoot!.getElementById('darkMode');
+    assertTrue(!!radioButton);
   });
 
   test('sets color mode in store on first load', async () => {

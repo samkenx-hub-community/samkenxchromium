@@ -39,6 +39,7 @@ class MEDIA_EXPORT HlsManifestDemuxerEngine : public ManifestDemuxer::Engine,
                            MediaLog* media_log);
   ~HlsManifestDemuxerEngine() override;
 
+  // HlsRenditionHost implementation
   std::string GetName() const override;
   void Initialize(ManifestDemuxerEngineHost* host,
                   PipelineStatusCallback status_cb) override;
@@ -48,19 +49,27 @@ class MEDIA_EXPORT HlsManifestDemuxerEngine : public ManifestDemuxer::Engine,
   bool Seek(base::TimeDelta time) override;
   void StartWaitingForSeek() override;
   void AbortPendingReads() override;
-  bool IsSeekable() override;
+  bool IsSeekable() const override;
   int64_t GetMemoryUsage() const override;
   void Stop() override;
   void ReadFromUrl(GURL uri,
                    bool read_chunked,
                    absl::optional<hls::types::ByteRange> range,
-                   HlsDataSourceStream::ReadCb cb) override;
+                   HlsDataSourceStreamManager::ReadCb cb) override;
 
   // Parses a playlist using the multivariant playlist, if it's being used.
   hls::ParseStatus::Or<scoped_refptr<hls::MediaPlaylist>>
-  ParseMediaPlaylistFromStream(HlsDataSourceStream stream,
-                               GURL uri,
-                               hls::types::DecimalInteger version);
+  ParseMediaPlaylistFromStringSource(
+      base::StringPiece source,
+      GURL uri,
+      hls::types::DecimalInteger version) override;
+
+  // HlsDataSourceStreamManager implementation
+  void ReadStream(std::unique_ptr<HlsDataSourceStream> stream,
+                  HlsDataSourceStreamManager::ReadCb cb) override;
+
+  // Test helpers.
+  void AddRenditionForTesting(std::unique_ptr<HlsRendition> test_rendition);
 
  private:
   struct PlaylistParseInfo {
@@ -85,19 +94,60 @@ class MEDIA_EXPORT HlsManifestDemuxerEngine : public ManifestDemuxer::Engine,
     bool allow_multivariant_playlist;
   };
 
+  // Call the `CheckState` method of each rendition recursively and
+  // asynchronously while also maintaining the correct delay time.
+  // `media_time` and `playback_rate` represent the state of the playing media
+  // `cb` allows requesting a delay time until the next CheckState call,
+  // `rendition_index` is the index into `renditions_` that should be
+  // asynchronously checked next, and `response_time` is what the previously
+  // checked renditions requested for a delay time. The ultimate response to
+  // `cb` should be the lowest of all requested delays, adjusted for the time
+  // taken to calculate later delays, e.g.:
+  // Rendition1 requests 5 seconds, takes 2 seconds
+  // Rendition2 requests 4 seconds, takes 1.5 seconds
+  // Rendition3 requests kNoTimestamp, takes 1 second
+  // First the 5 second response is carried forward, then after the second
+  // response is acquired, the lesser of (5 - 1.5) and 4 is selected, so 3.5
+  // seconds is carried forward as a delay time. Finally after the kNoTimestamp
+  // response is acquired, the duration is once again subtracted and a final
+  // delay time of 2.5 seconds is returned via cb.
+  void CheckStateAtIndex(base::TimeDelta media_time,
+                         double playback_rate,
+                         ManifestDemuxer::DelayCallback cb,
+                         size_t rendition_index,
+                         absl::optional<base::TimeDelta> response_time);
+
+  // Helper for `CheckStateAtIndex` to be bound for Rendition::CheckState
+  // method calls.
+  void OnStateChecked(
+      base::TimeTicks call_start,
+      absl::optional<base::TimeDelta> prior_delay,
+      base::OnceCallback<void(absl::optional<base::TimeDelta>)> cb,
+      base::TimeDelta delay_time);
+
   // Helpers to call |PlayerImplDemuxer::OnDemuxerError|.
   void Abort(HlsDemuxerStatus status);
   void Abort(hls::ParseStatus status);
   void Abort(HlsDataSource::ReadStatus status);
 
   // ReadFromUrl needs a helper to abort in case of failure.
-  void ReadDataSource(bool read_chunked,
-                      HlsDataSourceStream::ReadCb cb,
+  void ReadDataSource(HlsDataSourceStreamManager::ReadCb cb,
                       std::unique_ptr<HlsDataSource> source);
+
+  // Trampoline allows converting a non-active HlsDataSourceStream::StreamId
+  // into a HlsDataSourceStream so that the pending callback can use it's
+  // internal data.
+  void ExchangeStreamId(HlsDataSourceStream::StreamId ticket,
+                        HlsDataSourceStreamManager::ReadCb cb,
+                        HlsDataSource::ReadStatus::Or<size_t> result);
+
+  // Read the entire contents of a data source stream before calling cb.
+  void ReadUntilExhausted(HlsDataSourceStreamManager::ReadCb cb,
+                          HlsDataSourceStreamManager::ReadResult result);
 
   void ParsePlaylist(PipelineStatusCallback parse_complete_cb,
                      PlaylistParseInfo parse_info,
-                     HlsDataSourceStream::ReadResult m_stream);
+                     HlsDataSourceStreamManager::ReadResult m_stream);
 
   void OnMultivariantPlaylist(
       PipelineStatusCallback parse_complete_cb,
@@ -111,7 +161,6 @@ class MEDIA_EXPORT HlsManifestDemuxerEngine : public ManifestDemuxer::Engine,
                        scoped_refptr<hls::MediaPlaylist> playlist);
   void DetermineStreamContainerAndCodecs(
       hls::MediaPlaylist* playlist,
-      PlaylistParseInfo parse_info,
       HlsDemuxerStatusCb<HlsCodecDetector::ContainerAndCodecs> container_cb);
   void OnPlaylistContainerDetermined(
       PipelineStatusCallback parse_complete_cb,
@@ -119,9 +168,8 @@ class MEDIA_EXPORT HlsManifestDemuxerEngine : public ManifestDemuxer::Engine,
       scoped_refptr<hls::MediaPlaylist> playlist,
       HlsDemuxerStatus::Or<HlsCodecDetector::ContainerAndCodecs> maybe_info);
   void PeekFirstSegment(
-      PlaylistParseInfo parse_info,
       HlsDemuxerStatusCb<HlsCodecDetector::ContainerAndCodecs> cb,
-      std::unique_ptr<HlsDataSource> data_source);
+      HlsDataSourceStreamManager::ReadResult maybe_stream);
 
   void OnChunkDemuxerParseWarning(std::string role,
                                   SourceBufferParseWarning warning);
@@ -135,26 +183,46 @@ class MEDIA_EXPORT HlsManifestDemuxerEngine : public ManifestDemuxer::Engine,
   GURL root_playlist_uri_;
 
   std::unique_ptr<MediaLog> media_log_;
-  base::raw_ptr<ManifestDemuxerEngineHost> host_ = nullptr;
+  raw_ptr<ManifestDemuxerEngineHost> host_
+      GUARDED_BY_CONTEXT(media_sequence_checker_) = nullptr;
 
   // The codec detector is a reusable way for determining codecs in a media
   // stream.
-  std::unique_ptr<HlsCodecDetector> codec_detector_;
+  std::unique_ptr<HlsCodecDetector> codec_detector_
+      GUARDED_BY_CONTEXT(media_sequence_checker_);
 
   // If the root playlist is multivariant, we need to store it for parsing the
   // dependant media playlists.
-  scoped_refptr<hls::MultivariantPlaylist> multivariant_root_;
-  std::unique_ptr<hls::RenditionSelector> rendition_selector_;
+  scoped_refptr<hls::MultivariantPlaylist> multivariant_root_
+      GUARDED_BY_CONTEXT(media_sequence_checker_);
+  std::unique_ptr<hls::RenditionSelector> rendition_selector_
+      GUARDED_BY_CONTEXT(media_sequence_checker_);
 
   // Multiple renditions are allowed, and have to be synchronized.
-  std::vector<std::unique_ptr<HlsRendition>> renditions_;
+  std::vector<std::unique_ptr<HlsRendition>> renditions_
+      GUARDED_BY_CONTEXT(media_sequence_checker_);
+
+  // When renditions are added, this ensures that they are all of the same
+  // liveness, and allows access to the liveness check later.
+  absl::optional<bool> is_seekable_ = absl::nullopt;
 
   // Preferences for selecting optimal renditions. Storing them allows them
   // to be changed later due to network constraints or user changes.
-  hls::RenditionSelector::VideoPlaybackPreferences video_preferences_ = {
-      absl::nullopt, absl::nullopt};
-  hls::RenditionSelector::AudioPlaybackPreferences audio_preferences_ = {
-      absl::nullopt, absl::nullopt};
+  hls::RenditionSelector::VideoPlaybackPreferences video_preferences_
+      GUARDED_BY_CONTEXT(media_sequence_checker_) = {absl::nullopt,
+                                                     absl::nullopt};
+  hls::RenditionSelector::AudioPlaybackPreferences audio_preferences_
+      GUARDED_BY_CONTEXT(media_sequence_checker_) = {absl::nullopt,
+                                                     absl::nullopt};
+
+  HlsDataSourceStream::StreamId::Generator stream_ticket_generator_
+      GUARDED_BY_CONTEXT(media_sequence_checker_);
+  base::flat_map<HlsDataSourceStream::StreamId,
+                 std::unique_ptr<HlsDataSourceStream>>
+      stream_map_ GUARDED_BY_CONTEXT(media_sequence_checker_);
+
+  // Ensure that safe member fields are only accessed on the media sequence.
+  SEQUENCE_CHECKER(media_sequence_checker_);
 
   base::WeakPtrFactory<HlsManifestDemuxerEngine> weak_factory_{this};
 };

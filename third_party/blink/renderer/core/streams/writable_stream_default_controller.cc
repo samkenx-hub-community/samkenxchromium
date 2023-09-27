@@ -105,8 +105,7 @@ void WritableStreamDefaultController::SetUp(
   //  5. Perform ! ResetQueue(controller).
 
   //  6. Set controller.[[abortController]] to a new AbortController.
-  controller->abort_controller_ =
-      AbortController::Create(ExecutionContext::From(script_state));
+  controller->abort_controller_ = AbortController::Create(script_state);
 
   //  7. Set controller.[[started]] to false.
   controller->started_ = false;
@@ -396,7 +395,8 @@ void WritableStreamDefaultController::Close(
 double WritableStreamDefaultController::GetChunkSize(
     ScriptState* script_state,
     WritableStreamDefaultController* controller,
-    v8::Local<v8::Value> chunk) {
+    v8::Local<v8::Value> chunk,
+    ExceptionState& exception_state) {
   if (!controller->strategy_size_algorithm_) {
     DCHECK_NE(controller->controlled_writable_stream_->GetState(),
               WritableStream::kWritable);
@@ -404,8 +404,6 @@ double WritableStreamDefaultController::GetChunkSize(
     return 1;
   }
 
-  ExceptionState exception_state(script_state->GetIsolate(),
-                                 ExceptionState::kUnknownContext, "", "");
   // https://streams.spec.whatwg.org/#writable-stream-default-controller-get-chunk-size
   //  1. Let returnValue be the result of performing
   //     controller.[[strategySizeAlgorithm]], passing in chunk, and
@@ -439,14 +437,13 @@ void WritableStreamDefaultController::Write(
     ScriptState* script_state,
     WritableStreamDefaultController* controller,
     v8::Local<v8::Value> chunk,
-    double chunk_size) {
+    double chunk_size,
+    ExceptionState& exception_state) {
   // https://streams.spec.whatwg.org/#writable-stream-default-controller-write
   // The chunk is represented literally in the queue, rather than being embedded
   // in an object, so the following step is not performed:
   //  1. Let writeRecord be Record {[[chunk]]: chunk}.
   {
-    ExceptionState exception_state(script_state->GetIsolate(),
-                                   ExceptionState::kUnknownContext, "", "");
     //  2. Let enqueueResult be EnqueueValueWithSize(controller, writeRecord,
     //     chunkSize).
     controller->queue_->EnqueueValueWithSize(script_state->GetIsolate(), chunk,

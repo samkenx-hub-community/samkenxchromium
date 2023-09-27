@@ -13,8 +13,10 @@
 #include "ash/app_list/app_list_model_provider.h"
 #include "ash/app_list/app_list_util.h"
 #include "ash/app_list/app_list_view_delegate.h"
+#include "ash/app_list/views/app_list_toast_view.h"
 #include "ash/app_list/views/result_selection_controller.h"
 #include "ash/app_list/views/search_box_view.h"
+#include "ash/app_list/views/search_notifier_controller.h"
 #include "ash/app_list/views/search_result_image_list_view.h"
 #include "ash/app_list/views/search_result_list_view.h"
 #include "ash/app_list/views/search_result_view.h"
@@ -27,6 +29,7 @@
 #include "base/metrics/histogram_macros.h"
 #include "base/notreached.h"
 #include "base/strings/string_number_conversions.h"
+#include "components/vector_icons/vector_icons.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "ui/accessibility/platform/ax_unique_id.h"
 #include "ui/base/l10n/l10n_util.h"
@@ -37,6 +40,8 @@
 #include "ui/views/controls/scroll_view.h"
 #include "ui/views/controls/textfield/textfield.h"
 #include "ui/views/layout/box_layout.h"
+#include "ui/views/view_class_properties.h"
+#include "ui/views/view_utils.h"
 
 using views::BoxLayout;
 
@@ -56,6 +61,9 @@ constexpr auto kVerticalScrollInsets = gfx::Insets::TLBR(1, 0, 1, 1);
 constexpr base::TimeDelta kForcedFastAnimationInterval =
     base::Milliseconds(500);
 
+// The size of the icon in the search notifier.
+constexpr int kSearchNotifierIconSize = 30;
+
 }  // namespace
 
 AppListSearchView::AppListSearchView(
@@ -73,6 +81,10 @@ AppListSearchView::AppListSearchView(
       views::ScrollView::ScrollWithLayers::kEnabled));
   scroll_view_->ClipHeightTo(0, std::numeric_limits<int>::max());
   scroll_view_->SetDrawOverflowIndicator(false);
+
+  // Arrow keys are used for focus updating and the result selection handles the
+  // scrolling.
+  scroll_view_->SetAllowKeyboardScrolling(false);
 
   // Don't paint a background. The bubble already has one.
   scroll_view_->SetBackgroundColor(absl::nullopt);
@@ -95,6 +107,36 @@ AppListSearchView::AppListSearchView(
                           base::Unretained(this)));
   search_box_view_->SetResultSelectionController(
       result_selection_controller_.get());
+
+  if (features::IsProductivityLauncherImageSearchEnabled()) {
+    search_notifier_controller_ = std::make_unique<SearchNotifierController>();
+    if (search_notifier_controller_->ShouldShowPrivacyNotice()) {
+      // The image search category should be always disabled unless the search
+      // notifier is accepted or timeout.
+      view_delegate->SetCategoryEnabled(AppListSearchControlCategory::kImages,
+                                        false);
+
+      AppListToastView::Builder toast_view_builder(l10n_util::GetStringUTF16(
+          IDS_ASH_SEARCH_IMAGE_SEARCH_PRIVACY_NOTICE_TITLE));
+      toast_view_builder.SetButton(
+          l10n_util::GetStringUTF16(IDS_ASH_CONTINUE_BUTTON),
+          base::BindRepeating(&AppListSearchView::OnSearchNotifierButtonPressed,
+                              weak_ptr_factory_.GetWeakPtr()));
+      search_notifier_ = scroll_contents->AddChildView(
+          toast_view_builder.SetViewDelegate(view_delegate)
+              .SetIcon(ui::ImageModel::FromVectorIcon(
+                  vector_icons::kImageSearchIcon, ui::kColorMenuIcon,
+                  kSearchNotifierIconSize))
+              .SetSubtitle(l10n_util::GetStringUTF16(
+                  IDS_ASH_SEARCH_IMAGE_SEARCH_PRIVACY_NOTICE_CONTENT))
+              .SetSubtitleMultiline(true)
+              .Build());
+      search_notifier_->SetProperty(views::kMarginsKey,
+                                    gfx::Insets::TLBR(16, 16, 0, 16));
+      search_notifier_->icon()->SetProperty(views::kMarginsKey,
+                                            gfx::Insets::TLBR(8, 8, 8, 0));
+    }
+  }
 
   auto add_result_container = [&](SearchResultContainerView* new_container) {
     new_container->SetResults(
@@ -124,9 +166,9 @@ AppListSearchView::AppListSearchView(
 
   // Launcher image search container is always the third view shown.
   if (features::IsProductivityLauncherImageSearchEnabled()) {
-    auto* image_search_container = scroll_contents->AddChildView(
+    image_search_container_ = scroll_contents->AddChildView(
         std::make_unique<SearchResultImageListView>(view_delegate));
-    add_result_container(image_search_container);
+    add_result_container(image_search_container_);
   }
 
   // SearchResultListViews are aware of their relative position in the
@@ -277,6 +319,38 @@ void AppListSearchView::VisibilityChanged(View* starting_from,
   }
 }
 
+void AppListSearchView::OnKeyEvent(ui::KeyEvent* event) {
+  // Only handle the key event that triggers the focus or result selection
+  // traversal here.
+  if (event->type() != ui::ET_KEY_PRESSED ||
+      !(IsUnhandledArrowKeyEvent(*event) ||
+        event->key_code() == ui::VKEY_TAB)) {
+    return;
+  }
+
+  // Only handle the case when the search notifier has the focus.
+  if (!search_notifier_ || !search_notifier_->toast_button()->HasFocus()) {
+    return;
+  }
+
+  // Left/Right key shouldn't update the focus. Set the event to handled to make
+  // left/right keys no-ops.
+  if (IsUnhandledLeftRightKeyEvent(*event)) {
+    event->SetHandled();
+    return;
+  }
+
+  bool moving_down =
+      (event->key_code() == ui::VKEY_TAB && !event->IsShiftDown()) ||
+      event->key_code() == ui::VKEY_DOWN;
+  if (moving_down) {
+    search_box_view_->EnterSearchResultSelection(*event);
+  } else {
+    search_box_view_->close_button()->RequestFocus();
+  }
+  event->SetHandled();
+}
+
 void AppListSearchView::GetAccessibleNodeData(ui::AXNodeData* node_data) {
   if (!GetVisible()) {
     return;
@@ -314,6 +388,19 @@ void AppListSearchView::OnActiveAppListModelsChanged(
   }
 }
 
+bool AppListSearchView::OverrideKeyNavigationAboveSearchResults(
+    const ui::KeyEvent& key_event) {
+  // The toast button on the search notifier is the only target to check if the
+  // `key_event` should be handled. Other events will be handled by either the
+  // search box or the SearchBoxViewDelegate.
+  if (!search_notifier_) {
+    return false;
+  }
+
+  search_notifier_->toast_button()->RequestFocus();
+  return true;
+}
+
 void AppListSearchView::UpdateForNewSearch(bool search_active) {
   for (auto* container : result_container_views_) {
     container->SetActive(search_active);
@@ -331,6 +418,22 @@ void AppListSearchView::UpdateForNewSearch(bool search_active) {
     } else {
       search_result_fast_update_time_.reset();
     }
+  }
+}
+
+void AppListSearchView::RemoveSearchNotifierView() {
+  if (!search_notifier_) {
+    return;
+  }
+
+  auto* scroll_contents = search_notifier_->parent();
+  scroll_contents->RemoveChildViewT(std::exchange(search_notifier_, nullptr));
+  scroll_contents->InvalidateLayout();
+}
+
+void AppListSearchView::OnBoundsChanged(const gfx::Rect& old_bounds) {
+  if (image_search_container_ && width() != old_bounds.width()) {
+    image_search_container_->ConfigureLayoutForAvailableWidth(width());
   }
 }
 
@@ -395,6 +498,15 @@ void AppListSearchView::MaybeNotifySelectedResultChanged() {
 
   search_box_view_->SetA11yActiveDescendant(
       selected_view->GetViewAccessibility().GetUniqueId().Get());
+}
+
+void AppListSearchView::OnSearchNotifierButtonPressed() {
+  search_notifier_controller_->SetPrivacyNoticeAcceptedPref();
+  RemoveSearchNotifierView();
+
+  // Update the search results as the image search category should be populated
+  // now.
+  search_box_view()->TriggerSearch();
 }
 
 bool AppListSearchView::CanSelectSearchResults() {

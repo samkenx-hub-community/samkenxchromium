@@ -32,7 +32,6 @@
 #include "third_party/blink/public/common/input/web_keyboard_event.h"
 #include "third_party/blink/public/web/web_local_frame_client.h"
 #include "third_party/blink/renderer/core/accessibility/ax_object_cache.h"
-#include "third_party/blink/renderer/core/dom/context_features.h"
 #include "third_party/blink/renderer/core/dom/element.h"
 #include "third_party/blink/renderer/core/dom/events/event_dispatch_forbidden_scope.h"
 #include "third_party/blink/renderer/core/dom/events/event_dispatch_result.h"
@@ -223,20 +222,6 @@ DispatchEventResult EventDispatcher::Dispatch() {
       UseCounter::Count(document, WebFeature::kAdClick);
     }
   }
-
-#if DCHECK_IS_ON()
-  // If Mutation Events are disabled, we should never dispatch trusted ones.
-  if (event_->isTrusted() &&
-      (event_->type() == event_type_names::kDOMCharacterDataModified ||
-       event_->type() == event_type_names::kDOMSubtreeModified ||
-       event_->type() == event_type_names::kDOMNodeInserted ||
-       event_->type() == event_type_names::kDOMNodeInsertedIntoDocument ||
-       event_->type() == event_type_names::kDOMNodeRemoved ||
-       event_->type() == event_type_names::kDOMNodeRemovedFromDocument)) {
-    DCHECK(RuntimeEnabledFeatures::MutationEventsEnabled());
-    DCHECK(ContextFeatures::MutationEventsEnabled(&document));
-  }
-#endif
 
   // 6. Let isActivationEvent be true, if event is a MouseEvent object and
   // event's type attribute is "click", and false otherwise.

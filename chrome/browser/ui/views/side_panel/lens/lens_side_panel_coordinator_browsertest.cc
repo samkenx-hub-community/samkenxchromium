@@ -56,7 +56,7 @@ constexpr char kExpectedLensSidePanelContentUrlRegex[] =
     ".*ep=ccm&re=dcsp&s=4&st=\\d+&lm=.+&p=somepayload&ep=ccmupload&"
     "sideimagesearch=1";
 constexpr char kExpected3PDseSidePanelContentUrlRegex[] =
-    ".*p=somepayload&sideimagesearch=1";
+    ".*p=somepayload&sideimagesearch=1&vpw=\\d+&vph=\\d+";
 constexpr char kExpectedNewTabContentUrlRegex[] = ".*p=somepayload";
 
 // Maintains image search test state. In particular, note that |menu_observer_|
@@ -209,6 +209,7 @@ class SearchImageWithUnifiedSidePanel : public InProcessBrowserTest {
 
   std::unique_ptr<ContextMenuNotificationObserver> menu_observer_;
   base::UserActionTester user_action_tester;
+  base::HistogramTester histogram_tester;
 };
 
 // https://crbug.com/1444953
@@ -239,6 +240,10 @@ IN_PROC_BROWSER_TEST_F(
   EXPECT_THAT(side_panel_content,
               testing::MatchesRegex(kExpectedLensSidePanelContentUrlRegex));
   ExpectThatRequestContainsImageData(contents);
+
+  // Ensure SidePanel.OpenTrigger was recorded correctly.
+  histogram_tester.ExpectBucketCount("SidePanel.OpenTrigger",
+                                     SidePanelOpenTrigger::kLensContextMenu, 1);
 }
 
 IN_PROC_BROWSER_TEST_F(SearchImageWithUnifiedSidePanel,

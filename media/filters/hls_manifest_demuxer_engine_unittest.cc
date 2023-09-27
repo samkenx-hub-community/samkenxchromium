@@ -35,6 +35,18 @@ const std::string kSimpleMediaPlaylist =
     "http://media.example.com/third.ts\n"
     "#EXT-X-ENDLIST\n";
 
+const std::string kSimpleLiveMediaPlaylist =
+    "#EXTM3U\n"
+    "#EXT-X-TARGETDURATION:10\n"
+    "#EXT-X-VERSION:3\n"
+    "#EXT-X-MEDIA-SEQUENCE:18698597\n"
+    "#EXTINF:9.009,\n"
+    "http://media.example.com/first.ts\n"
+    "#EXTINF:9.009,\n"
+    "http://media.example.com/second.ts\n"
+    "#EXTINF:3.003,\n"
+    "http://media.example.com/third.ts\n";
+
 const std::string kSingleInfoMediaPlaylist =
     "#EXTM3U\n"
     "#EXT-X-TARGETDURATION:10\n"
@@ -92,48 +104,16 @@ using testing::Ref;
 using testing::Return;
 using testing::SaveArg;
 using testing::SetArgPointee;
+using testing::StrictMock;
 
-class MockManifestDemuxerEngineHost : public ManifestDemuxerEngineHost {
- public:
-  MOCK_METHOD(bool,
-              AddRole,
-              (base::StringPiece, std::string, std::string),
-              (override));
-  MOCK_METHOD(void, RemoveRole, (base::StringPiece), (override));
-  MOCK_METHOD(void, SetSequenceMode, (base::StringPiece, bool), (override));
-  MOCK_METHOD(void, SetDuration, (double), (override));
-  MOCK_METHOD(Ranges<base::TimeDelta>,
-              GetBufferedRanges,
-              (base::StringPiece),
-              (override));
-  MOCK_METHOD(void,
-              Remove,
-              (base::StringPiece, base::TimeDelta, base::TimeDelta),
-              (override));
-  MOCK_METHOD(
-      void,
-      RemoveAndReset,
-      (base::StringPiece, base::TimeDelta, base::TimeDelta, base::TimeDelta*),
-      (override));
-  MOCK_METHOD(void,
-              SetGroupStartIfParsingAndSequenceMode,
-              (base::StringPiece, base::TimeDelta),
-              (override));
-  MOCK_METHOD(void,
-              EvictCodedFrames,
-              (base::StringPiece, base::TimeDelta, size_t),
-              (override));
-  MOCK_METHOD(bool,
-              AppendAndParseData,
-              (base::StringPiece,
-               base::TimeDelta,
-               base::TimeDelta,
-               base::TimeDelta*,
-               const uint8_t*,
-               size_t),
-              (override));
-  MOCK_METHOD(void, OnError, (PipelineStatus), (override));
-};
+MATCHER_P2(CloseTo,
+           Target,
+           Radius,
+           std::string(negation ? "isn't" : "is") + " within " +
+               testing::PrintToString(Radius) + " of " +
+               testing::PrintToString(Target)) {
+  return (arg - Target <= Radius) || (Target - arg <= Radius);
+}
 
 class MockHlsDataSourceProvider : public HlsDataSourceProvider {
  public:
@@ -147,7 +127,7 @@ class MockHlsDataSourceProvider : public HlsDataSourceProvider {
 
 class FakeHlsDataSourceProvider : public HlsDataSourceProvider {
  private:
-  base::raw_ptr<HlsDataSourceProvider> mock_;
+  raw_ptr<HlsDataSourceProvider> mock_;
 
  public:
   FakeHlsDataSourceProvider(HlsDataSourceProvider* mock) : mock_(mock) {}
@@ -157,6 +137,19 @@ class FakeHlsDataSourceProvider : public HlsDataSourceProvider {
                          RequestCb request) override {
     mock_->RequestDataSource(url, range, std::move(request));
   }
+};
+
+class MockHlsDataSource : public HlsDataSource {
+ public:
+  MockHlsDataSource() : HlsDataSource(0) {}
+  ~MockHlsDataSource() override = default;
+  MOCK_METHOD(
+      void,
+      Read,
+      (uint64_t pos, size_t size, uint8_t* buf, HlsDataSource::ReadCb cb),
+      (override));
+  MOCK_METHOD(base::StringPiece, GetMimeType, (), (const, override));
+  MOCK_METHOD(void, Stop, (), (override));
 };
 
 class HlsManifestDemuxerEngineTest : public testing::Test {
@@ -200,7 +193,10 @@ class HlsManifestDemuxerEngineTest : public testing::Test {
                        base::Unretained(this)));
   }
 
-  ~HlsManifestDemuxerEngineTest() override { base::RunLoop().RunUntilIdle(); }
+  ~HlsManifestDemuxerEngineTest() override {
+    engine_->Stop();
+    base::RunLoop().RunUntilIdle();
+  }
 };
 
 TEST_F(HlsManifestDemuxerEngineTest, TestSimpleConfigAddsOnePrimaryRole) {
@@ -208,6 +204,7 @@ TEST_F(HlsManifestDemuxerEngineTest, TestSimpleConfigAddsOnePrimaryRole) {
   EXPECT_CALL(*mock_mdeh_, SetDuration(21.021));
   EXPECT_CALL(*mock_mdeh_, AddRole(base::StringPiece("primary"), "video/mp2t",
                                    "avc1.420000, mp4a.40.05"));
+  EXPECT_CALL(*mock_mdeh_, RemoveRole(base::StringPiece("primary")));
   BindUrlToDataSource<StringHlsDataSource>(
       "http://media.example.com/manifest.m3u8", kSimpleMediaPlaylist);
   BindUrlToDataSource<FileHlsDataSource>("http://media.example.com/first.ts",
@@ -215,6 +212,22 @@ TEST_F(HlsManifestDemuxerEngineTest, TestSimpleConfigAddsOnePrimaryRole) {
   EXPECT_CALL(*this, MockInitComplete(HasStatusCode(PIPELINE_OK)));
   InitializeEngine();
   task_environment_.RunUntilIdle();
+  ASSERT_TRUE(engine_->IsSeekable());
+}
+
+TEST_F(HlsManifestDemuxerEngineTest, TestSimpleLiveConfigAddsOnePrimaryRole) {
+  EXPECT_CALL(*mock_mdeh_, SetSequenceMode(base::StringPiece("primary"), true));
+  EXPECT_CALL(*mock_mdeh_, AddRole(base::StringPiece("primary"), "video/mp2t",
+                                   "avc1.420000, mp4a.40.05"));
+  EXPECT_CALL(*mock_mdeh_, RemoveRole(base::StringPiece("primary")));
+  BindUrlToDataSource<StringHlsDataSource>(
+      "http://media.example.com/manifest.m3u8", kSimpleLiveMediaPlaylist);
+  BindUrlToDataSource<FileHlsDataSource>("http://media.example.com/first.ts",
+                                         "bear-1280x720-hls.ts");
+  EXPECT_CALL(*this, MockInitComplete(HasStatusCode(PIPELINE_OK)));
+  InitializeEngine();
+  task_environment_.RunUntilIdle();
+  ASSERT_FALSE(engine_->IsSeekable());
 }
 
 TEST_F(HlsManifestDemuxerEngineTest, TestMultivariantPlaylistNoAlternates) {
@@ -273,6 +286,134 @@ TEST_F(HlsManifestDemuxerEngineTest, TestMultivariantWithNoSupportedCodecs) {
               OnError(HasStatusCode(DEMUXER_ERROR_COULD_NOT_PARSE)));
   InitializeEngine();
   task_environment_.RunUntilIdle();
+}
+
+TEST_F(HlsManifestDemuxerEngineTest, TestMultiRenditionCheckState) {
+  auto rendition1 = std::make_unique<MockHlsRendition>();
+  auto rendition2 = std::make_unique<MockHlsRendition>();
+  EXPECT_CALL(*rendition1, GetDuration()).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(*rendition2, GetDuration()).WillOnce(Return(absl::nullopt));
+
+  auto* rend1 = rendition1.get();
+  auto* rend2 = rendition2.get();
+  engine_->AddRenditionForTesting(std::move(rendition1));
+
+  // While there is only one rendition, the response from |OnTimeUpdate| is
+  // whatever that rendition wants.
+  EXPECT_CALL(*rend1, CheckState(_, _, _))
+      .WillOnce(RunOnceCallback<2>(base::Seconds(7)));
+  engine_->OnTimeUpdate(base::Seconds(0), 0.0,
+                        base::BindOnce([](base::TimeDelta r) {
+                          ASSERT_EQ(r, base::Seconds(7));
+                        }));
+
+  EXPECT_CALL(*rend1, CheckState(_, _, _))
+      .WillOnce(RunOnceCallback<2>(kNoTimestamp));
+  engine_->OnTimeUpdate(
+      base::Seconds(0), 0.0,
+      base::BindOnce([](base::TimeDelta r) { ASSERT_EQ(r, kNoTimestamp); }));
+
+  // After adding the second rendition, the response from OnTimeUpdate is now
+  // the lesser of (rend1.response - (calc time of rend2)) and
+  // (rend2.response)
+  engine_->AddRenditionForTesting(std::move(rendition2));
+
+  // Both renditions request time, so pick the lesser.
+  EXPECT_CALL(*rend1, CheckState(_, _, _))
+      .WillOnce(RunOnceCallback<2>(base::Seconds(7)));
+  EXPECT_CALL(*rend2, CheckState(_, _, _))
+      .WillOnce(RunOnceCallback<2>(base::Seconds(3)));
+  engine_->OnTimeUpdate(
+      base::Seconds(0), 0.0, base::BindOnce([](base::TimeDelta r) {
+        EXPECT_THAT(r, CloseTo(base::Seconds(3), base::Milliseconds(1)));
+      }));
+
+  // When one rendition provides kNoTimestamp and another does not, use the
+  // non-kNoTimestamp value.
+  EXPECT_CALL(*rend1, CheckState(_, _, _))
+      .WillOnce(RunOnceCallback<2>(kNoTimestamp));
+  EXPECT_CALL(*rend2, CheckState(_, _, _))
+      .WillOnce(RunOnceCallback<2>(base::Seconds(3)));
+  engine_->OnTimeUpdate(
+      base::Seconds(0), 0.0, base::BindOnce([](base::TimeDelta r) {
+        EXPECT_THAT(r, CloseTo(base::Seconds(3), base::Milliseconds(1)));
+      }));
+
+  EXPECT_CALL(*rend1, CheckState(_, _, _))
+      .WillOnce(RunOnceCallback<2>(base::Seconds(7)));
+  EXPECT_CALL(*rend2, CheckState(_, _, _))
+      .WillOnce(RunOnceCallback<2>(kNoTimestamp));
+  engine_->OnTimeUpdate(
+      base::Seconds(0), 0.0, base::BindOnce([](base::TimeDelta r) {
+        EXPECT_THAT(r, CloseTo(base::Seconds(7), base::Milliseconds(1)));
+      }));
+}
+
+TEST_F(HlsManifestDemuxerEngineTest, TestAbortMidDownload) {
+  auto mock_data_source = std::make_unique<StrictMock<MockHlsDataSource>>();
+  auto* mock_ds_ptr = mock_data_source.get();
+  EXPECT_CALL(*mock_dsp_,
+              GetDataSource("http://media.example.com/manifest.m3u8"))
+      .Times(1)
+      .WillOnce(Return(ByMove(std::move(mock_data_source))));
+
+  HlsDataSource::ReadCb read_cb;
+  EXPECT_CALL(*mock_ds_ptr, Read(_, _, _, _))
+      .WillRepeatedly(
+          [&read_cb](uint64_t, size_t, uint8_t*, HlsDataSource::ReadCb cb) {
+            read_cb = std::move(cb);
+          });
+
+  InitializeEngine();
+  task_environment_.RunUntilIdle();
+  CHECK(read_cb);
+
+  EXPECT_CALL(*mock_ds_ptr, Stop());
+  engine_->AbortPendingReads();
+  task_environment_.RunUntilIdle();
+
+  // Return some random size.
+  EXPECT_CALL(*mock_mdeh_,
+              OnError(HasStatusCode(DEMUXER_ERROR_COULD_NOT_OPEN)));
+  std::move(read_cb).Run(55);
+  task_environment_.RunUntilIdle();
+}
+
+TEST_F(HlsManifestDemuxerEngineTest, TestStop) {
+  auto mock_data_source = std::make_unique<StrictMock<MockHlsDataSource>>();
+  auto* mock_ds_ptr = mock_data_source.get();
+  EXPECT_CALL(*mock_dsp_,
+              GetDataSource("http://media.example.com/manifest.m3u8"))
+      .Times(1)
+      .WillOnce(Return(ByMove(std::move(mock_data_source))));
+
+  HlsDataSource::ReadCb read_cb;
+  EXPECT_CALL(*mock_ds_ptr, Read(_, _, _, _))
+      .WillRepeatedly(
+          [&read_cb](uint64_t, size_t, uint8_t*, HlsDataSource::ReadCb cb) {
+            read_cb = std::move(cb);
+          });
+
+  InitializeEngine();
+  task_environment_.RunUntilIdle();
+  CHECK(read_cb);
+
+  auto rendition = std::make_unique<MockHlsRendition>();
+  EXPECT_CALL(*rendition, GetDuration()).WillOnce(Return(absl::nullopt));
+  auto* rend = rendition.get();
+  engine_->AddRenditionForTesting(std::move(rendition));
+
+  EXPECT_CALL(*mock_ds_ptr, Stop());
+  EXPECT_CALL(*rend, Stop());
+  engine_->Stop();
+  task_environment_.RunUntilIdle();
+
+  engine_->ReadFromUrl(
+      GURL("https://example.com"), true, absl::nullopt,
+      base::BindOnce([](HlsDataSourceStreamManager::ReadResult result) {
+        ASSERT_EQ(std::move(result).error(),
+                  HlsDataSource::ReadStatus::Codes::kAborted);
+      }));
 }
 
 }  // namespace media

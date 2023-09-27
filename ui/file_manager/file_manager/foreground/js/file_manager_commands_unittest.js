@@ -6,29 +6,28 @@ import {assertArrayEquals, assertEquals, assertFalse, assertNotEquals, assertTru
 
 import {MockVolumeManager} from '../../background/js/mock_volume_manager.js';
 import {FakeEntryImpl} from '../../common/js/files_app_entry_types.js';
-import {metrics} from '../../common/js/metrics.js';
-import {installMockChrome} from '../../common/js/mock_chrome.js';
+import {installMockChrome, MockMetrics} from '../../common/js/mock_chrome.js';
 import {MockDirectoryEntry, MockEntry} from '../../common/js/mock_entry.js';
 import {waitUntil} from '../../common/js/test_error_reporting.js';
 import {util} from '../../common/js/util.js';
 import {VolumeManagerCommon} from '../../common/js/volume_manager_types.js';
+import {VolumeInfo} from '../../externs/volume_info.js';
+import {addVolume, convertVolumeInfoAndMetadataToVolume, trashRootKey, updateIsInteractiveVolume} from '../../state/ducks/volumes.js';
+import {createMyFilesDataWithVolumeEntry} from '../../state/ducks/volumes_unittest.js';
+import {createFakeVolumeMetadata, setUpFileManagerOnWindow, setupStore, waitDeepEquals} from '../../state/for_tests.js';
 
 import {CommandHandler} from './file_manager_commands.js';
 
-/**
- * Mock metrics.recordEnum.
- * @param {string} name
- * @param {*} value
- * @param {Array<*>|number=} opt_validValues
- */
-metrics.recordEnum = function(name, value, opt_validValues) {
-  if (!Array.isArray(metrics.recordEnumCalls[name])) {
-    metrics.recordEnumCalls[name] = [];
-  }
-  metrics.recordEnumCalls[name].push(value);
-};
+/** @type {!MockMetrics} */
+let mockMetrics;
 
-metrics.recordEnumCalls = {};
+/**
+ * @param {number} metricIndex
+ * @returns {string|undefined}
+ */
+function getMetricName(metricIndex) {
+  return CommandHandler.ValidMenuCommandsForUMA[metricIndex];
+}
 
 /**
  * Checks that the `toggle-holding-space` command is appropriately enabled/
@@ -46,7 +45,9 @@ export async function testToggleHoldingSpaceCommand(done) {
    * @type {!Object}
    */
   let itemUrls = [];
+  mockMetrics = new MockMetrics();
   const mockChrome = {
+    metricsPrivate: mockMetrics,
     fileManagerPrivate: {
       getHoldingSpaceState: (callback) => {
         callback({itemUrls});
@@ -240,17 +241,21 @@ export async function testToggleHoldingSpaceCommand(done) {
     };
 
     // Reset cache of metrics recorded.
-    metrics.recordEnumCalls['MenuItemSelected'] = [];
+    mockMetrics.metricCalls['FileBrowser.MenuItemSelected'] = [];
 
     // Verify `command.execute()` results in expected mock API interactions.
     command.execute(event, fileManager);
     assertTrue(didInteractWithMockPrivateApi);
 
     // Verify metrics recorded.
-    assertArrayEquals(
-        metrics.recordEnumCalls['MenuItemSelected'],
-        [testCase.expect.isAdd ? 'pin-to-holding-space' :
-                                 'unpin-from-holding-space']);
+    const calls = mockMetrics.metricCalls['FileBrowser.MenuItemSelected'] || [];
+    assertTrue(calls.length > 0);
+    // The index is 2nd position argument, we're only checking the first call.
+    const metricIndex = calls[0][1];
+    assertEquals(
+        getMetricName(metricIndex),
+        testCase.expect.isAdd ? 'pin-to-holding-space' :
+                                'unpin-from-holding-space');
   }
 
   done();
@@ -321,6 +326,9 @@ export async function testExtractAllCommand(done) {
       isOnNative: () => true,
       isReadOnly: () => false,
       getCurrentRootType: () => VolumeManagerCommon.RootType.DOWNLOADS,
+    },
+    metadataModel: {
+      getCache: () => [],
     },
     getCurrentDirectoryEntry: () => folderEntry,
     getSelection: () => currentSelection,
@@ -430,6 +438,230 @@ export async function testRenameCommand(done) {
   command.canExecute(event, fileManager);
   assertFalse(event.canExecute);
   assertFalse(event.command.hidden);
+
+  done();
+}
+
+/**
+ * Create and add a Downloads volume to the store. Update the volume as
+ * non-interactive.
+ * @return {!Promise<VolumeInfo>}
+ */
+async function createAndAddNonInteractiveDownloadsVolume() {
+  setUpFileManagerOnWindow();
+  // Dispatch an action to add MyFiles volume.
+  const store = setupStore();
+  const {fileData, volumeInfo} = createMyFilesDataWithVolumeEntry();
+  const myFilesVolumeEntry = fileData.entry;
+  const volumeMetadata = createFakeVolumeMetadata(volumeInfo);
+  const volume =
+      convertVolumeInfoAndMetadataToVolume(volumeInfo, volumeMetadata);
+  store.dispatch(addVolume({
+    volumeInfo,
+    volumeMetadata,
+  }));
+
+  // Expect the newly added volume is in the store.
+  const wantNewVol = {
+    allEntries: {
+      [myFilesVolumeEntry.toURL()]: fileData,
+    },
+    volumes: {
+      [volume.volumeId]: volume,
+    },
+  };
+  await waitDeepEquals(store, wantNewVol, (state) => ({
+                                            allEntries: state.allEntries,
+                                            volumes: state.volumes,
+                                          }));
+
+  // Dispatch an action to set |isInteractive| for the volume to false.
+  store.dispatch(updateIsInteractiveVolume({
+    volumeId: volumeInfo.volumeId,
+    isInteractive: false,
+  }));
+  // Expect the volume is set to non-interactive.
+  const wantUpdatedVol = {
+    volumes: {
+      [volumeInfo.volumeId]: {
+        ...volume,
+        isInteractive: false,
+      },
+    },
+  };
+  await waitDeepEquals(store, wantUpdatedVol, (state) => ({
+                                                volumes: state.volumes,
+                                              }));
+  return volumeInfo;
+}
+
+/**
+ * Tests that the paste, cut, copy and new-folder commands should be
+ * disabled and hidden when there are no selected entries but the current
+ * directory is on a non-interactive volume (e.g. when the blank space in a
+ * non-interactive directory is right clicked).
+ */
+export async function testCommandsForNonInteractiveVolumeAndNoEntries(done) {
+  const nonInteractiveVolumeInfo =
+      await createAndAddNonInteractiveDownloadsVolume();
+
+  const currentSelection = {
+    entries: [],
+    iconType: 'none',
+    totalCount: 0,
+  };
+
+  // Mock `FileManager`.
+  const fileManager = {
+    getCurrentDirectoryEntry: () => null,
+    // Selection includes entry on non-interactive volume.
+    getSelection: () => currentSelection,
+    directoryModel: {
+      getCurrentDirEntry: () => null,
+      // Navigate to the non-interactive volume.
+      getCurrentRootType: () => VolumeManagerCommon.RootType.DOWNLOADS,
+      getCurrentVolumeInfo: () => nonInteractiveVolumeInfo,
+    },
+    document: {
+      getElementsByClassName: () => [],
+    },
+    // Allow paste command.
+    fileTransferController: {
+      queryPasteCommandEnabled: () => true,
+    },
+    ui: {
+      actionbar: {
+        contains: () => false,
+      },
+      directoryTree: {
+        contains: () => false,
+      },
+    },
+  };
+
+  // Check each command is disabled and hidden.
+  const commandNames = [
+    'paste',
+    'cut',
+    'copy',
+    'new-folder',
+  ];
+  for (const commandName of commandNames) {
+    // Check: command exists.
+    const command = CommandHandler.getCommand(commandName);
+    assertNotEquals(command, undefined);
+
+    // Mock `Event`.
+    const event = {
+      canExecute: true,
+      target: {
+        parentElement: {
+          contextElement: null,
+        },
+      },
+      command: {
+        hidden: false,
+        setHidden: (hidden) => {
+          event.command.hidden = hidden;
+        },
+        id: commandName,
+      },
+    };
+
+    command.canExecute(event, fileManager);
+    assertFalse(event.canExecute);
+    assertTrue(event.command.hidden);
+  }
+
+  done();
+}
+
+/**
+ * Tests that the paste, cut, copy, new-folder, delete, move-to-trash,
+ * paste-into-folder, rename, extract-all and zip-selection commands should be
+ * disabled and hidden for an entry on a non-interactive volume.
+ */
+export async function testCommandsForEntriesOnNonInteractiveVolume(done) {
+  // Create non-interactive volume.
+  const nonInteractiveVolumeInfo =
+      await createAndAddNonInteractiveDownloadsVolume();
+
+  // Mock volume manager.
+  const volumeManager = new MockVolumeManager();
+
+  // Create file entry on non-interactive volume.
+  const nonInteractiveVolumeEntry =
+      MockDirectoryEntry.create(nonInteractiveVolumeInfo.fileSystem, 'abc.pdf');
+  const currentSelection = {
+    entries: [nonInteractiveVolumeEntry],
+    iconType: 'none',
+    totalCount: 1,
+  };
+
+  // Mock `FileManager`.
+  const fileManager = {
+    getCurrentDirectoryEntry: () => null,
+    // Selection includes entry on non-interactive volume.
+    getSelection: () => currentSelection,
+    directoryModel: {
+      getCurrentDirEntry: () => null,
+      getCurrentRootType: () => null,
+      getCurrentVolumeInfo: () => null,
+    },
+    document: {
+      getElementsByClassName: () => [],
+    },
+    // Allow copy, cut and paste command.
+    fileTransferController: {
+      canCopyOrDrag: () => true,
+      canCutOrDrag: () => true,
+      queryPasteCommandEnabled: () => true,
+    },
+    ui: {
+      directoryTree: {
+        contains: () => false,
+      },
+    },
+    volumeManager: volumeManager,
+  };
+
+  // Check each command is disabled and hidden.
+  const commandNames = [
+    'paste',
+    'cut',
+    'copy',
+    'new-folder',
+    'delete',
+    'move-to-trash',
+    'paste-into-folder',
+    'rename',
+    'extract-all',
+    'zip-selection',
+  ];
+  for (const commandName of commandNames) {
+    // Check: command exists.
+    const command = CommandHandler.getCommand(commandName);
+    assertNotEquals(command, undefined);
+
+    // Mock `Event`.
+    const event = {
+      canExecute: true,
+      target: {
+        entry: nonInteractiveVolumeEntry,
+      },
+      command: {
+        hidden: false,
+        setHidden: (hidden) => {
+          event.command.hidden = hidden;
+        },
+        id: commandName,
+      },
+    };
+
+    command.canExecute(event, fileManager);
+    assertFalse(event.canExecute);
+    assertTrue(event.command.hidden);
+  }
 
   done();
 }

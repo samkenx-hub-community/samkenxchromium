@@ -7,9 +7,11 @@
 #include <algorithm>
 
 #include "ash/constants/ash_features.h"
+#include "ash/public/cpp/window_properties.h"
 #include "base/notreached.h"
 #include "chrome/browser/ash/arc/input_overlay/actions/action.h"
 #include "chrome/browser/ash/arc/input_overlay/actions/input_element.h"
+#include "ui/aura/window.h"
 #include "ui/views/focus/focus_manager.h"
 #include "ui/views/view.h"
 
@@ -89,8 +91,44 @@ void ResetFocusTo(views::View* view) {
   focus_manager->SetFocusedView(view);
 }
 
+// For the keys that are caught by display overlay, check if they are reserved
+// for special use.
+bool IsReservedDomCode(ui::DomCode code) {
+  switch (code) {
+    // Audio, brightness key events won't be caught by display overlay so no
+    // need to add them.
+    // Used for mouse lock.
+    case ui::DomCode::ESCAPE:
+    // Used for traversing the views, which is also required by Accessibility.
+    case ui::DomCode::TAB:
+    // Don't support according to UX requirement.
+    case ui::DomCode::BROWSER_BACK:
+    case ui::DomCode::BROWSER_FORWARD:
+    case ui::DomCode::BROWSER_REFRESH:
+      return true;
+    default:
+      return false;
+  }
+}
+
+void UpdateFlagAndProperty(aura::Window* window,
+                           ash::ArcGameControlsFlag flag,
+                           bool turn_on) {
+  const ash::ArcGameControlsFlag flags =
+      window->GetProperty(ash::kArcGameControlsFlagsKey);
+
+  if (IsFlagSet(flags, flag) != turn_on) {
+    window->SetProperty(ash::kArcGameControlsFlagsKey,
+                        UpdateFlag(flags, flag, turn_on));
+  }
+}
+
 bool IsBeta() {
   return ash::features::IsArcInputOverlayBetaEnabled();
+}
+
+bool IsGameDashboardFlagOn() {
+  return ash::features::IsGameDashboardEnabled();
 }
 
 }  // namespace arc::input_overlay

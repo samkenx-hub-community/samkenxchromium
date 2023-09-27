@@ -6,7 +6,7 @@
 
 #import <UIKit/UIKit.h>
 
-#import "base/mac/foundation_util.h"
+#import "base/apple/foundation_util.h"
 #import "base/test/task_environment.h"
 #import "components/prefs/pref_service.h"
 #import "components/signin/public/base/signin_metrics.h"
@@ -32,10 +32,6 @@
 #import "third_party/ocmock/gtest_support.h"
 #import "ui/base/l10n/l10n_util.h"
 #import "ui/strings/grit/ui_strings.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 class SignoutActionSheetCoordinatorTest : public PlatformTest {
  public:
@@ -67,8 +63,14 @@ class SignoutActionSheetCoordinatorTest : public PlatformTest {
         std::make_unique<FakeAuthenticationServiceDelegate>());
     browser_ = std::make_unique<TestBrowser>(browser_state_.get());
 
-    sync_setup_service_mock_ = static_cast<SyncSetupServiceMock*>(
-        SyncSetupServiceFactory::GetForBrowserState(browser_state_.get()));
+    sync_service_mock_ = static_cast<syncer::MockSyncService*>(
+        SyncServiceFactory::GetForBrowserState(browser_state_.get()));
+  }
+
+  void TearDown() override {
+    [signout_coordinator_ stop];
+    signout_coordinator_ = nil;
+    PlatformTest::TearDown();
   }
 
   // Identity services.
@@ -106,7 +108,7 @@ class SignoutActionSheetCoordinatorTest : public PlatformTest {
   std::unique_ptr<TestChromeBrowserState> browser_state_;
   id<SystemIdentity> identity_ = nil;
 
-  SyncSetupServiceMock* sync_setup_service_mock_ = nullptr;
+  syncer::MockSyncService* sync_service_mock_ = nullptr;
 };
 
 // Tests that a signed-in user with Sync enabled will have an action sheet with
@@ -114,13 +116,14 @@ class SignoutActionSheetCoordinatorTest : public PlatformTest {
 TEST_F(SignoutActionSheetCoordinatorTest, SignedInUserWithSync) {
   authentication_service()->SignIn(
       identity_, signin_metrics::AccessPoint::ACCESS_POINT_UNKNOWN);
-  ON_CALL(*sync_setup_service_mock_, IsInitialSyncFeatureSetupComplete())
+  ON_CALL(*sync_service_mock_->GetMockUserSettings(),
+          IsInitialSyncFeatureSetupComplete())
       .WillByDefault(testing::Return(true));
 
-  SignoutActionSheetCoordinator* signout_coordinator = CreateCoordinator();
-  [signout_coordinator start];
+  CreateCoordinator();
+  [signout_coordinator_ start];
 
-  ASSERT_NE(nil, signout_coordinator.title);
+  ASSERT_NE(nil, signout_coordinator_.title);
 }
 
 // Tests that a signed-in user with Sync disabled will have an action sheet with
@@ -128,13 +131,14 @@ TEST_F(SignoutActionSheetCoordinatorTest, SignedInUserWithSync) {
 TEST_F(SignoutActionSheetCoordinatorTest, SignedInUserWithoutSync) {
   authentication_service()->SignIn(
       identity_, signin_metrics::AccessPoint::ACCESS_POINT_UNKNOWN);
-  ON_CALL(*sync_setup_service_mock_, IsInitialSyncFeatureSetupComplete())
+  ON_CALL(*sync_service_mock_->GetMockUserSettings(),
+          IsInitialSyncFeatureSetupComplete())
       .WillByDefault(testing::Return(false));
 
-  SignoutActionSheetCoordinator* signout_coordinator = CreateCoordinator();
-  [signout_coordinator start];
+  CreateCoordinator();
+  [signout_coordinator_ start];
 
-  ASSERT_EQ(nil, signout_coordinator.title);
+  ASSERT_EQ(nil, signout_coordinator_.title);
 }
 
 // Tests that a signed-in user with the forced sign-in policy enabled will have
@@ -146,14 +150,15 @@ TEST_F(SignoutActionSheetCoordinatorTest, SignedInUserWithForcedSignin) {
 
   authentication_service()->SignIn(
       identity_, signin_metrics::AccessPoint::ACCESS_POINT_UNKNOWN);
-  ON_CALL(*sync_setup_service_mock_, IsInitialSyncFeatureSetupComplete())
+  ON_CALL(*sync_service_mock_->GetMockUserSettings(),
+          IsInitialSyncFeatureSetupComplete())
       .WillByDefault(testing::Return(false));
 
-  SignoutActionSheetCoordinator* signout_coordinator = CreateCoordinator();
-  [signout_coordinator start];
+  CreateCoordinator();
+  [signout_coordinator_ start];
 
-  ASSERT_NE(nil, signout_coordinator.title);
-  ASSERT_NE(nil, signout_coordinator.message);
+  ASSERT_NE(nil, signout_coordinator_.title);
+  ASSERT_NE(nil, signout_coordinator_.message);
 }
 
 // Tests that a signed-in managed user with Sync enabled will have an action
@@ -161,13 +166,14 @@ TEST_F(SignoutActionSheetCoordinatorTest, SignedInUserWithForcedSignin) {
 TEST_F(SignoutActionSheetCoordinatorTest, SignedInManagedUserWithSync) {
   authentication_service()->SignIn(
       identity_, signin_metrics::AccessPoint::ACCESS_POINT_UNKNOWN);
-  ON_CALL(*sync_setup_service_mock_, IsInitialSyncFeatureSetupComplete())
+  ON_CALL(*sync_service_mock_->GetMockUserSettings(),
+          IsInitialSyncFeatureSetupComplete())
       .WillByDefault(testing::Return(true));
 
-  SignoutActionSheetCoordinator* signout_coordinator = CreateCoordinator();
-  [signout_coordinator start];
+  CreateCoordinator();
+  [signout_coordinator_ start];
 
-  ASSERT_NE(nil, signout_coordinator.title);
+  ASSERT_NE(nil, signout_coordinator_.title);
 }
 
 // Tests that a signed-in managed user with Sync disabled will have an action
@@ -175,11 +181,12 @@ TEST_F(SignoutActionSheetCoordinatorTest, SignedInManagedUserWithSync) {
 TEST_F(SignoutActionSheetCoordinatorTest, SignedInManagedUserWithoutSync) {
   authentication_service()->SignIn(
       identity_, signin_metrics::AccessPoint::ACCESS_POINT_UNKNOWN);
-  ON_CALL(*sync_setup_service_mock_, IsInitialSyncFeatureSetupComplete())
+  ON_CALL(*sync_service_mock_->GetMockUserSettings(),
+          IsInitialSyncFeatureSetupComplete())
       .WillByDefault(testing::Return(false));
 
-  SignoutActionSheetCoordinator* signout_coordinator = CreateCoordinator();
-  [signout_coordinator start];
+  CreateCoordinator();
+  [signout_coordinator_ start];
 
-  ASSERT_EQ(nil, signout_coordinator.title);
+  ASSERT_EQ(nil, signout_coordinator_.title);
 }

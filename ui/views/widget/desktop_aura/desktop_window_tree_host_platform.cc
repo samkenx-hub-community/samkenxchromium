@@ -34,11 +34,11 @@
 #include "ui/platform_window/platform_window.h"
 #include "ui/platform_window/platform_window_init_properties.h"
 #include "ui/platform_window/wm/wm_move_loop_handler.h"
-#include "ui/views/corewm/tooltip_aura.h"
 #include "ui/views/corewm/tooltip_controller.h"
 #include "ui/views/widget/desktop_aura/desktop_drag_drop_client_ozone.h"
 #include "ui/views/widget/desktop_aura/desktop_native_widget_aura.h"
 #include "ui/views/widget/widget_aura_utils.h"
+#include "ui/views/widget/widget_delegate.h"
 #include "ui/views/window/native_frame_view.h"
 #include "ui/wm/core/window_properties.h"
 #include "ui/wm/core/window_util.h"
@@ -46,6 +46,12 @@
 
 #if BUILDFLAG(IS_LINUX)
 #include "ui/views/widget/desktop_aura/desktop_drag_drop_client_ozone_linux.h"
+#endif
+
+#if BUILDFLAG(IS_CHROMEOS_LACROS)
+#include "ui/views/corewm/tooltip_lacros.h"
+#else
+#include "ui/views/corewm/tooltip_aura.h"
 #endif
 
 DEFINE_UI_CLASS_PROPERTY_TYPE(views::DesktopWindowTreeHostPlatform*)
@@ -286,6 +292,9 @@ void DesktopWindowTreeHostPlatform::Init(const Widget::InitParams& params) {
 
   // Calculate initial bounds.
   properties.bounds = params.bounds;
+#if BUILDFLAG(IS_CHROMEOS)
+  properties.display_id = params.display_id;
+#endif
 
   // Set extensions delegate.
   DCHECK(!properties.workspace_extension_delegate);
@@ -329,7 +338,11 @@ void DesktopWindowTreeHostPlatform::OnActiveWindowChanged(bool active) {}
 
 std::unique_ptr<corewm::Tooltip>
 DesktopWindowTreeHostPlatform::CreateTooltip() {
+#if BUILDFLAG(IS_CHROMEOS_LACROS)
+  return std::make_unique<corewm::TooltipLacros>();
+#else
   return std::make_unique<corewm::TooltipAura>();
+#endif
 }
 
 std::unique_ptr<aura::client::DragDropClient>
@@ -574,6 +587,10 @@ bool DesktopWindowTreeHostPlatform::IsActive() const {
   return is_active_;
 }
 
+bool DesktopWindowTreeHostPlatform::CanMaximize() {
+  return GetWidget()->widget_delegate()->CanMaximize();
+}
+
 void DesktopWindowTreeHostPlatform::Maximize() {
   platform_window()->Maximize();
   if (IsMinimized())
@@ -707,6 +724,10 @@ void DesktopWindowTreeHostPlatform::FrameTypeChanged() {
   // the button assets don't update otherwise.
   if (GetWidget()->non_client_view())
     GetWidget()->non_client_view()->UpdateFrame();
+}
+
+bool DesktopWindowTreeHostPlatform::CanFullscreen() {
+  return GetWidget()->widget_delegate()->CanFullscreen();
 }
 
 void DesktopWindowTreeHostPlatform::SetFullscreen(bool fullscreen,
@@ -887,6 +908,13 @@ void DesktopWindowTreeHostPlatform::OnWillDestroyAcceleratedWidget() {
   desktop_native_widget_aura_->OnHostWillClose();
 }
 
+bool DesktopWindowTreeHostPlatform::OnRotateFocus(
+    ui::PlatformWindowDelegate::RotateDirection direction,
+    bool reset) {
+  return DesktopWindowTreeHostPlatform::RotateFocusForWidget(*GetWidget(),
+                                                             direction, reset);
+}
+
 void DesktopWindowTreeHostPlatform::OnActivationChanged(bool active) {
   if (active) {
     auto widget = GetAcceleratedWidget();
@@ -1033,6 +1061,23 @@ display::Display DesktopWindowTreeHostPlatform::GetDisplayNearestRootWindow()
   // TODO(sky): GetDisplayNearestWindow() should take a const aura::Window*.
   return display::Screen::GetScreen()->GetDisplayNearestWindow(
       const_cast<aura::Window*>(window()));
+}
+
+bool DesktopWindowTreeHostPlatform::RotateFocusForWidget(
+    Widget& widget,
+    ui::PlatformWindowDelegate::RotateDirection direction,
+    bool reset) {
+  if (reset) {
+    widget.GetFocusManager()->ClearFocus();
+  }
+  auto focus_manager_direction =
+      direction == RotateDirection::kForward
+          ? views::FocusManager::Direction::kForward
+          : views::FocusManager::Direction::kBackward;
+  auto wrapping = reset ? views::FocusManager::FocusCycleWrapping::kEnabled
+                        : views::FocusManager::FocusCycleWrapping::kDisabled;
+  return widget.GetFocusManager()->RotatePaneFocus(focus_manager_direction,
+                                                   wrapping);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

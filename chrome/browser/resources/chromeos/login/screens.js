@@ -7,6 +7,7 @@
 
 // COMMON SCREENS
 import './screens/common/adb_sideloading.js';
+import './screens/common/add_child.js';
 import './screens/common/app_downloading.js';
 import './screens/common/app_launch_splash.js';
 import './screens/common/assistant_optin.js';
@@ -26,15 +27,18 @@ import './screens/common/gaia_signin.js';
 import './screens/common/gesture_navigation.js';
 import './screens/common/guest_tos.js';
 import './screens/common/hw_data_collection.js';
+import './screens/common/local_password_setup.js';
 import './screens/common/local_state_error.js';
 import './screens/common/managed_terms_of_service.js';
 import './screens/common/marketing_opt_in.js';
 import './screens/common/multidevice_setup.js';
 import './screens/common/offline_ad_login.js';
+import './screens/common/online_authentication_screen.js';
 import './screens/common/oobe_reset.js';
 import './screens/common/os_install.js';
 import './screens/common/os_trial.js';
 import './screens/common/parental_handoff.js';
+import './screens/common/password_selection.js';
 import './screens/common/pin_setup.js';
 import './screens/common/recommend_apps.js';
 import './screens/common/saml_confirm_password.js';
@@ -44,7 +48,7 @@ import './screens/common/sync_consent.js';
 import './screens/common/theme_selection.js';
 import './screens/common/touchpad_scroll.js';
 import './screens/common/tpm_error.js';
-import './screens/common/user_creation.js';
+import './screens/common/user_allowlist_check_screen.js';
 import './screens/common/wrong_hwid.js';
 // SCREENS USED DURING THE LOGIN FLOW
 import './screens/login/arc_vm_data_migration.js';
@@ -58,6 +62,7 @@ import './screens/login/offline_login.js';
 import './screens/login/update_required_card.js';
 // SCREENS USED DURING THE OOBE FLOW
 import './screens/oobe/auto_enrollment_check.js';
+import './screens/oobe/consumer_update.js';
 import './screens/oobe/demo_preferences.js';
 import './screens/oobe/demo_setup.js';
 import './screens/oobe/enable_debugging.js';
@@ -73,9 +78,14 @@ import './screens/oobe/update.js';
  */
 export const commonScreensList = [
   {tag: 'adb-sideloading-element', id: 'adb-sideloading'},
+  {tag: 'add-child-element', id: 'add-child'},
   {tag: 'app-downloading-element', id: 'app-downloading'},
   {tag: 'app-launch-splash-element', id: 'app-launch-splash'},
-  {tag: 'assistant-optin-element', id: 'assistant-optin-flow'},
+  {
+    tag: 'assistant-optin-element',
+    id: 'assistant-optin-flow',
+    condition: 'isOobeAssistantEnabled',
+  },
   {tag: 'autolaunch-element', id: 'autolaunch'},
   {
     tag: 'choobe-element',
@@ -109,11 +119,17 @@ export const commonScreensList = [
   {tag: 'gesture-navigation-element', id: 'gesture-navigation'},
   {tag: 'guest-tos-element', id: 'guest-tos'},
   {tag: 'hw-data-collection-element', id: 'hw-data-collection'},
+  {
+    tag: 'local-password-setup-element',
+    id: 'local-password-setup',
+    condition: 'isOobeConsumersLocalPasswordsEnabled',
+  },
   {tag: 'local-state-error-element', id: 'local-state-error'},
   {tag: 'managed-terms-of-service-element', id: 'terms-of-service'},
   {tag: 'marketing-opt-in-element', id: 'marketing-opt-in'},
   {tag: 'multidevice-setup-element', id: 'multidevice-setup-screen'},
   {tag: 'offline-ad-login-element', id: 'offline-ad-login'},
+  { tag: 'online-authentication-screen-element', id: 'online-authentication-screen' },
   {tag: 'oobe-reset-element', id: 'reset'},
   {
     tag: 'os-install-element',
@@ -122,6 +138,11 @@ export const commonScreensList = [
   },
   {tag: 'os-trial-element', id: 'os-trial', condition: 'isOsInstallAllowed'},
   {tag: 'parental-handoff-element', id: 'parental-handoff'},
+  {
+    tag: 'password-selection-element',
+    id: 'password-selection',
+    condition: 'isPasswordSelectionEnabledInOobe',
+  },
   {tag: 'pin-setup-element', id: 'pin-setup'},
   {tag: 'recommend-apps-element', id: 'recommend-apps'},
   {tag: 'saml-confirm-password-element', id: 'saml-confirm-password'},
@@ -135,7 +156,10 @@ export const commonScreensList = [
     condition: 'isTouchpadScrollEnabled',
   },
   {tag: 'tpm-error-message-element', id: 'tpm-error-message'},
-  {tag: 'user-creation-element', id: 'user-creation'},
+  {
+    tag: 'user-allowlist-check-screen-element',
+    id: 'user-allowlist-check-screen',
+  },
   {tag: 'wrong-hwid-element', id: 'wrong-hwid'},
 ];
 
@@ -175,6 +199,11 @@ export const loginScreensList = [
  */
 export const oobeScreensList = [
   {tag: 'auto-enrollment-check-element', id: 'auto-enrollment-check'},
+  {
+    tag: 'consumer-update-element',
+    id: 'consumer-update',
+    condition: 'isSoftwareUpdateEnabled',
+  },
   {tag: 'demo-preferences-element', id: 'demo-preferences'},
   {tag: 'demo-setup-element', id: 'demo-setup'},
   {tag: 'enable-debugging-element', id: 'debugging'},

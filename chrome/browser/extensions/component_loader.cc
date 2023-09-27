@@ -31,8 +31,8 @@
 #include "chrome/common/chrome_paths.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/extensions/extension_constants.h"
+#include "chrome/grit/branded_strings.h"
 #include "chrome/grit/browser_resources.h"
-#include "chrome/grit/chromium_strings.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/crx_file/id_util.h"
 #include "components/nacl/common/buildflags.h"
@@ -91,7 +91,12 @@ namespace extensions {
 
 namespace {
 
-static bool enable_background_extensions_during_testing = false;
+bool g_enable_background_extensions_during_testing = false;
+
+#if BUILDFLAG(IS_CHROMEOS_ASH) && BUILDFLAG(GOOGLE_CHROME_BRANDING)
+// Whether HelpApp is enabled.
+bool g_enable_help_app = true;
+#endif
 
 std::string GenerateId(const base::Value::Dict& manifest,
                        const base::FilePath& path) {
@@ -400,7 +405,9 @@ void ComponentLoader::AddWebStoreApp() {
 void ComponentLoader::AddChromeApp() {
   AddWithNameAndDescription(
       IDR_CHROME_APP_MANIFEST, base::FilePath(FILE_PATH_LITERAL("chrome_app")),
-      l10n_util::GetStringUTF8(IDS_SHORT_PRODUCT_NAME),
+      crosapi::browser_util::IsAshWebBrowserEnabled()
+          ? l10n_util::GetStringUTF8(IDS_SHORT_PRODUCT_NAME)
+          : "Ash Chrome",  // Because this is debug only, we do not need i18n.
       l10n_util::GetStringUTF8(IDS_CHROME_SHORTCUT_DESCRIPTION));
 }
 
@@ -436,8 +443,15 @@ scoped_refptr<const Extension> ComponentLoader::CreateExtension(
 
 // static
 void ComponentLoader::EnableBackgroundExtensionsForTesting() {
-  enable_background_extensions_during_testing = true;
+  g_enable_background_extensions_during_testing = true;
 }
+
+#if BUILDFLAG(IS_CHROMEOS_ASH) && BUILDFLAG(GOOGLE_CHROME_BRANDING)
+// static
+void ComponentLoader::DisableHelpAppForTesting() {
+  g_enable_help_app = false;
+}
+#endif
 
 void ComponentLoader::AddDefaultComponentExtensions(
     bool skip_session_components) {
@@ -446,7 +460,7 @@ void ComponentLoader::AddDefaultComponentExtensions(
 #if BUILDFLAG(IS_CHROMEOS_ASH)
 
 #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
-  if (browser_defaults::enable_help_app) {
+  if (g_enable_help_app) {
     Add(IDR_HELP_MANIFEST, base::FilePath(FILE_PATH_LITERAL(
                                "/usr/share/chromeos-assets/helpapp")));
   }
@@ -460,7 +474,8 @@ void ComponentLoader::AddDefaultComponentExtensions(
   if (!skip_session_components) {
     AddWebStoreApp();
 #if BUILDFLAG(IS_CHROMEOS_ASH)
-    if (crosapi::browser_util::IsAshWebBrowserEnabled()) {
+    if (crosapi::browser_util::IsAshWebBrowserEnabled() ||
+        ash::switches::IsAshDebugBrowserEnabled()) {
       AddChromeApp();
     }
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
@@ -504,7 +519,7 @@ void ComponentLoader::AddDefaultComponentExtensionsWithBackgroundPages(
   // Component extensions with background pages are not enabled during tests
   // because they generate a lot of background behavior that can interfere.
   const bool should_disable_background_extensions =
-      !enable_background_extensions_during_testing &&
+      !g_enable_background_extensions_during_testing &&
       (command_line->HasSwitch(::switches::kTestType) ||
        command_line->HasSwitch(
            ::switches::kDisableComponentExtensionsWithBackgroundPages));
@@ -575,7 +590,7 @@ void ComponentLoader::
 
   // Component extensions with background pages are not enabled during tests
   // because they generate a lot of background behavior that can interfere.
-  if (!enable_background_extensions_during_testing &&
+  if (!g_enable_background_extensions_during_testing &&
       (command_line->HasSwitch(::switches::kTestType) ||
        command_line->HasSwitch(
            ::switches::kDisableComponentExtensionsWithBackgroundPages))) {

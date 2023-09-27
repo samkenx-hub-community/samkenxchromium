@@ -9,10 +9,13 @@
 #include "base/command_line.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
+#include "base/json/json_writer.h"
 #include "base/memory/raw_ptr.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/stringprintf.h"
 #include "base/test/scoped_feature_list.h"
+#include "base/test/values_test_util.h"
+#include "base/values.h"
 #include "components/network_session_configurator/common/network_switches.h"
 #include "content/browser/webid/fake_identity_request_dialog_controller.h"
 #include "content/browser/webid/identity_registry.h"
@@ -43,6 +46,7 @@
 #include "url/gurl.h"
 #include "url/origin.h"
 
+using ::base::test::IsJson;
 using net::EmbeddedTestServer;
 using net::HttpStatusCode;
 using net::test_server::BasicHttpResponse;
@@ -52,6 +56,7 @@ using net::test_server::HttpResponse;
 using ::testing::_;
 using ::testing::NiceMock;
 using ::testing::WithArg;
+using ::testing::WithArgs;
 
 namespace content {
 
@@ -207,6 +212,14 @@ class TestFederatedIdentityModalDialogViewDelegate
     std::move(closure_).Run();
     closed_ = true;
   }
+
+  base::WeakPtr<TestFederatedIdentityModalDialogViewDelegate> GetWeakPtr() {
+    return weak_ptr_factory_.GetWeakPtr();
+  }
+
+ private:
+  base::WeakPtrFactory<TestFederatedIdentityModalDialogViewDelegate>
+      weak_ptr_factory_{this};
 };
 
 }  // namespace
@@ -306,7 +319,7 @@ class WebIdBrowserTest : public ContentBrowserTest {
     test_modal_dialog_view_delegate_ =
         std::make_unique<TestFederatedIdentityModalDialogViewDelegate>();
     test_browser_client_->SetIdentityRegistry(
-        shell()->web_contents(), test_modal_dialog_view_delegate_.get(),
+        shell()->web_contents(), test_modal_dialog_view_delegate_->GetWeakPtr(),
         url::Origin::Create(GURL(BaseIdpUrl())));
   }
 
@@ -324,9 +337,8 @@ class WebIdBrowserTest : public ContentBrowserTest {
 class WebIdIdpSigninStatusBrowserTest : public WebIdBrowserTest {
  public:
   void SetUpCommandLine(base::CommandLine* command_line) override {
-    scoped_feature_list_.InitAndEnableFeatureWithParameters(
-        features::kFedCm,
-        {{features::kFedCmIdpSigninStatusFieldTrialParamName, "true"}});
+    scoped_feature_list_.InitAndEnableFeature(
+        features::kFedCmIdpSigninStatusEnabled);
     command_line->AppendSwitch(switches::kIgnoreCertificateErrors);
   }
 
@@ -560,7 +572,24 @@ IN_PROC_BROWSER_TEST_F(WebIdIdpSigninStatusBrowserTest, IdPClose) {
         }) ()
     )";
 
-  // Check that modal dialog is not closed.
+#if BUILDFLAG(IS_ANDROID)
+  // On Android, IdentityProvider.close() should invoke CloseModalDialog() on
+  // the dialog controller.
+  auto controller = std::make_unique<MockIdentityRequestDialogController>();
+  base::RunLoop run_loop;
+  EXPECT_CALL(*controller, CloseModalDialog).WillOnce([&run_loop]() {
+    run_loop.Quit();
+  });
+  test_browser_client_->SetIdentityRequestDialogController(
+      std::move(controller));
+
+  // Run the script.
+  EXPECT_EQ(true, EvalJs(shell(), script));
+  run_loop.Run();
+#else
+  // On desktop, IdentityProvider.close() should invoke NotifyClose() on the
+  // delegate set on the identity registry. Check that modal dialog is not
+  // closed.
   EXPECT_FALSE(test_modal_dialog_view_delegate_->closed_);
 
   // Run the script.
@@ -573,6 +602,7 @@ IN_PROC_BROWSER_TEST_F(WebIdIdpSigninStatusBrowserTest, IdPClose) {
 
   // Check that modal dialog is closed.
   EXPECT_TRUE(test_modal_dialog_view_delegate_->closed_);
+#endif  // BUILDFLAG(IS_ANDROID)
 }
 
 class WebIdMDocsBrowserTest : public WebIdBrowserTest {
@@ -599,8 +629,31 @@ IN_PROC_BROWSER_TEST_F(WebIdMDocsBrowserTest, RequestMDoc) {
   MockMDocProvider* mdoc_provider = static_cast<MockMDocProvider*>(
       test_browser_client_->GetMDocProviderForTests());
 
-  EXPECT_CALL(*mdoc_provider, RequestMDoc(_, _, _, _, _))
-      .WillOnce(WithArg<4>([](MDocProvider::MDocCallback callback) {
+  const char request[] = R"(
+  {
+   "providers": [ {
+      "params": {
+         "extraParamAsNeededByWallets": "true",
+         "nonce": "1234",
+         "readerPublicKey": "test_reader_public_key"
+      },
+      "responseFormat": [ "mdoc" ],
+      "selector": {
+         "fields": [ {
+            "equals": "org.iso.18013.5.1.mDL",
+            "name": "doctype"
+         }, {
+            "name": "org.iso.18013.5.1.family_name"
+         }, {
+            "name": "org.iso.18013.5.1.portrait"
+         } ]
+      }
+   } ]
+  }
+  )";
+
+  EXPECT_CALL(*mdoc_provider, RequestMDoc(_, _, IsJson(request), _))
+      .WillOnce(WithArg<3>([](MDocProvider::MDocCallback callback) {
         std::move(callback).Run("test-mdoc");
       }));
 
@@ -609,17 +662,20 @@ IN_PROC_BROWSER_TEST_F(WebIdMDocsBrowserTest, RequestMDoc) {
           const {token} = await navigator.credentials.get({
             identity: {
               providers: [{
-                configURL: '',
-                clientId: '',
-                mdoc: {
-                  documentType: 'test_document_type',
-                  readerPublicKey: 'test_reader_public_key',
-                  requestedElements: [
-                    {
-                      namespace: 'test_namespace',
-                      name: 'test_name'
-                    }
-                  ],
+                holder: {
+                  selector: {
+                    format: ['mdoc'],
+                    doctype: 'org.iso.18013.5.1.mDL',
+                    fields: [
+                      'org.iso.18013.5.1.family_name',
+                      'org.iso.18013.5.1.portrait',
+                    ]
+                  },
+                  params: {
+                    nonce: '1234',
+                    readerPublicKey: 'test_reader_public_key',
+                    extraParamAsNeededByWallets: true,
+                  },
                 },
               }],
             },
@@ -644,17 +700,20 @@ IN_PROC_BROWSER_TEST_F(WebIdMDocsBrowserTest,
           const {token} = await navigator.credentials.get({
             identity: {
               providers: [{
-                configURL: '',
-                clientId: '',
-                mdoc: {
-                  documentType: 'test_document_type',
-                  readerPublicKey: 'test_reader_public_key',
-                  requestedElements: [
-                    {
-                      namespace: 'test_namespace',
-                      name: 'test_name'
-                    }
-                  ],
+                holder: {
+                  selector: {
+                    format: ["mdoc"],
+                    doctype: 'org.iso.18013.5.1.mDL',
+                    fields: [
+                      'org.iso.18013.5.1.family_name',
+                      'org.iso.18013.5.1.portrait',
+                    ],
+                  },
+                  params: {
+                    nonce: '1234',
+                    readerPublicKey: 'test_reader_public_key',
+                    extraParamAsNeededByWallets: true,
+                  },
                 },
               }],
             },
@@ -663,8 +722,8 @@ IN_PROC_BROWSER_TEST_F(WebIdMDocsBrowserTest,
         }) ()
     )";
 
-  EXPECT_CALL(*mdoc_provider, RequestMDoc(_, _, _, _, _))
-      .WillOnce(WithArg<4>([&](MDocProvider::MDocCallback callback) {
+  EXPECT_CALL(*mdoc_provider, RequestMDoc(_, _, _, _))
+      .WillOnce(WithArg<3>([&](MDocProvider::MDocCallback callback) {
         EXPECT_EQ(
             "a JavaScript error: \"AbortError: Only one "
             "navigator.credentials.get request may be outstanding at one "
@@ -695,6 +754,7 @@ IN_PROC_BROWSER_TEST_F(WebIdAuthzBrowserTest, Authz_noPopUpWindow) {
             content += "nonce=12345&";
             content += "account_id=not_real_account&";
             content += "disclosure_text_shown=false&";
+            content += "is_account_auto_selected=false&";
             // Asserts that the scope, response_type and params parameters
             // were passed correctly to the id assertion endpoint.
             content += "scope=name+email+picture&";
@@ -769,6 +829,7 @@ IN_PROC_BROWSER_TEST_F(WebIdAuthzBrowserTest, Authz_openPopUpWindow) {
             content += "nonce=12345&";
             content += "account_id=not_real_account&";
             content += "disclosure_text_shown=false&";
+            content += "is_account_auto_selected=false&";
             content += "scope=calendar.readonly";
 
             EXPECT_EQ(request.content, content);
@@ -786,6 +847,14 @@ IN_PROC_BROWSER_TEST_F(WebIdAuthzBrowserTest, Authz_openPopUpWindow) {
 
   idp_server()->SetConfigResponseDetails(config_details);
 
+  // Create a WebContents that represents the modal dialog, specifically
+  // the structure that the Identity Registry hangs to.
+  Shell* modal = CreateBrowser();
+  auto config_url = GURL(BaseIdpUrl());
+
+  modal->LoadURL(config_url);
+  EXPECT_TRUE(WaitForLoadStop(modal->web_contents()));
+
   auto mock = std::make_unique<
       ::testing::NiceMock<MockIdentityRequestDialogController>>();
   test_browser_client_->SetIdentityRequestDialogController(std::move(mock));
@@ -794,21 +863,14 @@ IN_PROC_BROWSER_TEST_F(WebIdAuthzBrowserTest, Authz_openPopUpWindow) {
       static_cast<MockIdentityRequestDialogController*>(
           test_browser_client_->GetIdentityRequestDialogControllerForTests());
 
-  auto config_url = GURL(BaseIdpUrl());
-
   // Expects the account chooser to be opened. Selects the first account.
-  EXPECT_CALL(*controller, ShowAccountsDialog(_, _, _, _, _, _, _, _))
-      .WillOnce(::testing::WithArg<6>([&config_url](auto on_selected) {
+  EXPECT_CALL(*controller, ShowAccountsDialog(_, _, _, _, _, _, _))
+      .WillOnce(::testing::WithArg<5>([&config_url](auto on_selected) {
         std::move(on_selected)
             .Run(config_url,
                  /* account_id=*/"not_real_account",
                  /* is_sign_in= */ true);
       }));
-
-  // Create a WebContents that represents the modal dialog, specifically
-  // the structure that the Identity Registry hangs to.
-  Shell* modal = CreateBrowser();
-  modal->LoadURL(config_url);
 
   base::RunLoop run_loop;
   EXPECT_CALL(*controller, ShowModalDialog(_, _))

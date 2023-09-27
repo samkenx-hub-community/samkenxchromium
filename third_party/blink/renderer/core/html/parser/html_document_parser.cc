@@ -43,6 +43,7 @@
 #include "third_party/blink/renderer/core/css/style_engine.h"
 #include "third_party/blink/renderer/core/dom/document_fragment.h"
 #include "third_party/blink/renderer/core/dom/element.h"
+#include "third_party/blink/renderer/core/execution_context/agent.h"
 #include "third_party/blink/renderer/core/frame/local_frame.h"
 #include "third_party/blink/renderer/core/frame/settings.h"
 #include "third_party/blink/renderer/core/html/html_document.h"
@@ -62,7 +63,6 @@
 #include "third_party/blink/renderer/core/probe/core_probes.h"
 #include "third_party/blink/renderer/core/script/html_parser_script_runner.h"
 #include "third_party/blink/renderer/platform/bindings/runtime_call_stats.h"
-#include "third_party/blink/renderer/platform/bindings/v8_per_isolate_data.h"
 #include "third_party/blink/renderer/platform/heap/garbage_collected.h"
 #include "third_party/blink/renderer/platform/heap/persistent.h"
 #include "third_party/blink/renderer/platform/instrumentation/tracing/trace_event.h"
@@ -643,6 +643,10 @@ bool HTMLDocumentParser::PumpTokenizer() {
           ? task_runner_state_->GetDefaultBudget()
           : kInfiniteTokenizationBudget;
 
+  if (RuntimeEnabledFeatures::HTMLParserYieldAndDelayOftenForTestingEnabled()) {
+    budget = 2;
+  }
+
   base::TimeDelta timed_budget;
   if (TimedParserBudgetEnabled())
     timed_budget = GetTimedBudget(task_runner_state_->TimesYielded());
@@ -654,6 +658,7 @@ bool HTMLDocumentParser::PumpTokenizer() {
   unsigned tokens_parsed = 0;
   int characters_consumed_before_token = 0;
   base::TimeDelta time_executing_script;
+  v8::Isolate* isolate = GetDocument()->GetAgent().isolate();
   while (true) {
     if (should_process_preloading)
       FlushPendingPreloads();
@@ -677,8 +682,7 @@ bool HTMLDocumentParser::PumpTokenizer() {
     HTMLToken* token;
     {
       RUNTIME_CALL_TIMER_SCOPE(
-          V8PerIsolateData::MainThreadIsolate(),
-          RuntimeCallStats::CounterId::kHTMLTokenizerNextToken);
+          isolate, RuntimeCallStats::CounterId::kHTMLTokenizerNextToken);
       token = tokenizer_.NextToken(input_.Current());
       if (!token)
         break;
@@ -693,7 +697,9 @@ bool HTMLDocumentParser::PumpTokenizer() {
     ConstructTreeFromToken(atomic_html_token);
     if (!should_run_until_completion && !IsPaused()) {
       DCHECK_EQ(task_runner_state_->GetMode(), kAllowDeferredParsing);
-      if (TimedParserBudgetEnabled()) {
+      if (TimedParserBudgetEnabled() &&
+          !RuntimeEnabledFeatures::
+              HTMLParserYieldAndDelayOftenForTestingEnabled()) {
         if (CheckParserBudgetLessOften()) {
           int newly_consumed_characters =
               input_.Current().NumberOfCharactersConsumed() -
@@ -769,6 +775,7 @@ bool HTMLDocumentParser::PumpTokenizer() {
   CHECK(!should_run_until_completion || !should_yield);
   if (should_yield)
     task_runner_state_->MarkYield();
+
   return should_yield;
 }
 
@@ -781,11 +788,16 @@ void HTMLDocumentParser::SchedulePumpTokenizer(bool from_finish_append) {
     // If the parser is already scheduled, there's no need to do anything.
     return;
   }
-  loading_task_runner_->PostTask(
+  base::TimeDelta delay = base::Milliseconds(0);
+  if (RuntimeEnabledFeatures::HTMLParserYieldAndDelayOftenForTestingEnabled()) {
+    delay = base::Milliseconds(10);
+  }
+  loading_task_runner_->PostDelayedTask(
       FROM_HERE,
       WTF::BindOnce(&HTMLDocumentParser::DeferredPumpTokenizerIfPossible,
                     WrapPersistent(this), from_finish_append,
-                    base::TimeTicks::Now()));
+                    base::TimeTicks::Now()),
+      delay);
   task_runner_state_->SetState(
       HTMLDocumentParserState::DeferredParserState::kScheduled);
 

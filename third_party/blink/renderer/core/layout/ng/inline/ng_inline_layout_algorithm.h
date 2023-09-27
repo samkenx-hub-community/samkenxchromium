@@ -30,6 +30,7 @@ class NGInlineLayoutStateStack;
 class NGLineInfo;
 struct NGInlineBoxState;
 struct NGInlineItemResult;
+struct NGLeadingFloats;
 
 // A class for laying out an inline formatting context, i.e. a block with inline
 // children.
@@ -61,10 +62,12 @@ class CORE_EXPORT NGInlineLayoutAlgorithm final
   }
 
  private:
-  unsigned PositionLeadingFloats(NGExclusionSpace*, NGPositionedFloatVector*);
+  friend class NGLineWidthsTest;
+
+  void PositionLeadingFloats(NGExclusionSpace&, NGLeadingFloats&);
   NGPositionedFloat PositionFloat(LayoutUnit origin_block_bfc_offset,
                                   LayoutObject* floating_object,
-                                  NGExclusionSpace*) const;
+                                  NGExclusionSpace*);
 
   void PrepareBoxStates(const NGLineInfo&, const NGInlineBreakToken*);
   void RebuildBoxStates(const NGLineInfo&,

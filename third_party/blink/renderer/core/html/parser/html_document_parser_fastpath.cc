@@ -613,7 +613,7 @@ class HTMLFastPathParser {
     // input. This path could handle other valid attribute name chars, but they
     // are not as common, so it only looks for lowercase.
     const Char* start = pos_;
-    while (pos_ != end_ && *pos_ >= 'a' && *pos_ <= 'z') {
+    while (pos_ != end_ && ((*pos_ >= 'a' && *pos_ <= 'z') || *pos_ == '-')) {
       ++pos_;
     }
     if (UNLIKELY(pos_ == end_)) {
@@ -640,18 +640,41 @@ class HTMLFastPathParser {
                 static_cast<size_t>(attribute_name_buffer_.size()));
   }
 
+  static constexpr int kSingleQuote = 0x27;     // '
+  static constexpr int kDoubleQuote = 0x22;     // "
+  static constexpr int kAmpersand = 0x26;       // &
+  static constexpr int kCarriageReturn = 0x0D;  // \r
+
   std::pair<Span, USpan> ScanAttrValue() {
     Span result;
     SkipWhitespace();
     const Char* start = pos_;
-    if (Char quote_char = GetNext(); quote_char == '"' || quote_char == '\'') {
+    // clang-format off
+    if (Char quote_char = GetNext();
+        quote_char == '"' || quote_char == '\'') {
+      // clang-format on
       start = ++pos_;
-      while (pos_ != end_ && GetNext() != quote_char) {
-        if (GetNext() == '&' || GetNext() == '\r') {
+      while (pos_ != end_) {
+        uint16_t c = GetNext();
+        static_assert(kSingleQuote > kDoubleQuote);
+        // The c is mostly like to be a~z or A~Z, the ASCII code value of a~z
+        // and A~Z is greater than kSingleQuote, so we just need to compare
+        // kSingleQuote here.
+        if (LIKELY(c > kSingleQuote)) {
+          ++pos_;
+        } else if (c == kAmpersand || c == kCarriageReturn) {
           pos_ = start - 1;
           return {Span{}, ScanEscapedAttrValue()};
+        } else if (c == kDoubleQuote || c == kSingleQuote) {
+          break;
+        } else if (UNLIKELY(c == '\0')) {
+          // \0 is generally mapped to \uFFFD (but there are exceptions).
+          // Fallback to normal path as this generally does not happen often.
+          return Fail(HtmlFastPathResult::kFailedParsingQuotedAttributeValue,
+                      std::pair{Span{}, USpan{}});
+        } else {
+          ++pos_;
         }
-        ++pos_;
       }
       if (pos_ == end_) {
         return Fail(HtmlFastPathResult::kFailedParsingQuotedAttributeValue,
@@ -937,13 +960,19 @@ class HTMLFastPathParser {
           return Fail(HtmlFastPathResult::kFailedParsingAttributes);
         }
       }
-      if (attr_name.size() >= 2 && attr_name[0] == 'o' && attr_name[1] == 'n') {
+      if (attr_name.size() > 2 && attr_name[0] == 'o' && attr_name[1] == 'n') {
         // These attributes likely contain script that may be executed at random
         // points, which could cause problems if parsing via the fast path
         // fails. For example, an image's onload event.
         return Fail(HtmlFastPathResult::kFailedOnAttribute);
       }
-      SkipWhitespace();
+      if (attr_name.size() == 2 && attr_name[0] == 'i' && attr_name[1] == 's') {
+        // This is for the "is" attribute case.
+        return Fail(HtmlFastPathResult::kFailedParsingAttributes);
+      }
+      if (GetNext() != '=') {
+        SkipWhitespace();
+      }
       std::pair<Span, USpan> attr_value = {};
       if (GetNext() == '=') {
         ++pos_;
@@ -951,11 +980,8 @@ class HTMLFastPathParser {
         SkipWhitespace();
       }
       Attribute attribute = ProcessAttribute(attr_name, attr_value);
-      attribute_buffer_.push_back(attribute);
-      if (attribute.GetName() == html_names::kIsAttr) {
-        return Fail(HtmlFastPathResult::kFailedParsingAttributes);
-      }
       attribute_names_.push_back(attribute.LocalName().Impl());
+      attribute_buffer_.push_back(std::move(attribute));
     }
     std::sort(attribute_names_.begin(), attribute_names_.end());
     if (std::adjacent_find(attribute_names_.begin(), attribute_names_.end()) !=
@@ -1130,7 +1156,7 @@ class HTMLFastPathParser {
 };
 
 void LogFastPathResult(HtmlFastPathResult result) {
-  base::UmaHistogramEnumeration("Blink.HTMLFastPathParser.ParseResult", result);
+  UMA_HISTOGRAM_ENUMERATION("Blink.HTMLFastPathParser.ParseResult", result);
   if (result != HtmlFastPathResult::kSucceeded) {
     VLOG(2) << "innerHTML fast-path parser failed, "
             << static_cast<int>(result);
@@ -1358,17 +1384,14 @@ bool TryParsingHTMLFragmentImpl(const base::span<const Char>& source,
   LogFastPathResult(parser.parse_result());
   number_of_bytes_parsed = parser.NumberOfBytesParsed();
   // The time needed to parse is typically < 1ms (even at the 99%).
-  if (base::TimeTicks::IsHighResolution()) {
-    if (success) {
-      base::UmaHistogramCustomMicrosecondsTimes(
-          "Blink.HTMLFastPathParser.SuccessfulParseTime2",
-          parse_timer.Elapsed(), base::Microseconds(1), base::Milliseconds(10),
-          100);
-    } else {
-      base::UmaHistogramCustomMicrosecondsTimes(
-          "Blink.HTMLFastPathParser.AbortedParseTime2", parse_timer.Elapsed(),
-          base::Microseconds(1), base::Milliseconds(10), 100);
-    }
+  if (success) {
+    UMA_HISTOGRAM_CUSTOM_MICROSECONDS_TIMES(
+        "Blink.HTMLFastPathParser.SuccessfulParseTime2", parse_timer.Elapsed(),
+        base::Microseconds(1), base::Milliseconds(10), 100);
+  } else {
+    UMA_HISTOGRAM_CUSTOM_MICROSECONDS_TIMES(
+        "Blink.HTMLFastPathParser.AbortedParseTime2", parse_timer.Elapsed(),
+        base::Microseconds(1), base::Milliseconds(10), 100);
   }
   if (failed_because_unsupported_tag) {
     *failed_because_unsupported_tag =
@@ -1389,10 +1412,13 @@ bool TryParsingHTMLFragmentImpl(const base::span<const Char>& source,
           kUnsupportedContextTagTypeMaskNames);
     }
   }
-  base::UmaHistogramCounts10M(
-      success ? "Blink.HTMLFastPathParser.SuccessfulParseSize"
-              : "Blink.HTMLFastPathParser.AbortedParseSize",
-      number_of_bytes_parsed);
+  if (success) {
+    UMA_HISTOGRAM_COUNTS_10M("Blink.HTMLFastPathParser.SuccessfulParseSize",
+                             number_of_bytes_parsed);
+  } else {
+    UMA_HISTOGRAM_COUNTS_10M("Blink.HTMLFastPathParser.AbortedParseSize",
+                             number_of_bytes_parsed);
+  }
   return success;
 }
 

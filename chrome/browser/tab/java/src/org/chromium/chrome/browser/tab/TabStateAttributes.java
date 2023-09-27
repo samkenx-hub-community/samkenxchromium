@@ -9,11 +9,10 @@ import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
 import org.chromium.base.ObserverList;
+import org.chromium.base.ResettersForTesting;
 import org.chromium.base.UserDataHost;
 import org.chromium.base.task.PostTask;
 import org.chromium.base.task.TaskTraits;
-import org.chromium.chrome.browser.tab.state.CriticalPersistedTabData;
-import org.chromium.chrome.browser.tab.state.CriticalPersistedTabDataObserver;
 import org.chromium.content_public.browser.NavigationHandle;
 import org.chromium.content_public.browser.WebContents;
 import org.chromium.content_public.browser.WebContentsObserver;
@@ -47,12 +46,9 @@ public class TabStateAttributes extends TabWebContentsUserData {
 
     private final ObserverList<Observer> mObservers = new ObserverList<>();
     private final Tab mTab;
-    private final CriticalPersistedTabData mTabData;
-    private final CriticalPersistedTabDataObserver mTabDataObserver;
 
     /** Whether or not the TabState has changed. */
-    @DirtinessState
-    private int mDirtinessState = DirtinessState.CLEAN;
+    private @DirtinessState int mDirtinessState = DirtinessState.CLEAN;
     private WebContentsObserver mWebContentsObserver;
     private boolean mPendingLowPrioritySave;
 
@@ -159,16 +155,13 @@ public class TabStateAttributes extends TabWebContentsUserData {
                 if (window == null) return;
                 updateIsDirty(DirtinessState.UNTIDY);
             }
-        });
-        mTabDataObserver = new CriticalPersistedTabDataObserver() {
+
             @Override
             public void onRootIdChanged(Tab tab, int newRootId) {
                 if (!tab.isInitialized()) return;
                 updateIsDirty(DirtinessState.DIRTY);
             }
-        };
-        mTabData = CriticalPersistedTabData.from(mTab);
-        mTabData.addObserver(mTabDataObserver);
+        });
     }
 
     @Override
@@ -194,16 +187,10 @@ public class TabStateAttributes extends TabWebContentsUserData {
         }
     }
 
-    @Override
-    protected void destroyInternal() {
-        mTabData.removeObserver(mTabDataObserver);
-    }
-
     /**
      * @return true if the {@link TabState} has been changed
      */
-    @DirtinessState
-    public int getDirtinessState() {
+    public @DirtinessState int getDirtinessState() {
         return mDirtinessState;
     }
 
@@ -220,11 +207,14 @@ public class TabStateAttributes extends TabWebContentsUserData {
         if (dirtiness == mDirtinessState) return;
         if (mTab.isBeingRestored()) return;
 
-        mDirtinessState = dirtiness;
-        if (dirtiness == DirtinessState.DIRTY) {
-            CriticalPersistedTabData.from(mTab).setShouldSave();
+        // Do not lower dirtiness to UNTIDY from DIRTY as we should wait for the state to be CLEAN.
+        if (dirtiness == DirtinessState.UNTIDY && mDirtinessState == DirtinessState.DIRTY) {
+            return;
         }
-        for (Observer observer : mObservers) observer.onTabStateDirtinessChanged(mTab, dirtiness);
+        mDirtinessState = dirtiness;
+        for (Observer observer : mObservers) {
+            observer.onTabStateDirtinessChanged(mTab, mDirtinessState);
+        }
     }
 
     /**
@@ -232,8 +222,7 @@ public class TabStateAttributes extends TabWebContentsUserData {
      * @param obs The observer to be added.
      * @return The current dirtiness state.
      */
-    @DirtinessState
-    public int addObserver(Observer obs) {
+    public @DirtinessState int addObserver(Observer obs) {
         mObservers.addObserver(obs);
         return mDirtinessState;
     }
@@ -248,6 +237,8 @@ public class TabStateAttributes extends TabWebContentsUserData {
 
     /** Allows overriding the current value for tests. */
     public void setStateForTesting(@DirtinessState int dirtiness) {
+        var oldValue = mDirtinessState;
         mDirtinessState = dirtiness;
+        ResettersForTesting.register(() -> mDirtinessState = oldValue);
     }
 }

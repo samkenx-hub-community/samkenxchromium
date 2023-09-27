@@ -7,6 +7,7 @@ import {
   assertExists,
   assertInstanceof,
 } from '../../assert.js';
+import {AsyncJobQueue} from '../../async_job_queue.js';
 import * as dom from '../../dom.js';
 import {reportError} from '../../error.js';
 import * as expert from '../../expert.js';
@@ -17,6 +18,7 @@ import {Filenamer} from '../../models/file_namer.js';
 import * as loadTimeData from '../../models/load_time_data.js';
 import {
   GifSaver,
+  TimeLapseEncoderArgs,
   TimeLapseSaver,
   VideoSaver,
 } from '../../models/video_saver.js';
@@ -124,8 +126,6 @@ function getVideoMimeType(param: h264.EncoderParameters|null): string {
 
 /**
  * Gets VideoEncoder's config from current h264 params and resolutions.
- *
- * @return VideoEncoderConfig.
  */
 function getVideoEncoderConfig(
     param: h264.EncoderParameters, resolution: Resolution): VideoEncoderConfig {
@@ -183,6 +183,12 @@ export interface VideoHandler {
    * Creates VideoSaver to save video capture result.
    */
   createVideoSaver(): Promise<VideoSaver>;
+
+  /**
+   * Creates TimeLapseSaver to save time-lapse capture result.
+   */
+  createTimeLapseSaver(encoderArgs: TimeLapseEncoderArgs, speed: number):
+      Promise<TimeLapseSaver>;
 
   /**
    * Handles the result video snapshot.
@@ -247,15 +253,9 @@ export class Video extends ModeBase {
   private recordingType: RecordType = RecordType.NORMAL;
 
   /**
-   * The ongoing video snapshot.
+   * Ongoing video snapshot queue.
    */
-  private snapshotting: Promise<void>|null = null;
-
-  /**
-   * Promise for process of toggling video pause/resume. Sets to null if CCA
-   * is already paused or resumed.
-   */
-  private togglePausedInternal: Promise<void>|null = null;
+  private readonly snapshottingQueue = new AsyncJobQueue('drop');
 
   /**
    * Whether current recording ever paused/resumed before it ended.
@@ -302,16 +302,13 @@ export class Video extends ModeBase {
 
   override async clear(): Promise<void> {
     await this.stopCapture();
-    if (this.captureStream !== null) {
-      if (expert.isEnabled(expert.ExpertOption.ENABLE_MULTISTREAM_RECORDING)) {
-        await StreamManager.getInstance().closeCaptureStream(
-            this.captureStream);
-      } else if (expert.isEnabled(
-                     expert.ExpertOption.ENABLE_MULTISTREAM_RECORDING_CHROME)) {
-        StreamManagerChrome.getInstance().stopCaptureStream();
-      }
-      this.captureStream = null;
+
+    if (StreamManagerChrome.getInstance().getCaptureStream() !== null) {
+      StreamManagerChrome.getInstance().stopCaptureStream();
+    } else if (this.captureStream !== null) {
+      await StreamManager.getInstance().closeCaptureStream(this.captureStream);
     }
+    this.captureStream = null;
   }
 
   /**
@@ -338,15 +335,13 @@ export class Video extends ModeBase {
 
   /**
    * Takes a video snapshot during recording.
-   *
-   * @return Promise resolved when video snapshot is finished.
    */
-  async takeSnapshot(): Promise<void> {
-    if (this.snapshotting !== null) {
-      return;
-    }
-    state.set(state.State.SNAPSHOTTING, true);
-    this.snapshotting = (async () => {
+  takeSnapshot(): void {
+    this.snapshottingQueue.push(async () => {
+      if (!state.get(state.State.RECORDING)) {
+        return;
+      }
+      state.set(state.State.SNAPSHOTTING, true);
       try {
         const timestamp = Date.now();
         let blob: Blob;
@@ -375,10 +370,8 @@ export class Video extends ModeBase {
         });
       } finally {
         state.set(state.State.SNAPSHOTTING, false);
-        this.snapshotting = null;
       }
-    })();
-    return this.snapshotting;
+    });
   }
 
   private toggleLowStorageWarning(show: boolean): void {
@@ -389,7 +382,7 @@ export class Video extends ModeBase {
   }
 
   /**
-   * Start monitor storage status and return initial status.
+   * Starts monitor storage status and returns initial status.
    *
    * @return Promise resolved to boolean indicating whether users can
    * start/resume the recording.
@@ -426,17 +419,11 @@ export class Video extends ModeBase {
     if (!state.get(state.State.RECORDING)) {
       return;
     }
-    if (this.togglePausedInternal !== null) {
-      return this.togglePausedInternal;
-    }
     this.everPaused = true;
 
     if (this.recordingType === RecordType.TIME_LAPSE) {
       return this.togglePausedTimeLapse();
     }
-
-    const waitable = new WaitableEvent();
-    this.togglePausedInternal = waitable.wait();
 
     assert(this.mediaRecorder !== null);
     assert(this.mediaRecorder.state !== 'inactive');
@@ -444,28 +431,29 @@ export class Video extends ModeBase {
     const toggledEvent = toBePaused ? 'pause' : 'resume';
 
     if (!toBePaused && !(await this.resumeMonitorStorage())) {
-      // Keep |togglePausedInternal| non-null to prevent pause/resume while
-      // stopping the recording.
-      waitable.signal();
       return;
     }
 
+    const waitable = new WaitableEvent();
     const onToggled = () => {
       assert(this.mediaRecorder !== null);
       this.mediaRecorder.removeEventListener(toggledEvent, onToggled);
       state.set(state.State.RECORDING_PAUSED, toBePaused);
-      this.togglePausedInternal = null;
       waitable.signal();
     };
 
     this.mediaRecorder.addEventListener(toggledEvent, onToggled);
     if (toBePaused) {
-      waitable.wait().then(() => this.playPauseEffect(toBePaused));
-      this.recordTime.stop({pause: true});
+      // This is for playing pause effect after the toggle is done, and
+      // shouldn't be included in the returned promise.
+      // TODO(pihsun): Reconsider if we should return a Promise for audio /
+      // animation.
+      void waitable.wait().then(() => this.playPauseEffect(toBePaused));
+      this.recordTime.pause();
       this.mediaRecorder.pause();
     } else {
       await this.playPauseEffect(toBePaused);
-      this.recordTime.start({resume: true});
+      this.recordTime.resume();
       this.mediaRecorder.resume();
     }
 
@@ -473,12 +461,9 @@ export class Video extends ModeBase {
   }
 
   private async togglePausedTimeLapse(): Promise<void> {
-    const toggleDone = new WaitableEvent();
-    this.togglePausedInternal = toggleDone.wait();
     const toBePaused = !state.get(state.State.RECORDING_PAUSED);
 
     if (!toBePaused && !(await this.resumeMonitorStorage())) {
-      toggleDone.signal();
       return;
     }
 
@@ -486,16 +471,13 @@ export class Video extends ModeBase {
     // Resume: Sound/Button UI -> Update Timer -> Resume
     if (toBePaused) {
       state.set(state.State.RECORDING_PAUSED, true);
-      this.recordTime.stop({pause: true});
+      this.recordTime.pause();
       await this.playPauseEffect(true);
     } else {
       await this.playPauseEffect(false);
-      this.recordTime.start({resume: true});
+      this.recordTime.resume();
       state.set(state.State.RECORDING_PAUSED, false);
     }
-
-    toggleDone.signal();
-    this.togglePausedInternal = null;
   }
 
   private async playPauseEffect(toBePaused: boolean): Promise<void> {
@@ -562,8 +544,6 @@ export class Video extends ModeBase {
   }
 
   async start(): Promise<[Promise<void>]> {
-    assert(this.snapshotting === null);
-    this.togglePausedInternal = null;
     this.everPaused = false;
     this.autoStopped = false;
     this.stopped = false;
@@ -588,7 +568,7 @@ export class Video extends ModeBase {
       if (expert.isEnabled(
               expert.ExpertOption.ENABLE_MULTISTREAM_RECORDING_CHROME)) {
         this.captureStream =
-            StreamManagerChrome.getInstance().getCaptureStream();
+            assertExists(StreamManagerChrome.getInstance().getCaptureStream());
       } else if (this.captureConstraints !== null) {
         this.captureStream =
             await StreamManager.getInstance().openCaptureStream(
@@ -629,7 +609,7 @@ export class Video extends ModeBase {
         this.recordingType === RecordType.GIF);
     if (this.recordingType === RecordType.GIF) {
       state.set(state.State.RECORDING, true);
-      this.gifRecordTime.start({resume: false});
+      this.gifRecordTime.start();
 
       let gifSaver = null;
       try {
@@ -642,7 +622,7 @@ export class Video extends ModeBase {
         throw e;
       } finally {
         state.set(state.State.RECORDING, false);
-        this.gifRecordTime.stop({pause: false});
+        this.gifRecordTime.stop();
       }
 
       const gifName = (new Filenamer()).newVideoName(VideoType.GIF);
@@ -658,21 +638,21 @@ export class Video extends ModeBase {
       // TODO(b/279865370): Don't pause when the confirm dialog is shown.
       window.addEventListener('beforeunload', beforeUnloadListener);
 
-      this.recordTime.start({resume: false});
+      this.recordTime.start();
       let timeLapseSaver: TimeLapseSaver|null = null;
       try {
         assert(param !== null);
         timeLapseSaver = await this.captureTimeLapse(param);
       } finally {
         state.set(state.State.RECORDING, false);
-        this.recordTime.stop({pause: false});
+        this.recordTime.stop();
         window.removeEventListener('beforeunload', beforeUnloadListener);
       }
 
       if (this.recordTime.inMilliseconds() <
           (MINIMUM_VIDEO_DURATION_IN_MILLISECONDS * TIME_LAPSE_INITIAL_SPEED)) {
         toast.show(I18nString.ERROR_MSG_VIDEO_TOO_SHORT);
-        timeLapseSaver.cancel();
+        await timeLapseSaver.cancel();
         return [Promise.resolve()];
       }
 
@@ -685,7 +665,7 @@ export class Video extends ModeBase {
         timeLapseSaver,
       })];
     } else {
-      this.recordTime.start({resume: false});
+      this.recordTime.start();
       let videoSaver: VideoSaver|null = null;
 
       const isVideoTooShort = () => this.recordTime.inMilliseconds() <
@@ -695,9 +675,10 @@ export class Video extends ModeBase {
         try {
           videoSaver = await this.captureVideo();
         } finally {
-          this.recordTime.stop({pause: false});
-          sound.play(dom.get('#sound-rec-end', HTMLAudioElement));
-          await this.snapshotting;
+          this.recordTime.stop();
+          // TODO(pihsun): Reconsider if sound.play should return a Promise.
+          void sound.play(dom.get('#sound-rec-end', HTMLAudioElement));
+          await this.snapshottingQueue.flush();
         }
       } catch (e) {
         // Tolerates the error if it is due to the very short duration. Reports
@@ -712,7 +693,7 @@ export class Video extends ModeBase {
         assert(videoSaver !== null);
         toast.show(I18nString.ERROR_MSG_VIDEO_TOO_SHORT);
         await videoSaver.cancel();
-        return [this.snapshotting ?? Promise.resolve()];
+        return [Promise.resolve()];
       }
 
       return [(async () => {
@@ -724,7 +705,6 @@ export class Video extends ModeBase {
           videoSaver,
           everPaused: this.everPaused,
         });
-        await this.snapshotting;
       })()];
     }
   }
@@ -808,7 +788,7 @@ export class Video extends ModeBase {
   }
 
   /**
-   * Initial time-lapse saver with specified encoder parameters. Then, Starts
+   * Creates time-lapse saver with specified encoder parameters. Then, Starts
    * recording time-lapse and waits for stop recording event.
    */
   private async captureTimeLapse(param: h264.EncoderParameters):
@@ -816,8 +796,12 @@ export class Video extends ModeBase {
     const encoderConfig = getVideoEncoderConfig(param, this.captureResolution);
 
     // Creates a saver given the initial speed.
-    const saver = await TimeLapseSaver.create(
-        encoderConfig, this.captureResolution, this.frameRate,
+    const saver = await this.handler.createTimeLapseSaver(
+        {
+          encoderConfig,
+          fps: this.frameRate,
+          resolution: this.captureResolution,
+        },
         TIME_LAPSE_INITIAL_SPEED);
 
     // Creates a frame reader from track processor.
@@ -826,51 +810,44 @@ export class Video extends ModeBase {
     const reader = trackProcessor.readable.getReader();
 
     state.set(state.State.RECORDING, true);
-    const frames = await new Promise<number>((resolve, reject) => {
-      let frameCount = 0;
-      let writtenFrameCount = 0;
 
-      async function onError(error: unknown) {
-        await saver.cancel();
-        reject(error);
-      }
-      saver.setErrorCallback(onError);
-
-      async function updateFrame(): Promise<void> {
-        if (!state.get(state.State.RECORDING)) {
-          resolve(writtenFrameCount);
-          return;
-        }
-        if (state.get(state.State.RECORDING_PAUSED)) {
-          state.addOneTimeObserver(state.State.RECORDING_PAUSED, updateFrame);
-          return;
-        }
-        let frame: VideoFrame|null = null;
-        try {
-          const {done, value} = await reader.read();
-          if (done) {
-            resolve(writtenFrameCount);
-            return;
-          }
-          frame = value;
-          if (frameCount % saver.speed === 0) {
-            saver.write(frame, frameCount);
-            writtenFrameCount++;
-          }
-        } catch (e) {
-          onError(e);
-        } finally {
-          if (frame !== null) {
-            frame.close();
-          }
-        }
-        frameCount++;
-        updateFrame();
-      }
-      updateFrame();
+    const errorPromise = new Promise<never>((_, reject) => {
+      saver.setErrorCallback(reject);
     });
 
-    if (frames === 0) {
+    let frameCount = 0;
+    let writtenFrameCount = 0;
+
+    while (state.get(state.State.RECORDING)) {
+      if (state.get(state.State.RECORDING_PAUSED)) {
+        const waitUnpaused = new WaitableEvent();
+        state.addOneTimeObserver(
+            state.State.RECORDING_PAUSED, () => waitUnpaused.signal());
+        await Promise.race([waitUnpaused.wait(), errorPromise]);
+        continue;
+      }
+      let frame: VideoFrame|null = null;
+      try {
+        const {done, value} = await Promise.race([reader.read(), errorPromise]);
+        if (done) {
+          break;
+        }
+        frame = value;
+        if (frameCount % saver.speed === 0) {
+          saver.write(frame, frameCount);
+          writtenFrameCount++;
+        }
+      } catch (e) {
+        await saver.cancel();
+        throw e;
+      } finally {
+        if (frame !== null) {
+          frame.close();
+        }
+      }
+      frameCount++;
+    }
+    if (writtenFrameCount === 0) {
       throw new NoFrameError();
     }
 
@@ -888,14 +865,14 @@ export class Video extends ModeBase {
       await new Promise((resolve, reject) => {
         let noChunk = true;
 
-        function onDataAvailable(event: BlobEvent) {
+        async function onDataAvailable(event: BlobEvent) {
           if (event.data.size > 0) {
             noChunk = false;
-            saver.write(event.data);
+            await saver.write(event.data);
           }
         }
 
-        const onStop = async () => {
+        const onStop = () => {
           assert(this.mediaRecorder !== null);
 
           state.set(state.State.RECORDING, false);

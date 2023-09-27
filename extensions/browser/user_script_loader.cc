@@ -302,6 +302,14 @@ void UserScriptLoader::StartLoad() {
                   return removed_script_ids_.count(script->id()) > 0u;
                 });
 
+  // Since all scripts managed by an instance of this class should have unique
+  // IDs, remove any already loaded scripts from `scripts_to_load` that will be
+  // updated from `added_scripts_map_`.
+  base::EraseIf(*scripts_to_load,
+                [this](const std::unique_ptr<UserScript>& script) {
+                  return added_scripts_map_.count(script->id()) > 0u;
+                });
+
   std::set<std::string> added_script_ids;
   scripts_to_load->reserve(scripts_to_load->size() + added_scripts_map_.size());
   for (auto& id_and_script : added_scripts_map_) {
@@ -343,12 +351,12 @@ base::ReadOnlySharedMemoryRegion UserScriptLoader::Serialize(
     script->Pickle(&pickle);
     // Write scripts as 'data' so that we can read it out in the slave without
     // allocating a new string.
-    for (const std::unique_ptr<UserScript::File>& js_file :
+    for (const std::unique_ptr<UserScript::Content>& js_file :
          script->js_scripts()) {
       base::StringPiece contents = js_file->GetContent();
       pickle.WriteData(contents.data(), contents.length());
     }
-    for (const std::unique_ptr<UserScript::File>& css_file :
+    for (const std::unique_ptr<UserScript::Content>& css_file :
          script->css_scripts()) {
       base::StringPiece contents = css_file->GetContent();
       pickle.WriteData(contents.data(), contents.length());

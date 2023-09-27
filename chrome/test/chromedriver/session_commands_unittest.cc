@@ -340,7 +340,7 @@ namespace {
 class DetachChrome : public StubChrome {
  public:
   DetachChrome() : quit_called_(false) {}
-  ~DetachChrome() override {}
+  ~DetachChrome() override = default;
 
   // Overridden from Chrome:
   Status Quit() override {
@@ -394,6 +394,22 @@ TEST(SessionCommandsTest, MatchCapabilitiesVirtualAuthenticatorsLargeBlob) {
   // Don't match values other than bools.
   merged.clear();
   merged.Set("webauthn:extension:largeBlob", "not a bool");
+  EXPECT_FALSE(MatchCapabilities(merged));
+}
+
+TEST(SessionCommandsTest, MatchCapabilitiesFedCm) {
+  // Match fedcm:accounts.
+  base::Value::Dict merged;
+  merged.SetByDottedPath("fedcm:accounts", true);
+  EXPECT_TRUE(MatchCapabilities(merged));
+
+  // Don't match false.
+  merged.SetByDottedPath("fedcm:accounts", false);
+  EXPECT_FALSE(MatchCapabilities(merged));
+
+  // Don't match values other than bools.
+  merged.clear();
+  merged.Set("fedcm:accounts", "not a bool");
   EXPECT_FALSE(MatchCapabilities(merged));
 }
 
@@ -481,13 +497,13 @@ TEST(SessionCommandsTest, ConfigureHeadlessSession_dotNotation) {
 
   Status status = capabilities.Parse(caps);
   BrowserInfo binfo;
-  binfo.is_headless = true;
+  binfo.is_headless_shell = true;
   MockChrome* chrome = new MockChrome(binfo);
   Session session("id", std::unique_ptr<Chrome>(chrome));
 
   status = internal::ConfigureHeadlessSession(&session, capabilities);
   ASSERT_EQ(kOk, status.code()) << status.message();
-  ASSERT_TRUE(session.chrome->GetBrowserInfo()->is_headless);
+  ASSERT_TRUE(session.chrome->GetBrowserInfo()->is_headless_shell);
   ASSERT_STREQ("/examples/python/downloads",
                session.headless_download_directory->c_str());
 }
@@ -503,13 +519,13 @@ TEST(SessionCommandsTest, ConfigureHeadlessSession_nestedMap) {
 
   Status status = capabilities.Parse(caps);
   BrowserInfo binfo;
-  binfo.is_headless = true;
+  binfo.is_headless_shell = true;
   MockChrome* chrome = new MockChrome(binfo);
   Session session("id", std::unique_ptr<Chrome>(chrome));
 
   status = internal::ConfigureHeadlessSession(&session, capabilities);
   ASSERT_EQ(kOk, status.code()) << status.message();
-  ASSERT_TRUE(session.chrome->GetBrowserInfo()->is_headless);
+  ASSERT_TRUE(session.chrome->GetBrowserInfo()->is_headless_shell);
   ASSERT_STREQ("/examples/python/downloads",
                session.headless_download_directory->c_str());
 }
@@ -523,13 +539,13 @@ TEST(SessionCommandsTest, ConfigureHeadlessSession_noDownloadDir) {
 
   Status status = capabilities.Parse(caps);
   BrowserInfo binfo;
-  binfo.is_headless = true;
+  binfo.is_headless_shell = true;
   MockChrome* chrome = new MockChrome(binfo);
   Session session("id", std::unique_ptr<Chrome>(chrome));
 
   status = internal::ConfigureHeadlessSession(&session, capabilities);
   ASSERT_EQ(kOk, status.code()) << status.message();
-  ASSERT_TRUE(session.chrome->GetBrowserInfo()->is_headless);
+  ASSERT_TRUE(session.chrome->GetBrowserInfo()->is_headless_shell);
   ASSERT_STREQ(".", session.headless_download_directory->c_str());
 }
 
@@ -546,7 +562,7 @@ TEST(SessionCommandsTest, ConfigureHeadlessSession_notHeadless) {
 
   status = internal::ConfigureHeadlessSession(&session, capabilities);
   ASSERT_EQ(kOk, status.code()) << status.message();
-  ASSERT_FALSE(session.chrome->GetBrowserInfo()->is_headless);
+  ASSERT_FALSE(session.chrome->GetBrowserInfo()->is_headless_shell);
   ASSERT_FALSE(session.headless_download_directory);
 }
 
@@ -589,7 +605,7 @@ TEST(SessionCommandsTest, ConfigureSession_allSet) {
   ASSERT_NE(desired_caps_out, nullptr);
   ASSERT_TRUE(capabilities_out.logging_prefs["driver"]);
   // Verify session settings are correct
-  ASSERT_EQ(kAccept, session.unhandled_prompt_behavior);
+  ASSERT_EQ(::prompt_behavior::kAccept, session.unhandled_prompt_behavior);
   ASSERT_EQ(base::Seconds(57), session.implicit_wait);
   ASSERT_EQ(base::Seconds(29), session.page_load_timeout);
   ASSERT_EQ(base::Seconds(21), session.script_timeout);
@@ -624,7 +640,8 @@ TEST(SessionCommandsTest, ConfigureSession_defaults) {
   ASSERT_FALSE(session.strict_file_interactability);
   ASSERT_EQ(Log::Level::kWarning, session.driver_log.get()->min_level());
   // w3c values:
-  ASSERT_EQ(kDismissAndNotify, session.unhandled_prompt_behavior);
+  ASSERT_EQ(::prompt_behavior::kDismissAndNotify,
+            session.unhandled_prompt_behavior);
 }
 
 TEST(SessionCommandsTest, ConfigureSession_legacyDefault) {
@@ -650,5 +667,5 @@ TEST(SessionCommandsTest, ConfigureSession_legacyDefault) {
   ASSERT_EQ(kOk, status.code()) << status.message();
   ASSERT_NE(desired_caps_out, nullptr);
   // legacy values:
-  ASSERT_EQ(kIgnore, session.unhandled_prompt_behavior);
+  ASSERT_EQ(::prompt_behavior::kIgnore, session.unhandled_prompt_behavior);
 }

@@ -299,6 +299,23 @@ TEST_F(UserManagerTest, RetrieveTrustedDevicePolicies) {
   EXPECT_EQ(GetUserManagerOwnerId(), kOwnerAccountId);
 }
 
+TEST_F(UserManagerTest, GetProfilePrefs) {
+  // Log in the user and create the profile.
+  user_manager::UserManager::Get()->UserLoggedIn(
+      kOwnerAccountId, kOwnerAccountId.GetUserEmail(),
+      false /* browser_restart */, false /* is_child */);
+  user_manager::User* const user =
+      user_manager::UserManager::Get()->GetActiveUser();
+  ASSERT_FALSE(user->GetProfilePrefs());
+  Profile& profile = profiles::testing::CreateProfileSync(
+      g_browser_process->profile_manager(),
+      ash::ProfileHelper::GetProfilePathByUserIdHash(user->username_hash()));
+  EXPECT_TRUE(user->GetProfilePrefs());
+  EXPECT_EQ(profile.GetPrefs(), user->GetProfilePrefs());
+
+  ResetUserManager();
+}
+
 // Tests that `IsEphemeralAccountId(account_id)` returns false when `account_id`
 // is a device owner account id.
 TEST_F(UserManagerTest, IsEphemeralAccountIdFalseForOwnerAccountId) {
@@ -338,27 +355,9 @@ TEST_F(UserManagerTest, IsEphemeralAccountIdFalseForStubAccountId) {
   EXPECT_FALSE(IsEphemeralAccountId(user_manager::StubAccountId()));
 }
 
-// Tests that `IsEphemeralAccountId(account_id)` returns false when `account_id`
-// is a stub ad account id.
-TEST_F(UserManagerTest, IsEphemeralAccountIdFalseForStubAdAccountId) {
-  EXPECT_FALSE(IsEphemeralAccountId(user_manager::StubAdAccountId()));
-
-  SetDeviceSettings(
-      /* ephemeral_users_enabled= */ true,
-      /* owner= */ kOwnerAccountId.GetUserEmail());
-  RetrieveTrustedDevicePolicies();
-
-  EXPECT_FALSE(IsEphemeralAccountId(user_manager::StubAdAccountId()));
-}
-
 // Tests that `IsEphemeralAccountId(account_id)` returns true when `account_id`
 // is a public account id.
 TEST_F(UserManagerTest, IsEphemeralAccountIdTrueForPublicAccountId) {
-  const AccountId public_accout_id = CreateDeviceLocalAccountId(
-      kDeviceLocalAccountId, policy::DeviceLocalAccount::TYPE_PUBLIC_SESSION);
-
-  EXPECT_TRUE(IsEphemeralAccountId(public_accout_id));
-
   // Set all ephemeral related policies to `false` to make sure that policies
   // don't affect ephemeral mode of the public account.
   SetDeviceSettings(
@@ -369,18 +368,14 @@ TEST_F(UserManagerTest, IsEphemeralAccountIdTrueForPublicAccountId) {
       policy::DeviceLocalAccount::EphemeralMode::kDisable);
   RetrieveTrustedDevicePolicies();
 
+  const AccountId public_accout_id = CreateDeviceLocalAccountId(
+      kDeviceLocalAccountId, policy::DeviceLocalAccount::TYPE_PUBLIC_SESSION);
   EXPECT_TRUE(IsEphemeralAccountId(public_accout_id));
 }
 
 // Tests that `IsEphemeralAccountId(account_id)` returns true when `account_id`
 // is a SAML public account id.
 TEST_F(UserManagerTest, IsEphemeralAccountIdTrueForSamlPublicAccountId) {
-  const AccountId saml_public_accout_id = CreateDeviceLocalAccountId(
-      kDeviceLocalAccountId,
-      policy::DeviceLocalAccount::TYPE_SAML_PUBLIC_SESSION);
-
-  EXPECT_TRUE(IsEphemeralAccountId(saml_public_accout_id));
-
   // Set all ephemeral related policies to `false` to make sure that policies
   // don't affect ephemeral mode of the SAML public account.
   SetDeviceSettings(
@@ -392,6 +387,9 @@ TEST_F(UserManagerTest, IsEphemeralAccountIdTrueForSamlPublicAccountId) {
       policy::DeviceLocalAccount::EphemeralMode::kDisable);
   RetrieveTrustedDevicePolicies();
 
+  const AccountId saml_public_accout_id = CreateDeviceLocalAccountId(
+      kDeviceLocalAccountId,
+      policy::DeviceLocalAccount::TYPE_SAML_PUBLIC_SESSION);
   EXPECT_TRUE(IsEphemeralAccountId(saml_public_accout_id));
 }
 

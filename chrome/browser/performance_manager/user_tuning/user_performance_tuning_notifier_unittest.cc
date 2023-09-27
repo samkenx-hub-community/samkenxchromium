@@ -11,10 +11,13 @@
 #include <vector>
 
 #include "base/memory/raw_ptr.h"
+#include "base/ranges/algorithm.h"
+#include "base/test/scoped_feature_list.h"
 #include "components/performance_manager/graph/frame_node_impl.h"
 #include "components/performance_manager/graph/page_node_impl.h"
 #include "components/performance_manager/graph/system_node_impl.h"
 #include "components/performance_manager/public/decorators/process_metrics_decorator.h"
+#include "components/performance_manager/public/features.h"
 #include "components/performance_manager/public/graph/graph.h"
 #include "components/performance_manager/test_support/graph_test_harness.h"
 #include "testing/gmock/include/gmock/gmock.h"
@@ -38,12 +41,10 @@ class UserPerformanceTuningNotifierTest : public GraphTestHarness {
     void NotifyMemoryMetricsRefreshed(
         ProxyAndPmfKbVector proxies_and_pmf) override {
       pages_pmf_kb_.clear();
-      std::transform(
-          proxies_and_pmf.begin(), proxies_and_pmf.end(),
-          std::back_inserter(pages_pmf_kb_),
-          [](const std::pair<WebContentsProxy, uint64_t>& proxy_and_pmf) {
-            return proxy_and_pmf.second;
-          });
+
+      base::ranges::transform(proxies_and_pmf,
+                              std::back_inserter(pages_pmf_kb_),
+                              &std::pair<WebContentsProxy, uint64_t>::second);
       ++memory_refreshed_count_;
     }
 
@@ -53,11 +54,27 @@ class UserPerformanceTuningNotifierTest : public GraphTestHarness {
     std::vector<uint64_t> pages_pmf_kb_;
   };
 
+  class TestProcessMetricsDecorator : public ProcessMetricsDecorator {
+   public:
+    void RequestProcessesMemoryMetrics(
+        bool immediate_request,
+        ProcessMemoryDumpCallback callback) override {
+      if (immediate_request) {
+        ++request_immediate_metrics_count_;
+      }
+      ProcessMetricsDecorator::RequestProcessesMemoryMetrics(
+          immediate_request, std::move(callback));
+    }
+
+    int request_immediate_metrics_count_ = 0;
+  };
+
   void SetUp() override {
     GraphTestHarness::SetUp();
 
-    graph()->PassToGraph(
-        std::make_unique<performance_manager::ProcessMetricsDecorator>());
+    auto decorator = std::make_unique<TestProcessMetricsDecorator>();
+    decorator_ = decorator.get();
+    graph()->PassToGraph(std::move(decorator));
 
     auto receiver = std::make_unique<TestReceiver>();
     receiver_ = receiver.get();
@@ -68,6 +85,7 @@ class UserPerformanceTuningNotifierTest : public GraphTestHarness {
     graph()->PassToGraph(std::move(notifier));
   }
 
+  raw_ptr<TestProcessMetricsDecorator> decorator_;
   raw_ptr<TestReceiver> receiver_;
 };
 
@@ -155,6 +173,29 @@ TEST_F(UserPerformanceTuningNotifierTest, TestMemoryAvailableTriggered) {
   SystemNodeImpl::FromNode(graph()->GetSystemNode())
       ->OnProcessMemoryMetricsAvailable();
   EXPECT_EQ(2, receiver_->memory_refreshed_count_);
+}
+
+TEST_F(UserPerformanceTuningNotifierTest,
+       TestRequestImmediateMetricsTriggered) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeatureWithParameters(
+      features::kMemoryUsageInHovercards,
+      {{"memory_update_trigger", "navigation"}});
+
+  // Memory Metrics are available
+  auto process = CreateNode<ProcessNodeImpl>();
+  auto page = CreateNode<PageNodeImpl>();
+  page->SetType(PageType::kTab);
+  auto frame = CreateFrameNodeAutoId(process.get(), page.get());
+  frame->SetPrivateFootprintKbEstimate(30);
+
+  // No memory refresh should occur while loading.
+  page->SetLoadingState(PageNode::LoadingState::kLoading);
+  EXPECT_EQ(0, decorator_->request_immediate_metrics_count_);
+
+  // Memory refresh should occur after MainFrameDocumentCommitted.
+  page->SetLoadingState(PageNode::LoadingState::kLoadedIdle);
+  EXPECT_EQ(1, decorator_->request_immediate_metrics_count_);
 }
 
 }  // namespace performance_manager::user_tuning

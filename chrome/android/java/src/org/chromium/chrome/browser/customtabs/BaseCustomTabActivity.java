@@ -26,6 +26,7 @@ import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ChromeApplicationImpl;
 import org.chromium.chrome.browser.DeferredStartupHandler;
+import org.chromium.chrome.browser.IntentHandler;
 import org.chromium.chrome.browser.KeyboardShortcuts;
 import org.chromium.chrome.browser.app.ChromeActivity;
 import org.chromium.chrome.browser.app.tabmodel.TabModelOrchestrator;
@@ -53,6 +54,7 @@ import org.chromium.chrome.browser.metrics.UmaSessionStats;
 import org.chromium.chrome.browser.night_mode.NightModeStateProvider;
 import org.chromium.chrome.browser.night_mode.PowerSavingModeMonitor;
 import org.chromium.chrome.browser.night_mode.SystemNightModeMonitor;
+import org.chromium.chrome.browser.page_insights.PageInsightsCoordinator;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabState;
 import org.chromium.chrome.browser.tabmodel.ChromeTabCreator;
@@ -63,6 +65,7 @@ import org.chromium.chrome.browser.ui.appmenu.AppMenuPropertiesDelegate;
 import org.chromium.chrome.browser.usage_stats.UsageStatsService;
 import org.chromium.chrome.browser.webapps.SameTaskWebApkActivity;
 import org.chromium.chrome.browser.webapps.WebappActivityCoordinator;
+import org.chromium.components.browser_ui.share.ShareHelper;
 import org.chromium.components.browser_ui.widget.gesture.BackPressHandler;
 import org.chromium.components.embedder_support.delegate.WebContentsDelegateAndroid;
 
@@ -139,6 +142,11 @@ public abstract class BaseCustomTabActivity extends ChromeActivity<BaseCustomTab
 
     @Override
     public void onNewIntent(Intent intent) {
+        // Drop the cleaner intent since it's created in order to clear up the OS share sheet.
+        if (ShareHelper.isCleanerIntent(intent)) {
+            return;
+        }
+
         Intent originalIntent = getIntent();
         super.onNewIntent(intent);
         // Currently we can't handle arbitrary updates of intent parameters, so make sure
@@ -170,7 +178,7 @@ public abstract class BaseCustomTabActivity extends ChromeActivity<BaseCustomTab
                 /* statusBarColorProvider= */ this, getIntentRequestTracker(),
                 () -> mToolbarCoordinator, () -> mNavigationController, () -> mIntentDataProvider,
                 () -> mDelegateFactory.getEphemeralTabCoordinator(), mBackPressManager,
-                () -> mTabController, this::isPageInsightsHubEnabled);
+                () -> mTabController);
         // clang-format on
         return mBaseCustomTabRootUiCoordinator;
     }
@@ -193,9 +201,8 @@ public abstract class BaseCustomTabActivity extends ChromeActivity<BaseCustomTab
                 ModuleFactoryOverrides.getOverrideFor(BaseCustomTabActivityModule.Factory.class);
 
         // mIntentHandler comes from the base class.
-        IntentIgnoringCriterion intentIgnoringCriterion = (intent)
-                -> mIntentHandler.shouldIgnoreIntent(
-                        intent, /*startedActivity=*/true, isCustomTab());
+        IntentIgnoringCriterion intentIgnoringCriterion =
+                (intent) -> IntentHandler.shouldIgnoreIntent(intent, isCustomTab());
 
         BaseCustomTabActivityModule baseCustomTabsModule = overridenBaseCustomTabFactory != null
                 ? overridenBaseCustomTabFactory.create(mIntentDataProvider,
@@ -265,13 +272,6 @@ public abstract class BaseCustomTabActivity extends ChromeActivity<BaseCustomTab
         final int separateTaskFlags =
                 Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NEW_DOCUMENT;
         return (getIntent().getFlags() & separateTaskFlags) != 0;
-    }
-
-    /**
-     * Return true when PageInsights Hub is enabled on Custom Tabs. False by default.
-     */
-    protected boolean isPageInsightsHubEnabled() {
-        return false;
     }
 
     @Override
@@ -380,8 +380,7 @@ public abstract class BaseCustomTabActivity extends ChromeActivity<BaseCustomTab
     }
 
     @Override
-    @ActivityType
-    public int getActivityType() {
+    public @ActivityType int getActivityType() {
         return getIntentDataProvider().getActivityType();
     }
 
@@ -397,8 +396,7 @@ public abstract class BaseCustomTabActivity extends ChromeActivity<BaseCustomTab
     }
 
     @Override
-    @Nullable
-    public Tab getActivityTab() {
+    public @Nullable Tab getActivityTab() {
         return mTabProvider.getTab();
     }
 
@@ -416,7 +414,7 @@ public abstract class BaseCustomTabActivity extends ChromeActivity<BaseCustomTab
                 mIntentDataProvider.shouldShowShareMenuItem(),
                 mIntentDataProvider.shouldShowStarButton(),
                 mIntentDataProvider.shouldShowDownloadButton(), mIntentDataProvider.isIncognito(),
-                isMenuIconAtStart, this::isPageInsightsHubEnabled);
+                isMenuIconAtStart, mBaseCustomTabRootUiCoordinator::isPageInsightsHubEnabled);
     }
 
     @Override
@@ -449,6 +447,16 @@ public abstract class BaseCustomTabActivity extends ChromeActivity<BaseCustomTab
 
     @Override
     protected boolean handleBackPressed() {
+        if (!BackPressManager.isEnabled() && getTabModalLifetimeHandler() != null
+                && getTabModalLifetimeHandler().onBackPressed()) {
+            BackPressManager.record(BackPressHandler.Type.TAB_MODAL_HANDLER);
+            return true;
+        }
+        if (BackPressManager.correctTabNavigationOnFallback()) {
+            if (getToolbarManager() != null && getToolbarManager().back()) {
+                return true;
+            }
+        }
         return mNavigationController.navigateOnBack();
     }
 
@@ -514,6 +522,13 @@ public abstract class BaseCustomTabActivity extends ChromeActivity<BaseCustomTab
 
     @Override
     public int getBaseStatusBarColor(Tab tab) {
+        // TODO(b/300419189): Pass the CCT Top Bar Color in AGSA intent after the Chrome side LE for
+        // Page Insights Hub
+        if (PageInsightsCoordinator.isFeatureEnabled()
+                && CustomTabsConnection.getInstance().shouldEnablePageInsightsForIntent(
+                        mIntentDataProvider)) {
+            return getWindow().getContext().getColor(R.color.gm3_baseline_surface_container);
+        }
         return mStatusBarColorProvider.getBaseStatusBarColor(tab);
     }
 
@@ -593,8 +608,7 @@ public abstract class BaseCustomTabActivity extends ChromeActivity<BaseCustomTab
      * @return The package name of the Trusted Web Activity, if the activity is a TWA; null
      * otherwise.
      */
-    @Nullable
-    public String getTwaPackage() {
+    public @Nullable String getTwaPackage() {
         return mTwaCoordinator == null ? null : mTwaCoordinator.getTwaPackage();
     }
 

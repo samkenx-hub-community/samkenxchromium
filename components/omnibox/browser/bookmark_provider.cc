@@ -144,7 +144,7 @@ void BookmarkProvider::DoAutocomplete(const AutocompleteInput& input) {
                     matches_.end(), AutocompleteMatch::MoreRelevant);
   ResizeMatches(
       num_matches,
-      OmniboxFieldTrial::IsMlUrlScoringIncreaseNumCandidatesEnabled());
+      OmniboxFieldTrial::IsMlUrlScoringUnlimitedNumCandidatesEnabled());
 }
 
 query_parser::MatchingAlgorithm BookmarkProvider::GetMatchingAlgorithm(
@@ -153,8 +153,7 @@ query_parser::MatchingAlgorithm BookmarkProvider::GetMatchingAlgorithm(
   //  specifically, since we might still get bookmarks suggestions in
   //  non-bookmarks keyword mode. This is enough of an edge case it makes sense
   //  to just stick with simplicity for now.
-  if (OmniboxFieldTrial::IsSiteSearchStarterPackEnabled() &&
-      InKeywordMode(input)) {
+  if (InKeywordMode(input)) {
     return query_parser::MatchingAlgorithm::ALWAYS_PREFIX_SEARCH;
   }
 
@@ -262,8 +261,8 @@ std::pair<int, int> BookmarkProvider::CalculateBookmarkMatchRelevance(
   size_t url_node_count = 0;
 
   {
-    std::vector<const BookmarkNode*> nodes;
-    local_or_syncable_bookmark_model_->GetNodesByURL(url, &nodes);
+    std::vector<const BookmarkNode*> nodes =
+        local_or_syncable_bookmark_model_->GetNodesByURL(url);
     url_node_count += nodes.size();
   }
 
@@ -271,8 +270,8 @@ std::pair<int, int> BookmarkProvider::CalculateBookmarkMatchRelevance(
   // take the maximum. This appears more robust against edge cases where a user
   // may have many or all bookmarks duplicated between the two models.
   if (account_bookmark_model_) {
-    std::vector<const BookmarkNode*> nodes;
-    account_bookmark_model_->GetNodesByURL(url, &nodes);
+    std::vector<const BookmarkNode*> nodes =
+        account_bookmark_model_->GetNodesByURL(url);
     url_node_count = std::max(url_node_count, nodes.size());
   }
 

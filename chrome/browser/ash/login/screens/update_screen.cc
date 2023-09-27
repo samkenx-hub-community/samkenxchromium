@@ -24,7 +24,7 @@
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/ui/webui/ash/login/update_screen_handler.h"
 #include "chrome/common/pref_names.h"
-#include "chrome/grit/chromium_strings.h"
+#include "chrome/grit/branded_strings.h"
 #include "chrome/grit/generated_resources.h"
 #include "chromeos/ash/components/network/network_state.h"
 #include "components/prefs/pref_service.h"
@@ -359,9 +359,9 @@ void UpdateScreen::UpdateInfoChanged(
     case update_engine::Operation::FINALIZING:
       if (view_)
         view_->SetUpdateState(UpdateView::UIState::kUpdateInProgress);
-      // set that critcial update applied in OOBE.
-      g_browser_process->local_state()->SetBoolean(prefs::kOobeCriticalUpdate,
-                                                   true);
+      // set that critical update applied in OOBE.
+      g_browser_process->local_state()->SetBoolean(
+          prefs::kOobeCriticalUpdateCompleted, true);
       SetUpdateStatusMessage(update_info.better_update_progress,
                              update_info.total_time_left);
       // Make sure that VERIFYING and FINALIZING stages are recorded correctly.

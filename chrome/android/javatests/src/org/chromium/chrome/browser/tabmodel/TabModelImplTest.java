@@ -24,14 +24,12 @@ import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.DisabledTest;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
-import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
 import org.chromium.chrome.test.batch.BlankCTATabInitialStateRule;
 import org.chromium.chrome.test.util.ChromeTabUtils;
-import org.chromium.chrome.test.util.browser.Features.EnableFeatures;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
 import org.chromium.net.test.EmbeddedTestServer;
 import org.chromium.net.test.EmbeddedTestServerRule;
@@ -66,15 +64,12 @@ public class TabModelImplTest {
         mActivity = sActivityTestRule.getActivity();
         final Tab tab = mActivity.getActivityTab();
         ChromeTabUtils.waitForInteractable(tab);
-        TestThreadUtils.runOnUiThreadBlocking(() -> tab.setIsTabSaveEnabled(false));
     }
 
     private void createTabs(int tabsCount, boolean isIncognito, String url) {
         for (int i = 0; i < tabsCount; i++) {
             Tab tab = ChromeTabUtils.fullyLoadUrlInNewTab(
                     InstrumentationRegistry.getInstrumentation(), mActivity, url, isIncognito);
-
-            TestThreadUtils.runOnUiThreadBlocking(() -> tab.setIsTabSaveEnabled(false));
         }
     }
 
@@ -151,7 +146,6 @@ public class TabModelImplTest {
 
     @Test
     @SmallTest
-    @EnableFeatures({ChromeFeatureList.TAB_GROUPS_ANDROID})
     public void hasOtherRelatedTabs_detectMergedTabs() throws Exception {
         createTabs(3, false, mTestUrl);
 

@@ -8,6 +8,7 @@
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "components/autofill/core/browser/autofill_suggestion_generator.h"
+#include "components/autofill/core/browser/browser_autofill_manager_test_api.h"
 #include "components/autofill/core/browser/field_types.h"
 #include "components/autofill/core/browser/form_structure.h"
 #include "components/autofill/core/browser/form_structure_test_api.h"
@@ -22,14 +23,6 @@
 #include "testing/gtest/include/gtest/gtest.h"
 
 namespace autofill {
-
-namespace {
-
-FormStructureTestApi test_api(FormStructure* form_structure) {
-  return FormStructureTestApi(form_structure);
-}
-
-}  // namespace
 
 TestBrowserAutofillManager::TestBrowserAutofillManager(AutofillDriver* driver,
                                                        AutofillClient* client)
@@ -77,13 +70,11 @@ void TestBrowserAutofillManager::OnAskForValuesToFill(
     const FormData& form,
     const FormFieldData& field,
     const gfx::RectF& bounding_box,
-    AutoselectFirstSuggestion autoselect_first_suggestion,
-    FormElementWasClicked form_element_was_clicked) {
+    AutofillSuggestionTriggerSource trigger_source) {
   TestAutofillManagerWaiter waiter(*this,
                                    {AutofillManagerEvent::kAskForValuesToFill});
   AutofillManager::OnAskForValuesToFill(form, field, bounding_box,
-                                        autoselect_first_suggestion,
-                                        form_element_was_clicked);
+                                        trigger_source);
   ASSERT_TRUE(waiter.Wait());
 }
 
@@ -118,7 +109,8 @@ void TestBrowserAutofillManager::UploadVotesAndLogQuality(
     std::unique_ptr<FormStructure> submitted_form,
     base::TimeTicks interaction_time,
     base::TimeTicks submission_time,
-    bool observed_submission) {
+    bool observed_submission,
+    const ukm::SourceId source_id) {
   submitted_form_signature_ = submitted_form->FormSignatureAsStr();
 
   if (observed_submission) {
@@ -151,7 +143,7 @@ void TestBrowserAutofillManager::UploadVotesAndLogQuality(
 
   BrowserAutofillManager::UploadVotesAndLogQuality(
       std::move(submitted_form), interaction_time, submission_time,
-      observed_submission);
+      observed_submission, source_id);
 }
 
 void TestBrowserAutofillManager::StoreUploadVotesAndLogQualityCallback(
@@ -169,8 +161,8 @@ const gfx::Image& TestBrowserAutofillManager::GetCardImage(
 
 void TestBrowserAutofillManager::ScheduleRefill(
     const FormData& form,
-    const AutofillTriggerSource trigger_source) {
-  TriggerRefillForTest(form, trigger_source);
+    const AutofillTriggerDetails& trigger_details) {
+  test_api(*this).TriggerRefill(form, trigger_details);
 }
 
 bool TestBrowserAutofillManager::MaybeStartVoteUploadProcess(
@@ -194,27 +186,26 @@ void TestBrowserAutofillManager::AddSeenForm(
     const std::vector<ServerFieldType>& heuristic_types,
     const std::vector<ServerFieldType>& server_types,
     bool preserve_values_in_form_structure) {
-  std::vector<std::vector<std::pair<PatternSource, ServerFieldType>>>
+  std::vector<std::vector<std::pair<HeuristicSource, ServerFieldType>>>
       all_heuristic_types;
   for (ServerFieldType type : heuristic_types)
-    all_heuristic_types.push_back({{GetActivePatternSource(), type}});
+    all_heuristic_types.push_back({{GetActiveHeuristicSource(), type}});
   AddSeenForm(form, all_heuristic_types, server_types,
               preserve_values_in_form_structure);
 }
 
 void TestBrowserAutofillManager::AddSeenForm(
     const FormData& form,
-    const std::vector<std::vector<std::pair<PatternSource, ServerFieldType>>>&
+    const std::vector<std::vector<std::pair<HeuristicSource, ServerFieldType>>>&
         heuristic_types,
     const std::vector<ServerFieldType>& server_types,
     bool preserve_values_in_form_structure) {
   auto form_structure = std::make_unique<FormStructure>(
       preserve_values_in_form_structure ? form : test::WithoutValues(form));
-  test_api(form_structure.get()).SetFieldTypes(heuristic_types, server_types);
-  test_api(form_structure.get())
-      .IdentifySections(/*ignore_autocomplete=*/false);
+  test_api(*form_structure).SetFieldTypes(heuristic_types, server_types);
+  test_api(*form_structure).IdentifySections(/*ignore_autocomplete=*/false);
   AddSeenFormStructure(std::move(form_structure));
-  form_interactions_ukm_logger()->OnFormsParsed(client()->GetUkmSourceId());
+  form_interactions_ukm_logger()->OnFormsParsed(client().GetUkmSourceId());
 }
 
 void TestBrowserAutofillManager::AddSeenFormStructure(
@@ -235,13 +226,11 @@ void TestBrowserAutofillManager::OnAskForValuesToFillTest(
     const FormData& form,
     const FormFieldData& field,
     const gfx::RectF& bounding_box,
-    AutoselectFirstSuggestion autoselect_first_suggestion,
-    FormElementWasClicked form_element_was_clicked) {
+    AutofillSuggestionTriggerSource trigger_source) {
   TestAutofillManagerWaiter waiter(*this,
                                    {AutofillManagerEvent::kAskForValuesToFill});
   BrowserAutofillManager::OnAskForValuesToFill(form, field, bounding_box,
-                                               autoselect_first_suggestion,
-                                               form_element_was_clicked);
+                                               trigger_source);
   ASSERT_TRUE(waiter.Wait());
 }
 

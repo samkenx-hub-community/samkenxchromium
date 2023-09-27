@@ -29,9 +29,15 @@ class ManagementContextMixinBrowser : public ManagementContextMixin {
 
   ~ManagementContextMixinBrowser() override;
 
+  // ManagementContextMixin:
+  void ManageCloudUser() override;
+
  protected:
   // InProcessBrowserTestMixin:
   void SetUpOnMainThread() override;
+
+  // ManagementContextMixin:
+  void SetUpInProcessBrowserTestFixture() override;
 
 #if !BUILDFLAG(GOOGLE_CHROME_BRANDING)
   void SetUpDefaultCommandLine(base::CommandLine* command_line) override;

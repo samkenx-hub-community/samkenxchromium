@@ -22,7 +22,7 @@ class ManifestDemuxerEngineHost;
 
 // Interface for `HlsRendition` to make data requests to avoid having to own or
 // create data sources.
-class MEDIA_EXPORT HlsRenditionHost {
+class MEDIA_EXPORT HlsRenditionHost : public HlsDataSourceStreamManager {
  public:
   // Lets a rendition read URL data from `uri`. Usually this will be a chunked
   // read, but can be configured with `read_chunked`, since live video needs to
@@ -31,7 +31,12 @@ class MEDIA_EXPORT HlsRenditionHost {
   virtual void ReadFromUrl(GURL uri,
                            bool read_chunked,
                            absl::optional<hls::types::ByteRange> range,
-                           HlsDataSourceStream::ReadCb cb) = 0;
+                           HlsDataSourceStreamManager::ReadCb cb) = 0;
+
+  virtual hls::ParseStatus::Or<scoped_refptr<hls::MediaPlaylist>>
+  ParseMediaPlaylistFromStringSource(base::StringPiece source,
+                                     GURL uri,
+                                     hls::types::DecimalInteger version) = 0;
 };
 
 class MEDIA_EXPORT HlsRendition {
@@ -53,6 +58,10 @@ class MEDIA_EXPORT HlsRendition {
 
   // Live renditions should return a nullopt for duration.
   virtual absl::optional<base::TimeDelta> GetDuration() = 0;
+
+  // Stop the rendition, including canceling pending seeks. After stopping,
+  // `CheckState` and `Seek` should be no-ops.
+  virtual void Stop() = 0;
 
   static HlsDemuxerStatus::Or<std::unique_ptr<HlsRendition>> CreateRendition(
       ManifestDemuxerEngineHost* engine_host,

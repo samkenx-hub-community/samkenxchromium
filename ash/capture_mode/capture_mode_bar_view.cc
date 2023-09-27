@@ -69,11 +69,13 @@ void CaptureModeBarView::AddedToWidget() {
   auto* parent = layer()->parent();
   parent->Add(shadow_->GetLayer());
   parent->StackAtBottom(shadow_->GetLayer());
+
+  // Make the shadow observe the color provider source change to update the
+  // colors.
+  shadow_->ObserveColorProviderSource(GetWidget());
 }
 
-void CaptureModeBarView::Layout() {
-  views::View::Layout();
-
+void CaptureModeBarView::OnBoundsChanged(const gfx::Rect& previous_bounds) {
   // The shadow layer is a sibling of this view's layer, and should have the
   // same bounds.
   shadow_->SetContentBounds(layer()->bounds());
@@ -100,9 +102,7 @@ CaptureModeBarView::CaptureModeBarView()
 
   capture_mode_util::SetHighlightBorder(
       this, border_radius,
-      chromeos::features::IsJellyrollEnabled()
-          ? views::HighlightBorder::Type::kHighlightBorderOnShadow
-          : views::HighlightBorder::Type::kHighlightBorder2);
+      views::HighlightBorder::Type::kHighlightBorderOnShadow);
 
   shadow_->SetRoundedCornerRadius(border_radius);
 }
@@ -134,8 +134,11 @@ void CaptureModeBarView::AppendCommonElements() {
 }
 
 void CaptureModeBarView::OnSettingsButtonPressed(const ui::Event& event) {
-  CaptureModeController::Get()->capture_mode_session()->SetSettingsMenuShown(
-      !settings_button_->toggled(), /*by_key_event=*/event.IsKeyEvent());
+  CaptureModeSession* session = static_cast<CaptureModeSession*>(
+      CaptureModeController::Get()->capture_mode_session());
+  CHECK_EQ(session->session_type(), SessionType::kReal);
+  session->SetSettingsMenuShown(!settings_button_->toggled(),
+                                /*by_key_event=*/event.IsKeyEvent());
 }
 
 void CaptureModeBarView::OnCloseButtonPressed() {

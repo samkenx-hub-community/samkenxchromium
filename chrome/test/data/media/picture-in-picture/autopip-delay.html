@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<head>
+<meta charset="utf-8">
+<title>Autopip On a Delay</title>
+<script src="../../webrtc/test_functions.js"></script>
+<script src="../../webrtc/getusermedia.js"></script>
+</head>
+<body>
+</body>
+<script>
+function openPip(details) {
+  // These tests should have `automatic` set to true in the
+  // MediaSessionActionDetails, so only proceed if they do.
+  if (details.automatic) {
+    // Delay opening PiP, but still within the user gesture window.
+    setTimeout(() => {
+      documentPictureInPicture.requestWindow();
+    }, 100);
+  }
+}
+
+navigator.mediaSession.setActionHandler('enterpictureinpicture', openPip);
+</script>

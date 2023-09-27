@@ -5,6 +5,8 @@
 package org.chromium.chrome.browser.compositor.overlays.strip;
 
 import android.content.pm.ActivityInfo;
+import android.view.MotionEvent;
+import android.view.View;
 
 import androidx.test.filters.LargeTest;
 import androidx.test.platform.app.InstrumentationRegistry;
@@ -25,16 +27,20 @@ import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.Feature;
 import org.chromium.base.test.util.Restriction;
 import org.chromium.chrome.browser.compositor.layouts.components.CompositorButton;
+import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tabmodel.TabModel;
 import org.chromium.chrome.browser.tabmodel.TabModelSelectorObserver;
 import org.chromium.chrome.browser.tabmodel.TabModelUtils;
+import org.chromium.chrome.browser.tasks.tab_management.TabManagementFieldTrial;
+import org.chromium.chrome.browser.tasks.tab_management.TabUiThemeProvider;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
 import org.chromium.chrome.test.batch.BlankCTATabInitialStateRule;
 import org.chromium.chrome.test.util.ChromeTabUtils;
 import org.chromium.chrome.test.util.TabStripUtils;
+import org.chromium.chrome.test.util.browser.Features.EnableFeatures;
 import org.chromium.content_public.browser.test.util.DOMUtils;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
 import org.chromium.ui.base.LocalizationUtils;
@@ -344,7 +350,7 @@ public class TabStripTest {
         // 3. Invoke "close all tabs" menu action; block until action is completed
         TestThreadUtils.runOnUiThreadBlocking(() -> {
             TabStripUtils.getActiveStripLayoutHelper(sActivityTestRule.getActivity())
-                    .clickTabMenuItem(StripLayoutHelper.ID_CLOSE_ALL_TABS);
+                    .clickTabMenuItemForTesting(StripLayoutHelper.ID_CLOSE_ALL_TABS);
         });
 
         // 4. Ensure all tabs were closed
@@ -377,7 +383,7 @@ public class TabStripTest {
                 ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         InstrumentationRegistry.getInstrumentation().waitForIdleSync();
         Assert.assertFalse(TabStripUtils.getActiveStripLayoutHelper(sActivityTestRule.getActivity())
-                                   .isTabMenuShowing());
+                                   .isTabMenuShowingForTesting());
         Assert.assertEquals("Expected 1 tab to be present", 1,
                 sActivityTestRule.getActivity().getCurrentTabModel().getCount());
 
@@ -480,7 +486,7 @@ public class TabStripTest {
         // 3. Invoke menu action; block until action is completed
         TestThreadUtils.runOnUiThreadBlocking(() -> {
             TabStripUtils.getActiveStripLayoutHelper(sActivityTestRule.getActivity())
-                    .clickTabMenuItem(StripLayoutHelper.ID_CLOSE_ALL_TABS);
+                    .clickTabMenuItemForTesting(StripLayoutHelper.ID_CLOSE_ALL_TABS);
         });
 
         // 4. Ensure all incognito tabs were closed and TabStrip is switched to normal
@@ -624,7 +630,7 @@ public class TabStripTest {
         // the ScrollingStripStacker.
         assertSetTabStripScrollOffset(
                 (int) TabStripUtils.getActiveStripLayoutHelper(sActivityTestRule.getActivity())
-                        .getMinimumScrollOffset());
+                        .getMinimumScrollOffsetForTesting());
 
         // Tab should now be hidden.
         helper.waitForCallback(0);
@@ -670,7 +676,7 @@ public class TabStripTest {
         // Open enough regular tabs to cause the strip to scroll.
         StripLayoutHelper tabStrip =
                 TabStripUtils.getStripLayoutHelper(sActivityTestRule.getActivity(), false);
-        while (tabStrip.getMinimumScrollOffset() >= 0) {
+        while (tabStrip.getMinimumScrollOffsetForTesting() >= 0) {
             ChromeTabUtils.newTabFromMenu(
                     InstrumentationRegistry.getInstrumentation(), sActivityTestRule.getActivity());
         }
@@ -686,7 +692,7 @@ public class TabStripTest {
         // at partial opacity.
         assertSetTabStripScrollOffset(
                 (int) (TabStripUtils.getActiveStripLayoutHelper(sActivityTestRule.getActivity())
-                                .getMinimumScrollOffset()
+                                .getMinimumScrollOffsetForTesting()
                         + StripLayoutHelper.FADE_FULL_OPACITY_THRESHOLD_DP / 2));
         assertTabStripFadePartiallyVisible(!isLeft);
         assertTabStripFadeFullyVisible(isLeft);
@@ -766,8 +772,8 @@ public class TabStripTest {
         // Set up some variables.
         StripLayoutHelper strip =
                 TabStripUtils.getActiveStripLayoutHelper(sActivityTestRule.getActivity());
-        StripLayoutTab[] tabs = strip.getStripLayoutTabs();
-        float tabDrawWidth = tabs[0].getWidth() - strip.getTabOverlapWidth();
+        StripLayoutTab[] tabs = strip.getStripLayoutTabsForTesting();
+        float tabDrawWidth = tabs[0].getWidth() - strip.getTabOverlapWidthForTesting();
 
         // Disable animations. The animation that normally runs when scrolling the tab strip makes
         // this test flaky.
@@ -852,6 +858,252 @@ public class TabStripTest {
                 2);
 
         assertWaitForKeyboardStatus(false);
+    }
+
+    /**
+     * Tests hover enter/move/exit events associated with the tab strip (with the tab strip redesign
+     * folio treatment enabled, for maximum coverage).
+     */
+    @Test
+    @LargeTest
+    @Feature({"TabStrip"})
+    @EnableFeatures({ChromeFeatureList.ADVANCED_PERIPHERALS_SUPPORT_TAB_STRIP,
+            ChromeFeatureList.TAB_STRIP_REDESIGN})
+    @Restriction(UiRestriction.RESTRICTION_TYPE_TABLET)
+    public void
+    testHoverOnTabStrip() throws Exception {
+        TabManagementFieldTrial.TAB_STRIP_REDESIGN_ENABLE_FOLIO.setForTesting(true);
+        // Open a few regular tabs.
+        ChromeTabUtils.newTabsFromMenu(
+                InstrumentationRegistry.getInstrumentation(), sActivityTestRule.getActivity(), 4);
+
+        // Select tabs to hover on.
+        TabModel model = sActivityTestRule.getActivity().getTabModelSelector().getModel(false);
+        StripLayoutTab tab1 = TabStripUtils.findStripLayoutTab(
+                sActivityTestRule.getActivity(), false, model.getTabAt(1).getId());
+        StripLayoutTab tab2 = TabStripUtils.findStripLayoutTab(
+                sActivityTestRule.getActivity(), false, model.getTabAt(2).getId());
+        assertTabVisibility(true, tab1);
+        assertTabVisibility(true, tab2);
+
+        // Simulate a hover into tab1.
+        StripLayoutHelperManager stripLayoutHelperManager =
+                TabStripUtils.getStripLayoutHelperManager(sActivityTestRule.getActivity());
+        Assert.assertNotNull("Hover card ViewStub should not be inflated before first hover event.",
+                stripLayoutHelperManager.getTabHoverCardViewStubForTesting().getParent());
+        float xEnter = tab1.getDrawX() + tab1.getWidth() / 2;
+        float yEnter = tab1.getDrawY() + tab1.getHeight() / 2;
+        TestThreadUtils.runOnUiThreadBlocking(
+                ()
+                        -> stripLayoutHelperManager.simulateHoverEventForTesting(
+                                MotionEvent.ACTION_HOVER_ENTER, xEnter, yEnter));
+
+        // Verify that the card view is inflated as expected.
+        var hoverCardView = stripLayoutHelperManager.getActiveStripLayoutHelper()
+                                    .getTabHoverCardViewForTesting();
+        Assert.assertNotNull("Hover card view should be set in normal StripLayoutHelper instance.",
+                stripLayoutHelperManager.getStripLayoutHelper(false)
+                        .getTabHoverCardViewForTesting());
+
+        // Verify that the card view background color is correctly set.
+        Assert.assertEquals("Hover card background color is incorrect.",
+                TabUiThemeProvider.getStripTabHoverCardBackgroundTintList(
+                        hoverCardView.getContext(), false),
+                hoverCardView.getBackgroundTintList());
+
+        StripLayoutTab lastHoveredTab =
+                stripLayoutHelperManager.getActiveStripLayoutHelper().getLastHoveredTab();
+        Assert.assertEquals("The last hovered tab is not set correctly.", tab1, lastHoveredTab);
+        Assert.assertFalse(
+                "|mFolioAttached| for tab1 should be false.", tab1.getFolioAttachedForTesting());
+        Assert.assertEquals("tab1 container bottom margin should match.",
+                StripLayoutHelper.FOLIO_DETACHED_BOTTOM_MARGIN_DP, tab1.getBottomMargin(), 0.f);
+
+        // Simulate a subsequent hover into the adjacent tab (tab2).
+        float xMove = tab2.getDrawX() + tab2.getWidth() / 3;
+        float yMove = tab2.getDrawY() + tab2.getHeight() / 3;
+        TestThreadUtils.runOnUiThreadBlocking(
+                ()
+                        -> stripLayoutHelperManager.simulateHoverEventForTesting(
+                                MotionEvent.ACTION_HOVER_MOVE, xMove, yMove));
+        lastHoveredTab = stripLayoutHelperManager.getActiveStripLayoutHelper().getLastHoveredTab();
+        Assert.assertEquals("The last hovered tab is not set correctly.", tab2, lastHoveredTab);
+        Assert.assertFalse(
+                "|mFolioAttached| for tab2 should be false.", tab2.getFolioAttachedForTesting());
+        Assert.assertTrue(
+                "|mFolioAttached| for tab1 should be true.", tab1.getFolioAttachedForTesting());
+        Assert.assertEquals("tab1 container bottom margin should match.",
+                StripLayoutHelper.FOLIO_ATTACHED_BOTTOM_MARGIN_DP, tab1.getBottomMargin(), 0.f);
+
+        // Simulate a subsequent hover outside tab2.
+        float xExit = tab2.getDrawX() + 2 * tab2.getWidth();
+        float yExit = tab2.getDrawY() + 2 * tab2.getHeight();
+        TestThreadUtils.runOnUiThreadBlocking(
+                ()
+                        -> stripLayoutHelperManager.simulateHoverEventForTesting(
+                                MotionEvent.ACTION_HOVER_EXIT, xExit, yExit));
+        lastHoveredTab = stripLayoutHelperManager.getActiveStripLayoutHelper().getLastHoveredTab();
+        Assert.assertNull("The last hovered tab is not set correctly.", lastHoveredTab);
+        Assert.assertTrue(
+                "|mFolioAttached| for tab2 should be true.", tab2.getFolioAttachedForTesting());
+    }
+
+    /**
+     * Tests hover cards shown in standard as well as incognito tab models.
+     */
+    @Test
+    @LargeTest
+    @Feature({"TabStrip"})
+    @EnableFeatures({ChromeFeatureList.ADVANCED_PERIPHERALS_SUPPORT_TAB_STRIP})
+    @Restriction(UiRestriction.RESTRICTION_TYPE_TABLET)
+    public void testHoverOnTabStrip_switchTabModel() throws Exception {
+        // Open regular tabs.
+        ChromeTabUtils.newTabsFromMenu(
+                InstrumentationRegistry.getInstrumentation(), sActivityTestRule.getActivity(), 2);
+
+        // Select a tab to hover on.
+        TabModel model = sActivityTestRule.getActivity().getTabModelSelector().getModel(false);
+        StripLayoutTab standardTab = TabStripUtils.findStripLayoutTab(
+                sActivityTestRule.getActivity(), false, model.getTabAt(1).getId());
+        assertTabVisibility(true, standardTab);
+
+        // Simulate a hover into standardTab.
+        StripLayoutHelperManager stripLayoutHelperManager =
+                TabStripUtils.getStripLayoutHelperManager(sActivityTestRule.getActivity());
+        float standardXEnter = standardTab.getDrawX() + standardTab.getWidth() / 2;
+        float standardYEnter = standardTab.getDrawY() + standardTab.getHeight() / 2;
+        TestThreadUtils.runOnUiThreadBlocking(
+                ()
+                        -> stripLayoutHelperManager.simulateHoverEventForTesting(
+                                MotionEvent.ACTION_HOVER_ENTER, standardXEnter, standardYEnter));
+
+        // Verify that the card view background color is correctly set.
+        var hoverCardView = stripLayoutHelperManager.getActiveStripLayoutHelper()
+                                    .getTabHoverCardViewForTesting();
+        Assert.assertNotNull("Hover card view should be set in normal StripLayoutHelper instance.",
+                stripLayoutHelperManager.getStripLayoutHelper(false)
+                        .getTabHoverCardViewForTesting());
+        Assert.assertEquals("Hover card background color is incorrect.",
+                TabUiThemeProvider.getStripTabHoverCardBackgroundTintList(
+                        hoverCardView.getContext(), false),
+                hoverCardView.getBackgroundTintList());
+
+        // Open an incognito tab from the menu.
+        Tab tab = sActivityTestRule.newIncognitoTabFromMenu();
+        StripLayoutTab incognitoTab = TabStripUtils.findStripLayoutTab(
+                sActivityTestRule.getActivity(), true, tab.getId());
+        assertTabVisibility(true, incognitoTab);
+
+        // Simulate a hover into incognitoTab.
+        float incognitoXEnter = incognitoTab.getDrawX() + incognitoTab.getWidth() / 2;
+        float incognitoYEnter = incognitoTab.getDrawY() + incognitoTab.getHeight() / 2;
+        TestThreadUtils.runOnUiThreadBlocking(
+                ()
+                        -> stripLayoutHelperManager.simulateHoverEventForTesting(
+                                MotionEvent.ACTION_HOVER_ENTER, incognitoXEnter, incognitoYEnter));
+
+        // Verify that the card view background color is correctly set.
+        hoverCardView = stripLayoutHelperManager.getActiveStripLayoutHelper()
+                                .getTabHoverCardViewForTesting();
+        Assert.assertNotNull(
+                "Hover card view should be set in incognito StripLayoutHelper instance.",
+                stripLayoutHelperManager.getStripLayoutHelper(true)
+                        .getTabHoverCardViewForTesting());
+        Assert.assertEquals("Hover card background color is incorrect.",
+                TabUiThemeProvider.getStripTabHoverCardBackgroundTintList(
+                        hoverCardView.getContext(), true),
+                hoverCardView.getBackgroundTintList());
+    }
+
+    /**
+     * Tests that the tab hover state is cleared when the activity is paused.
+     */
+    @Test
+    @LargeTest
+    @Feature({"TabStrip"})
+    @EnableFeatures({ChromeFeatureList.ADVANCED_PERIPHERALS_SUPPORT_TAB_STRIP,
+            ChromeFeatureList.TAB_STRIP_REDESIGN})
+    @Restriction(UiRestriction.RESTRICTION_TYPE_TABLET)
+    public void
+    testTabHoverStateClearedOnActivityPause() throws Exception {
+        TabManagementFieldTrial.TAB_STRIP_REDESIGN_ENABLE_FOLIO.setForTesting(true);
+
+        TabModel model = sActivityTestRule.getActivity().getTabModelSelector().getModel(false);
+        StripLayoutTab tab = TabStripUtils.findStripLayoutTab(
+                sActivityTestRule.getActivity(), false, model.getTabAt(0).getId());
+        assertTabVisibility(true, tab);
+
+        // Simulate a hover into the tab.
+        StripLayoutHelperManager stripLayoutHelperManager =
+                TabStripUtils.getStripLayoutHelperManager(sActivityTestRule.getActivity());
+        float xEnter = tab.getDrawX() + tab.getWidth() / 2;
+        float yEnter = tab.getDrawY() + tab.getHeight() / 2;
+        TestThreadUtils.runOnUiThreadBlocking(
+                ()
+                        -> stripLayoutHelperManager.simulateHoverEventForTesting(
+                                MotionEvent.ACTION_HOVER_ENTER, xEnter, yEnter));
+
+        // Verify that the card is visible.
+        var hoverCardView = stripLayoutHelperManager.getActiveStripLayoutHelper()
+                                    .getTabHoverCardViewForTesting();
+        Assert.assertEquals(
+                "Hover card should be visible.", View.VISIBLE, hoverCardView.getVisibility());
+
+        // Simulate activity pause.
+        TestThreadUtils.runOnUiThreadBlocking(
+                () -> { sActivityTestRule.getActivity().onPauseWithNative(); });
+
+        CriteriaHelper.pollInstrumentationThread(() -> {
+            Criteria.checkThat("Hover card should be hidden.", hoverCardView.getVisibility(),
+                    Matchers.is(View.GONE));
+        });
+    }
+
+    /**
+     * Tests that the tab hover state is cleared when a down event is received on the tab strip.
+     */
+    @Test
+    @LargeTest
+    @Feature({"TabStrip"})
+    @EnableFeatures({ChromeFeatureList.ADVANCED_PERIPHERALS_SUPPORT_TAB_STRIP,
+            ChromeFeatureList.TAB_STRIP_REDESIGN})
+    @Restriction(UiRestriction.RESTRICTION_TYPE_TABLET)
+    public void
+    testTabHoverStateClearedOnDownEvent() throws Exception {
+        TabManagementFieldTrial.TAB_STRIP_REDESIGN_ENABLE_FOLIO.setForTesting(true);
+        // Open a new tab.
+        ChromeTabUtils.newTabFromMenu(
+                InstrumentationRegistry.getInstrumentation(), sActivityTestRule.getActivity());
+
+        TabModel model = sActivityTestRule.getActivity().getTabModelSelector().getModel(false);
+        StripLayoutTab tab = TabStripUtils.findStripLayoutTab(
+                sActivityTestRule.getActivity(), false, model.getTabAt(1).getId());
+        assertTabVisibility(true, tab);
+
+        // Simulate a hover into the tab's close button.
+        StripLayoutHelperManager stripLayoutHelperManager =
+                TabStripUtils.getStripLayoutHelperManager(sActivityTestRule.getActivity());
+        float xEnter = tab.getCloseButton().getX();
+        float yEnter = tab.getCloseButton().getY();
+        TestThreadUtils.runOnUiThreadBlocking(
+                ()
+                        -> stripLayoutHelperManager.simulateHoverEventForTesting(
+                                MotionEvent.ACTION_HOVER_ENTER, xEnter, yEnter));
+
+        // Verify that the card is visible.
+        View hoverCardView = stripLayoutHelperManager.getActiveStripLayoutHelper()
+                                     .getTabHoverCardViewForTesting();
+        Assert.assertEquals(
+                "Hover card should be visible.", View.VISIBLE, hoverCardView.getVisibility());
+
+        // Simulate a down event on the tab's close button.
+        TestThreadUtils.runOnUiThreadBlocking(
+                () -> stripLayoutHelperManager.simulateOnDownForTesting(xEnter, yEnter, true, 0));
+
+        CriteriaHelper.pollInstrumentationThread(() -> {
+            Criteria.checkThat("Hover card should be hidden.", hoverCardView.getVisibility(),
+                    Matchers.is(View.GONE));
+        });
     }
 
     /**
@@ -955,7 +1207,7 @@ public class TabStripTest {
                     }
                 });
         Assert.assertTrue(TabStripUtils.getActiveStripLayoutHelper(sActivityTestRule.getActivity())
-                                  .isTabMenuShowing());
+                                  .isTabMenuShowingForTesting());
     }
 
     /**
@@ -983,16 +1235,16 @@ public class TabStripTest {
                 model.indexOf(tab));
 
         Assert.assertEquals("The tab is not in the proper position ", assumedTabViewIndex,
-                tabStrip.visualIndexOfTab(tabView));
+                tabStrip.visualIndexOfTabForTesting(tabView));
 
         if (TabModelUtils.getCurrentTab(model) == tab
                 && sActivityTestRule.getActivity().getTabModelSelector().isIncognitoSelected()
                         == incognito) {
             Assert.assertTrue("ChromeTab is not in the proper selection state",
-                    tabStrip.isForegroundTab(tabView));
+                    tabStrip.isForegroundTabForTesting(tabView));
         }
 
-        assertTabVisibilityForScrollingStripStacker(tabStrip, tabView);
+        assertTabVisibility(tabStrip, tabView);
 
         // TODO(dtrainor): Compare favicon bitmaps?  Only compare a few pixels.
     }
@@ -1083,7 +1335,8 @@ public class TabStripTest {
     private void assertSetTabStripScrollOffset(final int scrollOffset) throws ExecutionException {
         final StripLayoutHelper strip =
                 TabStripUtils.getActiveStripLayoutHelper(sActivityTestRule.getActivity());
-        TestThreadUtils.runOnUiThreadBlocking(() -> { strip.testSetScrollOffset(scrollOffset); });
+        TestThreadUtils.runOnUiThreadBlocking(
+                () -> { strip.setScrollOffsetForTesting(scrollOffset); });
 
         Assert.assertEquals(
                 "Tab strip scroll incorrect.", scrollOffset, strip.getScrollOffset(), 0);
@@ -1149,19 +1402,14 @@ public class TabStripTest {
      * @param tabStrip The StripLayoutHelper that owns the tab.
      * @param tabView The StripLayoutTab associated with the tab to check.
      */
-    private void assertTabVisibilityForScrollingStripStacker(final StripLayoutHelper tabStrip,
-            final StripLayoutTab tabView) throws ExecutionException {
-        // The visible percent for all tabs is 1.0 in the ScrollingStripStacker.
-        Assert.assertEquals("ChromeTab is not completely visible. All tabs should be visible when "
-                        + "the ScrollingStripStacker is in use.",
-                tabView.getVisiblePercentage(), 1.0f, 0);
-
+    private void assertTabVisibility(final StripLayoutHelper tabStrip, final StripLayoutTab tabView)
+            throws ExecutionException {
         // Only tabs that can currently be seen on the screen should be visible.
         Boolean shouldBeVisible = TestThreadUtils.runOnUiThreadBlocking(new Callable<Boolean>() {
             @Override
             public Boolean call() {
                 return (tabView.getDrawX() + tabView.getWidth()) >= 0
-                        && tabView.getDrawX() <= tabStrip.getWidth();
+                        && tabView.getDrawX() <= tabStrip.getWidthForTesting();
             }
         });
         assertTabVisibility(shouldBeVisible, tabView);

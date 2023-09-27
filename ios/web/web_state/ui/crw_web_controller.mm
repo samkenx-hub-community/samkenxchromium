@@ -6,18 +6,18 @@
 
 #import <WebKit/WebKit.h>
 
+#import "base/apple/foundation_util.h"
+#import "base/containers/contains.h"
 #import "base/functional/bind.h"
 #import "base/ios/block_types.h"
 #import "base/ios/ios_util.h"
 #import "base/json/string_escape.h"
-#import "base/mac/foundation_util.h"
 #import "base/metrics/histogram_functions.h"
 #import "base/metrics/histogram_macros.h"
 #import "base/metrics/user_metrics.h"
 #import "base/metrics/user_metrics_action.h"
 #import "base/strings/sys_string_conversions.h"
 #import "build/branding_buildflags.h"
-#import "ios/web/browsing_data/browsing_data_remover.h"
 #import "ios/web/common/annotations_utils.h"
 #import "ios/web/common/crw_input_view_provider.h"
 #import "ios/web/common/crw_web_view_content_view.h"
@@ -45,14 +45,12 @@
 #import "ios/web/public/browser_state.h"
 #import "ios/web/public/find_in_page/crw_find_interaction.h"
 #import "ios/web/public/permissions/permissions.h"
-#import "ios/web/public/ui/crw_context_menu_item.h"
 #import "ios/web/public/ui/crw_web_view_scroll_view_proxy.h"
 #import "ios/web/public/web_client.h"
 #import "ios/web/security/crw_cert_verification_controller.h"
 #import "ios/web/security/crw_ssl_status_updater.h"
 #import "ios/web/text_fragments/text_fragments_manager_impl.h"
 #import "ios/web/web_state/crw_web_view.h"
-#import "ios/web/web_state/page_viewport_state.h"
 #import "ios/web/web_state/ui/crw_context_menu_controller.h"
 #import "ios/web/web_state/ui/crw_web_controller_container_view.h"
 #import "ios/web/web_state/ui/crw_web_request_controller.h"
@@ -68,10 +66,6 @@
 #import "net/base/mac/url_conversions.h"
 #import "services/metrics/public/cpp/ukm_builders.h"
 #import "url/gurl.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 using web::NavigationManager;
 using web::NavigationManagerImpl;
@@ -207,11 +201,6 @@ char const kFullScreenStateHistogram[] = "IOS.Fullscreen.State";
 // may be called multiple times and thus must be idempotent.
 - (void)loadCompleteWithSuccess:(BOOL)loadSuccess
                      forContext:(web::NavigationContextImpl*)context;
-// Extracts the current page's viewport tag information and calls `completion`.
-// If the page has changed before the viewport tag is successfully extracted,
-// `completion` is called with nullptr.
-typedef void (^ViewportStateCompletion)(const web::PageViewportState*);
-- (void)extractViewportTagWithCompletion:(ViewportStateCompletion)completion;
 // Calls the zoom-preparation UIScrollViewDelegate callbacks on the web view.
 // This is called before `-applyWebViewScrollZoomScaleFromScrollState:`.
 - (void)prepareToApplyWebViewScrollZoomScale;
@@ -256,7 +245,7 @@ typedef void (^ViewportStateCompletion)(const web::PageViewportState*);
     web::JavaScriptFindInPageManagerImpl::CreateForWebState(_webStateImpl);
     web::TextFragmentsManagerImpl::CreateForWebState(_webStateImpl);
 
-    if (web::WebPageAnnotationsEnabled() && !browserState->IsOffTheRecord()) {
+    if (!browserState->IsOffTheRecord()) {
       web::AnnotationsTextManager::CreateForWebState(_webStateImpl);
     }
 
@@ -407,7 +396,7 @@ typedef void (^ViewportStateCompletion)(const web::PageViewportState*);
         @"microphoneCaptureState" : @"webViewMicrophoneCaptureStateDidChange",
       }];
 
-  if (web::features::IsFullscreenAPIEnabled()) {
+  if (web::GetWebClient()->EnableFullscreenAPI()) {
     [observers addEntriesFromDictionary:@{
       @"fullscreenState" : @"fullscreenStateDidChange"
     }];
@@ -1003,6 +992,10 @@ typedef void (^ViewportStateCompletion)(const web::PageViewportState*);
   return self.webView;
 }
 
+- (UIColor*)themeColor {
+  return self.webView.themeColor;
+}
+
 #pragma mark - JavaScript
 
 - (void)retrieveExistingFramesInContentWorld:(WKContentWorld*)contentWorld {
@@ -1063,48 +1056,18 @@ typedef void (^ViewportStateCompletion)(const web::PageViewportState*);
             : [self currentURL];
     _userInteractionState.SetLastUserInteraction(
         std::make_unique<web::UserInteractionEvent>(mainDocumentURL));
-    [self hideMenu];
-    [self hideHighlight];
+    [self hideAnnotationsHighlight];
   }
 }
 
 #pragma mark - Context Menu
 
-- (void)showMenuWithItems:(NSArray<CRWContextMenuItem*>*)items
-                     rect:(CGRect)rect {
-  // Add `hideHighlight` to all items' action.
-  NSMutableArray<CRWContextMenuItem*>* wrappedItems =
-      [[NSMutableArray alloc] init];
-  __weak CRWWebController* weakSelf = self;
-  for (CRWContextMenuItem* item in items) {
-    auto strongAction = item.action;
-    [wrappedItems
-        addObject:[CRWContextMenuItem itemWithID:item.ID
-                                           title:item.title
-                                           image:item.image
-                                          action:^{
-                                            [weakSelf hideHighlight];
-                                            if (weakSelf && strongAction) {
-                                              strongAction();
-                                            }
-                                          }]];
-  }
-  [_containerView showMenuWithItems:wrappedItems rect:rect];
-}
-
-// Hides the context menu.
-- (void)hideMenu {
-  [[UIMenuController sharedMenuController] hideMenu];
-}
-
-// Hides highlights triggered by custom context menu.
-- (void)hideHighlight {
-  if (web::WebPageAnnotationsEnabled()) {
-    web::AnnotationsTextManager* manager =
-        web::AnnotationsTextManager::FromWebState(_webStateImpl);
-    if (manager) {
-      manager->RemoveHighlight();
-    }
+// Hides annotations highlights triggered by context menu.
+- (void)hideAnnotationsHighlight {
+  web::AnnotationsTextManager* manager =
+      web::AnnotationsTextManager::FromWebState(_webStateImpl);
+  if (manager) {
+    manager->RemoveHighlight();
   }
 }
 
@@ -1313,31 +1276,6 @@ typedef void (^ViewportStateCompletion)(const web::PageViewportState*);
 
 #pragma mark - Page State
 
-- (void)extractViewportTagWithCompletion:(ViewportStateCompletion)completion {
-  DCHECK(completion);
-  web::NavigationItem* currentItem = self.currentNavItem;
-  if (!currentItem) {
-    completion(nullptr);
-    return;
-  }
-  NSString* const kViewportContentQuery =
-      @"var viewport = document.querySelector('meta[name=\"viewport\"]');"
-       "viewport ? viewport.content : '';";
-  __weak CRWWebController* weakSelf = self;
-  int itemID = currentItem->GetUniqueID();
-  [self executeJavaScript:kViewportContentQuery
-        completionHandler:^(id viewportContent, NSError* error) {
-          web::NavigationItem* item = [weakSelf currentNavItem];
-          if (item && item->GetUniqueID() == itemID) {
-            web::PageViewportState viewportState(
-                base::mac::ObjCCast<NSString>(viewportContent));
-            completion(&viewportState);
-          } else {
-            completion(nullptr);
-          }
-        }];
-}
-
 - (void)surfaceSizeChanged {
   // When rotating, the available zoom scale range may change, zoomScale's
   // percentage into this range should remain constant.  However, there are
@@ -1434,7 +1372,7 @@ CrFullscreenState CrFullscreenStateFromWKFullscreenState(
   }
   NSString* host = base::SysUTF8ToNSString(_documentURL.host());
   BOOL hasOnlySecureContent = [self.webView hasOnlySecureContent];
-  base::ScopedCFTypeRef<SecTrustRef> trust;
+  base::apple::ScopedCFTypeRef<SecTrustRef> trust;
   trust.reset([self.webView serverTrust], base::scoped_policy::RETAIN);
 
   [_SSLStatusUpdater updateSSLStatusForNavigationItem:currentNavItem
@@ -1623,7 +1561,7 @@ CrFullscreenState CrFullscreenStateFromWKFullscreenState(
 #pragma mark - CRWSSLStatusUpdaterDataSource
 
 - (void)SSLStatusUpdater:(CRWSSLStatusUpdater*)SSLStatusUpdater
-    querySSLStatusForTrust:(base::ScopedCFTypeRef<SecTrustRef>)trust
+    querySSLStatusForTrust:(base::apple::ScopedCFTypeRef<SecTrustRef>)trust
                       host:(NSString*)host
          completionHandler:(StatusQueryHandler)completionHandler {
   [_certVerificationController querySSLStatusForTrust:std::move(trust)
@@ -1817,8 +1755,8 @@ CrFullscreenState CrFullscreenStateFromWKFullscreenState(
     if (_documentURL.DeprecatedGetOriginAsURL() !=
         newURL.DeprecatedGetOriginAsURL()) {
       if (!_documentURL.host().empty() &&
-          (newURL.username().find(_documentURL.host()) != std::string::npos ||
-           newURL.password().find(_documentURL.host()) != std::string::npos)) {
+          (base::Contains(newURL.username(), _documentURL.host()) ||
+           base::Contains(newURL.password(), _documentURL.host()))) {
         CHECK(false);
       }
     }
@@ -1966,14 +1904,6 @@ CrFullscreenState CrFullscreenStateFromWKFullscreenState(
 - (void)webRequestControllerDidStartLoading:
     (CRWWebRequestController*)requestController {
   [self didStartLoading];
-}
-
-- (void)webRequestControllerDisableNavigationGesturesUntilFinishNavigation:
-    (CRWWebRequestController*)requestController {
-  // Disable `allowsBackForwardNavigationGestures` during restore. Otherwise,
-  // WebKit will trigger a snapshot for each (blank) page, and quickly
-  // overload system memory.
-  self.webView.allowsBackForwardNavigationGestures = NO;
 }
 
 - (CRWWKNavigationHandler*)webRequestControllerNavigationHandler:

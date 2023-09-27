@@ -78,6 +78,7 @@ class CodeGenContext(object):
         #   attribute name: default value
         cls._context_attrs = {
             # Top-level definition
+            "async_iterator": None,
             "callback_function": None,
             "callback_interface": None,
             "dictionary": None,
@@ -104,8 +105,10 @@ class CodeGenContext(object):
             "operation_group": None,
 
             # Special member-ish definition
+            "indexed_interceptor_kind": None,
             "indexed_property_getter": None,
             "indexed_property_setter": None,
+            "named_interceptor_kind": None,
             "named_property_getter": None,
             "named_property_setter": None,
             "named_property_deleter": None,
@@ -230,8 +233,9 @@ class CodeGenContext(object):
 
     @property
     def class_like(self):
-        return (self.callback_interface or self.dictionary or self.interface
-                or self.namespace or self.sync_iterator)
+        return (self.async_iterator or self.callback_interface
+                or self.dictionary or self.interface or self.namespace
+                or self.sync_iterator)
 
     @property
     def does_override_idl_return_type(self):

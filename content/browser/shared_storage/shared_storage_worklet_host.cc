@@ -12,9 +12,11 @@
 
 #include "base/check.h"
 #include "base/metrics/histogram_functions.h"
+#include "base/time/time.h"
 #include "components/services/storage/shared_storage/shared_storage_manager.h"
 #include "content/browser/attribution_reporting/attribution_manager.h"
 #include "content/browser/devtools/devtools_instrumentation.h"
+#include "content/browser/devtools/shared_storage_worklet_devtools_manager.h"
 #include "content/browser/fenced_frame/fenced_frame_reporter.h"
 #include "content/browser/private_aggregation/private_aggregation_budget_key.h"
 #include "content/browser/private_aggregation/private_aggregation_host.h"
@@ -34,6 +36,7 @@
 #include "third_party/blink/public/mojom/private_aggregation/private_aggregation_host.mojom.h"
 #include "third_party/blink/public/mojom/shared_storage/shared_storage_worklet_service.mojom.h"
 #include "third_party/blink/public/mojom/use_counter/metrics/web_feature.mojom.h"
+#include "third_party/blink/public/mojom/worker/worklet_global_scope_creation_params.mojom.h"
 #include "url/origin.h"
 
 namespace content {
@@ -85,8 +88,7 @@ SharedStorageURNMappingResult CreateSharedStorageURNMappingResult(
   if (!urls_with_metadata[index]->reporting_metadata.empty()) {
     fenced_frame_reporter = FencedFrameReporter::CreateForSharedStorage(
         storage_partition->GetURLLoaderFactoryForBrowserProcess(),
-        AttributionManager::FromBrowserContext(browser_context),
-        urls_with_metadata[index]->reporting_metadata);
+        browser_context, urls_with_metadata[index]->reporting_metadata);
   }
   return SharedStorageURNMappingResult(
       mapped_url,
@@ -96,6 +98,50 @@ SharedStorageURNMappingResult CreateSharedStorageURNMappingResult(
 }
 
 }  // namespace
+
+class SharedStorageWorkletHost::ScopedDevToolsHandle
+    : blink::mojom::WorkletDevToolsHost {
+ public:
+  explicit ScopedDevToolsHandle(SharedStorageWorkletHost& owner)
+      : owner_(owner), devtools_token_(base::UnguessableToken::Create()) {
+    SharedStorageWorkletDevToolsManager::GetInstance()->WorkletCreated(
+        owner, devtools_token_);
+  }
+
+  ScopedDevToolsHandle(const ScopedDevToolsHandle&) = delete;
+  ScopedDevToolsHandle& operator=(const ScopedDevToolsHandle&) = delete;
+
+  ~ScopedDevToolsHandle() override {
+    SharedStorageWorkletDevToolsManager::GetInstance()->WorkletDestroyed(
+        *owner_);
+  }
+
+  // blink::mojom::WorkletDevToolsHost:
+  void OnReadyForInspection(
+      mojo::PendingRemote<blink::mojom::DevToolsAgent> agent_remote,
+      mojo::PendingReceiver<blink::mojom::DevToolsAgentHost>
+          agent_host_receiver) override {
+    SharedStorageWorkletDevToolsManager::GetInstance()
+        ->WorkletReadyForInspection(*owner_, std::move(agent_remote),
+                                    std::move(agent_host_receiver));
+  }
+
+  const base::UnguessableToken& devtools_token() const {
+    return devtools_token_;
+  }
+
+  mojo::PendingRemote<blink::mojom::WorkletDevToolsHost>
+  BindNewPipeAndPassRemote() {
+    return host_.BindNewPipeAndPassRemote();
+  }
+
+ private:
+  raw_ref<SharedStorageWorkletHost> owner_;
+
+  mojo::Receiver<blink::mojom::WorkletDevToolsHost> host_{this};
+
+  const base::UnguessableToken devtools_token_;
+};
 
 SharedStorageWorkletHost::SharedStorageWorkletHost(
     std::unique_ptr<SharedStorageWorkletDriver> driver,
@@ -186,6 +232,9 @@ void SharedStorageWorkletHost::AddModuleOnWorklet(
   }
 
   add_module_state_ = AddModuleState::kInitiated;
+  script_source_url_ = script_source_url;
+
+  devtools_handle_ = std::make_unique<ScopedDevToolsHandle>(*this);
 
   mojo::PendingRemote<network::mojom::URLLoaderFactory> url_loader_factory;
 
@@ -247,6 +296,16 @@ void SharedStorageWorkletHost::RunURLSelectionOperationOnWorklet(
         "sharedStorage.worklet.addModule() has to be called before "
         "sharedStorage.selectURL().",
         /*result_config=*/absl::nullopt);
+    return;
+  }
+
+  // TODO(https://crbug.com/1473742): `page_` can somehow be null.
+  if (!page_) {
+    std::move(callback).Run(
+        /*success=*/false, /*error_message=*/
+        "Internal error: page does not exist.",
+        /*result_config=*/absl::nullopt);
+    base::debug::DumpWithoutCrashing();
     return;
   }
 
@@ -693,6 +752,10 @@ void SharedStorageWorkletHost::RecordUseCounters(
   }
 }
 
+RenderProcessHost* SharedStorageWorkletHost::GetProcessHost() const {
+  return driver_->GetProcessHost();
+}
+
 void SharedStorageWorkletHost::OnAddModuleOnWorkletFinished(
     blink::mojom::SharedStorageDocumentService::AddModuleOnWorkletCallback
         callback,
@@ -893,8 +956,15 @@ SharedStorageWorkletHost::GetAndConnectToSharedStorageWorkletService() {
     bool private_aggregation_permissions_policy_allowed =
         document_service_->render_frame_host().IsFeatureEnabled(
             blink::mojom::PermissionsPolicyFeature::kPrivateAggregation);
+
+    auto global_scope_creation_params =
+        blink::mojom::WorkletGlobalScopeCreationParams::New(
+            script_source_url_, devtools_handle_->devtools_token(),
+            devtools_handle_->BindNewPipeAndPassRemote());
+
     driver_->StartWorkletService(
-        shared_storage_worklet_service_.BindNewPipeAndPassReceiver());
+        shared_storage_worklet_service_.BindNewPipeAndPassReceiver(),
+        std::move(global_scope_creation_params));
 
     auto embedder_context = static_cast<RenderFrameHostImpl&>(
                                 document_service_->render_frame_host())
@@ -923,9 +993,17 @@ SharedStorageWorkletHost::MaybeBindPrivateAggregationHost(
 
   mojo::PendingRemote<blink::mojom::PrivateAggregationHost>
       pending_pa_host_remote;
+
+  absl::optional<base::TimeDelta> timeout =
+      (base::FeatureList::IsEnabled(blink::features::kSharedStorageAPIM118) &&
+       context_id)
+          ? absl::optional<base::TimeDelta>(base::Seconds(5))
+          : absl::nullopt;
+
   bool success = private_aggregation_manager->BindNewReceiver(
       shared_storage_origin_, main_frame_origin_,
       PrivateAggregationBudgetKey::Api::kSharedStorage, context_id,
+      std::move(timeout),
       pending_pa_host_remote.InitWithNewPipeAndPassReceiver());
   CHECK(success);
 

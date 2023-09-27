@@ -9,9 +9,9 @@
 #include "base/gtest_prod_util.h"
 #include "base/memory/raw_ref.h"
 #include "chrome/browser/chromeos/policy/dlp/dlp_rules_manager.h"
-#include "chrome/browser/enterprise/data_controls/component.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chromeos/dbus/dlp/dlp_service.pb.h"
+#include "components/enterprise/data_controls/component.h"
 #include "components/file_access/scoped_file_access.h"
 #include "storage/browser/file_system/file_system_url.h"
 
@@ -27,12 +27,15 @@ class DlpFilesController {
   struct FileDaemonInfo {
     FileDaemonInfo() = delete;
     FileDaemonInfo(ino64_t inode,
+                   time_t crtime,
                    const base::FilePath& path,
-                   const std::string& source_url);
+                   const std::string& source_url,
+                   const std::string& referrer_url);
+    FileDaemonInfo(const FileDaemonInfo&);
 
     friend bool operator==(const FileDaemonInfo& a, const FileDaemonInfo& b) {
-      return a.inode == b.inode && a.path == b.path &&
-             a.source_url == b.source_url;
+      return a.inode == b.inode && a.crtime == b.crtime && a.path == b.path &&
+             a.source_url == b.source_url && a.referrer_url == b.referrer_url;
     }
     friend bool operator!=(const FileDaemonInfo& a, const FileDaemonInfo& b) {
       return !(a == b);
@@ -40,10 +43,14 @@ class DlpFilesController {
 
     // File inode.
     ino64_t inode;
+    // File creation time.
+    time_t crtime;
     // File path.
     base::FilePath path;
     // Source URL from which the file was downloaded.
     GURL source_url;
+    // Referrer URL from which the download process was initiated.
+    GURL referrer_url;
   };
 
   DlpFilesController(const DlpFilesController& other) = delete;
@@ -59,19 +66,18 @@ class DlpFilesController {
 
   virtual ~DlpFilesController();
 
-  static constexpr bool kCopyTaskFlowEnabled = false;
-
  protected:
   explicit DlpFilesController(const DlpRulesManager& rules_manager);
 
-  virtual absl::optional<data_controls::Component> MapFilePathtoPolicyComponent(
+  virtual absl::optional<data_controls::Component> MapFilePathToPolicyComponent(
       Profile* profile,
       const base::FilePath& file_path) = 0;
 
   // TODO(b/284122497): Remove testing friend.
   FRIEND_TEST_ALL_PREFIXES(DlpFilesControllerComponentsTest, TestConvert);
 
-  const raw_ref<const DlpRulesManager, ExperimentalAsh> rules_manager_;
+  const raw_ref<const DlpRulesManager, DanglingUntriaged | ExperimentalAsh>
+      rules_manager_;
 };
 
 }  // namespace policy

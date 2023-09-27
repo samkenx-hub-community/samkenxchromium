@@ -12,6 +12,7 @@
 #include "chrome/browser/privacy_sandbox/privacy_sandbox_service.h"
 #include "chrome/browser/privacy_sandbox/privacy_sandbox_settings_factory.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/tpcd/experiment/eligibility_service_factory.h"
 #include "components/content_settings/core/browser/cookie_settings.h"
 #include "components/content_settings/core/browser/host_content_settings_map.h"
 #include "components/keyed_service/core/keyed_service.h"
@@ -76,14 +77,20 @@ PrivacySandboxServiceFactory::PrivacySandboxServiceFactory()
 #endif
   DependsOn(
       first_party_sets::FirstPartySetsPolicyServiceFactory::GetInstance());
+
+  // The Eligibility service should be created before the Privacy Sandbox
+  // service is created to determine the cookie deprecation experiment
+  // eligibility.
+  DependsOn(tpcd::experiment::EligibilityServiceFactory::GetInstance());
 }
 
-KeyedService* PrivacySandboxServiceFactory::BuildServiceInstanceFor(
+std::unique_ptr<KeyedService>
+PrivacySandboxServiceFactory::BuildServiceInstanceForBrowserContext(
     content::BrowserContext* context) const {
   Profile* profile = Profile::FromBrowserContext(context);
-  return new PrivacySandboxService(
+  return std::make_unique<PrivacySandboxService>(
       PrivacySandboxSettingsFactory::GetForProfile(profile),
-      CookieSettingsFactory::GetForProfile(profile).get(), profile->GetPrefs(),
+      CookieSettingsFactory::GetForProfile(profile), profile->GetPrefs(),
       profile->GetDefaultStoragePartition()->GetInterestGroupManager(),
       GetProfileType(profile),
       (!profile->IsGuestSession() || profile->IsOffTheRecord())

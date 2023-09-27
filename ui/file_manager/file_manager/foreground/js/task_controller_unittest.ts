@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 import {assert} from 'chrome://resources/ash/common/assert.js';
+import {getTrustedHTML} from 'chrome://resources/js/static_types.js';
 import {assertDeepEquals, assertEquals, assertNotReached, assertTrue} from 'chrome://webui-test/chromeos/chai_assert.js';
 
 import {createCrostiniForTest} from '../../background/js/mock_crostini.js';
 import {queryDecoratedElement} from '../../common/js/dom_utils.js';
-import {metrics} from '../../common/js/metrics.js';
 import {installMockChrome} from '../../common/js/mock_chrome.js';
 import {MockFileEntry, MockFileSystem} from '../../common/js/mock_entry.js';
 import {reportPromise} from '../../common/js/test_error_reporting.js';
@@ -15,12 +15,12 @@ import {decorate} from '../../common/js/ui.js';
 import {util} from '../../common/js/util.js';
 import {VolumeManagerCommon} from '../../common/js/volume_manager_types.js';
 import {ProgressCenter} from '../../externs/background/progress_center.js';
-import {PropStatus} from '../../externs/ts/state.js';
+import {PropStatus, State} from '../../externs/ts/state.js';
 import {VolumeInfo} from '../../externs/volume_info.js';
 import {VolumeManager} from '../../externs/volume_manager.js';
-import {changeDirectory} from '../../state/actions/current_directory.js';
+import {changeDirectory} from '../../state/ducks/current_directory.js';
 import {setUpFileManagerOnWindow} from '../../state/for_tests.js';
-import {getEmptyState, getStore} from '../../state/store.js';
+import {getEmptyState, getStore, waitForState} from '../../state/store.js';
 
 import {DirectoryModel} from './directory_model.js';
 import {FileSelectionHandler} from './file_selection.js';
@@ -32,12 +32,6 @@ import {ComboButton} from './ui/combobutton.js';
 import {Command} from './ui/command.js';
 import {FileManagerUI} from './ui/file_manager_ui.js';
 import {FilesMenuItem} from './ui/files_menu.js';
-
-
-/** Mock metrics. */
-metrics.recordEnum = function(
-    _name: string, _value: any, _valid?: any[]|number) {};
-metrics.recordDirectoryListLoadWithTolerance = function() {};
 
 /** Mock chrome APIs.  */
 let mockChrome: any;
@@ -64,15 +58,15 @@ export function setUp() {
   installMockChrome(mockChrome);
 
   // Install <command> elements on the page.
-  document.body.innerHTML = [
-    '<command id="default-task">',
-    '<command id="open-with">',
-    '<cr-menu id="tasks-menu">',
-    '  <cr-menu-item id="default-task-menu-item" command="#default-task">',
-    '  </cr-menu-item>',
-    '</cr-menu>',
-    '<cr-button id="tasks" menu="#tasks-menu"> Open </cr-button>',
-  ].join('');
+  document.body.innerHTML = getTrustedHTML`
+<command id="default-task">
+<command id="open-with">
+<cr-menu id="tasks-menu">
+  <cr-menu-item id="default-task-menu-item" command="#default-task">
+  </cr-menu-item>
+</cr-menu>
+<cr-button id="tasks" menu="#tasks-menu"> Open </cr-button>
+`;
 
   // Initialize Command with the <command>s.
   decorate('command', Command);
@@ -245,6 +239,45 @@ export async function testGetFileTasksShouldNotBeCalledMultipleTimes(
       util.isSameEntries(tasks3.entries, selectionHandler.selection.entries));
   assert(mockChrome.fileManagerPrivate.getFileTaskCalledCount_ === 3);
 
+  done();
+}
+
+
+/**
+ * Tests the file tasks in the store are updated each time the selected entries
+ * are changed, including when there are no selected entries.
+ */
+export async function testFileTasksUpdatedAfterSelectionChange(
+    done: () => void) {
+  const selectionHandler = window.fileManager.selectionHandler;
+  const store = getStore();
+  const fileSystem = downloads.fileSystem;
+
+  // Check no file tasks initially in the store.
+  await waitForState(
+      store,
+      (st: State) =>
+          st.currentDirectory?.selection.fileTasks.tasks !== undefined &&
+          st.currentDirectory?.selection.fileTasks.tasks.length === 0);
+
+  // Select entry.
+  selectionHandler.updateSelection(
+      [MockFileEntry.create(fileSystem, '/test.png')], ['image/png'], store);
+  // Check file tasks in store.
+  await waitForState(
+      store,
+      (st: State) =>
+          st.currentDirectory?.selection.fileTasks.tasks !== undefined &&
+          st.currentDirectory?.selection.fileTasks.tasks.length > 0);
+
+  // Select blank.
+  selectionHandler.updateSelection([], [], store);
+  // Check no file tasks in the store.
+  await waitForState(
+      store,
+      (st: State) =>
+          st.currentDirectory?.selection.fileTasks.tasks !== undefined &&
+          st.currentDirectory?.selection.fileTasks.tasks.length === 0);
   done();
 }
 

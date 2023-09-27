@@ -11,7 +11,6 @@ import androidx.test.filters.MediumTest;
 import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.hamcrest.Matchers;
-import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -25,7 +24,6 @@ import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.Criteria;
 import org.chromium.base.test.util.CriteriaHelper;
-import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.Feature;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
@@ -44,6 +42,9 @@ import org.chromium.components.policy.test.annotations.Policies;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
 import org.chromium.content_public.browser.test.util.TouchCommon;
 import org.chromium.net.test.EmbeddedTestServer;
+import org.chromium.url.GURL;
+
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Integration test for {@link HomepagePolicyManager}.
@@ -91,15 +92,9 @@ public class HomepagePolicyIntegrationTest {
                 InstrumentationRegistry.getInstrumentation().getContext());
     }
 
-    @After
-    public void tearDown() {
-        if (mTestServer != null) mTestServer.stopAndDestroyServer();
-    }
-
     @Test
     @MediumTest
     @Feature({"Homepage"})
-    @DisabledTest(message = "crbug.com/1133544")
     public void testStartUpPage() {
         TestThreadUtils.runOnUiThreadBlocking(
                 ()
@@ -109,10 +104,11 @@ public class HomepagePolicyIntegrationTest {
         // The first time when the page starts, the homepage is fetched from shared preference
         // So the homepage policy is not enforced yet at this point.
         // Instead, we verify the shared preference to see if right policy URL were stored.
+        String homepageGurlSerialized = SharedPreferencesManager.getInstance().readString(
+                ChromePreferenceKeys.HOMEPAGE_LOCATION_POLICY_GURL, "");
+        GURL homepageGurl = GURL.deserialize(homepageGurlSerialized);
         Assert.assertEquals("URL stored in shared preference should be the same as policy setting",
-                TEST_URL,
-                SharedPreferencesManager.getInstance().readString(
-                        ChromePreferenceKeys.DEPRECATED_HOMEPAGE_LOCATION_POLICY, ""));
+                TEST_URL, homepageGurl.getSpec());
 
         // METRICS_HOMEPAGE_LOCATION_TYPE is recorded once in deferred start up tasks.
         Assert.assertEquals("Settings.Homepage.LocationType should record POLICY_OTHER once.", 1,
@@ -184,8 +180,15 @@ public class HomepagePolicyIntegrationTest {
 
         // Start a new ChromeActivity.
         mActivityTestRule.startActivityCompletely(intent);
-        Assert.assertEquals("Start up page is not homepage", HomepageManager.getHomepageUri(),
+        Assert.assertEquals("Start up page is not homepage", getHomepageUrlOnUiThread(),
                 ChromeTabUtils.getUrlStringOnUiThread(
                         mActivityTestRule.getActivity().getActivityTab()));
+    }
+
+    private String getHomepageUrlOnUiThread() {
+        AtomicReference<String> res = new AtomicReference<>();
+        TestThreadUtils.runOnUiThreadBlocking(
+                () -> { res.set(HomepageManager.getHomepageGurl().getSpec()); });
+        return res.get();
     }
 }

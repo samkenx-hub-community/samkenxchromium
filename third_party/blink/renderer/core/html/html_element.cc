@@ -78,7 +78,9 @@
 #include "third_party/blink/renderer/core/html/forms/html_form_control_element.h"
 #include "third_party/blink/renderer/core/html/forms/html_form_element.h"
 #include "third_party/blink/renderer/core/html/forms/html_input_element.h"
+#include "third_party/blink/renderer/core/html/forms/html_listbox_element.h"
 #include "third_party/blink/renderer/core/html/forms/labels_node_list.h"
+#include "third_party/blink/renderer/core/html/forms/text_control_element.h"
 #include "third_party/blink/renderer/core/html/html_br_element.h"
 #include "third_party/blink/renderer/core/html/html_dialog_element.h"
 #include "third_party/blink/renderer/core/html/html_dimension.h"
@@ -167,6 +169,7 @@ const WebFeature kNoWebFeature = static_cast<WebFeature>(0);
 
 HTMLElement* GetParentForDirectionality(const HTMLElement& element,
                                         bool& needs_slot_assignment_recalc) {
+  CHECK(!RuntimeEnabledFeatures::CSSPseudoDirEnabled());
   if (element.IsPseudoElement())
     return DynamicTo<HTMLElement>(element.ParentOrShadowHostNode());
 
@@ -219,20 +222,36 @@ void CheckSoftNavigationHeuristicsTracking(const Document& document,
   }
 }
 
+class PopoverCloseWatcherEventListener : public NativeEventListener {
+ public:
+  explicit PopoverCloseWatcherEventListener(HTMLElement* popover)
+      : popover_(popover) {}
+
+  void Invoke(ExecutionContext*, Event* event) override {
+    if (!popover_) {
+      return;
+    }
+    // Don't do anything in response to cancel events, as per the HTML spec
+    if (event->type() == event_type_names::kClose) {
+      popover_->HidePopoverInternal(
+          HidePopoverFocusBehavior::kFocusPreviousElement,
+          HidePopoverTransitionBehavior::kFireEventsAndWaitForTransitions,
+          /*exception_state=*/nullptr);
+    }
+  }
+
+  void Trace(Visitor* visitor) const override {
+    visitor->Trace(popover_);
+    NativeEventListener::Trace(visitor);
+  }
+
+ private:
+  WeakMember<HTMLElement> popover_;
+};
+
 }  // anonymous namespace
 
-String HTMLElement::DebugNodeName() const {
-  if (IsA<HTMLDocument>(GetDocument())) {
-    return TagQName().HasPrefix() ? Element::nodeName().UpperASCII()
-                                  : TagQName().LocalName().UpperASCII();
-  }
-  return Element::nodeName();
-}
-
 String HTMLElement::nodeName() const {
-  // localNameUpper may intern and cache an AtomicString.
-  DCHECK(IsMainThread());
-
   // FIXME: Would be nice to have an atomicstring lookup based off uppercase
   // chars that does not have to copy the string on a hit in the hash.
   // FIXME: We should have a way to detect XHTML elements and replace the
@@ -599,6 +618,8 @@ AttributeTriggers* HTMLElement::TriggersForAttributeName(
        event_type_names::kSelectstart, nullptr},
       {html_names::kOnslotchangeAttr, kNoWebFeature,
        event_type_names::kSlotchange, nullptr},
+      {html_names::kOnsnapchangedAttr, kNoWebFeature,
+       event_type_names::kSnapchanged, nullptr},
       {html_names::kOnstalledAttr, kNoWebFeature, event_type_names::kStalled,
        nullptr},
       {html_names::kOnsubmitAttr, kNoWebFeature, event_type_names::kSubmit,
@@ -819,15 +840,16 @@ void HTMLElement::AttributeChanged(const AttributeModificationParams& params) {
     }
     if (AdjustedFocusedElementInTreeScope() != this)
       return;
-    // The attribute change may cause supportsFocus() to return false
+    // The attribute change may cause IsFocusable() to return false
     // for the element which had focus.
     //
     // TODO(tkent): We should avoid updating style.  We'd like to check only
     // DOM-level focusability here.
     GetDocument().UpdateStyleAndLayoutTreeForNode(this,
                                                   DocumentUpdateReason::kFocus);
-    if (!SupportsFocus())
+    if (!IsFocusable()) {
       blur();
+    }
   }
 }
 
@@ -1197,25 +1219,9 @@ PopoverValueType GetPopoverTypeFromAttributeValue(const AtomicString& value) {
 }  // namespace
 
 void HTMLElement::UpdatePopoverAttribute(const AtomicString& value) {
-  if (!RuntimeEnabledFeatures::HTMLPopoverAttributeEnabled(
-          GetDocument().GetExecutionContext())) {
-    // If the feature flag isn't enabled, give a console warning about this
-    // usage of the 'popover' attribute, which is likely to cause breakage when
-    // the feature ships.
-    auto& document = GetDocument();
-    auto* console_message = MakeGarbageCollected<ConsoleMessage>(
-        mojom::blink::ConsoleMessageSource::kOther,
-        mojom::blink::ConsoleMessageLevel::kError,
-        "Found a 'popover' attribute. If you are testing the popover API, you "
-        "must enable Experimental Web Platform Features. If not, note that "
-        "custom attributes must start with 'data-': "
-        "https://html.spec.whatwg.org/multipage/"
-        "dom.html#custom-data-attribute. This usage will *likely cause site "
-        "breakage* when the popover API ships: "
-        "https://chromestatus.com/feature/5463833265045504.");
-    console_message->SetNodes(document.GetFrame(),
-                              {DOMNodeIds::IdForNode(this)});
-    document.AddConsoleMessage(console_message);
+  if (HTMLListboxElement::IsSelectlistAssociated(this)) {
+    CHECK(RuntimeEnabledFeatures::HTMLSelectListElementEnabled());
+    // Selectlist listboxes manage their own popover state.
     return;
   }
 
@@ -1303,8 +1309,6 @@ PopoverValueType HTMLElement::PopoverType() const {
 
 // This should be true when `:popover-open` should match.
 bool HTMLElement::popoverOpen() const {
-  CHECK(RuntimeEnabledFeatures::HTMLPopoverAttributeEnabled(
-      GetDocument().GetExecutionContext()));
   if (auto* popover_data = GetPopoverData())
     return popover_data->visibilityState() == PopoverVisibilityState::kShowing;
   return false;
@@ -1314,10 +1318,7 @@ bool HTMLElement::IsPopoverReady(PopoverTriggerAction action,
                                  ExceptionState* exception_state,
                                  bool include_event_handler_text,
                                  Document* expected_document) const {
-  CHECK(RuntimeEnabledFeatures::HTMLPopoverAttributeEnabled(
-      GetDocument().GetExecutionContext()));
   CHECK_NE(action, PopoverTriggerAction::kNone);
-  CHECK_NE(action, PopoverTriggerAction::kToggle);
 
   auto maybe_throw_exception = [&exception_state, &include_event_handler_text](
                                    DOMExceptionCode code, const char* msg) {
@@ -1332,7 +1333,8 @@ bool HTMLElement::IsPopoverReady(PopoverTriggerAction action,
     }
   };
 
-  if (!HasPopoverAttribute()) {
+  if (!HasPopoverAttribute() &&
+      !HTMLListboxElement::IsSelectlistAssociated(this)) {
     maybe_throw_exception(DOMExceptionCode::kNotSupportedError,
                           "Not supported on elements that do not have a valid "
                           "value for the 'popover' attribute.");
@@ -1369,12 +1371,13 @@ bool HTMLElement::IsPopoverReady(PopoverTriggerAction action,
                           "hiding a popover element.");
     return false;
   }
-  if (action == PopoverTriggerAction::kShow && IsA<HTMLDialogElement>(this) &&
-      hasAttribute(html_names::kOpenAttr)) {
-    maybe_throw_exception(DOMExceptionCode::kInvalidStateError,
-                          "The dialog is already open as a dialog, and "
-                          "therefore cannot be opened as a popover.");
-    return false;
+  if (auto* dialog = DynamicTo<HTMLDialogElement>(this)) {
+    if (action == PopoverTriggerAction::kShow && dialog->IsModal()) {
+      maybe_throw_exception(DOMExceptionCode::kInvalidStateError,
+                            "The dialog is already open as a dialog, and "
+                            "therefore cannot be opened as a popover.");
+      return false;
+    }
   }
   if (action == PopoverTriggerAction::kShow &&
       Fullscreen::IsFullscreenElement(*this)) {
@@ -1407,24 +1410,38 @@ void MarkPopoverInvokersDirty(const HTMLElement& popover) {
 }
 }  // namespace
 
-void HTMLElement::togglePopover(ExceptionState& exception_state) {
-  CHECK(RuntimeEnabledFeatures::HTMLPopoverAttributeEnabled(
-      GetDocument().GetExecutionContext()));
+bool HTMLElement::togglePopover(ExceptionState& exception_state) {
   if (popoverOpen()) {
     hidePopover(exception_state);
   } else {
     ShowPopoverInternal(/*invoker*/ nullptr, &exception_state);
   }
+
+  if (GetPopoverData()) {
+    return GetPopoverData()->visibilityState() ==
+           PopoverVisibilityState::kShowing;
+  }
+  return false;
 }
 
-void HTMLElement::togglePopover(bool force, ExceptionState& exception_state) {
-  CHECK(RuntimeEnabledFeatures::HTMLPopoverAttributeEnabled(
-      GetDocument().GetExecutionContext()));
+bool HTMLElement::togglePopover(bool force, ExceptionState& exception_state) {
   if (!force && popoverOpen()) {
     hidePopover(exception_state);
   } else if (force && !popoverOpen()) {
     ShowPopoverInternal(/*invoker*/ nullptr, &exception_state);
+  } else {
+    // Throw an exception if this element is disconnected or doesn't have a
+    // popover attribute.
+    IsPopoverReady(PopoverTriggerAction::kToggle, &exception_state,
+                   /*include_event_handler_text=*/false,
+                   /*document=*/nullptr);
   }
+
+  if (GetPopoverData()) {
+    return GetPopoverData()->visibilityState() ==
+           PopoverVisibilityState::kShowing;
+  }
+  return false;
 }
 
 void HTMLElement::showPopover(ExceptionState& exception_state) {
@@ -1433,12 +1450,6 @@ void HTMLElement::showPopover(ExceptionState& exception_state) {
 
 void HTMLElement::ShowPopoverInternal(Element* invoker,
                                       ExceptionState* exception_state) {
-  CHECK(RuntimeEnabledFeatures::HTMLPopoverAttributeEnabled(
-      GetDocument().GetExecutionContext()));
-
-  if (GetPopoverData()) {
-    GetPopoverData()->setInvoker(invoker);
-  }
   if (!IsPopoverReady(PopoverTriggerAction::kShow, exception_state,
                       /*include_event_handler_text=*/false, /*document=*/nullptr)) {
     CHECK(exception_state)
@@ -1447,6 +1458,8 @@ void HTMLElement::ShowPopoverInternal(Element* invoker,
            "shown.";
     return;
   }
+
+  CHECK(!GetPopoverData() || !GetPopoverData()->invoker());
 
   // Fire events by default, unless we're recursively showing this popover.
   PopoverData::ScopedStartShowingOrHiding scoped_was_showing_or_hiding(*this);
@@ -1482,7 +1495,7 @@ void HTMLElement::ShowPopoverInternal(Element* invoker,
   auto original_type = PopoverType();
   if (original_type == PopoverValueType::kAuto ||
       original_type == PopoverValueType::kHint) {
-    const auto* ancestor = FindTopmostPopoverAncestor(*this);
+    const auto* ancestor = FindTopmostPopoverAncestor(*this, invoker);
     if (original_type == PopoverValueType::kHint) {
       CHECK(RuntimeEnabledFeatures::HTMLPopoverHintEnabled());
       // If the new popover is popover=hint, hide other hints first.
@@ -1536,6 +1549,20 @@ void HTMLElement::ShowPopoverInternal(Element* invoker,
       CHECK(RuntimeEnabledFeatures::HTMLPopoverHintEnabled());
       original_document.SetPopoverHintShowing(this);
     }
+
+    if (RuntimeEnabledFeatures::CloseWatcherEnabled()) {
+      auto* close_watcher = CloseWatcher::Create(
+          GetDocument().domWindow(), /*dialog_for_use_counters=*/nullptr);
+      if (close_watcher) {
+        auto* event_listener =
+            MakeGarbageCollected<PopoverCloseWatcherEventListener>(this);
+        close_watcher->addEventListener(event_type_names::kClose,
+                                        event_listener);
+        close_watcher->addEventListener(event_type_names::kCancel,
+                                        event_listener);
+      }
+      GetPopoverData()->setCloseWatcher(close_watcher);
+    }
   }
 
   MarkPopoverInvokersDirty(*this);
@@ -1544,6 +1571,7 @@ void HTMLElement::ShowPopoverInternal(Element* invoker,
   original_document.AddToTopLayer(this);
   // Make the popover match `:popover-open` and remove `display:none` styling:
   GetPopoverData()->setVisibilityState(PopoverVisibilityState::kShowing);
+  GetPopoverData()->setInvoker(invoker);
   PseudoStateChanged(CSSSelector::kPseudoPopoverOpen);
   CHECK(!original_document.AllOpenPopovers().Contains(this));
   original_document.AllOpenPopovers().insert(this);
@@ -1605,8 +1633,6 @@ void HTMLElement::HideAllPopoversUntil(
     HidePopoverFocusBehavior focus_behavior,
     HidePopoverTransitionBehavior transition_behavior,
     HidePopoverIndependence popover_independence) {
-  CHECK(RuntimeEnabledFeatures::HTMLPopoverAttributeEnabled(
-      document.GetExecutionContext()));
   CHECK(!endpoint || endpoint->HasPopoverAttribute());
   CHECK(endpoint ||
         popover_independence == HidePopoverIndependence::kHideUnrelated);
@@ -1649,8 +1675,9 @@ void HTMLElement::HideAllPopoversUntil(
         // If there is a popover=hint showing that is a descendant of something
         // on the popover=auto stack, then the hint should be hidden before that
         // ancestor is hidden, regardless of popover_independence.
-        hint_ancestor =
-            FindTopmostPopoverAncestor(*document.PopoverHintShowing());
+        hint_ancestor = FindTopmostPopoverAncestor(
+            *document.PopoverHintShowing(),
+            document.PopoverHintShowing()->GetPopoverData()->invoker());
         if (!hint_ancestor &&
             popover_independence == HidePopoverIndependence::kHideUnrelated) {
           document.PopoverHintShowing()->HidePopoverInternal(
@@ -1707,8 +1734,6 @@ void HTMLElement::HideAllPopoversUntil(
 }
 
 void HTMLElement::hidePopover(ExceptionState& exception_state) {
-  CHECK(RuntimeEnabledFeatures::HTMLPopoverAttributeEnabled(
-      GetDocument().GetExecutionContext()));
   HidePopoverInternal(
       HidePopoverFocusBehavior::kFocusPreviousElement,
       HidePopoverTransitionBehavior::kFireEventsAndWaitForTransitions,
@@ -1719,9 +1744,6 @@ void HTMLElement::HidePopoverInternal(
     HidePopoverFocusBehavior focus_behavior,
     HidePopoverTransitionBehavior transition_behavior,
     ExceptionState* exception_state) {
-  CHECK(RuntimeEnabledFeatures::HTMLPopoverAttributeEnabled(
-      GetDocument().GetExecutionContext()));
-
   if (!IsPopoverReady(PopoverTriggerAction::kHide, exception_state,
                       /*include_event_handler_text=*/true, /*document=*/nullptr)) {
     return;
@@ -1812,7 +1834,8 @@ void HTMLElement::HidePopoverInternal(
             },
             WrapPersistent(this), WrapPersistent(after_event))));
 
-    document.ScheduleForTopLayerRemoval(this);
+    document.ScheduleForTopLayerRemoval(this,
+                                        Document::TopLayerReason::kPopover);
   } else {
     document.RemoveFromTopLayerImmediately(this);
   }
@@ -1844,19 +1867,25 @@ void HTMLElement::HidePopoverInternal(
       focus_options->setPreventScroll(true);
       previously_focused_element->Focus(FocusParams(
           SelectionBehaviorOnFocus::kRestore, mojom::blink::FocusType::kScript,
-          /*capabilities=*/nullptr, focus_options,
-          /*gate_on_user_activation=*/true));
+          /*capabilities=*/nullptr, focus_options));
     }
   }
 
-  if (auto* selectmenu = ownerSelectMenuElement()) {
-    selectmenu->ListboxWasClosed();
+  if (auto* selectlist = popoverOwnerSelectListElement()) {
+    // popoverOwnerSelectListElement() is set on both the <selectlist> listbox
+    // and the <selectlist> autofill preview popover.
+    if (selectlist->ListBoxPart() == this) {
+      selectlist->ListboxWasClosed();
+    }
+  }
+
+  if (auto* close_watcher = GetPopoverData()->closeWatcher()) {
+    close_watcher->destroy();
+    GetPopoverData()->setCloseWatcher(nullptr);
   }
 }
 
 void HTMLElement::SetPopoverFocusOnShow() {
-  CHECK(RuntimeEnabledFeatures::HTMLPopoverAttributeEnabled(
-      GetDocument().GetExecutionContext()));
   // The layout must be updated here because we call Element::isFocusable,
   // which requires an up-to-date layout.
   GetDocument().UpdateStyleAndLayoutTreeForNode(this,
@@ -1871,8 +1900,7 @@ void HTMLElement::SetPopoverFocusOnShow() {
     return;
   }
 
-  Element* control =
-      IsAutofocusable() ? this : GetFocusDelegate(/*autofocus_only=*/true);
+  Element* control = IsAutofocusable() ? this : GetAutofocusDelegate();
 
   // If the popover does not use autofocus, then the focus should remain on the
   // currently active element.
@@ -1881,7 +1909,7 @@ void HTMLElement::SetPopoverFocusOnShow() {
     return;
 
   // 3. Run the focusing steps for control.
-  control->Focus(FocusParams(/*gate_on_user_activation=*/true));
+  control->Focus();
 
   // 4. Let topDocument be the active document of control's node document's
   // browsing context's top-level browsing context.
@@ -1994,12 +2022,11 @@ const HTMLElement* NearestTargetPopoverForInvoker(
 // popover=auto popovers can *be* ancestors, and only popover=auto/hint popovers
 // can *have* ancestors.
 const HTMLElement* HTMLElement::FindTopmostPopoverAncestor(
-    HTMLElement& new_popover) {
+    HTMLElement& new_popover,
+    Element* new_popovers_invoker) {
   CHECK(new_popover.HasPopoverAttribute());
   CHECK_NE(new_popover.PopoverType(), PopoverValueType::kManual);
   auto& document = new_popover.GetDocument();
-  CHECK(RuntimeEnabledFeatures::HTMLPopoverAttributeEnabled(
-      document.GetExecutionContext()));
 
   // Build a map from each open popover to its position in the stack.
   HeapHashMap<Member<const HTMLElement>, int> popover_positions;
@@ -2032,7 +2059,7 @@ const HTMLElement* HTMLElement::FindTopmostPopoverAncestor(
   // 2. Anchor attribute.
   check_ancestor(new_popover.anchorElement());
   // 3. Invoker to popover
-  check_ancestor(new_popover.GetPopoverData()->invoker());
+  check_ancestor(new_popovers_invoker);
   return topmost_popover_ancestor;
 }
 
@@ -2048,8 +2075,6 @@ const HTMLElement* FindTopmostRelatedPopover(
     const PopoverAncestorOptionsSet& ancestor_options =
         PopoverAncestorOptionsSet()) {
   auto& document = node.GetDocument();
-  CHECK(RuntimeEnabledFeatures::HTMLPopoverAttributeEnabled(
-      document.GetExecutionContext()));
   // Check if we're in an invoking element or a popover, and choose
   // the higher popover on the stack.
   auto* direct_popover_ancestor = NearestOpenPopover(&node, ancestor_options);
@@ -2076,10 +2101,6 @@ void HTMLElement::HandlePopoverLightDismiss(const Event& event,
                                             const Node& target_node) {
   CHECK(event.isTrusted());
   auto& document = target_node.GetDocument();
-  if (!RuntimeEnabledFeatures::HTMLPopoverAttributeEnabled(
-          document.GetExecutionContext())) {
-    return;
-  }
   if (!document.TopmostPopoverOrHint()) {
     return;
   }
@@ -2117,6 +2138,10 @@ void HTMLElement::HandlePopoverLightDismiss(const Event& event,
       }
     }
   } else if (event_type == event_type_names::kKeydown) {
+    // TODO(http://crbug.com/1171318): Remove this keydown branch once
+    // CloseWatcher has been fully enabled. CloseWatcher will handle escape key
+    // presses instead of this.
+    DCHECK(!RuntimeEnabledFeatures::CloseWatcherEnabled());
     const KeyboardEvent* key_event = DynamicTo<KeyboardEvent>(event);
     if (key_event && key_event->key() == "Escape") {
       CHECK(!event.GetEventPath().IsEmpty());
@@ -2132,8 +2157,6 @@ void HTMLElement::HandlePopoverLightDismiss(const Event& event,
 
 void HTMLElement::InvokePopover(Element* invoker) {
   CHECK(invoker);
-  CHECK(RuntimeEnabledFeatures::HTMLPopoverAttributeEnabled(
-      GetDocument().GetExecutionContext()));
   CHECK(HasPopoverAttribute());
   ShowPopoverInternal(invoker, /*exception_state=*/nullptr);
 }
@@ -2251,16 +2274,15 @@ void HTMLElement::HoveredElementChanged(Element* old_element,
   }
 }
 
-void HTMLElement::SetOwnerSelectMenuElement(HTMLSelectMenuElement* element) {
-  CHECK(RuntimeEnabledFeatures::HTMLSelectMenuElementEnabled());
-  CHECK(RuntimeEnabledFeatures::HTMLPopoverAttributeEnabled(
-      GetDocument().GetExecutionContext()));
+void HTMLElement::SetPopoverOwnerSelectListElement(
+    HTMLSelectListElement* element) {
+  CHECK(RuntimeEnabledFeatures::HTMLSelectListElementEnabled());
   CHECK(HasPopoverAttribute());
-  GetPopoverData()->setOwnerSelectMenuElement(element);
+  GetPopoverData()->setOwnerSelectListElement(element);
 }
 
-HTMLSelectMenuElement* HTMLElement::ownerSelectMenuElement() const {
-  return GetPopoverData() ? GetPopoverData()->ownerSelectMenuElement()
+HTMLSelectListElement* HTMLElement::popoverOwnerSelectListElement() const {
+  return GetPopoverData() ? GetPopoverData()->ownerSelectListElement()
                           : nullptr;
 }
 
@@ -2406,20 +2428,25 @@ HTMLFormElement* HTMLElement::FindFormAncestor() const {
   return Traversal<HTMLFormElement>::FirstAncestor(*this);
 }
 
-static inline bool ElementAffectsDirectionality(const Node* node) {
+bool HTMLElement::ElementAffectsDirectionality(const Node* node) {
   auto* html_element = DynamicTo<HTMLElement>(node);
-  return html_element && (IsA<HTMLBDIElement>(*html_element) ||
-                          IsValidDirAttribute(html_element->FastGetAttribute(
-                              html_names::kDirAttr)));
+  auto* input_element = DynamicTo<HTMLInputElement>(node);
+  return (html_element && (IsA<HTMLBDIElement>(*html_element) ||
+                           IsValidDirAttribute(html_element->FastGetAttribute(
+                               html_names::kDirAttr)))) ||
+         (input_element && input_element->IsTelephone());
 }
 
 void HTMLElement::ChildrenChanged(const ChildrenChange& change) {
   Element::ChildrenChanged(change);
 
-  if (GetDocument().IsDirAttributeDirty()) {
+  if (GetDocument().HasDirAttribute()) {
     AdjustDirectionalityIfNeededAfterChildrenChanged(change);
 
-    if (change.IsChildInsertion() && !SelfOrAncestorHasDirAutoAttribute()) {
+    if (change.IsChildInsertion() && !SelfOrAncestorHasDirAutoAttribute() &&
+        // The new code for handling this is in Element::InsertedInto and
+        // Element::RemovedFrom.
+        !RuntimeEnabledFeatures::CSSPseudoDirEnabled()) {
       auto* element = DynamicTo<HTMLElement>(change.sibling_changed);
       if (element && !element->NeedsInheritDirectionalityFromParent() &&
           !ElementAffectsDirectionality(element))
@@ -2436,17 +2463,37 @@ bool HTMLElement::HasDirectionAuto() const {
   // <bdi> defaults to dir="auto"
   // https://html.spec.whatwg.org/C/#the-bdi-element
   const AtomicString& direction = FastGetAttribute(html_names::kDirAttr);
-  return (IsA<HTMLBDIElement>(*this) && direction == g_null_atom) ||
+  return (IsA<HTMLBDIElement>(*this) && !IsValidDirAttribute(direction)) ||
          EqualIgnoringASCIICase(direction, "auto");
 }
 
+const TextControlElement* ElementIfAutoDirShouldUseValueOrNull(
+    const Element* element) {
+  const TextControlElement* text_element =
+      DynamicTo<TextControlElement>(element);
+  if (text_element && text_element->ShouldAutoDirUseValue()) {
+    return text_element;
+  }
+  return nullptr;
+}
+
+inline TextControlElement* ElementIfAutoDirShouldUseValueOrNull(
+    Element* element) {
+  return const_cast<TextControlElement*>(ElementIfAutoDirShouldUseValueOrNull(
+      const_cast<const Element*>(element)));
+}
+
+// TODO(https://crbug.com/576815): Once the CSSPseudoDir flag is
+// removed, this function no longer needs to be templatized over
+// Traversal since it can always use NodeTraversal.
 template <typename Traversal>
 absl::optional<TextDirection> HTMLElement::ResolveAutoDirectionality(
     bool& is_deferred,
     Node* stay_within) const {
   is_deferred = false;
-  if (auto* input_element = DynamicTo<HTMLInputElement>(*this)) {
-    return BidiParagraph::BaseDirectionForStringOrLtr(input_element->Value());
+  if (const TextControlElement* text_element =
+          ElementIfAutoDirShouldUseValueOrNull(this)) {
+    return BidiParagraph::BaseDirectionForStringOrLtr(text_element->Value());
   }
 
   // For <textarea>, the heuristic is applied on a per-paragraph level, and
@@ -2467,7 +2514,7 @@ absl::optional<TextDirection> HTMLElement::ResolveAutoDirectionality(
     }
 
     auto* slot = ToHTMLSlotElementIfSupportsAssignmentOrNull(node);
-    if (slot) {
+    if (slot && !RuntimeEnabledFeatures::CSSPseudoDirEnabled()) {
       ShadowRoot* root = slot->ContainingShadowRoot();
       // Defer to adjust the directionality to avoid recalcuating slot
       // assignment in FlatTreeTraversal when updating slot.
@@ -2487,6 +2534,18 @@ absl::optional<TextDirection> HTMLElement::ResolveAutoDirectionality(
         node = Traversal::NextSkippingChildren(*node, stay_within);
         continue;
       }
+    }
+
+    // TODO(https://crbug.com/576815): Once we have final spec text for
+    // https://github.com/whatwg/html/issues/3699 we should recheck the
+    // relative order of this check and the "Skip elements with valid
+    // dir attribute" check above, and add tests for the case that
+    // exercises both.  (Note that if the order is switched, this test
+    // needs to consider the dir attribute on the slot element rather
+    // than just jumping to its shadow host.)
+    if (slot && RuntimeEnabledFeatures::CSSPseudoDirEnabled()) {
+      ShadowRoot* root = slot->ContainingShadowRoot();
+      return root->host().CachedDirectionality();
     }
 
     if (node->IsTextNode()) {
@@ -2511,6 +2570,7 @@ absl::optional<TextDirection> HTMLElement::ResolveAutoDirectionality(
 
 void HTMLElement::AdjustDirectionalityIfNeededAfterChildAttributeChanged(
     Element* child) {
+  DCHECK(!RuntimeEnabledFeatures::CSSPseudoDirEnabled());
   DCHECK(SelfOrAncestorHasDirAutoAttribute());
   bool is_deferred;
   TextDirection text_direction =
@@ -2539,6 +2599,7 @@ void HTMLElement::AdjustDirectionalityIfNeededAfterChildAttributeChanged(
 }
 
 bool HTMLElement::CalculateAndAdjustAutoDirectionality(Node* stay_within) {
+  CHECK(!RuntimeEnabledFeatures::CSSPseudoDirEnabled() || this == stay_within);
   bool is_deferred = false;
   TextDirection text_direction =
       ResolveAutoDirectionality<NodeTraversal>(is_deferred, stay_within)
@@ -2590,26 +2651,91 @@ void HTMLElement::AdjustDirectionalityIfNeededAfterChildrenChanged(
 
   UpdateDescendantHasDirAutoAttribute(true /* has_dir_auto */);
 
+  // We have some fixes to dir=auto calculation behind the
+  // CSSPseudoDirEnabled() flag.  This code has two branches to account
+  // for *both* those fixes *and* for the :dir() pseudo-class itself.
+  if (RuntimeEnabledFeatures::CSSPseudoDirEnabled()) {
+    this->UpdateAncestorWithDirAuto(UpdateAncestorTraversal::IncludeSelf);
+  } else {
+    for (Element* element_to_adjust = this; element_to_adjust;
+         element_to_adjust =
+             FlatTreeTraversal::ParentElement(*element_to_adjust)) {
+      if (ElementAffectsDirectionality(element_to_adjust)) {
+        if (To<HTMLElement>(element_to_adjust)
+                ->CalculateAndAdjustAutoDirectionality(
+                    stay_within ? stay_within : element_to_adjust)) {
+          SetNeedsStyleRecalc(kLocalStyleChange,
+                              StyleChangeReasonForTracing::Create(
+                                  style_change_reason::kPseudoClass));
+        }
+        return;
+      }
+    }
+  }
+}
+
+void HTMLElement::UpdateAncestorWithDirAuto(UpdateAncestorTraversal traversal) {
+  CHECK(RuntimeEnabledFeatures::CSSPseudoDirEnabled());
+
+  bool skip = traversal == UpdateAncestorTraversal::ExcludeSelf;
+
   for (Element* element_to_adjust = this; element_to_adjust;
-       element_to_adjust =
-           FlatTreeTraversal::ParentElement(*element_to_adjust)) {
-    if (ElementAffectsDirectionality(element_to_adjust)) {
-      if (To<HTMLElement>(element_to_adjust)
-              ->CalculateAndAdjustAutoDirectionality(
-                  stay_within ? stay_within : element_to_adjust)) {
+       element_to_adjust = element_to_adjust->parentElement()) {
+    if (!skip) {
+      if (ElementAffectsDirectionality(element_to_adjust)) {
+        HTMLElement* html_element_to_adjust =
+            To<HTMLElement>(element_to_adjust);
+        if (html_element_to_adjust->HasDirectionAuto() &&
+            html_element_to_adjust->CalculateAndAdjustAutoDirectionality(
+                element_to_adjust)) {
+          SetNeedsStyleRecalc(kLocalStyleChange,
+                              StyleChangeReasonForTracing::Create(
+                                  style_change_reason::kPseudoClass));
+          element_to_adjust->PseudoStateChanged(CSSSelector::kPseudoDir);
+        }
+        return;
+      }
+      if (!element_to_adjust->SelfOrAncestorHasDirAutoAttribute()) {
+        return;
+      }
+    }
+    skip = false;
+    // Directionality mostly operates on the node tree rather than the
+    // flat tree.  However, a <slot>'s dir=auto is affected by its
+    // assigned nodes.
+    if (HTMLSlotElement* slot = element_to_adjust->AssignedSlot()) {
+      if (slot->HasDirectionAuto() &&
+          slot->CalculateAndAdjustAutoDirectionality(slot)) {
         SetNeedsStyleRecalc(kLocalStyleChange,
                             StyleChangeReasonForTracing::Create(
                                 style_change_reason::kPseudoClass));
+        slot->PseudoStateChanged(CSSSelector::kPseudoDir);
       }
-      if (RuntimeEnabledFeatures::CSSPseudoDirEnabled())
-        element_to_adjust->PseudoStateChanged(CSSSelector::kPseudoDir);
-      return;
+    }
+    // And the values of many text form controls influence dir=auto on
+    // the control.
+    if (ShadowRoot* shadow_root =
+            DynamicTo<ShadowRoot>(element_to_adjust->parentNode())) {
+      if (TextControlElement* text_control =
+              ElementIfAutoDirShouldUseValueOrNull(&shadow_root->host())) {
+        if (text_control->HasDirectionAuto() &&
+            text_control->CalculateAndAdjustAutoDirectionality(text_control)) {
+          SetNeedsStyleRecalc(kLocalStyleChange,
+                              StyleChangeReasonForTracing::Create(
+                                  style_change_reason::kPseudoClass));
+          text_control->PseudoStateChanged(CSSSelector::kPseudoDir);
+        }
+      }
     }
   }
 }
 
 void HTMLElement::AdjustDirectionalityIfNeededAfterShadowRootChanged() {
   DCHECK(IsShadowHost(this));
+  if (RuntimeEnabledFeatures::CSSPseudoDirEnabled()) {
+    return;
+  }
+
   if (SelfOrAncestorHasDirAutoAttribute()) {
     for (auto* element_to_adjust = this; element_to_adjust;
          element_to_adjust = DynamicTo<HTMLElement>(
@@ -2625,8 +2751,37 @@ void HTMLElement::AdjustDirectionalityIfNeededAfterShadowRootChanged() {
   }
 }
 
+void HTMLElement::UpdateDirectionalityAfterInputTypeChange(
+    const AtomicString& old_value,
+    const AtomicString& new_value) {
+  OnDirAttrChanged(
+      AttributeModificationParams(html_names::kDirAttr, old_value, new_value,
+                                  AttributeModificationReason::kDirectly));
+}
+
+void HTMLElement::AdjustDirectionAutoAfterRecalcAssignedNodes() {
+  if (!RuntimeEnabledFeatures::CSSPseudoDirEnabled()) {
+    return;
+  }
+
+  // If the slot has dir=auto, then the resulting directionality may
+  // have changed.
+  ChildrenChange fakeChange = {
+      .type = ChildrenChangeType::kAllChildrenRemoved,
+      .by_parser = ChildrenChangeSource::kAPI,
+      .affects_elements = ChildrenChangeAffectsElements::kYes,
+  };
+  AdjustDirectionalityIfNeededAfterChildrenChanged(fakeChange);
+}
+
 void HTMLElement::AdjustCandidateDirectionalityForSlot(
     HeapHashSet<Member<Node>> candidate_set) {
+  if (RuntimeEnabledFeatures::CSSPseudoDirEnabled()) {
+    // This code should not be used for the new dir=auto inheritance rules.
+    CHECK(candidate_set.empty());
+    return;
+  }
+
   HeapHashSet<Member<HTMLElement>> directionality_set;
   // Transfer a candidate directionality set to |directionality_set| to avoid
   // the tree walk to the duplicated parent node for the directionality.
@@ -2950,7 +3105,7 @@ int HTMLElement::OffsetTopOrLeft(bool top) {
   if (!layout_object)
     return 0;
 
-  HashSet<Member<TreeScope>> ancestor_tree_scopes = GetAncestorTreeScopes();
+  HeapHashSet<Member<TreeScope>> ancestor_tree_scopes = GetAncestorTreeScopes();
   LayoutUnit offset;
   Element* offset_parent = this;
   bool new_spec_behavior =
@@ -2987,7 +3142,7 @@ int HTMLElement::offsetTopForBinding() {
 
 int HTMLElement::offsetWidthForBinding() {
   GetDocument().EnsurePaintLocationDataValidForNode(
-      this, DocumentUpdateReason::kJavaScript, CSSPropertyID::kWidth);
+      this, DocumentUpdateReason::kJavaScript);
   int result = 0;
   if (const auto* layout_object = GetLayoutBoxModelObject()) {
     result = AdjustedOffsetForZoom(layout_object->OffsetWidth());
@@ -3000,7 +3155,7 @@ int HTMLElement::offsetWidthForBinding() {
 DISABLE_CFI_PERF
 int HTMLElement::offsetHeightForBinding() {
   GetDocument().EnsurePaintLocationDataValidForNode(
-      this, DocumentUpdateReason::kJavaScript, CSSPropertyID::kHeight);
+      this, DocumentUpdateReason::kJavaScript);
   int result = 0;
   if (const auto* layout_object = GetLayoutBoxModelObject()) {
     result = AdjustedOffsetForZoom(layout_object->OffsetHeight());
@@ -3021,53 +3176,187 @@ Element* HTMLElement::unclosedOffsetParent() {
   return layout_object->OffsetParent(this);
 }
 
-void HTMLElement::UpdateDescendantHasDirAutoAttribute(bool has_dir_auto) {
-  Node* node = FlatTreeTraversal::FirstChild(*this);
-  while (node) {
-    if (auto* element = DynamicTo<Element>(node)) {
-      AtomicString dir_attribute_value =
-          element->FastGetAttribute(html_names::kDirAttr);
-      if (IsValidDirAttribute(dir_attribute_value)) {
-        node = FlatTreeTraversal::NextSkippingChildren(*node, this);
-        continue;
-      }
+// Because the self-or-ancestor has dir=auto state could come from either a
+// node tree ancestor, a slot, or an input, we have a method to
+// recalculate it (just for this element) based on all three sources.
+//
+// TODO(https://crbug.com/576815): When this code moves to Element, this could
+// be a member function.
+namespace {
 
-      if (auto* slot = ToHTMLSlotElementIfSupportsAssignmentOrNull(node)) {
-        ShadowRoot* root = slot->ContainingShadowRoot();
-        // Defer to adjust the directionality to avoid recalcuating slot
-        // assignment in FlatTreeTraversal when updating slot.
-        // Slot and its children will be updated after recalculating children.
-        if (root->NeedsSlotAssignmentRecalc()) {
-          root->SetNeedsDirAutoAttributeUpdate(true);
-          node = FlatTreeTraversal::NextSkippingChildren(*node, this);
-          continue;
-        }
-      }
-
-      if (!has_dir_auto) {
-        if (!element->SelfOrAncestorHasDirAutoAttribute()) {
-          node = FlatTreeTraversal::NextSkippingChildren(*node, this);
-          continue;
-        }
-        element->ClearSelfOrAncestorHasDirAutoAttribute();
-      } else {
-        if (element->SelfOrAncestorHasDirAutoAttribute()) {
-          node = FlatTreeTraversal::NextSkippingChildren(*node, this);
-          continue;
-        }
-        element->SetSelfOrAncestorHasDirAutoAttribute();
+bool RecalcSelfOrAncestorHasDirAuto(Element* element) {
+  if (DynamicTo<HTMLElement>(element)) {
+    AtomicString dir_attribute_value =
+        element->FastGetAttribute(html_names::kDirAttr);
+    if (IsValidDirAttribute(dir_attribute_value)) {
+      return EqualIgnoringASCIICase(dir_attribute_value, "auto");
+    }
+  }
+  Node* parent = element->parentNode();
+  if (parent && parent->SelfOrAncestorHasDirAutoAttribute()) {
+    return true;
+  }
+  if (HTMLSlotElement* slot = element->AssignedSlot()) {
+    if (slot->HasDirectionAuto()) {
+      return true;
+    }
+  }
+  if (ShadowRoot* shadow_root = DynamicTo<ShadowRoot>(parent)) {
+    if (TextControlElement* text_element =
+            ElementIfAutoDirShouldUseValueOrNull(&shadow_root->host())) {
+      if (text_element->HasDirectionAuto()) {
+        return true;
       }
     }
-    node = FlatTreeTraversal::Next(*node, this);
+  }
+  return false;
+}
+
+}  // namespace
+
+void HTMLElement::UpdateDescendantHasDirAutoAttribute(bool has_dir_auto) {
+  if (RuntimeEnabledFeatures::CSSPseudoDirEnabled()) {
+    if (ToHTMLSlotElementIfSupportsAssignmentOrNull(this) ||
+        ElementIfAutoDirShouldUseValueOrNull(this)) {
+      for (Node& node : FlatTreeTraversal::ChildrenOf(*this)) {
+        if (HTMLElement* element = DynamicTo<HTMLElement>(node)) {
+          if (!IsValidDirAttribute(
+                  element->FastGetAttribute(html_names::kDirAttr))) {
+            if (!has_dir_auto) {
+              if (!element->SelfOrAncestorHasDirAutoAttribute() ||
+                  RecalcSelfOrAncestorHasDirAuto(element)) {
+                continue;
+              }
+              element->ClearSelfOrAncestorHasDirAutoAttribute();
+            } else {
+              if (element->SelfOrAncestorHasDirAutoAttribute()) {
+                continue;
+              }
+              element->SetSelfOrAncestorHasDirAutoAttribute();
+            }
+            element->UpdateDescendantHasDirAutoAttribute(has_dir_auto);
+          }
+        }
+      }
+    } else {
+      Element* element = ElementTraversal::FirstChild(*this);
+      while (element) {
+        AtomicString dir_attribute_value =
+            element->FastGetAttribute(html_names::kDirAttr);
+        if (IsValidDirAttribute(dir_attribute_value)) {
+          element = ElementTraversal::NextSkippingChildren(*element, this);
+          continue;
+        }
+
+        if (!has_dir_auto) {
+          if (!element->SelfOrAncestorHasDirAutoAttribute() ||
+              RecalcSelfOrAncestorHasDirAuto(element)) {
+            element = ElementTraversal::NextSkippingChildren(*element, this);
+            continue;
+          }
+          element->ClearSelfOrAncestorHasDirAutoAttribute();
+        } else {
+          if (element->SelfOrAncestorHasDirAutoAttribute()) {
+            element = ElementTraversal::NextSkippingChildren(*element, this);
+            continue;
+          }
+          element->SetSelfOrAncestorHasDirAutoAttribute();
+        }
+        element = ElementTraversal::Next(*element, this);
+      }
+    }
+  } else {
+    Node* node = FlatTreeTraversal::FirstChild(*this);
+    while (node) {
+      if (auto* element = DynamicTo<Element>(node)) {
+        AtomicString dir_attribute_value =
+            element->FastGetAttribute(html_names::kDirAttr);
+        if (IsValidDirAttribute(dir_attribute_value)) {
+          node = FlatTreeTraversal::NextSkippingChildren(*node, this);
+          continue;
+        }
+
+        if (auto* slot = ToHTMLSlotElementIfSupportsAssignmentOrNull(node)) {
+          ShadowRoot* root = slot->ContainingShadowRoot();
+          // Defer to adjust the directionality to avoid recalcuating slot
+          // assignment in FlatTreeTraversal when updating slot.
+          // Slot and its children will be updated after recalculating children.
+          if (root->NeedsSlotAssignmentRecalc()) {
+            root->SetNeedsDirAutoAttributeUpdate(true);
+            node = FlatTreeTraversal::NextSkippingChildren(*node, this);
+            continue;
+          }
+        }
+
+        if (!has_dir_auto) {
+          if (!element->SelfOrAncestorHasDirAutoAttribute()) {
+            node = FlatTreeTraversal::NextSkippingChildren(*node, this);
+            continue;
+          }
+          element->ClearSelfOrAncestorHasDirAutoAttribute();
+        } else {
+          if (element->SelfOrAncestorHasDirAutoAttribute()) {
+            node = FlatTreeTraversal::NextSkippingChildren(*node, this);
+            continue;
+          }
+          element->SetSelfOrAncestorHasDirAutoAttribute();
+        }
+      }
+      node = FlatTreeTraversal::Next(*node, this);
+    }
   }
 }
 
 void HTMLElement::UpdateDirectionalityAndDescendant(TextDirection direction) {
-  SetCachedDirectionality(direction);
-  UpdateDescendantDirectionality(direction);
+  if (!RuntimeEnabledFeatures::CSSPseudoDirEnabled()) {
+    SetCachedDirectionality(direction);
+    UpdateDescendantDirectionality(direction);
+  } else {
+    // This code applies a direction change to an element and to any elements
+    // that inherit from it.  It should match the code in
+    // Element::RecomputeDirectionFromParent that determines whether a single
+    // element should inherit direction and recomputes it if it does.
+    Element* element = this;
+    do {
+      if (element != this &&
+          (ToHTMLSlotElementIfSupportsAssignmentOrNull(element) ||
+           ElementAffectsDirectionality(element) ||
+           element->CachedDirectionality() == direction)) {
+        element = ElementTraversal::NextSkippingChildren(*element, this);
+        continue;
+      }
+
+      element->SetCachedDirectionality(direction);
+      element->PseudoStateChanged(CSSSelector::kPseudoDir);
+
+      if (ShadowRoot* shadow_root = element->GetShadowRoot()) {
+        for (Node& child : ElementTraversal::ChildrenOf(*shadow_root)) {
+          // TODO(https://crbug.com/576815): This should work for
+          // non-HTML elements too.
+          if (HTMLElement* child_element = DynamicTo<HTMLElement>(child)) {
+            if (!ElementAffectsDirectionality(child_element) &&
+                child_element->CachedDirectionality() != direction) {
+              child_element->UpdateDirectionalityAndDescendant(direction);
+            }
+          }
+        }
+        if (shadow_root->HasSlotAssignment()) {
+          for (HTMLSlotElement* slot :
+               shadow_root->GetSlotAssignment().Slots()) {
+            if (!ElementAffectsDirectionality(slot) &&
+                slot->CachedDirectionality() != direction) {
+              slot->UpdateDirectionalityAndDescendant(direction);
+            }
+          }
+        }
+      }
+      element = ElementTraversal::Next(*element, this);
+    } while (element);
+  }
 }
 
 void HTMLElement::UpdateDescendantDirectionality(TextDirection direction) {
+  CHECK(!RuntimeEnabledFeatures::CSSPseudoDirEnabled());
   Node* node = FlatTreeTraversal::FirstChild(*this);
   while (node) {
     if (IsA<HTMLElement>(node)) {
@@ -3095,20 +3384,36 @@ void HTMLElement::UpdateDescendantDirectionality(TextDirection direction) {
 void HTMLElement::OnDirAttrChanged(const AttributeModificationParams& params) {
   // If an ancestor has dir=auto, and this node has the first character,
   // changes to dir attribute may affect the ancestor.
-  if (!IsValidDirAttribute(params.old_value) &&
-      !IsValidDirAttribute(params.new_value))
+  bool is_old_valid = IsValidDirAttribute(params.old_value);
+  bool is_new_valid = IsValidDirAttribute(params.new_value);
+  if (!is_old_valid && !is_new_valid) {
     return;
+  }
 
-  GetDocument().SetDirAttributeDirty();
+  GetDocument().SetHasDirAttribute();
 
   bool is_old_auto = SelfOrAncestorHasDirAutoAttribute();
   bool is_new_auto = HasDirectionAuto();
+
+  if (is_new_auto) {
+    if (auto* input_element = DynamicTo<HTMLInputElement>(*this)) {
+      input_element->EnsureShadowSubtree();
+    }
+  }
+
   bool needs_slot_assignment_recalc = false;
-  auto* parent =
-      GetParentForDirectionality(*this, needs_slot_assignment_recalc);
-  if (!is_old_auto || !is_new_auto) {
-    if (parent && parent->SelfOrAncestorHasDirAutoAttribute()) {
-      parent->AdjustDirectionalityIfNeededAfterChildAttributeChanged(this);
+  HTMLElement* parent = nullptr;
+  if (RuntimeEnabledFeatures::CSSPseudoDirEnabled()) {
+    parent = DynamicTo<HTMLElement>(parentElement());
+    if (is_old_valid != is_new_valid) {
+      UpdateAncestorWithDirAuto(UpdateAncestorTraversal::ExcludeSelf);
+    }
+  } else {
+    parent = GetParentForDirectionality(*this, needs_slot_assignment_recalc);
+    if (!is_old_auto || !is_new_auto) {
+      if (parent && parent->SelfOrAncestorHasDirAutoAttribute()) {
+        parent->AdjustDirectionalityIfNeededAfterChildAttributeChanged(this);
+      }
     }
   }
 
@@ -3284,21 +3589,6 @@ void HTMLElement::FinishParsingChildren() {
   Element::FinishParsingChildren();
   if (IsFormAssociatedCustomElement())
     EnsureElementInternals().TakeStateAndRestore();
-}
-
-void HTMLElement::ParserDidSetAttributes() {
-  Element::ParserDidSetAttributes();
-
-  if (GetDocument().IsDirAttributeDirty() && !HasDirectionAuto() &&
-      !ElementAffectsDirectionality(this)) {
-    bool needs_slot_assignment_recalc = false;
-    auto* parent =
-        GetParentForDirectionality(*this, needs_slot_assignment_recalc);
-    if (needs_slot_assignment_recalc)
-      SetNeedsInheritDirectionalityFromParent();
-    else if (parent)
-      SetCachedDirectionality(parent->CachedDirectionality());
-  }
 }
 
 }  // namespace blink

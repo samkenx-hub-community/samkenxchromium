@@ -45,7 +45,7 @@ public class PhoneCaptureStateTokenTest {
 
     private static ButtonData makeButtonDate() {
         // Uses default equals impl, reference quality, to compare. Values do not matter.
-        return new ButtonDataImpl(false, null, null, "", false, null, false, 0);
+        return new ButtonDataImpl(false, null, null, "", false, null, false, 0, 0, false);
     }
 
     @Before
@@ -274,8 +274,7 @@ public class PhoneCaptureStateTokenTest {
         private ButtonData mOptionalButtonData = DEFAULT_BUTTON_DATA;
         private @VisualState int mVisualState = DEFAULT_VISUAL_STATE;
         private String mUrlText = DEFAULT_URL_TEXT;
-        @Nullable
-        private CharSequence mVisibleTextPrefixHint = DEFAULT_URL_HINT_TEXT;
+        private @Nullable CharSequence mVisibleTextPrefixHint = DEFAULT_URL_HINT_TEXT;
         private @DrawableRes int mSecurityIcon = DEFAULT_SECURITY_ICON;
         private ColorStateList mHomeButtonColorStateList = mDefaultHomeButtonColorStateList;
         private boolean mHomeButtonIsVisible = DEFAULT_HOME_BUTTON_IS_VISIBLE;

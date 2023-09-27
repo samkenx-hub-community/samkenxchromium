@@ -71,17 +71,15 @@ public class CachedFeatureFlagsSafeModeUnitTest {
 
     @Before
     public void setUp() {
-        CachedFeatureFlags.setSafeModeExperimentEnabledForTesting(true);
-        CachedFeatureFlags.resetFlagsForTesting();
+        CachedFlagsSafeMode.getInstance().setExperimentEnabledForTesting(true);
+        clearMemory();
     }
 
     @After
     public void tearDown() {
-        CachedFeatureFlags.setSafeModeExperimentEnabledForTesting(null);
-        CachedFeatureFlags.resetFlagsForTesting();
-
+        CachedFlagsSafeMode.getInstance().setExperimentEnabledForTesting(null);
         FeatureList.setTestFeatures(null);
-        CachedFlagsSafeMode.clearDiskForTesting();
+        clearMemory();
     }
 
     @Test
@@ -392,7 +390,7 @@ public class CachedFeatureFlagsSafeModeUnitTest {
         CachedFeatureFlags.cacheFieldTrialParameters(
                 Arrays.asList(BOOL_PARAM, INT_PARAM, DOUBLE_PARAM, STRING_PARAM));
 
-        CachedFeatureFlags.resetFlagsForTesting();
+        clearMemory();
         // Cached values became true(crashy)/true/native1.
 
         startRun();
@@ -556,11 +554,11 @@ public class CachedFeatureFlagsSafeModeUnitTest {
 
     private void endFirstRunWithKill() {
         CachedFeatureFlags.onPauseCheckpoint();
-        CachedFeatureFlags.resetFlagsForTesting();
+        clearMemory();
     }
 
     private void endCrashyRun() {
-        CachedFeatureFlags.resetFlagsForTesting();
+        clearMemory();
     }
 
     private void endCleanRunCachingIrrelevantValues() {
@@ -593,7 +591,7 @@ public class CachedFeatureFlagsSafeModeUnitTest {
         assertTrue(CachedFlagsSafeMode.getSafeValuePreferences().contains(
                 "Chrome.Flags.CachedFlag.CrashyFeature"));
 
-        CachedFeatureFlags.resetFlagsForTesting();
+        clearMemory();
     }
 
     private void assertCachedParamsEqualDefaults() {
@@ -615,5 +613,10 @@ public class CachedFeatureFlagsSafeModeUnitTest {
         assertEquals(INT_PARAM_NATIVE_2, INT_PARAM.getValue());
         assertEquals(DOUBLE_PARAM_NATIVE_2, DOUBLE_PARAM.getValue(), 1e-10);
         assertEquals(STRING_PARAM_NATIVE_2, STRING_PARAM.getValue());
+    }
+
+    private static void clearMemory() {
+        CachedFeatureFlags.resetFlagsForTesting();
+        CachedFlagsSafeMode.getInstance().clearMemoryForTesting();
     }
 }

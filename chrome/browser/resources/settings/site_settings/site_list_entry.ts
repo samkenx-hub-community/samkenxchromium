@@ -213,7 +213,12 @@ export class SiteListEntryElement extends SiteListEntryElementBase {
   private computeSiteDescription_(): string {
     let description = '';
 
-    if (this.model.isEmbargoed) {
+    // If a description has been set by the handler, have it override others.
+    // TODO(crbug.com/1467504): Move all possible descriptions in to this
+    // field C++ side so this function can be greatly simplified.
+    if (this.model.description) {
+      description = this.model.description;
+    } else if (this.model.isEmbargoed) {
       assert(
           !this.model.embeddingOrigin,
           'Embedding origin should be empty for embargoed origin.');
@@ -234,13 +239,6 @@ export class SiteListEntryElement extends SiteListEntryElementBase {
     } else if (this.model.category === ContentSettingsTypes.GEOLOCATION) {
       description = loadTimeData.getString('embeddedOnAnyHost');
     }
-
-    // <if expr="chromeos_ash">
-    if (this.model.category === ContentSettingsTypes.NOTIFICATIONS &&
-        this.model.showAndroidSmsNote) {
-      description = loadTimeData.getString('androidSmsNote');
-    }
-    // </if>
 
     try {
       const url = new URL(this.model.origin);

@@ -6,6 +6,7 @@
 
 #include <memory>
 
+#include "ash/constants/ash_features.h"
 #include "ash/login_status.h"
 #include "ash/public/cpp/test/test_system_tray_client.h"
 #include "ash/strings/grit/ash_strings.h"
@@ -19,6 +20,7 @@
 #include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
 #include "base/test/metrics/user_action_tester.h"
+#include "base/test/scoped_feature_list.h"
 #include "mojo/public/cpp/bindings/clone_traits.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/events/test/event_generator.h"
@@ -45,8 +47,16 @@ class NetworkDetailedViewTest : public AshTestBase {
   void SetUp() override {
     AshTestBase::SetUp();
 
-    list_type_ = NetworkDetailedView::ListType::LIST_TYPE_NETWORK;
+    list_type_ = NetworkDetailedViewListType::LIST_TYPE_NETWORK;
+  }
 
+  void TearDown() override {
+    widget_.reset();
+
+    AshTestBase::TearDown();
+  }
+
+  void CreateNetworkDetailedView() {
     network_detailed_view_ = new NetworkDetailedView(
         &fake_detailed_view_delegate_, &fake_network_detailed_view_delegate_,
         list_type_);
@@ -58,10 +68,9 @@ class NetworkDetailedViewTest : public AshTestBase {
     base::RunLoop().RunUntilIdle();
   }
 
-  void TearDown() override {
-    widget_.reset();
-
-    AshTestBase::TearDown();
+  void DestroyNetworkDetailedView() {
+    delete network_detailed_view_;
+    base::RunLoop().RunUntilIdle();
   }
 
   views::Button* FindSettingsButton() {
@@ -74,8 +83,12 @@ class NetworkDetailedViewTest : public AshTestBase {
         NetworkDetailedView::NetworkDetailedViewChildId::kInfoButton);
   }
 
-  NetworkInfoBubble* GetInfoBubble() {
-    return network_detailed_view_->info_bubble_;
+  views::View* GetInfoBubble() {
+    return network_detailed_view_->info_bubble_tracker_.view();
+  }
+
+  int GetTitleRowStringId() {
+    return network_detailed_view_->title_row_string_id_for_testing();
   }
 
   FakeNetworkDetailedViewDelegate* network_detailed_view_delegate() {
@@ -105,14 +118,17 @@ class NetworkDetailedViewTest : public AshTestBase {
   }
 
   std::unique_ptr<views::Widget> widget_;
-  raw_ptr<NetworkDetailedView, ExperimentalAsh> network_detailed_view_;
+  raw_ptr<NetworkDetailedView, DanglingUntriaged | ExperimentalAsh>
+      network_detailed_view_;
   FakeNetworkDetailedViewDelegate fake_network_detailed_view_delegate_;
   FakeDetailedViewDelegate fake_detailed_view_delegate_;
-  NetworkDetailedView::ListType list_type_;
+  NetworkDetailedViewListType list_type_;
   base::UserActionTester user_action_tester_;
 };
 
 TEST_F(NetworkDetailedViewTest, PressingSettingsButtonOpensSettings) {
+  CreateNetworkDetailedView();
+
   views::Button* settings_button = FindSettingsButton();
 
   CheckHistogramBuckets(/*count=*/0);
@@ -135,6 +151,8 @@ TEST_F(NetworkDetailedViewTest, PressingSettingsButtonOpensSettings) {
 }
 
 TEST_F(NetworkDetailedViewTest, PressingInfoButtonOpensInfoBubble) {
+  CreateNetworkDetailedView();
+
   views::Button* info_button = FindInfoButton();
   LeftClickOn(info_button);
   for (int i = 0; i < 3; ++i) {
@@ -148,6 +166,38 @@ TEST_F(NetworkDetailedViewTest, PressingInfoButtonOpensInfoBubble) {
       EXPECT_FALSE(network_detailed_view()->GetWidget()->IsActive());
     }
   }
+}
+
+TEST_F(NetworkDetailedViewTest, InfoBubbleClosedWhenDetailedViewClosed) {
+  CreateNetworkDetailedView();
+
+  views::Button* info_button = FindInfoButton();
+  LeftClickOn(info_button);
+  views::ViewTracker bubble_tracker_;
+  bubble_tracker_.SetView(GetInfoBubble());
+  EXPECT_TRUE(bubble_tracker_.view());
+
+  // The info bubble should not exist after the detailed view has been closed.
+  DestroyNetworkDetailedView();
+  EXPECT_FALSE(bubble_tracker_.view());
+}
+
+TEST_F(NetworkDetailedViewTest, TitleRowString_InstantHotspotRebrandEnabled) {
+  base::test::ScopedFeatureList scoped_feature_list;
+  scoped_feature_list.InitAndEnableFeature(features::kInstantHotspotRebrand);
+
+  CreateNetworkDetailedView();
+
+  EXPECT_EQ(GetTitleRowStringId(), IDS_ASH_STATUS_TRAY_INTERNET);
+}
+
+TEST_F(NetworkDetailedViewTest, TitleRowString_InstantHotspotRebrandDisabled) {
+  base::test::ScopedFeatureList scoped_feature_list;
+  scoped_feature_list.InitAndDisableFeature(features::kInstantHotspotRebrand);
+
+  CreateNetworkDetailedView();
+
+  EXPECT_EQ(GetTitleRowStringId(), IDS_ASH_STATUS_TRAY_NETWORK);
 }
 
 }  // namespace ash

@@ -7,10 +7,12 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include "components/autofill/core/browser/data_model/autofill_profile.h"
+#include "components/autofill/core/browser/data_model/autofill_wallet_usage_data.h"
 #include "components/autofill/core/browser/data_model/credit_card.h"
 #include "components/autofill/core/browser/data_model/iban.h"
 #include "components/autofill/core/browser/payments/payments_customer_data.h"
@@ -40,20 +42,17 @@ class TestPersonalDataManager : public PersonalDataManager {
   // PersonalDataManager overrides.  These functions are overridden as needed
   // for various tests, whether to skip calls to uncreated databases/services,
   // or to make things easier in general to toggle.
-  AutofillSyncSigninState GetSyncSigninState() const override;
+  bool IsPaymentsWalletSyncTransportEnabled() const override;
   void RecordUseOf(absl::variant<const AutofillProfile*, const CreditCard*>
                        profile_or_credit_card) override;
-  std::string SaveImportedProfile(
-      const AutofillProfile& imported_profile) override;
   std::string SaveImportedCreditCard(
       const CreditCard& imported_credit_card) override;
-  void AddUpiId(const std::string& upi_id) override;
   void AddProfile(const AutofillProfile& profile) override;
   void UpdateProfile(const AutofillProfile& profile) override;
   void RemoveByGUID(const std::string& guid) override;
   bool IsEligibleForAddressAccountStorage() const override;
   void AddCreditCard(const CreditCard& credit_card) override;
-  std::string AddIBAN(const IBAN& iban) override;
+  std::string AddIban(const Iban& iban) override;
   void DeleteLocalCreditCards(const std::vector<CreditCard>& cards) override;
   void UpdateCreditCard(const CreditCard& credit_card) override;
   void AddFullServerCreditCard(const CreditCard& credit_card) override;
@@ -65,8 +64,7 @@ class TestPersonalDataManager : public PersonalDataManager {
   void LoadProfiles() override;
   void LoadCreditCards() override;
   void LoadCreditCardCloudTokenData() override;
-  void LoadIBANs() override;
-  void LoadUpiIds() override;
+  void LoadIbans() override;
   bool IsAutofillProfileEnabled() const override;
   bool IsAutofillCreditCardEnabled() const override;
   bool IsAutofillWalletImportEnabled() const override;
@@ -74,7 +72,7 @@ class TestPersonalDataManager : public PersonalDataManager {
   std::string CountryCodeForCurrentTimezone() const override;
   void ClearAllLocalData() override;
   bool IsDataLoaded() const override;
-  bool IsSyncFeatureEnabled() const override;
+  bool IsSyncFeatureEnabledForPaymentsServerMetrics() const override;
   CoreAccountInfo GetAccountInfoForPaymentsServer() const override;
   const AutofillProfileMigrationStrikeDatabase*
   GetProfileMigrationStrikeDatabase() const override;
@@ -82,7 +80,8 @@ class TestPersonalDataManager : public PersonalDataManager {
       const override;
   const AutofillProfileUpdateStrikeDatabase* GetProfileUpdateStrikeDatabase()
       const override;
-  bool IsAutofillPaymentMethodsMandatoryReauthEnabled() override;
+  bool IsPaymentMethodsMandatoryReauthEnabled() override;
+  void SetPaymentMethodsMandatoryReauthEnabled(bool enabled) override;
 
   // Unique to TestPersonalDataManager:
 
@@ -112,9 +111,12 @@ class TestPersonalDataManager : public PersonalDataManager {
   // cache.
   void AddCardArtImage(const GURL& url, const gfx::Image& image);
 
+  // Adds `usage_data` to `autofill_virtual_card_usage_data_`.
+  void AddVirtualCardUsageData(const VirtualCardUsageData& usage_data);
+
   // Sets a local/server card's nickname based on the provided |guid|.
-  void SetNicknameForCardWithGUID(const char* guid,
-                                  const std::string& nickname);
+  void SetNicknameForCardWithGUID(std::string_view guid,
+                                  std::string_view nickname);
 
   void set_timezone_country_code(const std::string& timezone_country_code) {
     timezone_country_code_ = timezone_country_code;
@@ -123,20 +125,8 @@ class TestPersonalDataManager : public PersonalDataManager {
     default_country_code_ = default_country_code;
   }
 
-  int num_times_save_imported_profile_called() const {
-    return num_times_save_imported_profile_called_;
-  }
-
-  AutofillProfile* last_save_imported_profile() {
-    return last_save_imported_profile_.get();
-  }
-
   int num_times_save_imported_credit_card_called() const {
     return num_times_save_imported_credit_card_called_;
-  }
-
-  int num_times_save_upi_id_called() const {
-    return num_times_save_upi_id_called_;
   }
 
   void SetAutofillCreditCardEnabled(bool autofill_credit_card_enabled) {
@@ -160,10 +150,8 @@ class TestPersonalDataManager : public PersonalDataManager {
     payments_customer_data_ = std::move(customer_data);
   }
 
-  void SetSyncFeatureEnabled(bool enabled) { sync_feature_enabled_ = enabled; }
-
-  void SetSyncAndSignInState(AutofillSyncSigninState sync_and_signin_state) {
-    sync_and_signin_state_ = sync_and_signin_state;
+  void SetIsPaymentsWalletSyncTransportEnabled(bool enabled) {
+    payments_wallet_sync_transport_enabled_ = enabled;
   }
 
   void SetAccountInfoForPayments(const CoreAccountInfo& account_info) {
@@ -172,26 +160,17 @@ class TestPersonalDataManager : public PersonalDataManager {
 
   void ClearCreditCardArtImages() { credit_card_art_images_.clear(); }
 
-  void SetAutofillPaymentMethodsMandatoryReauthEnabled(bool val) {
-    autofill_payment_methods_mandatory_reauth_enabled_ = val;
-  }
-
  private:
   std::string timezone_country_code_;
   std::string default_country_code_;
-  int num_times_save_imported_profile_called_ = 0;
-  std::unique_ptr<AutofillProfile> last_save_imported_profile_;
   int num_times_save_imported_credit_card_called_ = 0;
-  int num_times_save_upi_id_called_ = 0;
   absl::optional<bool> autofill_profile_enabled_;
   absl::optional<bool> autofill_credit_card_enabled_;
   absl::optional<bool> autofill_wallet_import_enabled_;
   absl::optional<bool> eligible_for_account_storage_;
-  bool sync_feature_enabled_ = false;
-  AutofillSyncSigninState sync_and_signin_state_ =
-      AutofillSyncSigninState::kSignedInAndSyncFeatureEnabled;
+  absl::optional<bool> payment_methods_mandatory_reauth_enabled_;
+  absl::optional<bool> payments_wallet_sync_transport_enabled_;
   CoreAccountInfo account_info_;
-  bool autofill_payment_methods_mandatory_reauth_enabled_ = false;
 
   TestInMemoryStrikeDatabase inmemory_strike_database_;
   AutofillProfileMigrationStrikeDatabase

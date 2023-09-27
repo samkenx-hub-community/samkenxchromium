@@ -573,7 +573,7 @@ class NetworkPolicyApplicationTest : public ash::LoginManagerTest {
     // becomes available for networks. Production code does this through
     // NSSCertDatabase::ImportUserCert.
     ScopedNetworkCertLoaderRefreshWaiter network_cert_loader_refresh_waiter;
-    net::CertDatabase::GetInstance()->NotifyObserversCertDBChanged();
+    net::CertDatabase::GetInstance()->NotifyObserversClientCertStoreChanged();
     network_cert_loader_refresh_waiter.Wait();
   }
 
@@ -758,13 +758,17 @@ class NetworkPolicyApplicationTest : public ash::LoginManagerTest {
   }
 
   // Unowned pointers -- just pointers to the singleton instances.
-  raw_ptr<ash::ShillManagerClient::TestInterface, ExperimentalAsh>
+  raw_ptr<ash::ShillManagerClient::TestInterface,
+          DanglingUntriaged | ExperimentalAsh>
       shill_manager_client_test_ = nullptr;
-  raw_ptr<ash::ShillServiceClient::TestInterface, ExperimentalAsh>
+  raw_ptr<ash::ShillServiceClient::TestInterface,
+          DanglingUntriaged | ExperimentalAsh>
       shill_service_client_test_ = nullptr;
-  raw_ptr<ash::ShillProfileClient::TestInterface, ExperimentalAsh>
+  raw_ptr<ash::ShillProfileClient::TestInterface,
+          DanglingUntriaged | ExperimentalAsh>
       shill_profile_client_test_ = nullptr;
-  raw_ptr<ash::ShillDeviceClient::TestInterface, ExperimentalAsh>
+  raw_ptr<ash::ShillDeviceClient::TestInterface,
+          DanglingUntriaged | ExperimentalAsh>
       shill_device_client_test_ = nullptr;
 
   AccountId test_account_id_;
@@ -777,6 +781,34 @@ class NetworkPolicyApplicationTest : public ash::LoginManagerTest {
 
   testing::NiceMock<MockConfigurationPolicyProvider> policy_provider_;
   PolicyMap current_policy_;
+};
+
+// A variant of NetworkPolicyApplicationTest which ensures that
+// the feature DisablePolicyEthernetRecommendedWorkaround is activated.
+class NetworkPolicyApplicationNoEthernetWorkaroundTest
+    : public NetworkPolicyApplicationTest {
+ public:
+  NetworkPolicyApplicationNoEthernetWorkaroundTest() {
+    scoped_feature_list_.InitAndEnableFeature(
+        policy::kDisablePolicyEthernetRecommendedWorkaround);
+  }
+
+ private:
+  base::test::ScopedFeatureList scoped_feature_list_;
+};
+
+// A variant of NetworkPolicyApplicationTest which ensures that
+// the feature DisablePolicyEthernetRecommendedWorkaround is not activated.
+class NetworkPolicyApplicationEthernetWorkaroundTest
+    : public NetworkPolicyApplicationTest {
+ public:
+  NetworkPolicyApplicationEthernetWorkaroundTest() {
+    scoped_feature_list_.InitAndDisableFeature(
+        policy::kDisablePolicyEthernetRecommendedWorkaround);
+  }
+
+ private:
+  base::test::ScopedFeatureList scoped_feature_list_;
 };
 
 // This test applies a global network policy with
@@ -1567,7 +1599,9 @@ IN_PROC_BROWSER_TEST_F(NetworkPolicyApplicationTest,
 
 // Tests that application of policy settings does not wipe an already-configured
 // client certificate. This is a regression test for b/203015922.
-IN_PROC_BROWSER_TEST_F(NetworkPolicyApplicationTest, DoesNotWipeCertSettings) {
+// TODO(crbug.com/1482522): Re-enable this test
+IN_PROC_BROWSER_TEST_F(NetworkPolicyApplicationTest,
+                       DISABLED_DoesNotWipeCertSettings) {
   const char* kCertKeyFilename = "client_3.pk8";
   const char* kCertFilename = "client_3.pem";
   const char* kCertIssuerCommonName = "E CA";
@@ -1736,7 +1770,11 @@ IN_PROC_BROWSER_TEST_F(NetworkPolicyApplicationTest,
 
 // Tests that re-applying Ethernet policy retains a manually-set IP address.
 // This is a regression test for b/183676832 and b/180365271.
-IN_PROC_BROWSER_TEST_F(NetworkPolicyApplicationTest, RetainEthernetIPAddr) {
+// This variant of the test runs with
+// "DisablePolicyEthernetRecommendedWorkaround" feature not activated, so the
+// "treat Ethernet IP address as Recommended by default" workaround is applied.
+IN_PROC_BROWSER_TEST_F(NetworkPolicyApplicationEthernetWorkaroundTest,
+                       RetainEthernetIPAddr) {
   constexpr char kEthernetGuid[] = "{EthernetGuid}";
 
   shill_service_client_test_->AddService(kServiceEth, "orig_guid_ethernet_any",
@@ -1760,6 +1798,7 @@ IN_PROC_BROWSER_TEST_F(NetworkPolicyApplicationTest, RetainEthernetIPAddr) {
           }
         ]
       })",
+
                                                  kEthernetGuid);
     SetDeviceOpenNetworkConfiguration(kDeviceONC1, /*wait_applied=*/true);
     // Expect "Enabled by feature, ONC NetworkConfiguration eligible".
@@ -2104,18 +2143,6 @@ IN_PROC_BROWSER_TEST_F(NetworkPolicyApplicationTest,
     EXPECT_EQ(eap->client_cert_type->policy_value, onc::client_cert::kPKCS11Id);
   }
 }
-
-class NetworkPolicyApplicationNoEthernetWorkaroundTest
-    : public NetworkPolicyApplicationTest {
- public:
-  NetworkPolicyApplicationNoEthernetWorkaroundTest() {
-    scoped_feature_list_.InitAndEnableFeature(
-        policy::kDisablePolicyEthernetRecommendedWorkaround);
-  }
-
- private:
-  base::test::ScopedFeatureList scoped_feature_list_;
-};
 
 // Tests that when the kDisablePolicyEthernetRecommendedWorkaround feature is
 // enabled, Ethernet policy behaves like wifi when nothing is "Recommended" -

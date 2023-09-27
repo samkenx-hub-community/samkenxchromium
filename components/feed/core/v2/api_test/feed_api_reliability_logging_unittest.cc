@@ -6,6 +6,7 @@
 #include <sstream>
 #include "base/functional/callback_helpers.h"
 #include "base/strings/strcat.h"
+#include "build/buildflag.h"
 #include "components/feed/core/proto/v2/wire/reliability_logging_enums.pb.h"
 #include "components/feed/core/shared_prefs/pref_names.h"
 #include "components/feed/core/v2/api_test/feed_api_test.h"
@@ -65,6 +66,21 @@ TEST_F(FeedApiReliabilityLoggingTest,
       "LogAboveTheFoldRender result=FULL_FEED_ERROR\n",
       surface.reliability_logging_bridge.GetEventsString());
 }
+
+#if BUILDFLAG(IS_ANDROID)
+TEST_F(FeedApiReliabilityLoggingTest, AttachSurface_DisabledByDse) {
+  profile_prefs_.SetBoolean(prefs::kEnableSnippetsByDse, false);
+  CreateStream(/*wait_for_initialization=*/true, /*start_surface=*/false,
+               /*is_new_tab_search_engine_url_android_enabled*/ true);
+  TestForYouSurface surface(stream_.get());
+  EXPECT_EQ(
+      "LogFeedLaunchOtherStart\n"
+      "LogLaunchFinishedAfterStreamUpdate "
+      "result=INELIGIBLE_DISCOVER_DISABLED_BY_DSE\n"
+      "LogAboveTheFoldRender result=FULL_FEED_ERROR\n",
+      surface.reliability_logging_bridge.GetEventsString());
+}
+#endif  // BUILDFLAG(IS_ANDROID)
 
 TEST_F(FeedApiReliabilityLoggingTest, AttachSurface_ClearAllInProgress) {
   TestForYouSurface surface(stream_.get());
@@ -521,7 +537,7 @@ TEST_F(FeedApiReliabilityLoggingTest, LoadMoreSucceeds) {
   response.last_fetch_timestamp = base::Time::Now();
   response_translator_.InjectResponse(std::move(response));
 
-  stream_->LoadMore(surface, base::DoNothing());
+  stream_->LoadMore(surface.GetSurfaceId(), base::DoNothing());
   WaitForIdleTaskQueue();
 
   EXPECT_EQ(base::StrCat({"LogLoadMoreStarted\n"
@@ -546,7 +562,7 @@ TEST_F(FeedApiReliabilityLoggingTest, LoadMoreFails) {
 
   // Don't inject another response, which results in a proto translation
   // failure.
-  stream_->LoadMore(surface, base::DoNothing());
+  stream_->LoadMore(surface.GetSurfaceId(), base::DoNothing());
   WaitForIdleTaskQueue();
 
   EXPECT_EQ(
@@ -569,7 +585,7 @@ TEST_F(FeedApiReliabilityLoggingTest, LoadMoreAbortsIfNoNextPageToken) {
   WaitForIdleTaskQueue();
   surface.reliability_logging_bridge.ClearEventsString();
 
-  stream_->LoadMore(surface, base::DoNothing());
+  stream_->LoadMore(surface.GetSurfaceId(), base::DoNothing());
   WaitForIdleTaskQueue();
 
   EXPECT_EQ("", surface.reliability_logging_bridge.GetEventsString());

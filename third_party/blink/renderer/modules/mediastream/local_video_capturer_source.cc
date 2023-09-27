@@ -47,6 +47,7 @@ void LocalVideoCapturerSource::StartCapture(
     const media::VideoCaptureParams& params,
     const VideoCaptureDeliverFrameCB& new_frame_callback,
     const VideoCaptureCropVersionCB& crop_version_callback,
+    const VideoCaptureNotifyFrameDroppedCB& frame_dropped_callback,
     const RunningCallback& running_callback) {
   DCHECK(params.requested_format.IsValid());
   DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
@@ -58,7 +59,7 @@ void LocalVideoCapturerSource::StartCapture(
           task_runner_, ConvertToBaseRepeatingCallback(CrossThreadBindRepeating(
                             &LocalVideoCapturerSource::OnStateUpdate,
                             weak_factory_.GetWeakPtr()))),
-      new_frame_callback, crop_version_callback);
+      new_frame_callback, crop_version_callback, frame_dropped_callback);
 }
 
 media::VideoCaptureFeedbackCB LocalVideoCapturerSource::GetFeedbackCallback()
@@ -107,10 +108,17 @@ void LocalVideoCapturerSource::OnStateUpdate(blink::VideoCaptureState state) {
     OnLog("LocalVideoCapturerSource::OnStateUpdate discarding state update.");
     return;
   }
-  RunState run_state =
-      (state == VIDEO_CAPTURE_STATE_ERROR_SYSTEM_PERMISSIONS_DENIED)
-          ? RunState::kSystemPermissionsError
-          : RunState::kStopped;
+  RunState run_state;
+  switch (state) {
+    case VIDEO_CAPTURE_STATE_ERROR_SYSTEM_PERMISSIONS_DENIED:
+      run_state = RunState::kSystemPermissionsError;
+      break;
+    case VIDEO_CAPTURE_STATE_ERROR_CAMERA_BUSY:
+      run_state = RunState::kCameraBusyError;
+      break;
+    default:
+      run_state = RunState::kStopped;
+  }
 
   auto* frame = LocalFrame::FromFrameToken(frame_token_);
   switch (state) {
@@ -125,6 +133,7 @@ void LocalVideoCapturerSource::OnStateUpdate(blink::VideoCaptureState state) {
     case VIDEO_CAPTURE_STATE_STOPPED:
     case VIDEO_CAPTURE_STATE_ERROR:
     case VIDEO_CAPTURE_STATE_ERROR_SYSTEM_PERMISSIONS_DENIED:
+    case VIDEO_CAPTURE_STATE_ERROR_CAMERA_BUSY:
     case VIDEO_CAPTURE_STATE_ENDED:
       std::move(release_device_cb_).Run();
       release_device_cb_ =

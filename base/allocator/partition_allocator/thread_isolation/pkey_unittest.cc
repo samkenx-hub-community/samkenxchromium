@@ -4,6 +4,7 @@
 
 #include "base/allocator/partition_allocator/address_pool_manager.h"
 #include "base/allocator/partition_allocator/partition_alloc_buildflags.h"
+#include "base/allocator/partition_allocator/partition_alloc_constants.h"
 #include "base/allocator/partition_allocator/partition_root.h"
 #include "base/allocator/partition_allocator/thread_isolation/thread_isolation.h"
 
@@ -111,8 +112,7 @@ class PkeyTest : public testing::Test {
     isolated_globals.pkey = pkey;
 
     isolated_globals.allocator->init(PartitionOptions{
-        .aligned_alloc = PartitionOptions::AlignedAlloc::kAllowed,
-        .cookie = PartitionOptions::Cookie::kAllowed,
+        .aligned_alloc = PartitionOptions::kAllowed,
         .thread_isolation = ThreadIsolationOption(isolated_globals.pkey),
     });
 
@@ -138,12 +138,12 @@ class PkeyTest : public testing::Test {
 // In the final use, we'll likely allow at least read access to the default
 // pkey.
 ISOLATED_FUNCTION uint64_t IsolatedAllocFree(void* arg) {
-  char* buf = (char*)isolated_globals.allocator->root()->AllocWithFlagsNoHooks(
-      0, 1024, partition_alloc::PartitionPageSize());
+  char* buf = (char*)isolated_globals.allocator->root()
+                  ->Alloc<partition_alloc::AllocFlags::kNoHooks>(1024);
   if (!buf) {
     return 0xffffffffffffffffllu;
   }
-  isolated_globals.allocator->root()->FreeNoHooks(buf);
+  isolated_globals.allocator->root()->Free<FreeFlags::kNoHooks>(buf);
 
   return kTestReturnValue;
 }

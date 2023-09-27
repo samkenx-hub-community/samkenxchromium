@@ -17,14 +17,22 @@ namespace base::features {
 // Alphabetical:
 BASE_EXPORT BASE_DECLARE_FEATURE(kEnforceNoExecutableFileHandles);
 
+BASE_EXPORT BASE_DECLARE_FEATURE(kNotReachedIsFatal);
+
 BASE_EXPORT BASE_DECLARE_FEATURE(kOptimizeDataUrls);
 
 BASE_EXPORT BASE_DECLARE_FEATURE(kSupportsUserDataFlatHashMap);
+
+BASE_EXPORT BASE_DECLARE_FEATURE(kUseRustJsonParser);
+
+BASE_EXPORT BASE_DECLARE_FEATURE(kJsonNegativeZero);
 
 #if BUILDFLAG(IS_ANDROID)
 BASE_EXPORT BASE_DECLARE_FEATURE(kPartialLowEndModeOnMidRangeDevices);
 extern const BASE_EXPORT FeatureParam<bool>
     kPartialLowEndModeExcludeLowEndBackgroundCleanup;
+
+BASE_EXPORT BASE_DECLARE_FEATURE(kCollectAndroidFrameTimelineMetrics);
 #endif
 
 }  // namespace base::features

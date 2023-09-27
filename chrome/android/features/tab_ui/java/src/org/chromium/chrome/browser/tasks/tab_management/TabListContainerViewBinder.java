@@ -7,8 +7,10 @@ package org.chromium.chrome.browser.tasks.tab_management;
 import static android.view.accessibility.AccessibilityEvent.TYPE_VIEW_FOCUSED;
 
 import static org.chromium.chrome.browser.tasks.tab_management.TabListContainerProperties.ANIMATE_VISIBILITY_CHANGES;
+import static org.chromium.chrome.browser.tasks.tab_management.TabListContainerProperties.BLOCK_TOUCH_INPUT;
 import static org.chromium.chrome.browser.tasks.tab_management.TabListContainerProperties.BOTTOM_CONTROLS_HEIGHT;
 import static org.chromium.chrome.browser.tasks.tab_management.TabListContainerProperties.BOTTOM_PADDING;
+import static org.chromium.chrome.browser.tasks.tab_management.TabListContainerProperties.BROWSER_CONTROLS_STATE_PROVIDER;
 import static org.chromium.chrome.browser.tasks.tab_management.TabListContainerProperties.FOCUS_TAB_INDEX_FOR_ACCESSIBILITY;
 import static org.chromium.chrome.browser.tasks.tab_management.TabListContainerProperties.INITIAL_SCROLL_INDEX;
 import static org.chromium.chrome.browser.tasks.tab_management.TabListContainerProperties.IS_INCOGNITO;
@@ -27,6 +29,7 @@ import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import org.chromium.chrome.browser.browser_controls.BrowserControlsStateProvider;
 import org.chromium.chrome.browser.tab.TabUtils;
 import org.chromium.chrome.browser.theme.ThemeUtils;
 import org.chromium.chrome.tab_ui.R;
@@ -54,6 +57,8 @@ class TabListContainerViewBinder {
             } else {
                 view.startHiding(model.get(ANIMATE_VISIBILITY_CHANGES));
             }
+        } else if (BLOCK_TOUCH_INPUT == propertyKey) {
+            view.setBlockTouchInput(model.get(BLOCK_TOUCH_INPUT));
         } else if (IS_INCOGNITO == propertyKey) {
             int primaryBackgroundColor = ChromeColors.getPrimaryBackgroundColor(
                     view.getContext(), model.get(IS_INCOGNITO));
@@ -115,6 +120,8 @@ class TabListContainerViewBinder {
     private static int computeOffset(TabListRecyclerView view, PropertyModel model) {
         int width = view.getWidth();
         int height = view.getHeight();
+        final BrowserControlsStateProvider browserControlsStateProvider =
+                model.get(BROWSER_CONTROLS_STATE_PROVIDER);
         // If layout hasn't happened yet fallback to dimensions based on visible display frame. This
         // works for multi-window and different orientations. Don't use View#post() because this
         // will cause animation jank for expand/shrink animations.
@@ -127,8 +134,7 @@ class TabListContainerViewBinder {
             width = frame.width();
             // Remove toolbar height from height.
             height = frame.height()
-                    - view.getContext().getResources().getDimensionPixelSize(
-                            R.dimen.toolbar_height_no_shadow);
+                    - Math.round(browserControlsStateProvider.getTopVisibleContentOffset());
         }
         if (width <= 0 || height <= 0) return 0;
 
@@ -138,7 +144,8 @@ class TabListContainerViewBinder {
         if (mode == TabListCoordinator.TabListMode.GRID) {
             GridLayoutManager gridLayoutManager = (GridLayoutManager) layoutManager;
             int cardWidth = width / gridLayoutManager.getSpanCount();
-            int cardHeight = TabUtils.deriveGridCardHeight(cardWidth, view.getContext());
+            int cardHeight = TabUtils.deriveGridCardHeight(
+                    cardWidth, view.getContext(), browserControlsStateProvider);
             return Math.max(0, height / 2 - cardHeight / 2);
         }
         if (mode == TabListCoordinator.TabListMode.CAROUSEL) {

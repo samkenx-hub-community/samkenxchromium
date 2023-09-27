@@ -89,7 +89,7 @@ void TestLastNameParsing(const std::u16string& last_name,
                          const std::u16string& target_second) {
   SCOPED_TRACE(last_name);
 
-  NameLast last_name_component(nullptr);
+  NameLast last_name_component;
   last_name_component.SetValueForType(NAME_LAST, last_name,
                                       VerificationStatus::kObserved);
 
@@ -287,9 +287,9 @@ TEST(AutofillStructuredName, HasCjkNameCharacteristics) {
 
 // Test the detection of Hispanic/Latinx name characteristics.
 TEST(AutofillStructuredName, HasHispanicLatinxNameCharacteristics) {
-  EXPECT_TRUE(HasHispanicLatinxNameCharaceristics("Pablo Ruiz Picasso"));
-  EXPECT_FALSE(HasHispanicLatinxNameCharaceristics("Werner Heisenberg"));
-  EXPECT_TRUE(HasHispanicLatinxNameCharaceristics("SomeName y SomeOtherName"));
+  EXPECT_TRUE(HasHispanicLatinxNameCharacteristics("Pablo Ruiz Picasso"));
+  EXPECT_FALSE(HasHispanicLatinxNameCharacteristics("Werner Heisenberg"));
+  EXPECT_TRUE(HasHispanicLatinxNameCharacteristics("SomeName y SomeOtherName"));
 }
 
 // Test the detection of middle name initials.

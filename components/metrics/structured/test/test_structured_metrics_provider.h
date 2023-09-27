@@ -18,10 +18,11 @@ class EventsProto;
 
 // TestStructuredMetricsProvider is a wrapper of StructuredMetricsProvider to
 // be used for testing.
-
 class TestStructuredMetricsProvider : public Recorder::RecorderImpl {
  public:
   TestStructuredMetricsProvider();
+  explicit TestStructuredMetricsProvider(
+      std::unique_ptr<StructuredMetricsRecorder> recorder);
   ~TestStructuredMetricsProvider() override;
   TestStructuredMetricsProvider(const TestStructuredMetricsProvider&) = delete;
   TestStructuredMetricsProvider& operator=(
@@ -43,6 +44,11 @@ class TestStructuredMetricsProvider : public Recorder::RecorderImpl {
 
   void EnableRecording();
   void DisableRecording();
+
+  void AddProfilePath(const base::FilePath& user_path);
+
+  // Waits until the recorder is fully initialized.
+  void WaitUntilReady();
 
   // Sets a callback that will be called after the event is flushed to
   // persistence.

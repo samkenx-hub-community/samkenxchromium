@@ -12,6 +12,7 @@
 #include "ash/ambient/ambient_constants.h"
 #include "ash/ambient/ambient_controller.h"
 #include "ash/ambient/ambient_photo_cache.h"
+#include "ash/ambient/ambient_ui_settings.h"
 #include "ash/ambient/model/ambient_animation_photo_config.h"
 #include "ash/ambient/model/ambient_backend_model.h"
 #include "ash/ambient/model/ambient_backend_model_observer.h"
@@ -24,6 +25,7 @@
 #include "ash/public/cpp/ambient/fake_ambient_backend_controller_impl.h"
 #include "ash/public/cpp/ambient/proto/photo_cache_entry.pb.h"
 #include "ash/shell.h"
+#include "ash/webui/personalization_app/mojom/personalization_app.mojom-shared.h"
 #include "base/barrier_closure.h"
 #include "base/base_paths.h"
 #include "base/check.h"
@@ -78,6 +80,9 @@ class AmbientPhotoControllerTest : public AmbientAshTestBase {
  protected:
   void SetUp() override {
     AmbientAshTestBase::SetUp();
+    // Force the `AmbientUiSettings` to be any setting that has photos, or
+    // `photo_controller()` will be null and the tests will crash.
+    SetAmbientTheme(personalization_app::mojom::AmbientTheme::kSlideshow);
     // This is common to all AmbientPhotoConfigs and mimics real-world behavior:
     // When OnImagesReady() is called, the UI synchronously starts rendering.
     ON_CALL(images_ready_observer_, OnImagesReady)
@@ -150,8 +155,9 @@ class AmbientPhotoControllerTest : public AmbientAshTestBase {
   }
 
   void RunUntilImagesReady() {
-    if (photo_controller()->ambient_backend_model()->ImagesReady())
+    if (photo_controller()->ambient_backend_model()->ImagesReady()) {
       return;
+    }
 
     static constexpr base::TimeDelta kTimeout = base::Seconds(3);
     base::test::ScopedRunLoopTimeout loop_timeout(FROM_HERE, kTimeout);

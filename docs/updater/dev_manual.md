@@ -73,37 +73,54 @@ could be in inconsistent state and leads to infra error.
  based on build rule) to swarming server and run the target on bots. The
  upload may take quite some time if the target changed a lot since the last
  upload and/or your network is slow.
+
 * Simple scenario:
+
   ```
   .\tools\mb\mb.bat run -v --swarmed .\out\Default updater_tests -- --gtest_filter=*Integration*
   ```
+
 * Sometimes the mb tool may fail to match the testing OS (when doing
  cross-compile) or you may want to run the task on certain kind of bots.
 This can be done by specifying bots dimension with switch `-d`. Remember
 `--no-default-dimensions` is necessary to avoid dimension value conflict.
 Example:
+
   ```
   .\tools\mb\mb.bat run --swarmed --no-default-dimensions -d pool chromium.win.uac -d os Windows-10 .\out\Default updater_tests_system -- --gtest_filter=*Install*
   ```
+
 * `mb` can schedule tests in the pools managed by different swarming servers.
   The default server is
   [chromium-swarm.appspot.com](https://chromium-swarm.appspot.com/botlist?k=pool).
   To schedule tests to pools managed by
   [chrome-swarming.appspot.com](https://chrome-swarming.appspot.com/botlist?k=pool),
   for example `chrome.tests`, add `--internal` flag in the command line:
+
   ```
     tools/mb/mb run -v --swarmed --internal --no-default-dimensions -d pool chrome.tests -d os Windows-10 out/WinDefault updater_tests
   ```
+
 * If `mb` command failed with error `isolate: original error: interactive login is required`, you need to login:
+
   ```
    tools/luci-go/isolate login
   ```
+
 * If your test introduces dependency on a new app on macOS, you need to let
  `mb` tool know so it can correctly figure out the dependency. Example:
   https://crrev.com/c/3470143.
+
 * To run tests on `Arm64`, the mb tool needs to be invoked as follows:
+
   ```
   .\tools\mb\mb run -v --swarmed --no-default-dimensions --internal -d pool chrome.tests.arm64 out\Default updater_tests_system -- --gtest_filter=LegacyAppCommandWebImplTest.FailedToLaunchStatus
+  ```
+
+* When system tests crash, the stack is missing from the swarming log. This can be avoided if you suppress the test bot mode:
+
+  ```
+  .\tools\mb\mb run -v --swarmed  --no-bot-mode out\Default updater_tests_system
   ```
 
 ### Accessing Bots
@@ -222,6 +239,40 @@ probably what you want for installing the updater you have built.
 
 TODO(crbug.com/1448700): list the relevant/interesting outputs here and what
 they are, why they're relevant/interesting, etc.
+
+## Code Coverage
+Gerrit now down-votes the changes that do not have enough coverage. And it's
+nice to have good coverage regardless. To improve code-coverage, we need to
+know what are already covered and what are not.
+
+#### Coverage on Gerrit
+It's automatically generated. But the coverage shown is the combined result
+from all OS platforms.
+
+#### Coverage Dashboard
+The [updater code coverage dashboard](https://analysis.chromium.org/coverage/p/chromium/dir?host=chromium.googlesource.com&project=chromium/src&ref=refs/heads/main&path=//chrome/updater/&platform=mac)
+supports breakdown by OS platform or test type. But it is only for the code in
+trunk.
+
+#### Run Coverage Locally
+We can quickly get OS-specific coverage result with the local changes:
+
+* macOS/Linux
+```
+gn gen out/coverage --args="use_clang_coverage=true is_component_build=false is_chrome_branded=true is_debug=true use_debug_fission=true use_goma=true symbol_level=2"
+
+vpython3 tools/code_coverage/coverage.py  updater_tests -b out/coverage -o out/report -c 'out/coverage/updater_tests' -f chrome/updater
+```
+
+* Windows
+```
+gn gen out\coverage --args="use_clang_coverage=true is_component_build=false is_chrome_branded=true is_debug=true use_debug_fission=true use_goma=true symbol_level=2"
+
+vpython3 tools\code_coverage\coverage.py updater_tests -b out\coverage -o out\report -c out\coverage\updater_tests.exe  -f chrome/updater
+```
+The last command outputs an HTML file and you can open it in browser to see the
+coverages.
+
 
 ## Debugging
 ### Debug into Windows update service

@@ -37,8 +37,10 @@ PrerenderCancelledInterface GetCancelledInterfaceType(
     return PrerenderCancelledInterface::kGamepadHapticsManager;
   else if (interface_name == "device.mojom.GamepadMonitor")
     return PrerenderCancelledInterface::kGamepadMonitor;
-  else if (interface_name == "chrome.mojom.SyncEncryptionKeysExtension")
-    return PrerenderCancelledInterface::kSyncEncryptionKeysExtension;
+  else if (interface_name ==
+           "chrome.mojom.TrustedVaultEncryptionKeysExtension") {
+    return PrerenderCancelledInterface::kTrustedVaultEncryptionKeys;
+  }
   return PrerenderCancelledInterface::kUnknown;
 }
 
@@ -221,6 +223,16 @@ std::string PrerenderCancellationReason::ToDevtoolReasonString() const {
   }
 }
 
+absl::optional<std::string>
+PrerenderCancellationReason::DisallowedMojoInterface() const {
+  switch (final_status_) {
+    case PrerenderFinalStatus::kMojoBinderPolicy:
+      return absl::get<std::string>(explanation_);
+    default:
+      return absl::nullopt;
+  }
+}
+
 void RecordPrerenderTriggered(ukm::SourceId ukm_id) {
   ukm::builders::PrerenderPageLoad(ukm_id).SetTriggeredPrerender(true).Record(
       ukm::UkmRecorder::Get());
@@ -398,17 +410,6 @@ void RecordPrerenderActivationTransition(
       potential_activation_transition);
 }
 
-void RecordPrerenderNavigationErrorCode(
-    net::Error error_code,
-    PrerenderTriggerType trigger_type,
-    const std::string& embedder_histogram_suffix) {
-  base::UmaHistogramSparse(
-      GenerateHistogramName(
-          "Prerender.Experimental.PrerenderNavigationRequestNetworkErrorCode",
-          trigger_type, embedder_histogram_suffix),
-      std::abs(error_code));
-}
-
 static_assert(
     static_cast<int>(PrerenderBackNavigationEligibility::kMaxValue) +
         static_cast<int>(
@@ -449,6 +450,29 @@ void RecordPrerenderActivationCommitDeferTime(
       GenerateHistogramName("Navigation.Prerender.ActivationCommitDeferTime",
                             trigger_type, embedder_histogram_suffix),
       time_delta);
+}
+
+void RecordBlockedByClientResourceType(
+    network::mojom::RequestDestination request_destination,
+    PrerenderTriggerType trigger_type,
+    const std::string& embedder_histogram_suffix) {
+  base::UmaHistogramEnumeration(
+      GenerateHistogramName(
+          "Prerender.Experimental.ResourceLoadingBlockedByClientByType",
+          trigger_type, embedder_histogram_suffix),
+      request_destination);
+}
+
+void RecordReceivedPrerendersPerPrimaryPageChangedCount(
+    int number,
+    PrerenderTriggerType trigger_type,
+    const std::string& eagerness_category) {
+  base::UmaHistogramCounts100(
+      GenerateHistogramName(
+          "Prerender.Experimental.ReceivedPrerendersPerPrimaryPageChangedCount",
+          trigger_type, /*embedder_suffix=*/"") +
+          "." + eagerness_category,
+      number);
 }
 
 }  // namespace content

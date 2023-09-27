@@ -10,11 +10,11 @@
 
 #include "base/android/jni_android.h"
 #include "base/android/jni_string.h"
+#include "base/barrier_closure.h"
 #include "base/base_paths_android.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/i18n/rtl.h"
-#include "base/memory/ptr_util.h"
 #include "base/metrics/field_trial_params.h"
 #include "base/metrics/persistent_histogram_allocator.h"
 #include "base/metrics/statistics_recorder.h"
@@ -39,7 +39,6 @@
 #include "components/metrics/drive_metrics_provider.h"
 #include "components/metrics/entropy_state_provider.h"
 #include "components/metrics/file_metrics_provider.h"
-#include "components/metrics/metrics_features.h"
 #include "components/metrics/metrics_pref_names.h"
 #include "components/metrics/metrics_service.h"
 #include "components/metrics/metrics_state_manager.h"
@@ -47,6 +46,7 @@
 #include "components/metrics/net/net_metrics_log_uploader.h"
 #include "components/metrics/net/network_metrics_provider.h"
 #include "components/metrics/persistent_histograms.h"
+#include "components/metrics/persistent_synthetic_trial_observer.h"
 #include "components/metrics/sampling_metrics_provider.h"
 #include "components/metrics/stability_metrics_helper.h"
 #include "components/metrics/ui/form_factor_metrics_provider.h"
@@ -269,6 +269,7 @@ void AndroidMetricsServiceClient::Initialize(PrefService* pref_service) {
   synthetic_trial_registry_ =
       std::make_unique<variations::SyntheticTrialRegistry>(
           IsExternalExperimentAllowlistEnabled());
+  synthetic_trial_observation_.Observe(synthetic_trial_registry_.get());
 
   // Create the MetricsService immediately so that other code can make use of
   // it. Chrome always creates the MetricsService as well.
@@ -332,13 +333,6 @@ void AndroidMetricsServiceClient::MaybeStartMetrics() {
 
 void AndroidMetricsServiceClient::RegisterMetricsProvidersAndInitState() {
   CHECK(metrics::SubprocessMetricsProvider::GetInstance());
-  if (!base::FeatureList::IsEnabled(
-          metrics::features::kSubprocessMetricsProviderLeaky)) {
-    // Hacky way to make MetricsService own the subprocess provider.
-    // TODO(crbug/1293026): Remove this.
-    metrics_service_->RegisterMetricsProvider(
-        base::WrapUnique(metrics::SubprocessMetricsProvider::GetInstance()));
-  }
 
   metrics_service_->RegisterMetricsProvider(
       std::make_unique<NetworkMetricsProvider>(
@@ -533,10 +527,29 @@ std::string AndroidMetricsServiceClient::GetVersionString() {
   return metrics::GetVersionString();
 }
 
+void AndroidMetricsServiceClient::MergeSubprocessHistograms() {
+  // TODO(crbug.com/1293026): Move this to a shared place to not have to
+  // duplicate the code across different `MetricsServiceClient`s.
+
+  // Synchronously fetch subprocess histograms that live in shared memory.
+  base::StatisticsRecorder::ImportProvidedHistogramsSync();
+
+  // Asynchronously fetch subprocess histograms that do not live in shared
+  // memory (e.g., they were emitted before the shared memory was set up).
+  content::FetchHistogramsAsynchronously(
+      base::SingleThreadTaskRunner::GetCurrentDefault(),
+      /*callback=*/base::DoNothing(),
+      /*wait_time=*/base::Milliseconds(kMaxHistogramGatheringWaitDuration));
+}
+
 void AndroidMetricsServiceClient::CollectFinalMetricsForLog(
     base::OnceClosure done_callback) {
+  auto barrier_closure =
+      base::BarrierClosure(/*num_closures=*/2, std::move(done_callback));
+
   // Merge histograms from metrics providers into StatisticsRecorder.
-  base::StatisticsRecorder::ImportProvidedHistograms();
+  base::StatisticsRecorder::ImportProvidedHistograms(
+      /*async=*/true, /*done_callback=*/barrier_closure);
 
   base::TimeDelta timeout =
       base::Milliseconds(kMaxHistogramGatheringWaitDuration);
@@ -546,7 +559,7 @@ void AndroidMetricsServiceClient::CollectFinalMetricsForLog(
   // calling us back on the task.
   content::FetchHistogramsAsynchronously(
       base::SingleThreadTaskRunner::GetCurrentDefault(),
-      CreateChainedClosure(std::move(done_callback),
+      CreateChainedClosure(barrier_closure,
                            on_final_metrics_collected_listener_),
       timeout);
 

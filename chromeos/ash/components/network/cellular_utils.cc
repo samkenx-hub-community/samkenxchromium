@@ -16,20 +16,23 @@
 #include "chromeos/ash/components/dbus/hermes/hermes_manager_client.h"
 #include "chromeos/ash/components/dbus/hermes/hermes_profile_client.h"
 #include "chromeos/ash/components/network/cellular_esim_profile.h"
+#include "chromeos/ash/components/network/network_handler.h"
+#include "chromeos/ash/components/network/network_profile.h"
+#include "chromeos/ash/components/network/network_profile_handler.h"
 
 namespace ash {
 
+namespace cellular_utils {
+
+const char kSmdsGsma[] = "1$lpa.ds.gsma.com$";
+const char kSmdsStork[] = "1$prod.smds.rsp.goog$";
+const char kSmdsAndroidProduction[] = "1$lpa.live.esimdiscovery.com$";
+const char kSmdsAndroidStaging[] = "1$lpa.live.esimdiscovery.dev$";
+
+}  // namespace cellular_utils
+
 namespace {
-
-// The activation code for the GSM Association SM-DS server.
-constexpr char kSmdsGsma[] = "1$lpa.ds.gsma.com$";
-// The activation code for the Stork SM-DS server.
-constexpr char kSmdsStork[] = "1$prod.smds.rsp.goog$";
-// The activation code for the Android staging SM-DS server.
-constexpr char kSmdsAndroidStaging[] = "1$lpa.live.esimdiscovery.dev$";
-
 const char kNonShillCellularNetworkPathPrefix[] = "/non-shill-cellular/";
-
 }  // namespace
 
 base::flat_set<dbus::ObjectPath> GetProfilePathsFromEuicc(
@@ -164,6 +167,13 @@ std::string GenerateStubCellularServicePath(const std::string& iccid) {
   return base::StrCat({kNonShillCellularNetworkPathPrefix, iccid});
 }
 
+const NetworkProfile* GetCellularProfile(
+    const NetworkProfileHandler* network_profile_handler) {
+  DCHECK(network_profile_handler);
+  return network_profile_handler->GetProfileForUserhash(
+      /*userhash=*/std::string());
+}
+
 bool IsStubCellularServicePath(const std::string& service_path) {
   return base::StartsWith(service_path, kNonShillCellularNetworkPathPrefix);
 }
@@ -194,6 +204,9 @@ std::vector<std::string> GetSmdsActivationCodes() {
     activation_codes.push_back(kSmdsAndroidStaging);
   }
   if (activation_codes.empty()) {
+    if (features::IsSmdsSupportEnabled()) {
+      activation_codes.push_back(kSmdsAndroidProduction);
+    }
     activation_codes.push_back(kSmdsGsma);
   }
   return activation_codes;

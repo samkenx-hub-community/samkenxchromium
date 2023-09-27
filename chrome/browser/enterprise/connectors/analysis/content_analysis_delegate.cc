@@ -39,6 +39,7 @@
 #include "chrome/browser/safe_browsing/cloud_content_scanning/file_analysis_request.h"
 #include "chrome/browser/safe_browsing/download_protection/check_client_download_request.h"
 #include "chrome/grit/generated_resources.h"
+#include "components/enterprise/buildflags/buildflags.h"
 #include "components/enterprise/common/proto/connectors.pb.h"
 #include "components/policy/core/common/chrome_schema.h"
 #include "components/prefs/pref_service.h"
@@ -52,7 +53,7 @@
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/ui_base_types.h"
 
-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+#if BUILDFLAG(ENTERPRISE_LOCAL_CONTENT_ANALYSIS)
 #include "chrome/browser/enterprise/connectors/analysis/content_analysis_sdk_manager.h"  // nogncheck
 #endif
 
@@ -87,6 +88,7 @@ StringAnalysisRequest::StringAnalysisRequest(
     std::string text,
     BinaryUploadService::ContentAnalysisCallback callback)
     : Request(std::move(callback), std::move(settings)) {
+  DCHECK_GT(text.size(), 0u);
   data_.size = text.size();
 
   // Only remember strings less than the maximum allowed.
@@ -135,7 +137,7 @@ void ContentAnalysisDelegate::BypassWarnings(
       content_size += entry.size();
 
     ReportAnalysisConnectorWarningBypass(
-        profile_, url_, "", "", "Text data", std::string(), "text/plain",
+        profile_, url_, url_, "", "", "Text data", std::string(), "text/plain",
         extensions::SafeBrowsingPrivateEventRouter::kTriggerWebContentUpload,
         access_point_, content_size, text_response_, user_justification);
   }
@@ -145,7 +147,7 @@ void ContentAnalysisDelegate::BypassWarnings(
     result_.image_result = true;
 
     ReportAnalysisConnectorWarningBypass(
-        profile_, url_, "", "", "Image data", std::string(),
+        profile_, url_, url_, "", "", "Image data", std::string(),
         /*mime_type*/ std::string(),
         extensions::SafeBrowsingPrivateEventRouter::kTriggerWebContentUpload,
         access_point_, data_.image.size(), image_response_, user_justification);
@@ -164,7 +166,7 @@ void ContentAnalysisDelegate::BypassWarnings(
     result_.page_result = true;
 
     ReportAnalysisConnectorWarningBypass(
-        profile_, url_, "", /*destination*/ data_.printer_name, title_,
+        profile_, url_, url_, "", /*destination*/ data_.printer_name, title_,
         /*sha256*/ std::string(),
         /*mime_type*/ std::string(),
         extensions::SafeBrowsingPrivateEventRouter::kTriggerPagePrint,
@@ -225,9 +227,6 @@ absl::optional<GURL> ContentAnalysisDelegate::GetCustomLearnMoreUrl() const {
 }
 
 bool ContentAnalysisDelegate::BypassRequiresJustification() const {
-  if (!base::FeatureList::IsEnabled(kBypassJustificationEnabled))
-    return false;
-
   return data_.settings.tags.count(final_result_tag_) &&
          data_.settings.tags.at(final_result_tag_).requires_justification;
 }
@@ -415,7 +414,7 @@ void ContentAnalysisDelegate::StringRequestCallback(
             text_complies);
 
   MaybeReportDeepScanningVerdict(
-      profile_, url_, "", "", "Text data", std::string(), "text/plain",
+      profile_, url_, url_, "", "", "Text data", std::string(), "text/plain",
       extensions::SafeBrowsingPrivateEventRouter::kTriggerWebContentUpload,
       access_point_, content_size, result, response,
       CalculateEventResult(data_.settings, text_complies, should_warn));
@@ -456,7 +455,7 @@ void ContentAnalysisDelegate::ImageRequestCallback(
   result_.image_result = image_complies;
 
   MaybeReportDeepScanningVerdict(
-      profile_, url_, "", "", "Image data", std::string(),
+      profile_, url_, url_, "", "", "Image data", std::string(),
       /*mime_type*/ std::string(),
       extensions::SafeBrowsingPrivateEventRouter::kTriggerWebContentUpload,
       access_point_, data_.image.size(), result, response,
@@ -511,7 +510,8 @@ bool ContentAnalysisDelegate::CancelDialog() {
   if (!dialog_)
     return false;
 
-  return dialog_->CancelDialogAndDelete();
+  dialog_->CancelDialogAndDelete();
+  return true;
 }
 
 void ContentAnalysisDelegate::PageRequestCallback(
@@ -536,7 +536,7 @@ void ContentAnalysisDelegate::PageRequestCallback(
                      FinalContentAnalysisResult::WARNING;
 
   MaybeReportDeepScanningVerdict(
-      profile_, url_, "", /*destination*/ data_.printer_name, title_,
+      profile_, url_, url_, "", /*destination*/ data_.printer_name, title_,
       /*sha256*/ std::string(),
       /*mime_type*/ std::string(),
       extensions::SafeBrowsingPrivateEventRouter::kTriggerPagePrint,
@@ -557,7 +557,7 @@ void ContentAnalysisDelegate::PageRequestCallback(
 bool ContentAnalysisDelegate::UploadData() {
   upload_start_time_ = base::TimeTicks::Now();
 
-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+#if BUILDFLAG(ENTERPRISE_LOCAL_CONTENT_ANALYSIS)
   // If this is a local content analysis, check if the local agent is ready.
   // If not, abort early.  This is to prevent doing a lot of work, like reading
   // files into memory or calcuating SHA256 hashes and prevent a flash of the
@@ -584,7 +584,7 @@ bool ContentAnalysisDelegate::UploadData() {
     // MultiFileRequestHandler is owned by this class.
     files_request_handler_ = FilesRequestHandler::Create(
         GetBinaryUploadService(), profile_, data_.settings, url_, "", "",
-        user_action_id_, title_, access_point_, data_.paths,
+        user_action_id_, title_, access_point_, data_.reason, data_.paths,
         base::BindOnce(&ContentAnalysisDelegate::FilesRequestCallback,
                        GetWeakPtr()));
     files_request_complete_ = !files_request_handler_->UploadData();
@@ -707,10 +707,18 @@ void ContentAnalysisDelegate::PrepareRequest(
   request->set_url(data_.url.spec());
   request->set_tab_url(data_.url);
   request->set_per_profile_request(data_.settings.per_profile);
-  for (const auto& tag : data_.settings.tags)
+
+  for (const auto& tag : data_.settings.tags) {
     request->add_tag(tag.first);
-  if (data_.settings.client_metadata)
+  }
+
+  if (data_.settings.client_metadata) {
     request->set_client_metadata(*data_.settings.client_metadata);
+  }
+
+  if (data_.reason != ContentAnalysisRequest::UNKNOWN) {
+    request->set_reason(data_.reason);
+  }
 }
 
 void ContentAnalysisDelegate::FillAllResultsWith(bool status) {

@@ -15,13 +15,16 @@
 #include "chrome/browser/bookmarks/bookmark_model_factory.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/consent_auditor/consent_auditor_factory.h"
-#include "chrome/browser/defaults.h"
 #include "chrome/browser/favicon/favicon_service_factory.h"
 #include "chrome/browser/gcm/gcm_profile_service_factory.h"
 #include "chrome/browser/history/history_service_factory.h"
+#include "chrome/browser/metrics/variations/google_groups_updater_service_factory.h"
 #include "chrome/browser/password_manager/account_password_store_factory.h"
+#include "chrome/browser/password_manager/password_receiver_service_factory.h"
+#include "chrome/browser/password_manager/password_sender_service_factory.h"
 #include "chrome/browser/password_manager/password_store_factory.h"
 #include "chrome/browser/power_bookmarks/power_bookmark_service_factory.h"
+#include "chrome/browser/prefs/pref_service_syncable_util.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
@@ -39,15 +42,18 @@
 #include "chrome/browser/sync/sync_invalidations_service_factory.h"
 #include "chrome/browser/sync/user_event_service_factory.h"
 #include "chrome/browser/themes/theme_service_factory.h"
+#include "chrome/browser/trusted_vault/trusted_vault_service_factory.h"
 #include "chrome/browser/undo/bookmark_undo_service_factory.h"
 #include "chrome/browser/web_applications/web_app_provider_factory.h"
 #include "chrome/browser/web_data_service_factory.h"
 #include "chrome/common/buildflags.h"
 #include "chrome/common/channel_info.h"
-#include "components/network_time/network_time_tracker.h"
+#include "components/password_manager/core/browser/sharing/password_receiver_service.h"
+#include "components/send_tab_to_self/send_tab_to_self_sync_service.h"
 #include "components/supervised_user/core/common/buildflags.h"
 #include "components/sync/base/command_line_switches.h"
 #include "components/sync/service/sync_service_impl.h"
+#include "components/sync_preferences/pref_service_syncable.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/network_service_instance.h"
 #include "content/public/browser/storage_partition.h"
@@ -66,6 +72,7 @@
 #endif  // BUILDFLAG(ENABLE_SUPERVISED_USERS)
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
+#include "chrome/browser/ash/app_list/app_list_syncable_service_factory.h"
 #include "chrome/browser/ash/printing/oauth2/authorization_zones_manager_factory.h"
 #include "chrome/browser/ash/printing/synced_printers_manager_factory.h"
 #include "chrome/browser/ash/profiles/profile_helper.h"
@@ -81,7 +88,11 @@
 
 #if !BUILDFLAG(IS_ANDROID)
 #include "chrome/browser/webauthn/passkey_model_factory.h"
-#endif  // !BUILDFLAG(IS_ANDROID)
+#else  // !BUILDFLAG(IS_ANDROID)
+#include "base/android/scoped_java_ref.h"
+#include "chrome/browser/profiles/profile_android.h"
+#include "chrome/browser/sync/android/jni_headers/SyncServiceFactory_jni.h"
+#endif  // BUILDFLAG(IS_ANDROID)
 
 namespace {
 
@@ -91,17 +102,13 @@ std::unique_ptr<KeyedService> BuildSyncService(
 
   Profile* profile = Profile::FromBrowserContext(context);
 
-  DCHECK(!profile->IsOffTheRecord());
   // Incognito, guest, or system profiles aren't relevant for Sync, and
-  // eventually no SyncService should even be created for those types of
-  // profiles. For now, they're just excluded from some startup metrics.
-  init_params.is_regular_profile_for_uma = profile->IsRegularProfile();
+  // no SyncService should be created for those types of profiles.
+  CHECK(profile->IsRegularProfile());
 #if BUILDFLAG(IS_CHROMEOS_ASH)
   // On Ash, there are additional non-interesting profile types (sign-in
   // profile and lockscreen profile).
-  init_params.is_regular_profile_for_uma =
-      init_params.is_regular_profile_for_uma &&
-      ash::ProfileHelper::IsUserProfile(profile);
+  CHECK(ash::ProfileHelper::IsUserProfile(profile));
 #endif
 
   init_params.sync_client =
@@ -123,10 +130,7 @@ std::unique_ptr<KeyedService> BuildSyncService(
     (BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS_LACROS))
   syncer::SyncPrefs prefs(profile->GetPrefs());
   local_sync_backend_enabled = prefs.IsLocalSyncEnabled();
-  if (init_params.is_regular_profile_for_uma) {
-    base::UmaHistogramBoolean("Sync.Local.Enabled2",
-                              local_sync_backend_enabled);
-  }
+  base::UmaHistogramBoolean("Sync.Local.Enabled2", local_sync_backend_enabled);
 
   if (local_sync_backend_enabled) {
     base::FilePath local_sync_backend_folder =
@@ -134,10 +138,8 @@ std::unique_ptr<KeyedService> BuildSyncService(
 
     // If the user has not specified a folder and we can't get the default
     // roaming profile location the sync service will not be created.
-    if (init_params.is_regular_profile_for_uma) {
-      base::UmaHistogramBoolean("Sync.Local.RoamingProfileUnavailable2",
-                                local_sync_backend_folder.empty());
-    }
+    base::UmaHistogramBoolean("Sync.Local.RoamingProfileUnavailable2",
+                              local_sync_backend_folder.empty());
     if (local_sync_backend_folder.empty()) {
       return nullptr;
     }
@@ -172,6 +174,22 @@ std::unique_ptr<KeyedService> BuildSyncService(
     password_store->OnSyncServiceInitialized(sync_service.get());
   }
 
+  // Notify PasswordReceiverService of complete initialization to resolve a
+  // circular dependency.
+  password_manager::PasswordReceiverService* password_receiver_service =
+      PasswordReceiverServiceFactory::GetForProfile(profile);
+  if (password_receiver_service) {
+    password_receiver_service->OnSyncServiceInitialized(sync_service.get());
+  }
+
+  SendTabToSelfSyncServiceFactory::GetForProfile(profile)
+      ->OnSyncServiceInitialized(sync_service.get());
+
+  // Allow sync_preferences/ components to use SyncService.
+  sync_preferences::PrefServiceSyncable* pref_service =
+      PrefServiceSyncableFromProfile(profile);
+  pref_service->OnSyncServiceInitialized(sync_service.get());
+
   return sync_service;
 }
 
@@ -204,9 +222,7 @@ SyncServiceFactory::SyncServiceFactory()
           "SyncService",
           ProfileSelections::Builder()
               .WithRegular(ProfileSelection::kOriginalOnly)
-              // TODO(crbug.com/1418376): Check if this service is needed in
-              // Guest mode.
-              .WithGuest(ProfileSelection::kOriginalOnly)
+              .WithAshInternals(ProfileSelection::kNone)
               .Build()) {
   // The SyncServiceImpl depends on various SyncableServices being around
   // when it is shut down.  Specify those dependencies here to build the proper
@@ -222,14 +238,24 @@ SyncServiceFactory::SyncServiceFactory()
   DependsOn(DeviceInfoSyncServiceFactory::GetInstance());
   DependsOn(FaviconServiceFactory::GetInstance());
   DependsOn(gcm::GCMProfileServiceFactory::GetInstance());
+  // Sync needs this service to still be present when the sync engine is
+  // disabled, so that preferences can be cleared.
+  DependsOn(GoogleGroupsUpdaterServiceFactory::GetInstance());
   DependsOn(HistoryServiceFactory::GetInstance());
   DependsOn(IdentityManagerFactory::GetInstance());
   DependsOn(ModelTypeStoreServiceFactory::GetInstance());
 #if !BUILDFLAG(IS_ANDROID)
   DependsOn(PasskeyModelFactory::GetInstance());
 #endif  // !BUILDFLAG(IS_ANDROID)
+  DependsOn(PasswordReceiverServiceFactory::GetInstance());
+  DependsOn(PasswordSenderServiceFactory::GetInstance());
   DependsOn(PasswordStoreFactory::GetInstance());
   DependsOn(PowerBookmarkServiceFactory::GetInstance());
+#if BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || \
+    BUILDFLAG(IS_WIN)
+  DependsOn(SavedTabGroupServiceFactory::GetInstance());
+#endif  // BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) ||
+        // BUILDFLAG(IS_WIN)
   DependsOn(SecurityEventRecorderFactory::GetInstance());
   DependsOn(SendTabToSelfSyncServiceFactory::GetInstance());
   DependsOn(SharingMessageBridgeFactory::GetInstance());
@@ -243,12 +269,9 @@ SyncServiceFactory::SyncServiceFactory()
 #if !BUILDFLAG(IS_ANDROID)
   DependsOn(ThemeServiceFactory::GetInstance());
 #endif  // !BUILDFLAG(IS_ANDROID)
-#if BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || \
-    BUILDFLAG(IS_WIN)
-  DependsOn(SavedTabGroupServiceFactory::GetInstance());
-#endif  // BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) ||
-        // BUILDFLAG(IS_WIN)
+  DependsOn(TrustedVaultServiceFactory::GetInstance());
   DependsOn(WebDataServiceFactory::GetInstance());
+
 #if BUILDFLAG(ENABLE_EXTENSIONS)
   DependsOn(
       extensions::ExtensionsBrowserClient::Get()->GetExtensionSystemFactory());
@@ -256,6 +279,7 @@ SyncServiceFactory::SyncServiceFactory()
   DependsOn(web_app::WebAppProviderFactory::GetInstance());
 #endif  // BUILDFLAG(ENABLE_EXTENSIONS)
 #if BUILDFLAG(IS_CHROMEOS_ASH)
+  DependsOn(app_list::AppListSyncableServiceFactory::GetInstance());
   DependsOn(ash::SyncedPrintersManagerFactory::GetInstance());
   DependsOn(
       ash::printing::oauth2::AuthorizationZonesManagerFactory::GetInstance());
@@ -266,9 +290,10 @@ SyncServiceFactory::SyncServiceFactory()
 
 SyncServiceFactory::~SyncServiceFactory() = default;
 
-KeyedService* SyncServiceFactory::BuildServiceInstanceFor(
+std::unique_ptr<KeyedService>
+SyncServiceFactory::BuildServiceInstanceForBrowserContext(
     content::BrowserContext* context) const {
-  return BuildSyncService(context).release();
+  return BuildSyncService(context);
 }
 
 bool SyncServiceFactory::ServiceIsNULLWhileTesting() const {
@@ -316,3 +341,20 @@ BrowserContextKeyedServiceFactory::TestingFactory
 SyncServiceFactory::GetDefaultFactory() {
   return base::BindRepeating(&BuildSyncService);
 }
+
+#if BUILDFLAG(IS_ANDROID)
+static base::android::ScopedJavaLocalRef<jobject>
+JNI_SyncServiceFactory_GetForProfile(
+    JNIEnv* env,
+    const base::android::JavaParamRef<jobject>& java_profile) {
+  Profile* profile = ProfileAndroid::FromProfileAndroid(java_profile);
+  DCHECK(profile);
+
+  syncer::SyncService* sync_service =
+      SyncServiceFactory::GetForProfile(profile);
+  if (!sync_service) {
+    return base::android::ScopedJavaLocalRef<jobject>();
+  }
+  return sync_service->GetJavaObject();
+}
+#endif  // BUILDFLAG(IS_ANDROID)

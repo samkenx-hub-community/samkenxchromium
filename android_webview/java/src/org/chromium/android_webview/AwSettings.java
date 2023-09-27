@@ -18,8 +18,11 @@ import android.webkit.WebSettings;
 import androidx.annotation.IntDef;
 
 import org.chromium.android_webview.autofill.ChromeAutocompleteSafeModeAction;
+import org.chromium.android_webview.client_hints.AwUserAgentMetadata;
 import org.chromium.android_webview.common.AwFeatures;
+import org.chromium.android_webview.common.Lifetime;
 import org.chromium.android_webview.safe_browsing.AwSafeBrowsingConfigHelper;
+import org.chromium.android_webview.settings.AttributionBehavior;
 import org.chromium.android_webview.settings.ForceDarkBehavior;
 import org.chromium.android_webview.settings.ForceDarkMode;
 import org.chromium.base.ContextUtils;
@@ -35,6 +38,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -43,6 +47,7 @@ import java.util.Set;
  * Methods in this class can be called from any thread, including threads created by
  * the client of WebView.
  */
+@Lifetime.WebView
 @JNINamespace("android_webview")
 public class AwSettings {
     private static final String TAG = "AwSettings";
@@ -83,6 +88,18 @@ public class AwSettings {
     @ForceDarkBehavior
     private int mForceDarkBehavior = ForceDarkBehavior.PREFER_MEDIA_QUERY_OVER_FORCE_DARK;
 
+    @AttributionBehavior
+    public static final int ATTRIBUTION_DISABLED = AttributionBehavior.DISABLED;
+    @AttributionBehavior
+    public static final int ATTRIBUTION_APP_SOURCE_AND_WEB_TRIGGER =
+            AttributionBehavior.APP_SOURCE_AND_WEB_TRIGGER;
+    @AttributionBehavior
+    public static final int ATTRIBUTION_WEB_SOURCE_AND_WEB_TRIGGER =
+            AttributionBehavior.WEB_SOURCE_AND_WEB_TRIGGER;
+    @AttributionBehavior
+    public static final int ATTRIBUTION_APP_SOURCE_AND_APP_TRIGGER =
+            AttributionBehavior.APP_SOURCE_AND_APP_TRIGGER;
+
     private Set<String> mRequestedWithHeaderAllowedOriginRules;
 
     private Context mContext;
@@ -111,6 +128,8 @@ public class AwSettings {
     private String mFantasyFontFamily = "fantasy";
     private String mDefaultTextEncoding = "UTF-8";
     private String mUserAgent;
+    private AwUserAgentMetadata mAwUserAgentMetadata;
+    private boolean mHasUserAgentMetadataOverrides;
     private int mMinimumFontSize = 8;
     private int mMinimumLogicalFontSize = 8;
     private int mDefaultFontSize = 16;
@@ -134,6 +153,7 @@ public class AwSettings {
     private boolean mSpatialNavigationEnabled;  // Default depends on device features.
     private boolean mEnableSupportedHardwareAcceleratedFeatures;
     private int mMixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW;
+    private int mAttributionBehavior = AttributionBehavior.APP_SOURCE_AND_WEB_TRIGGER;
     private boolean mCSSHexAlphaColorEnabled;
     private boolean mScrollTopLeftInteropEnabled;
     private boolean mWillSuppressErrorPage;
@@ -174,6 +194,13 @@ public class AwSettings {
     static class LazyDefaultUserAgent{
         // Lazy Holder pattern
         private static final String sInstance = AwSettingsJni.get().getDefaultUserAgent();
+    }
+
+    // Cache default user agent metadata obtained through JNI.
+    static class LazyDefaultUserAgentMetadata {
+        // Lazy Holder pattern
+        private static final AwUserAgentMetadata sInstance =
+                AwSettingsJni.get().getDefaultUserAgentMetadata();
     }
 
     // Protects access to settings global fields.
@@ -284,6 +311,7 @@ public class AwSettings {
             }
 
             mUserAgent = LazyDefaultUserAgent.sInstance;
+            mAwUserAgentMetadata = LazyDefaultUserAgentMetadata.sInstance.shallowCopy();
 
             // Best-guess a sensible initial value based on the features supported on the device.
             mSpatialNavigationEnabled = !context.getPackageManager().hasSystemFeature(
@@ -314,7 +342,7 @@ public class AwSettings {
             mAllowFileUrlAccess =
                     ContextUtils.getApplicationContext().getApplicationInfo().targetSdkVersion
                     < Build.VERSION_CODES.R;
-            if (AwFeatureMap.getInstance().isEnabled(
+            if (AwFeatureMap.isEnabled(
                         AwFeatures.WEBVIEW_X_REQUESTED_WITH_HEADER_MANIFEST_ALLOW_LIST)) {
                 mRequestedWithHeaderAllowedOriginRules =
                         ManifestMetadataUtil.getXRequestedWithAllowList();
@@ -407,6 +435,8 @@ public class AwSettings {
      */
     public void setAcceptThirdPartyCookies(boolean accept) {
         if (TRACE) Log.i(TAG, "setAcceptThirdPartyCookies=" + accept);
+        RecordHistogram.recordBooleanHistogram(
+                "Android.WebView.SetAcceptThirdPartyCookies", accept);
         synchronized (mAwSettingsLock) {
             mAcceptThirdPartyCookies = accept;
             mEventHandler.updateCookiePolicyLocked();
@@ -673,6 +703,14 @@ public class AwSettings {
         return LazyDefaultUserAgent.sInstance;
     }
 
+    /**
+     * @returns the default metadata for user-agent client hints used by each WebContents instance,
+     * i.e. unless overridden by {@link #setUserAgentMetadata()}
+     */
+    public static AwUserAgentMetadata getDefaultUserAgentMetadata() {
+        return LazyDefaultUserAgentMetadata.sInstance;
+    }
+
     @CalledByNative
     private static boolean getAllowSniffingFileUrls() {
         // Don't allow sniffing file:// URLs for MIME type if the application targets P or later.
@@ -721,6 +759,55 @@ public class AwSettings {
     private String getUserAgentLocked() {
         assert Thread.holdsLock(mAwSettingsLock);
         return mUserAgent;
+    }
+
+    /**
+     * See {@link androidx.webkit.WebSettingsCompat#setUserAgentMetadata}.
+     * Map<String, Object> represents the priorities name its value for AwUserAgentMetadata.
+     */
+    public void setUserAgentMetadataFromMap(Map<String, Object> uaMetadataMap) {
+        if (TRACE) Log.i(TAG, "setUserAgentMetadata=" + uaMetadataMap);
+        synchronized (mAwSettingsLock) {
+            final AwUserAgentMetadata overrideUaMetadata = AwUserAgentMetadata.fromMap(
+                    uaMetadataMap, LazyDefaultUserAgentMetadata.sInstance);
+            if (!mAwUserAgentMetadata.equals(overrideUaMetadata)) {
+                mAwUserAgentMetadata = overrideUaMetadata;
+                // We only consider it has override when the input is not empty and has difference
+                // with the existing user-agent metadata. e.g. user overrides the user-agent with a
+                // totally different value, initially they provide the user-agent metadata
+                // overrides, we should only generate low-entropy user-agent client hints once users
+                // clear the user-agent metadata overrides.
+                mHasUserAgentMetadataOverrides =
+                        (uaMetadataMap != null && !uaMetadataMap.isEmpty());
+                mEventHandler.runOnUiThreadBlockingAndLocked(() -> {
+                    if (mNativeAwSettings != 0) {
+                        AwSettingsJni.get().updateUserAgentLocked(
+                                mNativeAwSettings, AwSettings.this);
+                    }
+                });
+            }
+        }
+    }
+
+    /**
+     * See {@link androidx.webkit.WebSettingsCompat#getUserAgentMetadata}.
+     */
+    public Map<String, Object> getUserAgentMetadataMap() {
+        synchronized (mAwSettingsLock) {
+            return getUserAgentMetadataLocked().toMapObject();
+        }
+    }
+
+    @CalledByNative
+    private AwUserAgentMetadata getUserAgentMetadataLocked() {
+        assert Thread.holdsLock(mAwSettingsLock);
+        return mAwUserAgentMetadata;
+    }
+
+    @CalledByNative
+    private boolean getHasUserAgentMetadataOverridesLocked() {
+        assert Thread.holdsLock(mAwSettingsLock);
+        return mHasUserAgentMetadataOverrides;
     }
 
     /**
@@ -1748,6 +1835,23 @@ public class AwSettings {
         }
     }
 
+    public void setAttributionBehavior(@AttributionBehavior int behavior) {
+        synchronized (mAwSettingsLock) {
+            if (mAttributionBehavior != behavior) {
+                mAttributionBehavior = behavior;
+                mEventHandler.updateWebkitPreferencesLocked();
+            }
+        }
+    }
+
+    @CalledByNative
+    @AttributionBehavior
+    public int getAttributionBehavior() {
+        synchronized (mAwSettingsLock) {
+            return mAttributionBehavior;
+        }
+    }
+
     @ForceDarkMode
     public int getForceDarkMode() {
         synchronized (mAwSettingsLock) {
@@ -1845,7 +1949,7 @@ public class AwSettings {
 
     @CalledByNative
     private boolean getAllowMixedContentAutoupgradesLocked() {
-        if (AwFeatureMap.getInstance().isEnabled(AwFeatures.WEBVIEW_MIXED_CONTENT_AUTOUPGRADES)) {
+        if (AwFeatureMap.isEnabled(AwFeatures.WEBVIEW_MIXED_CONTENT_AUTOUPGRADES)) {
             // We only allow mixed content autoupgrades (upgrading HTTP subresources to HTTPS in
             // HTTPS sites) when the mixed content mode is set to MIXED_CONTENT_COMPATIBILITY,
             // which keeps it in line with the behavior in Chrome. With
@@ -2015,22 +2119,6 @@ public class AwSettings {
         }
     }
 
-    /**
-     * Enable sensitive web content restrictions per WebView.
-     */
-    public void enableRestrictSensitiveWebContent() {
-        synchronized (mAwSettingsLock) {
-            mEventHandler.runOnUiThreadBlockingAndLocked(() -> {
-                assert Thread.holdsLock(mAwSettingsLock);
-                AwOriginVerificationScheduler.initAndScheduleAll(null);
-                if (mNativeAwSettings != 0) {
-                    AwSettingsJni.get().setRestrictSensitiveWebContentEnabled(
-                            mNativeAwSettings, AwSettings.this, true);
-                }
-            });
-        }
-    }
-
     @NativeMethods
     interface Natives {
         long init(AwSettings caller, WebContents webContents);
@@ -2043,6 +2131,7 @@ public class AwSettings {
         void updateUserAgentLocked(long nativeAwSettings, AwSettings caller);
         void updateWebkitPreferencesLocked(long nativeAwSettings, AwSettings caller);
         String getDefaultUserAgent();
+        AwUserAgentMetadata getDefaultUserAgentMetadata();
         void updateFormDataPreferencesLocked(long nativeAwSettings, AwSettings caller);
         void updateRendererPreferencesLocked(long nativeAwSettings, AwSettings caller);
         void updateOffscreenPreRasterLocked(long nativeAwSettings, AwSettings caller);
@@ -2056,7 +2145,5 @@ public class AwSettings {
         boolean getEnterpriseAuthenticationAppLinkPolicyEnabled(
                 long nativeAwSettings, AwSettings caller);
         String[] updateXRequestedWithAllowListOriginMatcher(long nativeAwSettings, String[] rules);
-        void setRestrictSensitiveWebContentEnabled(
-                long nativeAwSettings, AwSettings caller, boolean enabled);
     }
 }

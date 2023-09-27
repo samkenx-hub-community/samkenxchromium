@@ -110,9 +110,6 @@ class BaseWebUIBrowserTest : public JavaScriptBrowserTest {
 
   void set_webui_host(const std::string& webui_host);
 
-  // Enable command line flags for test.
-  void SetUpCommandLine(base::CommandLine* command_line) override;
-
   // Set up & tear down console error catching.
   void SetUpOnMainThread() override;
   void TearDownOnMainThread() override;
@@ -180,8 +177,8 @@ class BaseWebUIBrowserTest : public JavaScriptBrowserTest {
 
   // When this is non-NULL, this is The WebUI instance used for testing.
   // Otherwise the selected tab's web_ui is used.
-  raw_ptr<content::WebUI, DanglingUntriaged> override_selected_web_ui_ =
-      nullptr;
+  raw_ptr<content::WebUI, AcrossTasksDanglingUntriaged>
+      override_selected_web_ui_ = nullptr;
 
   std::unique_ptr<TestChromeWebUIControllerFactory> test_factory_;
   std::unique_ptr<content::ScopedWebUIControllerFactoryRegistration>

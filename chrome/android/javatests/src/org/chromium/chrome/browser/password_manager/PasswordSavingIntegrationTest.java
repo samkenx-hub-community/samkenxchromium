@@ -5,6 +5,7 @@
 package org.chromium.chrome.browser.password_manager;
 
 import static org.chromium.base.test.util.Matchers.is;
+import static org.chromium.content_public.browser.test.util.DOMUtils.enterInputIntoTextField;
 import static org.chromium.content_public.browser.test.util.TestThreadUtils.runOnUiThreadBlocking;
 
 import android.widget.TextView;
@@ -24,13 +25,12 @@ import org.chromium.base.test.util.Criteria;
 import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.Matchers;
-import org.chromium.chrome.browser.flags.ChromeFeatureList;
+import org.chromium.base.test.util.Restriction;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
 import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.util.ChromeTabUtils;
-import org.chromium.chrome.test.util.browser.Features.EnableFeatures;
 import org.chromium.chrome.test.util.browser.signin.SigninTestRule;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController.SheetState;
@@ -44,6 +44,7 @@ import org.chromium.content_public.browser.test.util.DOMUtils;
 import org.chromium.content_public.browser.test.util.TestInputMethodManagerWrapper;
 import org.chromium.content_public.browser.test.util.WebContentsUtils;
 import org.chromium.ui.base.WindowAndroid;
+import org.chromium.ui.test.util.DeviceRestriction;
 import org.chromium.ui.widget.ButtonCompat;
 import org.chromium.url.GURL;
 
@@ -55,7 +56,6 @@ import java.util.concurrent.TimeoutException;
 @RunWith(ChromeJUnit4ClassRunner.class)
 @Batch(Batch.PER_CLASS)
 @CommandLineFlags.Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE, "show-autofill-signatures"})
-@EnableFeatures({ChromeFeatureList.UNIFIED_PASSWORD_MANAGER_ANDROID})
 public class PasswordSavingIntegrationTest {
     @Rule
     public ChromeTabbedActivityTestRule mActivityTestRule = new ChromeTabbedActivityTestRule();
@@ -81,6 +81,7 @@ public class PasswordSavingIntegrationTest {
     private PasswordStoreBridge mPasswordStoreBridge;
     private BottomSheetController mBottomSheetController;
     private WebContents mWebContents;
+    private TestInputMethodManagerWrapper mInputMethodManagerWrapper;
 
     @Before
     public void setup() throws Exception {
@@ -106,6 +107,9 @@ public class PasswordSavingIntegrationTest {
         });
 
         mWebContents = mActivityTestRule.getWebContents();
+        ImeAdapter imeAdapter = WebContentsUtils.getImeAdapter(mWebContents);
+        mInputMethodManagerWrapper = TestInputMethodManagerWrapper.create(imeAdapter);
+        imeAdapter.setInputMethodManagerWrapper(mInputMethodManagerWrapper);
     }
 
     @After
@@ -116,11 +120,15 @@ public class PasswordSavingIntegrationTest {
 
     @Test
     @MediumTest
+    @Restriction(DeviceRestriction.RESTRICTION_TYPE_NON_AUTO)
+    // TODO(crbug/1475346): Add integration tests for automotive save password flow.
     public void testSavingNewPassword() throws InterruptedException, TimeoutException {
         mActivityTestRule.loadUrl(mActivityTestRule.getTestServer().getURL(SIGNIN_FORM_URL));
 
-        enterInput(mWebContents, USERNAME_FIELD_ID, USERNAME_TEXT);
-        enterInput(mWebContents, PASSWORD_NODE_ID, PASSWORD_TEXT);
+        enterInputIntoTextField(
+                mWebContents, mInputMethodManagerWrapper, USERNAME_FIELD_ID, USERNAME_TEXT);
+        enterInputIntoTextField(
+                mWebContents, mInputMethodManagerWrapper, PASSWORD_NODE_ID, PASSWORD_TEXT);
         waitForPmParserAnnotation(mWebContents, PASSWORD_NODE_ID);
 
         DOMUtils.clickNodeWithJavaScript(mWebContents, SUBMIT_BUTTON_ID);
@@ -139,7 +147,9 @@ public class PasswordSavingIntegrationTest {
 
     @Test
     @MediumTest
-    @DisabledTest(message = "https://crbug.com/1359305")
+    @Restriction(DeviceRestriction.RESTRICTION_TYPE_NON_AUTO)
+    // TODO(crbug/1475346): Add integration tests for automotive update password flow.
+    @DisabledTest(message = "https://crbug.com/1468903")
     public void testUpdatingPassword() throws InterruptedException, TimeoutException {
         // Store the test credential.
         PasswordStoreCredential testCredential = new PasswordStoreCredential(
@@ -168,8 +178,10 @@ public class PasswordSavingIntegrationTest {
         BottomSheetTestSupport.waitForState(mBottomSheetController, SheetState.HIDDEN);
 
         // Enter the new password.
-        enterInput(mWebContents, NEW_PASSWORD_NODE_ID, NEW_PASSWORD_TEXT);
-        enterInput(mWebContents, NEW_PASSWORD_REPEAT_NODE_ID, NEW_PASSWORD_TEXT);
+        enterInputIntoTextField(
+                mWebContents, mInputMethodManagerWrapper, NEW_PASSWORD_NODE_ID, NEW_PASSWORD_TEXT);
+        enterInputIntoTextField(mWebContents, mInputMethodManagerWrapper,
+                NEW_PASSWORD_REPEAT_NODE_ID, NEW_PASSWORD_TEXT);
 
         // Submit the form and wait for the success page to load.
         DOMUtils.clickNodeWithJavaScript(mWebContents, CHANGE_PASSWORD_BUTTON_ID);
@@ -187,21 +199,6 @@ public class PasswordSavingIntegrationTest {
             Criteria.checkThat(credentials[0].getUsername(), is(USERNAME_TEXT));
             Criteria.checkThat(credentials[0].getPassword(), is(NEW_PASSWORD_TEXT));
         });
-    }
-
-    private void enterInput(WebContents webContents, String nodeId, String input)
-            throws TimeoutException {
-        ImeAdapter imeAdapter = WebContentsUtils.getImeAdapter(webContents);
-        TestInputMethodManagerWrapper inputMethodManagerWrapper =
-                TestInputMethodManagerWrapper.create(imeAdapter);
-        imeAdapter.setInputMethodManagerWrapper(inputMethodManagerWrapper);
-
-        DOMUtils.clickNode(webContents, nodeId);
-        CriteriaHelper.pollUiThread(() -> {
-            Criteria.checkThat(inputMethodManagerWrapper.getShowSoftInputCounter(), Matchers.is(1));
-        });
-
-        imeAdapter.setComposingTextForTest(input, input.length());
     }
 
     private void clickSaveUpdateButtonOnMessage() {

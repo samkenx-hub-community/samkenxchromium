@@ -35,6 +35,7 @@
 #include "ash/session/session_controller_impl.h"
 #include "ash/shell.h"
 #include "ash/test/ash_test_util.h"
+#include "ash/webui/personalization_app/mojom/personalization_app.mojom-shared.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
@@ -49,6 +50,7 @@
 #include "chromeos/dbus/power/fake_power_manager_client.h"
 #include "chromeos/dbus/power/power_manager_client.h"
 #include "chromeos/dbus/power_manager/idle.pb.h"
+#include "components/prefs/testing_pref_service.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "ui/gfx/codec/jpeg_codec.h"
 #include "ui/gfx/image/image_skia.h"
@@ -56,6 +58,11 @@
 #include "ui/views/widget/widget.h"
 
 namespace ash {
+namespace {
+
+constexpr base::TimeDelta kWaitForWidgetsTimeout = base::Seconds(10);
+
+}  // namespace
 
 class TestAmbientPhotoCacheImpl : public AmbientPhotoCache {
  public:
@@ -215,10 +222,6 @@ void AmbientAshTestBase::TearDown() {
 void AmbientAshTestBase::SetAmbientModeEnabled(bool enabled) {
   Shell::Get()->session_controller()->GetActivePrefService()->SetBoolean(
       ambient::prefs::kAmbientModeEnabled, enabled);
-
-  if (enabled) {
-    DisableBackupCacheDownloads();
-  }
 }
 
 void AmbientAshTestBase::SetAmbientUiSettings(
@@ -226,6 +229,13 @@ void AmbientAshTestBase::SetAmbientUiSettings(
   settings.WriteToPrefService(
       *Shell::Get()->session_controller()->GetActivePrefService());
   DisableBackupCacheDownloads();
+}
+
+AmbientUiSettings AmbientAshTestBase::GetCurrentUiSettings() {
+  PrefService* pref_service =
+      Shell::Get()->session_controller()->GetActivePrefService();
+  CHECK(pref_service);
+  return AmbientUiSettings::ReadFromPrefService(*pref_service);
 }
 
 void AmbientAshTestBase::DisableBackupCacheDownloads() {
@@ -237,11 +247,17 @@ void AmbientAshTestBase::DisableBackupCacheDownloads() {
 }
 
 void AmbientAshTestBase::SetAmbientModeManagedScreensaverEnabled(bool enabled) {
-  Shell::Get()->session_controller()->GetActivePrefService()->SetBoolean(
-      ambient::prefs::kAmbientModeManagedScreensaverEnabled, enabled);
+  PrefService* prefs =
+      Shell::Get()->session_controller()->GetActivePrefService();
+  DCHECK(prefs);
+
+  static_cast<TestingPrefServiceSimple*>(prefs)->SetManagedPref(
+      ambient::prefs::kAmbientModeManagedScreensaverEnabled,
+      std::make_unique<base::Value>(enabled));
 }
 
-void AmbientAshTestBase::SetAmbientTheme(AmbientTheme theme) {
+void AmbientAshTestBase::SetAmbientTheme(
+    personalization_app::mojom::AmbientTheme theme) {
   SetAmbientUiSettings(AmbientUiSettings(theme));
 }
 
@@ -256,10 +272,17 @@ void AmbientAshTestBase::DisableJitter() {
 
 void AmbientAshTestBase::SetAmbientShownAndWaitForWidgets() {
   // The widget will be destroyed in |AshTestBase::TearDown()|.
-  ambient_controller()->SetUiVisibilityShown();
+  ambient_controller()->SetUiVisibilityShouldShow();
+  WaitForWidgets(kWaitForWidgetsTimeout);
+}
 
-  static constexpr base::TimeDelta kTimeout = base::Seconds(10);
-  base::test::ScopedRunLoopTimeout loop_timeout(FROM_HERE, kTimeout);
+void AmbientAshTestBase::SetAmbientPreviewAndWaitForWidgets() {
+  ambient_controller()->SetUiVisibilityPreview();
+  WaitForWidgets(kWaitForWidgetsTimeout);
+}
+
+void AmbientAshTestBase::WaitForWidgets(base::TimeDelta timeout) {
+  base::test::ScopedRunLoopTimeout loop_timeout(FROM_HERE, timeout);
   base::RunLoop run_loop;
   task_environment()->GetMainThreadTaskRunner()->PostTask(
       FROM_HERE,
@@ -488,6 +511,10 @@ void AmbientAshTestBase::FastForwardByBackgroundLockScreenTimeout(
                                         ->background_lock_screen_timeout());
 }
 
+void AmbientAshTestBase::FastForwardByDurationInMinutes(int minutes) {
+  task_environment()->FastForwardBy(base::Minutes(minutes));
+}
+
 void AmbientAshTestBase::SetPowerStateCharging() {
   proto_.set_battery_state(
       power_manager::PowerSupplyProperties_BatteryState_CHARGING);
@@ -512,6 +539,13 @@ void AmbientAshTestBase::SetPowerStateFull() {
 void AmbientAshTestBase::SetExternalPowerConnected() {
   proto_.set_external_power(
       power_manager::PowerSupplyProperties_ExternalPower_AC);
+  PowerStatus::Get()->SetProtoForTesting(proto_);
+  ambient_controller()->OnPowerStatusChanged();
+}
+
+void AmbientAshTestBase::SetExternalUsbPowerConnected() {
+  proto_.set_external_power(
+      power_manager::PowerSupplyProperties_ExternalPower_USB);
   PowerStatus::Get()->SetProtoForTesting(proto_);
   ambient_controller()->OnPowerStatusChanged();
 }
@@ -580,8 +614,12 @@ AmbientController* AmbientAshTestBase::ambient_controller() {
   return Shell::Get()->ambient_controller();
 }
 
+AmbientUiLauncher* AmbientAshTestBase::ambient_ui_launcher() {
+  return ambient_controller()->ambient_ui_launcher();
+}
+
 AmbientPhotoController* AmbientAshTestBase::photo_controller() {
-  return ambient_controller()->ambient_photo_controller();
+  return ambient_ui_launcher()->GetAmbientPhotoController();
 }
 
 AmbientManagedPhotoController* AmbientAshTestBase::managed_photo_controller() {
@@ -589,8 +627,7 @@ AmbientManagedPhotoController* AmbientAshTestBase::managed_photo_controller() {
     return nullptr;
   }
   AmbientManagedSlideshowUiLauncher* ui_launcher =
-      static_cast<AmbientManagedSlideshowUiLauncher*>(
-          ambient_controller()->ambient_ui_launcher());
+      static_cast<AmbientManagedSlideshowUiLauncher*>(ambient_ui_launcher());
   return &ui_launcher->photo_controller_;
 }
 

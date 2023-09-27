@@ -52,9 +52,9 @@ v8::Local<v8::Value> BuildDetails(
     return V8ObjectBuilder(script_state).V8Value();
   }
 
-  ExceptionState exception_state(script_state->GetIsolate(),
-                                 ExceptionState::kConstructionContext,
-                                 "PaymentResponse");
+  ExceptionState exception_state(
+      script_state->GetIsolate(),
+      ExceptionContextType::kConstructorOperationInvoke, "PaymentResponse");
   v8::Local<v8::Value> parsed_value =
       FromJSONString(script_state->GetIsolate(), script_state->GetContext(),
                      json, exception_state);
@@ -184,7 +184,7 @@ void PaymentResponse::Trace(Visitor* visitor) const {
   visitor->Trace(details_);
   visitor->Trace(shipping_address_);
   visitor->Trace(payment_state_resolver_);
-  EventTargetWithInlineData::Trace(visitor);
+  EventTarget::Trace(visitor);
   ExecutionContextClient::Trace(visitor);
 }
 

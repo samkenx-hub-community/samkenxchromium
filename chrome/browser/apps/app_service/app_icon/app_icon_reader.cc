@@ -6,8 +6,10 @@
 
 #include "base/files/file_util.h"
 #include "base/task/thread_pool.h"
+#include "base/trace_event/trace_event.h"
 #include "chrome/browser/apps/app_service/app_icon/app_icon_decoder.h"
 #include "chrome/browser/apps/app_service/app_icon/app_icon_factory.h"
+#include "chrome/browser/apps/app_service/app_icon/app_icon_util.h"
 #include "chrome/browser/apps/app_service/app_icon/dip_px_util.h"
 #include "chrome/browser/ash/app_list/arc/arc_app_utils.h"
 #include "chrome/browser/profiles/profile.h"
@@ -15,14 +17,14 @@
 
 namespace {
 
-int GetResourceIdForIcon(const std::string& app_id,
+int GetResourceIdForIcon(const std::string& id,
                          int32_t size_in_dip,
                          const apps::IconKey& icon_key) {
   int resource_id = icon_key.resource_id;
 
-  if (app_id == arc::kPlayStoreAppId) {
+  if (id == arc::kPlayStoreAppId) {
     int size_in_px = apps_util::ConvertDipToPx(
-        size_in_dip, /*quantize_to_supported_scale_factor=*/true);
+        size_in_dip, /*quantize_to_supported_scale_factor=*/false);
     resource_id = (size_in_px <= 32) ? IDR_ARC_SUPPORT_ICON_32_PNG
                                      : IDR_ARC_SUPPORT_ICON_192_PNG;
   }
@@ -38,15 +40,16 @@ AppIconReader::AppIconReader(Profile* profile) : profile_(profile) {}
 
 AppIconReader::~AppIconReader() = default;
 
-void AppIconReader::ReadIcons(const std::string& app_id,
+void AppIconReader::ReadIcons(const std::string& id,
                               int32_t size_in_dip,
                               const IconKey& icon_key,
                               IconType icon_type,
                               LoadIconCallback callback) {
+  TRACE_EVENT0("ui", "AppIconReader::ReadIcons");
   IconEffects icon_effects = static_cast<IconEffects>(icon_key.icon_effects);
-  int resource_id = GetResourceIdForIcon(app_id, size_in_dip, icon_key);
+  int resource_id = GetResourceIdForIcon(id, size_in_dip, icon_key);
   if (resource_id != IconKey::kInvalidResourceId) {
-    LoadIconFromResource(profile_, app_id, icon_type, size_in_dip, resource_id,
+    LoadIconFromResource(profile_, id, icon_type, size_in_dip, resource_id,
                          /*is_placeholder_icon=*/false, icon_effects,
                          std::move(callback));
     return;
@@ -60,20 +63,21 @@ void AppIconReader::ReadIcons(const std::string& app_id,
   }
 
   decodes_.emplace_back(std::make_unique<AppIconDecoder>(
-      base_path, app_id, size_in_dip,
+      base_path, id, size_in_dip,
       base::BindOnce(&AppIconReader::OnUncompressedIconRead,
                      weak_ptr_factory_.GetWeakPtr(), size_in_dip, icon_effects,
-                     icon_type, app_id, std::move(callback))));
+                     icon_type, id, std::move(callback))));
   decodes_.back()->Start();
 }
 
 void AppIconReader::OnUncompressedIconRead(int32_t size_in_dip,
                                            IconEffects icon_effects,
                                            IconType icon_type,
-                                           const std::string& app_id,
+                                           const std::string& id,
                                            LoadIconCallback callback,
                                            AppIconDecoder* decoder,
                                            IconValuePtr iv) {
+  TRACE_EVENT0("ui", "AppIconReader::OnUncompressedIconRead");
   DCHECK_NE(IconType::kUnknown, icon_type);
 
   auto it = base::ranges::find(decodes_, decoder,
@@ -122,7 +126,7 @@ void AppIconReader::OnUncompressedIconRead(int32_t size_in_dip,
   }
 
   apps::ApplyIconEffects(
-      profile_, app_id, icon_effects, size_in_dip, std::move(iv),
+      profile_, id, icon_effects, size_in_dip, std::move(iv),
       base::BindOnce(&AppIconReader::OnCompleteWithIconValue,
                      weak_ptr_factory_.GetWeakPtr(), size_in_dip, icon_type,
                      std::move(callback)));
@@ -132,6 +136,7 @@ void AppIconReader::OnCompleteWithIconValue(int32_t size_in_dip,
                                             IconType icon_type,
                                             LoadIconCallback callback,
                                             IconValuePtr iv) {
+  TRACE_EVENT0("ui", "AppIconReader::OnCompleteWithIconValue");
   iv->uncompressed.MakeThreadSafe();
 
   if (icon_type != IconType::kCompressed) {
@@ -154,6 +159,7 @@ void AppIconReader::OnCompleteWithIconValue(int32_t size_in_dip,
 void AppIconReader::OnCompleteWithCompressedData(
     LoadIconCallback callback,
     std::vector<uint8_t> icon_data) {
+  TRACE_EVENT0("ui", "AppIconReader::OnCompleteWithCompressedData");
   auto iv = std::make_unique<IconValue>();
   iv->icon_type = IconType::kCompressed;
   iv->compressed = std::move(icon_data);

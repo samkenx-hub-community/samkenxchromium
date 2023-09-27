@@ -6,11 +6,15 @@
  * @fileoverview Start point for Files app.
  */
 
+
+import '/strings.m.js';
 import '../../common/js/error_counter.js';
+import '../../background/js/metrics_start.js';
 import './metrics_start.js';
 
-import {startColorChangeUpdater} from 'chrome://resources/cr_components/color_change_listener/colors_css_updater.js';
+import {loadTimeData} from 'chrome://resources/ash/common/load_time_data.m.js';
 
+import {GlitchType, reportGlitch} from '../../common/js/glitch.js';
 import {util} from '../../common/js/util.js';
 
 import {FileManager} from './file_manager.js';
@@ -19,9 +23,19 @@ import {FileManager} from './file_manager.js';
 const fileManager = new FileManager();
 window.fileManager = fileManager;
 
-fileManager.initializeCore();
+async function run() {
+  try {
+    window.appID = String(loadTimeData.getInteger('WINDOW_NUMBER'));
+  } catch (e) {
+    reportGlitch(GlitchType.CAUGHT_EXCEPTION);
+    console.warn('Failed to get the app ID', e);
+  }
+}
 
-fileManager.initializeUI(document.body).then(() => {
-  util.testSendMessage('ready');
-  startColorChangeUpdater();
+run().then(() => {
+  fileManager.initializeCore();
+
+  fileManager.initializeUI(document.body).then(() => {
+    util.testSendMessage('ready');
+  });
 });

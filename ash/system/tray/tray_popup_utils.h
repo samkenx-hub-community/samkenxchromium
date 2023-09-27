@@ -169,6 +169,11 @@ class ASH_EXPORT TrayPopupUtils {
   // user, and not in the supervised user creation flow.
   static bool CanOpenWebUISettings();
 
+  // Returns true if it is possible to show the night light feature tile, i.e.
+  // the `session_manager::SessionState` is ACTIVE, LOGGED_IN_NOT_ACTIVE, or
+  // LOCKED. This should only be used when `kQsRevamp` is enabled.
+  static bool CanShowNightLightFeatureTile();
+
   // Initializes a row in the system menu as checkable and update the check mark
   // status of this row. If |enterprise_managed| is true, adds an enterprise
   // managed icon to the row.
@@ -187,6 +192,9 @@ class ASH_EXPORT TrayPopupUtils {
   static ui::ImageModel CreateCheckMark(ui::ColorId color_id);
 
   // Sets the font list for |label| based on |style|.
+  // DEPRECATED: Use `TypographyProvider` in new code. If you need legacy fonts,
+  // use TypographyToken::kLegacy*. This function DCHECKs if used when QsRevamp
+  // and Jelly are both enabled.
   static void SetLabelFontList(views::Label* label, FontStyle style);
 };
 

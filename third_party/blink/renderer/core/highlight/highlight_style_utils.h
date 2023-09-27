@@ -8,6 +8,7 @@
 #include "base/memory/scoped_refptr.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/blink/renderer/core/core_export.h"
+#include "third_party/blink/renderer/core/editing/markers/document_marker.h"
 #include "third_party/blink/renderer/core/paint/paint_flags.h"
 #include "third_party/blink/renderer/core/style/applied_text_decoration.h"
 #include "third_party/blink/renderer/platform/wtf/allocator/allocator.h"
@@ -60,13 +61,14 @@ class CORE_EXPORT HighlightStyleUtils {
       absl::optional<Color> previous_layer_color,
       PseudoId);
 
-  static scoped_refptr<const ComputedStyle> HighlightPseudoStyle(
+  static const ComputedStyle* HighlightPseudoStyle(
       Node* node,
       const ComputedStyle& style,
       PseudoId pseudo,
       const AtomicString& pseudo_argument = g_null_atom);
 
-  static bool TextFragmentHasVisualOverflow(const Node* node);
+  static bool ShouldInvalidateVisualOverflow(const Node& node,
+                                             DocumentMarker::MarkerType type);
 
   static bool CustomHighlightHasVisualOverflow(
       const Node* node,

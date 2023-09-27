@@ -8,7 +8,6 @@
 #import "base/strings/sys_string_conversions.h"
 #import "base/test/ios/wait_util.h"
 #import "ios/chrome/browser/shared/ui/symbols/symbols.h"
-#import "ios/chrome/browser/tabs/features.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/grid/grid_constants.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/pinned_tabs/pinned_tabs_constants.h"
 #import "ios/chrome/grit/ios_strings.h"
@@ -21,13 +20,8 @@
 #import "ios/testing/earl_grey/matchers.h"
 #import "ui/base/l10n/l10n_util.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 using ::base::test::ios::kWaitForUIElementTimeout;
 using ::base::test::ios::WaitUntilConditionOrTimeout;
-using chrome_test_util::LongPressCellAndDragToOffsetOf;
 
 namespace {
 
@@ -120,7 +114,7 @@ void DragDropCellInRegularGrid(NSString* cell_identifier) {
 
   // Supposed position of the regular grid.
   XCUICoordinate* end_point =
-      [app coordinateWithNormalizedOffset:CGVectorMake(0.5, 0.4)];
+      [app coordinateWithNormalizedOffset:CGVectorMake(0.5, 0.5)];
 
   [start_point pressForDuration:1.5
            thenDragToCoordinate:end_point
@@ -177,13 +171,6 @@ void AssertPinnedCellMovedToRegularGrid(unsigned int pinned_index,
 @end
 
 @implementation PinnedTabsDragDropTestCase
-
-- (AppLaunchConfiguration)appConfigurationForTestCase {
-  AppLaunchConfiguration config;
-  config.features_enabled.push_back(kEnablePinnedTabs);
-
-  return config;
-}
 
 // Checks that the Pinned Tabs feature is disabled on iPad.
 - (void)testDragRegularTabOniPad {

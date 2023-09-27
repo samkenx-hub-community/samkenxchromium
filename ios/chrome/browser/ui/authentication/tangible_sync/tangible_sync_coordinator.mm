@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -6,7 +6,7 @@
 
 #import "base/metrics/histogram_functions.h"
 #import "components/sync/service/sync_service.h"
-#import "ios/chrome/browser/consent_auditor/consent_auditor_factory.h"
+#import "ios/chrome/browser/consent_auditor/model/consent_auditor_factory.h"
 #import "ios/chrome/browser/first_run/first_run_metrics.h"
 #import "ios/chrome/browser/shared/model/browser/browser.h"
 #import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
@@ -26,10 +26,6 @@
 #import "ios/chrome/browser/ui/authentication/tangible_sync/tangible_sync_view_controller.h"
 #import "ios/chrome/browser/ui/authentication/tangible_sync/tangible_sync_view_controller_delegate.h"
 #import "ios/chrome/browser/unified_consent/unified_consent_service_factory.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace {
 
@@ -81,7 +77,6 @@ constexpr signin_metrics::AccessPoint kTangibleSyncAccessPoint =
   [super start];
   _viewController = [[TangibleSyncViewController alloc] init];
   _viewController.delegate = self;
-  _viewController.modalInPresentation = YES;
   ChromeBrowserState* browserState = self.browser->GetBrowserState();
   AuthenticationService* authenticationService =
       AuthenticationServiceFactory::GetForBrowserState(browserState);
@@ -104,6 +99,7 @@ constexpr signin_metrics::AccessPoint kTangibleSyncAccessPoint =
   _mediator.consumer = _viewController;
   _mediator.delegate = self;
   if (_firstRun) {
+    _viewController.modalInPresentation = YES;
     base::UmaHistogramEnumeration("FirstRun.Stage",
                                   first_run::kTangibleSyncScreenStart);
   }

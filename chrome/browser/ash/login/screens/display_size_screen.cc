@@ -7,7 +7,10 @@
 #include "ash/constants/ash_features.h"
 #include "ash/constants/ash_pref_names.h"
 #include "ash/shell.h"
+#include "base/metrics/histogram_functions.h"
+#include "base/numerics/ranges.h"
 #include "chrome/browser/ash/login/login_pref_names.h"
+#include "chrome/browser/ash/login/users/chrome_user_manager_util.h"
 #include "chrome/browser/ash/login/wizard_context.h"
 #include "chrome/browser/ash/login/wizard_controller.h"
 #include "chrome/browser/ash/policy/core/browser_policy_connector_ash.h"
@@ -52,7 +55,7 @@ float GetCurrentZoomFactor(PrefService* prefs) {
 
 std::string RetrieveChoobeSubtitle(PrefService* prefs) {
   int percentage = std::round(GetCurrentZoomFactor(prefs) * 100);
-  return base::NumberToString(percentage) + "%";
+  return base::NumberToString(percentage);
 }
 
 bool ShouldShowChoobeReturnButton(ChoobeFlowController* controller) {
@@ -63,6 +66,12 @@ bool ShouldShowChoobeReturnButton(ChoobeFlowController* controller) {
 }
 
 void PersistSelectedFactor(PrefService* prefs, double factor) {
+  float current_factor = GetCurrentZoomFactor(prefs);
+  bool factor_changed = !base::IsApproximatelyEqual(
+      current_factor, static_cast<float>(factor), 0.01f);
+  base::UmaHistogramBoolean("OOBE.CHOOBE.SettingChanged.Display-size",
+                            factor_changed);
+
   prefs->SetDouble(prefs::kOobeDisplaySizeFactorDeferred, factor);
 }
 
@@ -131,12 +140,16 @@ bool DisplaySizeScreen::ShouldBeSkipped(const WizardContext& context) const {
     return true;
   }
 
+  if (chrome_user_manager_util::IsManagedGuestSessionOrEphemeralLogin()) {
+    return true;
+  }
+
   if (features::IsOobeChoobeEnabled()) {
     auto* choobe_controller =
         WizardController::default_controller()->choobe_flow_controller();
-    if (choobe_controller) {
-      return choobe_controller->ShouldScreenBeSkipped(
-          DisplaySizeScreenView::kScreenId);
+    if (choobe_controller && choobe_controller->ShouldScreenBeSkipped(
+                                 DisplaySizeScreenView::kScreenId)) {
+      return true;
     }
   }
 
@@ -222,9 +235,7 @@ void DisplaySizeScreen::OnUserAction(const base::Value::List& args) {
                           args[1].GetDouble());
     ReportScreenCompletedToChoobe(
         WizardController::default_controller()->choobe_flow_controller());
-    LoginDisplayHost::default_host()
-        ->GetWizardContext()
-        ->return_to_choobe_screen = true;
+    context()->return_to_choobe_screen = true;
     exit_callback_.Run(Result::kNext);
     return;
   }

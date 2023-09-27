@@ -13,7 +13,6 @@
 #include "components/gwp_asan/client/guarded_page_allocator.h"
 #include "components/gwp_asan/client/sampling_state.h"
 #include "components/gwp_asan/common/crash_key_name.h"
-#include "components/gwp_asan/common/lightweight_detector.h"
 
 namespace gwp_asan {
 namespace internal {
@@ -33,6 +32,7 @@ bool AllocationHook(void** out,
                     const char* type_name) {
   if (UNLIKELY(sampling_state.Sample())) {
     // Ignore allocation requests with unknown flags.
+    // TODO(crbug.com/1469794): Add support for memory tagging in GWP-Asan.
     constexpr int kKnownFlags = partition_alloc::AllocFlags::kReturnNull |
                                 partition_alloc::AllocFlags::kZeroFill;
     if (flags & ~kKnownFlags)
@@ -69,34 +69,23 @@ GWP_ASAN_EXPORT GuardedPageAllocator& GetPartitionAllocGpaForTesting() {
   return *gpa;
 }
 
-void QuarantineHook(void* address, size_t size) {
-  gpa->RecordLightweightDeallocation(address, size);
-}
-
 void InstallPartitionAllocHooks(
     size_t max_allocated_pages,
     size_t num_metadata,
     size_t total_pages,
     size_t sampling_frequency,
-    GuardedPageAllocator::OutOfMemoryCallback callback,
-    LightweightDetector::State lightweight_detector_state,
-    size_t num_lightweight_detector_metadata) {
+    GuardedPageAllocator::OutOfMemoryCallback callback) {
   static crash_reporter::CrashKeyString<24> pa_crash_key(
       kPartitionAllocCrashKey);
   gpa = new GuardedPageAllocator();
   gpa->Init(max_allocated_pages, num_metadata, total_pages, std::move(callback),
-            true, lightweight_detector_state,
-            num_lightweight_detector_metadata);
+            true);
   pa_crash_key.Set(gpa->GetCrashKey());
   sampling_state.Init(sampling_frequency);
   // TODO(vtsyrklevich): Allow SetOverrideHooks to be passed in so we can hook
   // PDFium's PartitionAlloc fork.
   partition_alloc::PartitionAllocHooks::SetOverrideHooks(
       &AllocationHook, &FreeHook, &ReallocHook);
-  if (lightweight_detector_state == LightweightDetector::State::kEnabled) {
-    partition_alloc::PartitionAllocHooks::SetQuarantineOverrideHook(
-        &QuarantineHook);
-  }
 }
 
 }  // namespace internal

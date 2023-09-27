@@ -4,6 +4,8 @@
 
 #include "third_party/blink/renderer/core/paint/paint_layer_painter.h"
 
+#include "base/debug/crash_logging.h"
+#include "base/debug/dump_without_crashing.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/blink/renderer/core/frame/local_frame.h"
 #include "third_party/blink/renderer/core/frame/local_frame_view.h"
@@ -12,6 +14,7 @@
 #include "third_party/blink/renderer/core/layout/layout_view.h"
 #include "third_party/blink/renderer/core/layout/ng/ng_fragmentation_utils.h"
 #include "third_party/blink/renderer/core/paint/clip_path_clipper.h"
+#include "third_party/blink/renderer/core/paint/fragment_data_iterator.h"
 #include "third_party/blink/renderer/core/paint/ng/ng_box_fragment_painter.h"
 #include "third_party/blink/renderer/core/paint/object_paint_properties.h"
 #include "third_party/blink/renderer/core/paint/paint_info.h"
@@ -109,8 +112,15 @@ PaintResult PaintLayerPainter::Paint(GraphicsContext& context,
   const auto& object = paint_layer_.GetLayoutObject();
   if (UNLIKELY(object.NeedsLayout() &&
                !object.ChildLayoutBlockedByDisplayLock())) {
-    // Skip if we need layout. This should never happen. See crbug.com/1244130
-    NOTREACHED();
+    // Skip if we need layout. This should never happen. See crbug.com/1423308.
+
+    // Record whether the LayoutView exists and if it needs layout.
+    LayoutView* view = object.GetFrameView()->GetLayoutView();
+    SCOPED_CRASH_KEY_BOOL("Crbug1423308", "ViewExists", !!view);
+    SCOPED_CRASH_KEY_BOOL("Crbug1423308", "ViewNeedsLayout",
+                          view && view->NeedsLayout());
+    base::debug::DumpWithoutCrashing();
+
     return kFullyPainted;
   }
 
@@ -162,7 +172,7 @@ PaintResult PaintLayerPainter::Paint(GraphicsContext& context,
       !paint_layer_.IsUnderSVGHiddenContainer() && is_self_painting_layer;
 
   PaintResult result = kFullyPainted;
-  if (object.FirstFragment().NextFragment() ||
+  if (object.IsFragmented() ||
       // When printing, the LayoutView's background should extend infinitely
       // regardless of LayoutView's visual rect, so don't check intersection
       // between the visual rect and the cull rect (custom for each page).
@@ -396,8 +406,8 @@ void PaintLayerPainter::PaintWithPhase(PaintPhase phase,
       layout_box_with_fragments ||
       CanPaintMultipleFragments(paint_layer_.GetLayoutObject());
 
-  for (const auto* fragment = &paint_layer_.GetLayoutObject().FirstFragment();
-       fragment; fragment = fragment->NextFragment(), ++fragment_idx) {
+  for (const FragmentData& fragment :
+       FragmentDataIterator(paint_layer_.GetLayoutObject())) {
     const NGPhysicalBoxFragment* physical_fragment = nullptr;
     if (layout_box_with_fragments) {
       physical_fragment =
@@ -409,11 +419,13 @@ void PaintLayerPainter::PaintWithPhase(PaintPhase phase,
     if (fragment_idx)
       scoped_display_item_fragment.emplace(context, fragment_idx);
 
-    PaintFragmentWithPhase(phase, *fragment, physical_fragment, context,
+    PaintFragmentWithPhase(phase, fragment, physical_fragment, context,
                            paint_flags);
 
     if (!multiple_fragments_allowed)
       break;
+
+    fragment_idx++;
   }
 }
 

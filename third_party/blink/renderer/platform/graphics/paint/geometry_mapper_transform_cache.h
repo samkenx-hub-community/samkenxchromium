@@ -115,8 +115,8 @@ class PLATFORM_EXPORT GeometryMapperTransformCache {
            plane_root_transform_->has_animation;
   }
 
-  bool has_sticky_or_anchor_scroll() const {
-    return has_sticky_or_anchor_scroll_;
+  bool has_sticky_or_anchor_position() const {
+    return has_sticky_or_anchor_position_;
   }
 
   bool is_backface_hidden() const { return is_backface_hidden_; }
@@ -124,6 +124,10 @@ class PLATFORM_EXPORT GeometryMapperTransformCache {
   const TransformPaintPropertyNode& nearest_scroll_translation() const {
     DCHECK(nearest_scroll_translation_);
     return *nearest_scroll_translation_;
+  }
+  const TransformPaintPropertyNode& scroll_translation_state() const {
+    DCHECK(scroll_translation_state_);
+    return *scroll_translation_state_;
   }
 
   const TransformPaintPropertyNode* nearest_directly_composited_ancestor()
@@ -221,11 +225,13 @@ class PLATFORM_EXPORT GeometryMapperTransformCache {
   absl::optional<ScreenTransform> screen_transform_;
 
   const TransformPaintPropertyNode* nearest_scroll_translation_ = nullptr;
+  const TransformPaintPropertyNode* scroll_translation_state_ = nullptr;
   const TransformPaintPropertyNode* nearest_directly_composited_ancestor_ =
       nullptr;
 
-  // Whether or not there is a sticky or anchor-scroll translation to the root.
-  bool has_sticky_or_anchor_scroll_ = false;
+  // Whether or not there is a sticky or anchor position scroll translation to
+  // the root.
+  bool has_sticky_or_anchor_position_ = false;
 
   bool is_backface_hidden_ = false;
 

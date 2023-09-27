@@ -5,11 +5,11 @@
 #include <memory>
 #include <string>
 
+#include "ash/public/cpp/ash_view_ids.h"
 #include "ash/resources/vector_icons/vector_icons.h"
 #include "ash/shell.h"
 #include "ash/style/checkbox_group.h"
 #include "ash/style/icon_button.h"
-#include "ash/style/icon_switch.h"
 #include "ash/style/radio_button_group.h"
 #include "ash/style/system_dialog_delegate_view.h"
 #include "ash/style/tab_slider.h"
@@ -17,11 +17,14 @@
 #include "ash/test/ash_test_base.h"
 #include "ash/wm/desks/desks_util.h"
 #include "base/run_loop.h"
+#include "base/strings/string_number_conversions.h"
+#include "ui/base/interaction/expect_call_in_scope.h"
 #include "ui/base/ui_base_types.h"
 #include "ui/chromeos/styles/cros_tokens_color_mappings.h"
 #include "ui/gfx/vector_icon_types.h"
 #include "ui/views/layout/fill_layout.h"
 #include "ui/views/metadata/view_factory_internal.h"
+#include "ui/views/test/widget_test.h"
 #include "ui/views/view_test_api.h"
 #include "ui/views/widget/widget.h"
 #include "ui/views/widget/widget_delegate.h"
@@ -37,6 +40,36 @@ enum class TabSliderType {
   kLabelSlider,
   kIconLabelSlider,
 };
+
+// Helpers ---------------------------------------------------------------------
+
+std::unique_ptr<views::Widget> CreateSystemDialogWidget(
+    ui::ModalType modal_type,
+    aura::Window* parent_window) {
+  // Generate a new dialog delegate view.
+  auto dialog_view = views::Builder<SystemDialogDelegateView>()
+                         .SetIcon(kTestIcon)
+                         .SetTitleText(u"Title")
+                         .SetDescription(u"Dialog description.")
+                         .Build();
+
+  dialog_view->SetModalType(modal_type);
+
+  // Create a dialog widget.
+  views::Widget::InitParams dialog_params;
+  dialog_params.type = views::Widget::InitParams::TYPE_WINDOW_FRAMELESS;
+  dialog_params.bounds = gfx::Rect(dialog_view->GetPreferredSize());
+  dialog_params.delegate = dialog_view.release();
+  dialog_params.ownership =
+      views::Widget::InitParams::WIDGET_OWNS_NATIVE_WIDGET;
+  dialog_params.parent = parent_window;
+  auto dialog_widget =
+      std::make_unique<views::Widget>(std::move(dialog_params));
+  dialog_widget->Show();
+  return dialog_widget;
+}
+
+// WidgetWithSystemUIComponentView ---------------------------------------------
 
 // A WidgetDelegateView with given component as the only content.
 class WidgetWithSystemUIComponentView : public views::WidgetDelegateView {
@@ -64,6 +97,29 @@ std::unique_ptr<views::Widget> CreateWidgetWithComponent(
 
 using SystemComponentsTest = AshTestBase;
 
+// Tests if the tooltip text of PillButton is same with the button text, unless
+// the tooltip text is explicitly set.
+TEST_F(SystemComponentsTest, PillButtonTooltip) {
+  // Create a PillButton object.
+  auto pill_button =
+      std::make_unique<PillButton>(PillButton::PressedCallback(), u"Default");
+
+  // The tooltip text should be same with initial button text.
+  EXPECT_EQ(pill_button->GetTooltipText(gfx::Point()), u"Default");
+
+  // Changing button text will also update the tooltip text.
+  pill_button->SetText(u"New Text");
+  EXPECT_EQ(pill_button->GetTooltipText(gfx::Point()), u"New Text");
+
+  // If the tooltip text is explicitly set, the tooltip text will always be use.
+  pill_button->SetTooltipText(u"Tooltip");
+  EXPECT_EQ(pill_button->GetTooltipText(gfx::Point()), u"Tooltip");
+
+  // Updating button text won't change the preset tooltip text.
+  pill_button->SetText(u"Foo");
+  EXPECT_EQ(pill_button->GetTooltipText(gfx::Point()), u"Tooltip");
+}
+
 // TODO(crbug/1384370): Disable for constant failure.
 TEST_F(SystemComponentsTest,
        DISABLED_IconButtonWithBackgroundColorIdDoesNotCrash) {
@@ -85,61 +141,6 @@ TEST_F(SystemComponentsTest,
   EXPECT_FALSE(views::ViewTestApi(icon_button_ptr).needs_paint());
 
   // No crash.
-}
-
-TEST_F(SystemComponentsTest, IconSwitch) {
-  auto icon_switch = std::make_unique<IconSwitch>();
-
-  // Add three toggle buttons.
-  auto* button_1 = icon_switch->AddButton(IconButton::PressedCallback(),
-                                          &kTestIcon, u"button 1");
-  auto* button_2 = icon_switch->AddButton(IconButton::PressedCallback(),
-                                          &kTestIcon, u"button 2");
-  auto* button_3 = icon_switch->AddButton(IconButton::PressedCallback(),
-                                          &kTestIcon, u"button 3");
-
-  auto* switch_raw_ptr = icon_switch.get();
-  auto widget = CreateWidgetWithComponent(std::move(icon_switch));
-
-  // All the buttons should be in untoggled state.
-  EXPECT_FALSE(button_1->toggled());
-  EXPECT_FALSE(button_2->toggled());
-  EXPECT_FALSE(button_3->toggled());
-
-  // Toggle the first button by using `IconButton::SetToggled`.
-  button_1->SetToggled(true);
-  // Only the first button is toggled.
-  EXPECT_TRUE(button_1->toggled());
-  EXPECT_FALSE(button_2->toggled());
-  EXPECT_FALSE(button_3->toggled());
-
-  // Toggle the second button by mouse clicking.
-  LeftClickOn(button_2);
-  // Only the second button is toggled.
-  EXPECT_FALSE(button_1->toggled());
-  EXPECT_TRUE(button_2->toggled());
-  EXPECT_FALSE(button_3->toggled());
-
-  // Toggle the third button by using `IconSwitch::Toggle`.
-  switch_raw_ptr->ToggleButtonOnAtIndex(2);
-  // Only the third button is toggled.
-  EXPECT_FALSE(button_1->toggled());
-  EXPECT_FALSE(button_2->toggled());
-  EXPECT_TRUE(button_3->toggled());
-
-  // Using `SetToggled` again on the first button will untoggle the other
-  // buttons.
-  button_1->SetToggled(true);
-  // Only the first button is toggled.
-  EXPECT_TRUE(button_1->toggled());
-  EXPECT_FALSE(button_2->toggled());
-  EXPECT_FALSE(button_3->toggled());
-
-  // Disabling icon switch makes all toggle buttons disabled.
-  switch_raw_ptr->SetEnabled(false);
-  EXPECT_FALSE(button_1->GetEnabled());
-  EXPECT_FALSE(button_2->GetEnabled());
-  EXPECT_FALSE(button_3->GetEnabled());
 }
 
 // Tests that when one button is selected in the radio button group, the others
@@ -271,13 +272,60 @@ struct DialogTestParams {
   bool parent_to_root;
 };
 
-class SystemDialogTest : public SystemComponentsTest,
-                         public testing::WithParamInterface<DialogTestParams> {
+using SystemDialogDelegateViewTest = SystemComponentsTest;
+
+TEST_F(SystemDialogDelegateViewTest, CancelCallback) {
+  std::unique_ptr<views::Widget> dialog_widget =
+      CreateSystemDialogWidget(ui::ModalType::MODAL_TYPE_NONE,
+                               /*parent_window=*/Shell::GetPrimaryRootWindow());
+  UNCALLED_MOCK_CALLBACK(base::OnceClosure, accept_callback);
+  UNCALLED_MOCK_CALLBACK(base::OnceClosure, cancel_callback);
+  UNCALLED_MOCK_CALLBACK(base::OnceClosure, close_callback);
+
+  auto* const system_dialog_delegate_view =
+      static_cast<SystemDialogDelegateView*>(dialog_widget->GetContentsView());
+  system_dialog_delegate_view->SetAcceptCallback(accept_callback.Get());
+  system_dialog_delegate_view->SetCancelCallback(cancel_callback.Get());
+  system_dialog_delegate_view->SetCloseCallback(close_callback.Get());
+
+  // Close the dialog through the cancel button. Only `cancel_callback` should
+  // be executed.
+  EXPECT_CALL_IN_SCOPE(cancel_callback, Run, {
+    auto* const cancel_button = system_dialog_delegate_view->GetViewByID(
+        ViewID::VIEW_ID_STYLE_SYSTEM_DIALOG_DELEGATE_CANCEL_BUTTON);
+    ASSERT_TRUE(cancel_button);
+    LeftClickOn(cancel_button);
+    views::test::WidgetDestroyedWaiter(system_dialog_delegate_view->GetWidget())
+        .Wait();
+  });
+}
+
+// Verifies that the close callback registered on `SystemDialogDelegateView`
+// should run when the dialog view is destroyed without clicking any buttons.
+TEST_F(SystemDialogDelegateViewTest, CloseCallback) {
+  std::unique_ptr<views::Widget> dialog_widget =
+      CreateSystemDialogWidget(ui::ModalType::MODAL_TYPE_NONE,
+                               /*parent_window=*/Shell::GetPrimaryRootWindow());
+  UNCALLED_MOCK_CALLBACK(base::OnceClosure, accept_callback);
+  UNCALLED_MOCK_CALLBACK(base::OnceClosure, cancel_callback);
+  UNCALLED_MOCK_CALLBACK(base::OnceClosure, close_callback);
+
+  auto* const system_dialog_delegate_view =
+      static_cast<SystemDialogDelegateView*>(dialog_widget->GetContentsView());
+  system_dialog_delegate_view->SetAcceptCallback(accept_callback.Get());
+  system_dialog_delegate_view->SetCancelCallback(cancel_callback.Get());
+  system_dialog_delegate_view->SetCloseCallback(close_callback.Get());
+  EXPECT_CALL_IN_SCOPE(close_callback, Run, dialog_widget.reset());
+}
+
+class SystemDialogSizeTest
+    : public SystemComponentsTest,
+      public testing::WithParamInterface<DialogTestParams> {
  public:
-  SystemDialogTest() = default;
-  SystemDialogTest(const SystemDialogTest&) = delete;
-  SystemDialogTest& operator=(const SystemDialogTest&) = delete;
-  ~SystemDialogTest() override = default;
+  SystemDialogSizeTest() = default;
+  SystemDialogSizeTest(const SystemDialogSizeTest&) = delete;
+  SystemDialogSizeTest& operator=(const SystemDialogSizeTest&) = delete;
+  ~SystemDialogSizeTest() override = default;
 
  protected:
   // Create a dialog according to the give test parameters. Resize the host
@@ -287,15 +335,6 @@ class SystemDialogTest : public SystemComponentsTest,
     // Clear existing dialog and host window instances.
     dialog_.reset();
     host_widget_.reset();
-
-    // Generate a new dialog delegate view.
-    auto dialog_view = views::Builder<SystemDialogDelegateView>()
-                           .SetIcon(kTestIcon)
-                           .SetTitleText(u"Title")
-                           .SetDescription(u"Dialog description.")
-                           .Build();
-
-    dialog_view->SetModalType(params.modal_type);
 
     // Resize the display if the dialog is parented to the root window.
     // Otherwise, create a host window with the given size.
@@ -308,18 +347,10 @@ class SystemDialogTest : public SystemComponentsTest,
                            gfx::Rect(host_size), /*show=*/true);
     }
 
-    // Create a dialog widget.
-    views::Widget::InitParams dialog_params;
-    dialog_params.type = views::Widget::InitParams::TYPE_WINDOW_FRAMELESS;
-    dialog_params.bounds = gfx::Rect(dialog_view->GetPreferredSize());
-    dialog_params.delegate = dialog_view.release();
-    dialog_params.ownership =
-        views::Widget::InitParams::WIDGET_OWNS_NATIVE_WIDGET;
-    dialog_params.parent = params.parent_to_root
-                               ? Shell::GetPrimaryRootWindow()
-                               : host_widget_->GetNativeWindow();
-    dialog_ = std::make_unique<views::Widget>(std::move(dialog_params));
-    dialog_->Show();
+    dialog_ = CreateSystemDialogWidget(params.modal_type,
+                                       params.parent_to_root
+                                           ? Shell::GetPrimaryRootWindow()
+                                           : host_widget_->GetNativeWindow());
   }
 
   // Get the dialog size.
@@ -345,11 +376,11 @@ const DialogTestParams kSystemDialogTestParams[] = {
 };
 
 INSTANTIATE_TEST_SUITE_P(SystemDialogSize,
-                         SystemDialogTest,
+                         SystemDialogSizeTest,
                          testing::ValuesIn(kSystemDialogTestParams));
 
 // Tests the dialog sizes with different sizes of host windows.
-TEST_P(SystemDialogTest, DialogResponsiveSize) {
+TEST_P(SystemDialogSizeTest, DialogResponsiveSize) {
   DialogTestParams params = GetParam();
 
   // When the width of the host window is no smaller than 672, the width of the
@@ -393,16 +424,9 @@ TEST_P(SystemDialogTest, DialogResponsiveSize) {
   EXPECT_EQ(296, GetDialogWidth());
 }
 
-struct TabSliderTestParams {
-  TabSliderType type;
-  bool distribute_space_evenly;
-  absl::optional<TabSlider::LayoutParams> custom_layout;
-  int button_num;
-  std::vector<std::u16string> labels_text;
-};
-
 class TabSliderTest : public SystemComponentsTest,
-                      public testing::WithParamInterface<TabSliderTestParams> {
+                      public testing::WithParamInterface<
+                          std::tuple<TabSliderType, bool, bool, int>> {
  public:
   TabSliderTest() = default;
   TabSliderTest(const TabSliderTest&) = delete;
@@ -410,177 +434,73 @@ class TabSliderTest : public SystemComponentsTest,
   ~TabSliderTest() override = default;
 };
 
-const TabSliderTestParams kTabSliderLayoutTestParams[] = {
-    // IconSliderButton
-    // Two buttons with evenly distributed space and recommended layout.
-    {TabSliderType::kIconSlider,
-     /*distribute_space_evenly=*/true,
-     absl::nullopt,
-     /*button_num=*/2,
-     {u"", u""}},
-    // Two buttons with unevenly distributed space and recommended layout.
-    {TabSliderType::kIconSlider,
-     /*distribute_space_evenly=*/false,
-     absl::nullopt,
-     /*button_num=*/2,
-     {u"", u""}},
-    // Three buttons with evenly distributed space and recommended layout.
-    {TabSliderType::kIconSlider,
-     /*distribute_space_evenly=*/true,
-     absl::nullopt,
-     /*button_num=*/3,
-     {u"", u"", u""}},
-    // Three buttons with unevenly distributed space and recommended layout.
-    {TabSliderType::kIconSlider,
-     /*distribute_space_evenly=*/false,
-     absl::nullopt,
-     /*button_num=*/3,
-     {u"", u"", u""}},
-    // Two buttons with evenly distributed space and customized layout.
-    {TabSliderType::kIconSlider,
-     /*distribute_space_evenly=*/true,
-     TabSlider::LayoutParams{3, 5},
-     /*button_num=*/2,
-     {u"", u""}},
-    // Two buttons with unevenly distributed space and customized layout.
-    {TabSliderType::kIconSlider,
-     /*distribute_space_evenly=*/false,
-     TabSlider::LayoutParams{3, 5},
-     /*button_num=*/2,
-     {u"", u""}},
-    // Three buttons with evenly distributed space and customized layout.
-    {TabSliderType::kIconSlider,
-     /*distribute_space_evenly=*/true,
-     TabSlider::LayoutParams{3, 5},
-     /*button_num=*/3,
-     {u"", u"", u""}},
-    // Three buttons with unevenly distributed space and customized layout.
-    {TabSliderType::kIconSlider,
-     /*distribute_space_evenly=*/false,
-     TabSlider::LayoutParams{3, 5},
-     /*button_num=*/3,
-     {u"", u"", u""}},
+const TabSliderType kTabSliderTypes[] = {TabSliderType::kIconSlider,
+                                         TabSliderType::kLabelSlider,
+                                         TabSliderType::kIconLabelSlider};
 
-    // LabelSliderButton
-    // Two buttons with evenly distributed space and recommended layout.
-    {TabSliderType::kLabelSlider,
-     /*distribute_space_evenly=*/true,
-     absl::nullopt,
-     /*button_num=*/2,
-     {u"one", u"one two three"}},
-    // Two buttons with unevenly distributed space and recommended layout.
-    {TabSliderType::kLabelSlider,
-     /*distribute_space_evenly=*/false,
-     absl::nullopt,
-     /*button_num=*/2,
-     {u"one", u"one two three"}},
-    // Three buttons with evenly distributed space and recommended layout.
-    {TabSliderType::kLabelSlider,
-     /*distribute_space_evenly=*/true,
-     absl::nullopt,
-     /*button_num=*/3,
-     {u"one", u"one two three", u"one two three four five"}},
-    // Three buttons with unevenly distributed space and recommended layout.
-    {TabSliderType::kLabelSlider,
-     /*distribute_space_evenly=*/false,
-     absl::nullopt,
-     /*button_num=*/3,
-     {u"one", u"one two three", u"one two three four five"}},
-    // Two buttons with evenly distributed space and customized layout.
-    {TabSliderType::kLabelSlider,
-     /*distribute_space_evenly=*/true,
-     TabSlider::LayoutParams{3, 5},
-     /*button_num=*/2,
-     {u"one", u"one two three"}},
-    // Two buttons with unevenly distributed space and customized layout.
-    {TabSliderType::kLabelSlider,
-     /*distribute_space_evenly=*/false,
-     TabSlider::LayoutParams{3, 5},
-     /*button_num=*/2,
-     {u"one", u"one two three"}},
-    // Three buttons with evenly distributed space and customized layout.
-    {TabSliderType::kLabelSlider,
-     /*distribute_space_evenly=*/true,
-     TabSlider::LayoutParams{3, 5},
-     /*button_num=*/3,
-     {u"one", u"one two three", u"one two three four five"}},
-    // Three buttons with unevenly distributed space and customized layout.
-    {TabSliderType::kLabelSlider,
-     /*distribute_space_evenly=*/false,
-     TabSlider::LayoutParams{3, 5},
-     /*button_num=*/3,
-     {u"one", u"one two three", u"one two three four five"}},
+INSTANTIATE_TEST_SUITE_P(
+    TabSliderStyle,
+    TabSliderTest,
+    testing::Combine(
+        /*tab slider types*/ testing::ValuesIn(kTabSliderTypes),
+        /*distribute space evenly*/ testing::Bool(),
+        /*use default layout*/ testing::Bool(),
+        /*number of tabs*/ testing::Values(2, 3)),
+    [](const testing::TestParamInfo<TabSliderTest::ParamType>& info) {
+      std::string test_name;
 
-    // IconLabelSliderButton
-    // Two buttons with evenly distributed space and recommended layout.
-    {TabSliderType::kIconLabelSlider,
-     /*distribute_space_evenly=*/true,
-     absl::nullopt,
-     /*button_num=*/2,
-     {u"one", u"one two three"}},
-    // Two buttons with unevenly distributed space and recommended layout.
-    {TabSliderType::kIconLabelSlider,
-     /*distribute_space_evenly=*/false,
-     absl::nullopt,
-     /*button_num=*/2,
-     {u"one", u"one two three"}},
-    // Three buttons with evenly distributed space and recommended layout.
-    {TabSliderType::kIconLabelSlider,
-     /*distribute_space_evenly=*/true,
-     absl::nullopt,
-     /*button_num=*/3,
-     {u"one", u"one two three", u"one two three four five"}},
-    // Three buttons with unevenly distributed space and recommended layout.
-    {TabSliderType::kIconLabelSlider,
-     /*distribute_space_evenly=*/false,
-     absl::nullopt,
-     /*button_num=*/3,
-     {u"one", u"one two three", u"one two three four five"}},
-    // Two buttons with evenly distributed space and customized layout.
-    {TabSliderType::kIconLabelSlider,
-     /*distribute_space_evenly=*/true,
-     TabSlider::LayoutParams{3, 5},
-     /*button_num=*/2,
-     {u"one", u"one two three"}},
-    // Two buttons with unevenly distributed space and customized layout.
-    {TabSliderType::kIconLabelSlider,
-     /*distribute_space_evenly=*/false,
-     TabSlider::LayoutParams{3, 5},
-     /*button_num=*/2,
-     {u"one", u"one two three"}},
-    // Three buttons with evenly distributed space and customized layout.
-    {TabSliderType::kIconLabelSlider,
-     /*distribute_space_evenly=*/true,
-     TabSlider::LayoutParams{3, 5},
-     /*button_num=*/3,
-     {u"one", u"one two three", u"one two three four five"}},
-    // Three buttons with unevenly distributed space and customized layout.
-    {TabSliderType::kIconLabelSlider,
-     /*distribute_space_evenly=*/false,
-     TabSlider::LayoutParams{3, 5},
-     /*button_num=*/3,
-     {u"one", u"one two three", u"one two three four five"}},
-};
+      const TabSliderType type = std::get<0>(info.param);
+      switch (type) {
+        case TabSliderType::kIconSlider:
+          test_name = "IconSlider";
+          break;
+        case TabSliderType::kLabelSlider:
+          test_name = "LabelSlider";
+          break;
+        case TabSliderType::kIconLabelSlider:
+          test_name = "IconLabelSlider";
+          break;
+      }
 
-INSTANTIATE_TEST_SUITE_P(TabSliderStyle,
-                         TabSliderTest,
-                         testing::ValuesIn(kTabSliderLayoutTestParams));
+      test_name +=
+          std::get<1>(info.param) ? "EvenlyDistributed" : "UnevenlyDistributed";
+      test_name += std::get<2>(info.param) ? "DefaultLayout" : "CustomLayout";
+      test_name += base::NumberToString(std::get<3>(info.param)) + "Buttons";
+      return test_name;
+    });
 
 // Tests tab slider layout works properly with different layout settings.
 TEST_P(TabSliderTest, TabSliderLayout) {
-  TabSliderTestParams params = GetParam();
+  auto test_params = GetParam();
+  const TabSliderType type = std::get<0>(test_params);
+  const bool distribute_space_evenly = std::get<1>(test_params);
+  const bool use_default_layout = std::get<2>(test_params);
+  const int tab_num = std::get<3>(test_params);
+
+  TabSlider::InitParams params = (type == TabSliderType::kIconLabelSlider)
+                                     ? IconLabelSliderButton::kSliderParams
+                                     : TabSlider::kDefaultParams;
+
+  params.distribute_space_evenly = distribute_space_evenly;
+
+  if (!use_default_layout) {
+    params.internal_border_padding = 3;
+    params.between_buttons_spacing = 5;
+  }
 
   // Create a tab slider.
   auto tab_slider =
-      std::make_unique<TabSlider>(true, true, params.distribute_space_evenly);
+      std::make_unique<TabSlider>(/*max_tab_num=*/tab_num, params);
 
+  // The texts for tabs.
+  const std::u16string labels_text[] = {u"one", u"one two three",
+                                        u"one two three four five"};
   // Add slider buttons according to the testing parameters.
-  TabSlider::LayoutParams layout_params;
+  std::vector<TabSliderButton*> buttons(tab_num, nullptr);
   int max_button_width = 0;
   int max_button_height = 0;
-  std::vector<TabSliderButton*> buttons(params.button_num, nullptr);
-  for (int i = 0; i < params.button_num; i++) {
-    switch (params.type) {
+  for (int i = 0; i < tab_num; i++) {
+    switch (type) {
       case TabSliderType::kIconSlider:
         buttons[i] = tab_slider->AddButton<IconSliderButton>(
             IconSliderButton::PressedCallback(), &kTestIcon,
@@ -588,19 +508,14 @@ TEST_P(TabSliderTest, TabSliderLayout) {
         break;
       case TabSliderType::kLabelSlider:
         buttons[i] = tab_slider->AddButton<LabelSliderButton>(
-            LabelSliderButton::PressedCallback(), params.labels_text[i],
+            LabelSliderButton::PressedCallback(), labels_text[i],
             u"label slider button");
         break;
       case TabSliderType::kIconLabelSlider:
         buttons[i] = tab_slider->AddButton<IconLabelSliderButton>(
             IconLabelSliderButton::PressedCallback(), &kTestIcon,
-            params.labels_text[i], u"icon label slider button");
+            labels_text[i], u"icon label slider button");
         break;
-    }
-
-    // Cache the recommended layout provided by the slider button.
-    if (auto recommended_layout = buttons[i]->GetRecommendedSliderLayout()) {
-      layout_params = *recommended_layout;
     }
 
     // Cache the maximum size of the button.
@@ -609,18 +524,12 @@ TEST_P(TabSliderTest, TabSliderLayout) {
     max_button_height = std::max(max_button_height, pref_size.height());
   }
 
-  // If using customized layout, overwrite the current layout.
-  if (params.custom_layout) {
-    tab_slider->SetCustomLayout(*params.custom_layout);
-    layout_params = *params.custom_layout;
-  }
-
   // Attach the tab slider to a widget.
   auto widget = CreateWidgetWithComponent(std::move(tab_slider));
-  int x = layout_params.internal_border_padding;
-  const int y = layout_params.internal_border_padding;
+  int x = params.internal_border_padding;
+  const int y = params.internal_border_padding;
   // Check if the layout works properly.
-  for (int i = 0; i < params.button_num; i++) {
+  for (int i = 0; i < tab_num; i++) {
     const gfx::Size pref_size = buttons[i]->GetPreferredSize();
     const int expect_width =
         params.distribute_space_evenly ? max_button_width : pref_size.width();
@@ -628,7 +537,7 @@ TEST_P(TabSliderTest, TabSliderLayout) {
         params.distribute_space_evenly ? max_button_height : pref_size.height();
     EXPECT_EQ(buttons[i]->bounds(),
               gfx::Rect(x, y, expect_width, expect_height));
-    x += expect_width + layout_params.between_buttons_spacing;
+    x += expect_width + params.between_buttons_spacing;
   }
 }
 

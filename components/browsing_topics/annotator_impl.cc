@@ -15,6 +15,8 @@
 #include "components/optimization_guide/proto/models.pb.h"
 #include "components/optimization_guide/proto/page_topics_model_metadata.pb.h"
 #include "components/optimization_guide/proto/page_topics_override_list.pb.h"
+#include "third_party/abseil-cpp/absl/strings/ascii.h"
+#include "third_party/blink/public/common/features.h"
 #include "third_party/zlib/google/compression_utils.h"
 
 namespace browsing_topics {
@@ -113,7 +115,7 @@ int MeaninglessPrefixLength(const std::string& host) {
       if (host[i] == '.') {
         return i + 1;
       }
-      if (!isdigit(host[i])) {
+      if (!absl::ascii_isdigit(static_cast<unsigned char>(host[i]))) {
         return 0;
       }
     }
@@ -131,6 +133,17 @@ int MeaninglessPrefixLength(const std::string& host) {
   return 0;
 }
 
+bool IsModelTaxonomyVersionSupported(int model_taxonomy_version) {
+  // Taxonomy version 1 is a special case, where the server would send nothing
+  // (i.e. use 0) for the taxonomy version.
+  if (blink::features::kBrowsingTopicsTaxonomyVersion.Get() == 1) {
+    return model_taxonomy_version == 0;
+  }
+
+  return model_taxonomy_version ==
+         blink::features::kBrowsingTopicsTaxonomyVersion.Get();
+}
+
 }  // namespace
 
 AnnotatorImpl::AnnotatorImpl(
@@ -143,7 +156,7 @@ AnnotatorImpl::AnnotatorImpl(
           optimization_guide::proto::OPTIMIZATION_TARGET_PAGE_TOPICS_V2,
           model_metadata),
       background_task_runner_(background_task_runner) {
-  // Handled manually at the end of every batch.
+  // Unloading the model is done via custom logic in this class.
   SetShouldUnloadModelOnComplete(false);
 }
 AnnotatorImpl::~AnnotatorImpl() = default;
@@ -154,6 +167,9 @@ void AnnotatorImpl::NotifyWhenModelAvailable(base::OnceClosure callback) {
 
 absl::optional<optimization_guide::ModelInfo>
 AnnotatorImpl::GetBrowsingTopicsModelInfo() const {
+  if (!is_valid_model_) {
+    return absl::nullopt;
+  }
   return GetModelInfo();
 }
 
@@ -379,13 +395,11 @@ AnnotatorImpl::ExtractCategoriesFromModelOutput(
 
   // Prune out categories that do not meet the minimum threshold.
   if (category_params.min_category_weight() > 0) {
-    categories.erase(
-        std::remove_if(categories.begin(), categories.end(),
+    base::EraseIf(categories,
                        [&](const std::pair<int32_t, float>& category) {
                          return category.second <
                                 category_params.min_category_weight();
-                       }),
-        categories.end());
+                       });
   }
 
   // Prune out none weights.
@@ -441,28 +455,42 @@ void AnnotatorImpl::UnloadModel() {
 
 void AnnotatorImpl::OnModelUpdated(
     optimization_guide::proto::OptimizationTarget optimization_target,
-    const optimization_guide::ModelInfo& model_info) {
+    base::optional_ref<const optimization_guide::ModelInfo> model_info) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  // First invoke parent to update internal status.
+  optimization_guide::BertModelHandler::OnModelUpdated(optimization_target,
+                                                       model_info);
+  is_valid_model_ = false;
+
   if (optimization_target !=
       optimization_guide::proto::OPTIMIZATION_TARGET_PAGE_TOPICS_V2) {
     return;
   }
 
-  optimization_guide::BertModelHandler::OnModelUpdated(optimization_target,
-                                                       model_info);
+  if (!model_info.has_value() || !model_info->GetModelMetadata()) {
+    return;
+  }
+
+  absl::optional<optimization_guide::proto::PageTopicsModelMetadata>
+      model_metadata = optimization_guide::ParsedAnyMetadata<
+          optimization_guide::proto::PageTopicsModelMetadata>(
+          *model_info->GetModelMetadata());
+
+  if (!model_metadata ||
+      !IsModelTaxonomyVersionSupported(model_metadata->taxonomy_version())) {
+    return;
+  }
 
   // New model, new override list.
+  is_valid_model_ = true;
   override_list_file_path_ = absl::nullopt;
   override_list_ = absl::nullopt;
 
-  absl::optional<optimization_guide::proto::PageTopicsModelMetadata>
-      model_metadata = ParsedSupportedFeaturesForLoadedModel<
-          optimization_guide::proto::PageTopicsModelMetadata>();
   if (model_metadata) {
     version_ = model_metadata->version();
   }
 
-  for (const base::FilePath& path : model_info.GetAdditionalFiles()) {
+  for (const base::FilePath& path : model_info->GetAdditionalFiles()) {
     DCHECK(path.IsAbsolute());
     if (path.BaseName() == base::FilePath(kOverrideListBasePath)) {
       override_list_file_path_ = path;

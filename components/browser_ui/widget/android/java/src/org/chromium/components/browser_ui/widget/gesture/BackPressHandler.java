@@ -4,7 +4,9 @@
 
 package org.chromium.components.browser_ui.widget.gesture;
 
+import androidx.activity.BackEventCompat;
 import androidx.annotation.IntDef;
+import androidx.annotation.NonNull;
 
 import org.chromium.base.supplier.ObservableSupplier;
 import org.chromium.base.supplier.ObservableSupplierImpl;
@@ -37,9 +39,10 @@ public interface BackPressHandler {
         int BOTTOM_SHEET = 4;
         int START_SURFACE = 5;
         int TAB_SWITCHER = 6;
-        int SELECTION_POPUP = 7;
-        int MANUAL_FILLING = 8;
-        int FULLSCREEN = 9;
+        // Fullscreen must be before selection popup. crbug.com/1454817.
+        int FULLSCREEN = 7;
+        int SELECTION_POPUP = 8;
+        int MANUAL_FILLING = 9;
         int LOCATION_BAR = 10;
         int TAB_MODAL_HANDLER = 11;
         int CLOSE_WATCHER = 12;
@@ -98,4 +101,22 @@ public interface BackPressHandler {
     default ObservableSupplier<Boolean> getHandleBackPressChangedSupplier() {
         return new ObservableSupplierImpl<>();
     }
+
+    /**
+     * API 34+ only. Triggered when a back press press is cancelled. In this case,
+     * {@link #handleBackPress()} must not be triggered any more.
+     */
+    default void handleOnBackCancelled() {}
+
+    /**
+     * API 34+ only. Triggered after a back press is started
+     * ({@link #handleOnBackStarted(BackEventCompat)}) and before a back press is released
+     * (either {@link #handleBackPress()} or {@link #handleOnBackCancelled()})
+     */
+    default void handleOnBackProgressed(@NonNull BackEventCompat backEvent) {}
+
+    /**
+     * API 34+ only. Triggered when a back press event is initialized.
+     */
+    default void handleOnBackStarted(@NonNull BackEventCompat backEvent) {}
 }

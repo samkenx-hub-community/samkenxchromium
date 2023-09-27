@@ -45,6 +45,7 @@ VULKAN_INSTANCE_FUNCTIONS = [
       'vkEnumerateDeviceLayerProperties',
       'vkEnumeratePhysicalDevices',
       'vkGetDeviceProcAddr',
+      'vkGetPhysicalDeviceExternalSemaphoreProperties',
       'vkGetPhysicalDeviceFeatures2',
       'vkGetPhysicalDeviceFormatProperties',
       'vkGetPhysicalDeviceFormatProperties2',
@@ -123,13 +124,20 @@ VULKAN_DEVICE_FUNCTIONS = [
       'vkBindImageMemory',
       'vkBindImageMemory2',
       'vkCmdBeginRenderPass',
+      'vkCmdBindDescriptorSets',
+      'vkCmdBindPipeline',
+      'vkCmdBindVertexBuffers',
       'vkCmdCopyBuffer',
       'vkCmdCopyBufferToImage',
       'vkCmdCopyImageToBuffer',
+      'vkCmdDraw',
       'vkCmdEndRenderPass',
       'vkCmdExecuteCommands',
       'vkCmdNextSubpass',
       'vkCmdPipelineBarrier',
+      'vkCmdPushConstants',
+      'vkCmdSetScissor',
+      'vkCmdSetViewport',
       'vkCreateBuffer',
       'vkCreateCommandPool',
       'vkCreateDescriptorPool',
@@ -139,6 +147,7 @@ VULKAN_DEVICE_FUNCTIONS = [
       'vkCreateGraphicsPipelines',
       'vkCreateImage',
       'vkCreateImageView',
+      'vkCreatePipelineLayout',
       'vkCreateRenderPass',
       'vkCreateSampler',
       'vkCreateSemaphore',
@@ -152,6 +161,8 @@ VULKAN_DEVICE_FUNCTIONS = [
       'vkDestroyFramebuffer',
       'vkDestroyImage',
       'vkDestroyImageView',
+      'vkDestroyPipeline',
+      'vkDestroyPipelineLayout',
       'vkDestroyRenderPass',
       'vkDestroySampler',
       'vkDestroySemaphore',
@@ -367,9 +378,14 @@ def WriteMacros(out_file, functions):
 
     callstat = ''
     if func in ('vkQueueSubmit', 'vkQueueWaitIdle', 'vkQueuePresentKHR'):
-        callstat = '''base::AutoLockMaybe auto_lock
-        (gpu::GetVulkanFunctionPointers()->per_queue_lock_map[queue].get());
-        \n'''
+        callstat = 'base::Lock* lock = nullptr;\n'
+        callstat += '''auto it = gpu::GetVulkanFunctionPointers()->
+        per_queue_lock_map.find(queue);\n'''
+        callstat += '''if (it != gpu::GetVulkanFunctionPointers()->
+        per_queue_lock_map.end()) {\n'''
+        callstat += '\tlock = it->second.get();\n'
+        callstat += '}\n'
+        callstat += 'base::AutoLockMaybe auto_lock(lock);\n'
 
     callstat += 'return gpu::GetVulkanFunctionPointers()->%s(' % func
     paramdecl = '('
@@ -485,6 +501,8 @@ struct COMPONENT_EXPORT(VULKAN) VulkanFunctionPointers {
     }
 
     Fn get() const { return fn_; }
+
+    void OverrideForTesting(Fn fn) { fn_ = fn; }
 
    private:
     friend VulkanFunctionPointers;

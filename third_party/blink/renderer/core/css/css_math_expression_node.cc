@@ -39,13 +39,13 @@
 #include "third_party/blink/renderer/core/css/css_math_operator.h"
 #include "third_party/blink/renderer/core/css/css_numeric_literal_value.h"
 #include "third_party/blink/renderer/core/css/css_primitive_value.h"
-#include "third_party/blink/renderer/core/css/css_primitive_value_mappings.h"
 #include "third_party/blink/renderer/core/css/css_value_clamping_utils.h"
 #include "third_party/blink/renderer/core/css/parser/css_parser_context.h"
 #include "third_party/blink/renderer/core/css/properties/css_parsing_utils.h"
 #include "third_party/blink/renderer/core/css/resolver/style_resolver.h"
 #include "third_party/blink/renderer/core/css_value_keywords.h"
 #include "third_party/blink/renderer/core/frame/web_feature.h"
+#include "third_party/blink/renderer/core/style/anchor_specifier_value.h"
 #include "third_party/blink/renderer/platform/geometry/calculation_expression_node.h"
 #include "third_party/blink/renderer/platform/geometry/math_functions.h"
 #include "third_party/blink/renderer/platform/runtime_enabled_features.h"
@@ -54,7 +54,8 @@
 
 namespace blink {
 
-static CalculationCategory UnitCategory(CSSPrimitiveValue::UnitType type) {
+static CalculationResultCategory UnitCategory(
+    CSSPrimitiveValue::UnitType type) {
   switch (type) {
     case CSSPrimitiveValue::UnitType::kNumber:
     case CSSPrimitiveValue::UnitType::kInteger:
@@ -84,6 +85,10 @@ static CalculationCategory UnitCategory(CSSPrimitiveValue::UnitType type) {
     case CSSPrimitiveValue::UnitType::kIcs:
     case CSSPrimitiveValue::UnitType::kLhs:
       return kCalcLength;
+    case CSSPrimitiveValue::UnitType::kCaps:
+    case CSSPrimitiveValue::UnitType::kRcaps:
+      return RuntimeEnabledFeatures::CSSCapFontUnitsEnabled() ? kCalcLength
+                                                              : kCalcOther;
     case CSSPrimitiveValue::UnitType::kViewportInlineSize:
     case CSSPrimitiveValue::UnitType::kViewportBlockSize:
     case CSSPrimitiveValue::UnitType::kSmallViewportWidth:
@@ -137,6 +142,11 @@ static CalculationCategory UnitCategory(CSSPrimitiveValue::UnitType type) {
   }
 }
 
+static bool CanTypeBeSimplifiedWithConversionData(
+    CSSPrimitiveValue::UnitType type) {
+  return type != CSSPrimitiveValue::UnitType::kPercentage;
+}
+
 static bool HasDoubleValue(CSSPrimitiveValue::UnitType type) {
   switch (type) {
     case CSSPrimitiveValue::UnitType::kNumber:
@@ -146,6 +156,8 @@ static bool HasDoubleValue(CSSPrimitiveValue::UnitType type) {
     case CSSPrimitiveValue::UnitType::kChs:
     case CSSPrimitiveValue::UnitType::kIcs:
     case CSSPrimitiveValue::UnitType::kLhs:
+    case CSSPrimitiveValue::UnitType::kCaps:
+    case CSSPrimitiveValue::UnitType::kRcaps:
     case CSSPrimitiveValue::UnitType::kRlhs:
     case CSSPrimitiveValue::UnitType::kRems:
     case CSSPrimitiveValue::UnitType::kRexs:
@@ -181,7 +193,7 @@ static bool HasDoubleValue(CSSPrimitiveValue::UnitType type) {
     case CSSPrimitiveValue::UnitType::kX:
     case CSSPrimitiveValue::UnitType::kDotsPerInch:
     case CSSPrimitiveValue::UnitType::kDotsPerCentimeter:
-    case CSSPrimitiveValue::UnitType::kFraction:
+    case CSSPrimitiveValue::UnitType::kFlex:
     case CSSPrimitiveValue::UnitType::kInteger:
       return true;
     default:
@@ -222,21 +234,33 @@ absl::optional<PixelsAndPercent> EvaluateValueIfNaNorInfinity(
   return absl::nullopt;
 }
 
-bool CanEagerlySimplify(CalculationCategory calc_cat) {
+bool CanEagerlySimplify(const CSSMathExpressionNode* operand) {
   // Eager Simplification can be expanded to more cases like lengths with
   // absolute units.
   // TODO(crbug.com/1050968)
+  if (operand->IsOperation()) {
+    return false;
+  }
 
-  switch (calc_cat) {
-    case CalculationCategory::kCalcNumber:
-    case CalculationCategory::kCalcAngle:
-    case CalculationCategory::kCalcTime:
-    case CalculationCategory::kCalcFrequency:
-    case CalculationCategory::kCalcResolution:
+  switch (operand->Category()) {
+    case CalculationResultCategory::kCalcNumber:
+    case CalculationResultCategory::kCalcAngle:
+    case CalculationResultCategory::kCalcTime:
+    case CalculationResultCategory::kCalcFrequency:
+    case CalculationResultCategory::kCalcResolution:
       return true;
     default:
       return false;
   }
+}
+
+bool CanEagerlySimplify(const CSSMathExpressionOperation::Operands& operands) {
+  for (const CSSMathExpressionNode* operand : operands) {
+    if (!CanEagerlySimplify(operand)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 }  // namespace
@@ -259,11 +283,13 @@ CSSMathExpressionNumericLiteral* CSSMathExpressionNumericLiteral::Create(
 
 CSSMathExpressionNumericLiteral::CSSMathExpressionNumericLiteral(
     const CSSNumericLiteralValue* value)
-    : CSSMathExpressionNode(UnitCategory(value->GetType()),
-                            false /* has_comparisons*/,
-                            false /* needs_tree_scope_population*/),
+    : CSSMathExpressionNode(
+          UnitCategory(value->GetType()),
+          CanTypeBeSimplifiedWithConversionData(value->GetType()),
+          false /* has_comparisons*/,
+          false /* needs_tree_scope_population*/),
       value_(value) {
-  if (!value_->IsNumber() && CanEagerlySimplify(Category())) {
+  if (!value_->IsNumber() && CanEagerlySimplify(this)) {
     // "If root is a dimension that is not expressed in its canonical unit, and
     // there is enough information available to convert it to the canonical
     // unit, do so, and return the value."
@@ -334,7 +360,7 @@ CSSMathExpressionNumericLiteral::ComputeValueInCanonicalUnit() const {
       if (CSSPrimitiveValue::IsRelativeUnit(value_->GetType())) {
         return absl::nullopt;
       }
-      U_FALLTHROUGH;
+      [[fallthrough]];
     case kCalcAngle:
     case kCalcTime:
     case kCalcFrequency:
@@ -345,6 +371,31 @@ CSSMathExpressionNumericLiteral::ComputeValueInCanonicalUnit() const {
     default:
       return absl::nullopt;
   }
+}
+
+double CSSMathExpressionNumericLiteral::ComputeDouble(
+    const CSSLengthResolver& length_resolver) const {
+  switch (category_) {
+    case kCalcLength:
+      return value_->ComputeLengthPx(length_resolver);
+    case kCalcNumber:
+      return value_->DoubleValue();
+    case kCalcAngle:
+      return value_->ComputeDegrees();
+    case kCalcTime:
+      return value_->ComputeSeconds();
+    case kCalcResolution:
+      return value_->ComputeDotsPerPixel();
+    case kCalcFrequency:
+      return value_->ComputeInCanonicalUnit();
+    case kCalcPercentLength:
+    case kCalcPercent:
+    case kCalcOther:
+      NOTREACHED();
+      break;
+  }
+  NOTREACHED();
+  return 0;
 }
 
 double CSSMathExpressionNumericLiteral::ComputeLengthPx(
@@ -411,37 +462,38 @@ bool CSSMathExpressionNumericLiteral::InvolvesPercentageComparisons() const {
 
 // ------ End of CSSMathExpressionNumericLiteral member functions
 
-static const CalculationCategory kAddSubtractResult[kCalcOther][kCalcOther] = {
-    /* CalcNumber */ {kCalcNumber, kCalcOther, kCalcOther, kCalcOther,
-                      kCalcOther, kCalcOther, kCalcOther, kCalcOther},
-    /* CalcLength */
-    {kCalcOther, kCalcLength, kCalcPercentLength, kCalcPercentLength,
-     kCalcOther, kCalcOther, kCalcOther, kCalcOther},
-    /* CalcPercent */
-    {kCalcOther, kCalcPercentLength, kCalcPercent, kCalcPercentLength,
-     kCalcOther, kCalcOther, kCalcOther, kCalcOther},
-    /* CalcPercentLength */
-    {kCalcOther, kCalcPercentLength, kCalcPercentLength, kCalcPercentLength,
-     kCalcOther, kCalcOther, kCalcOther, kCalcOther},
-    /* CalcAngle  */
-    {kCalcOther, kCalcOther, kCalcOther, kCalcOther, kCalcAngle, kCalcOther,
-     kCalcOther, kCalcOther},
-    /* CalcTime */
-    {kCalcOther, kCalcOther, kCalcOther, kCalcOther, kCalcOther, kCalcTime,
-     kCalcOther, kCalcOther},
-    /* CalcFrequency */
-    {kCalcOther, kCalcOther, kCalcOther, kCalcOther, kCalcOther, kCalcOther,
-     kCalcFrequency, kCalcOther},
-    /* CalcResolution */
-    {kCalcOther, kCalcOther, kCalcOther, kCalcOther, kCalcOther, kCalcOther,
-     kCalcOther, kCalcResolution}};
+static const CalculationResultCategory
+    kAddSubtractResult[kCalcOther][kCalcOther] = {
+        /* CalcNumber */ {kCalcNumber, kCalcOther, kCalcOther, kCalcOther,
+                          kCalcOther, kCalcOther, kCalcOther, kCalcOther},
+        /* CalcLength */
+        {kCalcOther, kCalcLength, kCalcPercentLength, kCalcPercentLength,
+         kCalcOther, kCalcOther, kCalcOther, kCalcOther},
+        /* CalcPercent */
+        {kCalcOther, kCalcPercentLength, kCalcPercent, kCalcPercentLength,
+         kCalcOther, kCalcOther, kCalcOther, kCalcOther},
+        /* CalcPercentLength */
+        {kCalcOther, kCalcPercentLength, kCalcPercentLength, kCalcPercentLength,
+         kCalcOther, kCalcOther, kCalcOther, kCalcOther},
+        /* CalcAngle  */
+        {kCalcOther, kCalcOther, kCalcOther, kCalcOther, kCalcAngle, kCalcOther,
+         kCalcOther, kCalcOther},
+        /* CalcTime */
+        {kCalcOther, kCalcOther, kCalcOther, kCalcOther, kCalcOther, kCalcTime,
+         kCalcOther, kCalcOther},
+        /* CalcFrequency */
+        {kCalcOther, kCalcOther, kCalcOther, kCalcOther, kCalcOther, kCalcOther,
+         kCalcFrequency, kCalcOther},
+        /* CalcResolution */
+        {kCalcOther, kCalcOther, kCalcOther, kCalcOther, kCalcOther, kCalcOther,
+         kCalcOther, kCalcResolution}};
 
-static CalculationCategory DetermineCategory(
+static CalculationResultCategory DetermineCategory(
     const CSSMathExpressionNode& left_side,
     const CSSMathExpressionNode& right_side,
     CSSMathOperator op) {
-  CalculationCategory left_category = left_side.Category();
-  CalculationCategory right_category = right_side.Category();
+  CalculationResultCategory left_category = left_side.Category();
+  CalculationResultCategory right_category = right_side.Category();
 
   if (left_category == kCalcOther || right_category == kCalcOther) {
     return kCalcOther;
@@ -469,12 +521,12 @@ static CalculationCategory DetermineCategory(
   return kCalcOther;
 }
 
-static CalculationCategory DetermineComparisonCategory(
+static CalculationResultCategory DetermineComparisonCategory(
     const CSSMathExpressionOperation::Operands& operands) {
   DCHECK(!operands.empty());
 
   bool is_first = true;
-  CalculationCategory category = kCalcOther;
+  CalculationResultCategory category = kCalcOther;
   for (const CSSMathExpressionNode* operand : operands) {
     if (is_first) {
       category = operand->Category();
@@ -491,6 +543,20 @@ static CalculationCategory DetermineComparisonCategory(
   return category;
 }
 
+static bool DetermineCanBeSimplifiedWithConversionData(
+    const CSSMathExpressionOperation::Operands& operands) {
+  DCHECK(!operands.empty());
+
+  bool can_be_resolved_with_conversion_data = true;
+  for (const CSSMathExpressionNode* operand : operands) {
+    can_be_resolved_with_conversion_data =
+        can_be_resolved_with_conversion_data &&
+        operand->CanBeResolvedWithConversionData();
+  }
+
+  return can_be_resolved_with_conversion_data;
+}
+
 // ------ Start of CSSMathExpressionOperation member functions ------
 
 // static
@@ -501,14 +567,18 @@ CSSMathExpressionNode* CSSMathExpressionOperation::CreateArithmeticOperation(
   DCHECK_NE(left_side->Category(), kCalcOther);
   DCHECK_NE(right_side->Category(), kCalcOther);
 
-  CalculationCategory new_category =
+  CalculationResultCategory new_category =
       DetermineCategory(*left_side, *right_side, op);
   if (new_category == kCalcOther) {
     return nullptr;
   }
 
-  return MakeGarbageCollected<CSSMathExpressionOperation>(left_side, right_side,
-                                                          op, new_category);
+  const bool can_be_resolved_with_conversion_data =
+      left_side->CanBeResolvedWithConversionData() &&
+      right_side->CanBeResolvedWithConversionData();
+  return MakeGarbageCollected<CSSMathExpressionOperation>(
+      left_side, right_side, op, new_category,
+      can_be_resolved_with_conversion_data);
 }
 
 // static
@@ -518,13 +588,15 @@ CSSMathExpressionNode* CSSMathExpressionOperation::CreateComparisonFunction(
   DCHECK(op == CSSMathOperator::kMin || op == CSSMathOperator::kMax ||
          op == CSSMathOperator::kClamp);
 
-  CalculationCategory category = DetermineComparisonCategory(operands);
+  CalculationResultCategory category = DetermineComparisonCategory(operands);
   if (category == kCalcOther) {
     return nullptr;
   }
 
+  const bool can_be_resolved_with_conversion_data =
+      DetermineCanBeSimplifiedWithConversionData(operands);
   return MakeGarbageCollected<CSSMathExpressionOperation>(
-      category, std::move(operands), op);
+      category, can_be_resolved_with_conversion_data, std::move(operands), op);
 }
 
 // static
@@ -535,12 +607,12 @@ CSSMathExpressionOperation::CreateComparisonFunctionSimplified(
   DCHECK(op == CSSMathOperator::kMin || op == CSSMathOperator::kMax ||
          op == CSSMathOperator::kClamp);
 
-  CalculationCategory category = DetermineComparisonCategory(operands);
+  CalculationResultCategory category = DetermineComparisonCategory(operands);
   if (category == kCalcOther) {
     return nullptr;
   }
 
-  if (CanEagerlySimplify(category)) {
+  if (CanEagerlySimplify(operands)) {
     Vector<double> canonical_values;
     canonical_values.reserve(operands.size());
     for (const CSSMathExpressionNode* operand : operands) {
@@ -559,8 +631,10 @@ CSSMathExpressionOperation::CreateComparisonFunctionSimplified(
         EvaluateOperator(canonical_values, op), canonical_unit);
   }
 
+  const bool can_be_resolved_with_conversion_data =
+      DetermineCanBeSimplifiedWithConversionData(operands);
   return MakeGarbageCollected<CSSMathExpressionOperation>(
-      category, std::move(operands), op);
+      category, can_be_resolved_with_conversion_data, std::move(operands), op);
 }
 
 // Helper function for parsing number value
@@ -572,7 +646,8 @@ static double ValueAsNumber(const CSSMathExpressionNode* node, bool& error) {
   return 0;
 }
 
-static bool SupportedCategoryForAtan2(const CalculationCategory category) {
+static bool SupportedCategoryForAtan2(
+    const CalculationResultCategory category) {
   switch (category) {
     case kCalcNumber:
     case kCalcLength:
@@ -594,7 +669,7 @@ static bool IsRelativeLength(CSSPrimitiveValue::UnitType type) {
 static double ResolveAtan2(const CSSMathExpressionNode* y_node,
                            const CSSMathExpressionNode* x_node,
                            bool& error) {
-  const CalculationCategory category = y_node->Category();
+  const CalculationResultCategory category = y_node->Category();
   if (category != x_node->Category() || !SupportedCategoryForAtan2(category)) {
     error = true;
     return 0;
@@ -626,10 +701,6 @@ CSSMathExpressionNode*
 CSSMathExpressionOperation::CreateTrigonometricFunctionSimplified(
     Operands&& operands,
     CSSValueID function_id) {
-  if (!RuntimeEnabledFeatures::CSSTrigonometricFunctionsEnabled()) {
-    return nullptr;
-  }
-
   double value;
   auto unit_type = CSSPrimitiveValue::UnitType::kUnknown;
   bool error = false;
@@ -716,12 +787,12 @@ CSSMathExpressionNode* CSSMathExpressionOperation::CreateSteppedValueFunction(
       operands[1]->Category() == kCalcOther) {
     return nullptr;
   }
-  CalculationCategory category =
+  CalculationResultCategory category =
       kAddSubtractResult[operands[0]->Category()][operands[1]->Category()];
   if (category == kCalcOther) {
     return nullptr;
   }
-  if (CanEagerlySimplify(category)) {
+  if (CanEagerlySimplify(operands)) {
     absl::optional<double> a = operands[0]->ComputeValueInCanonicalUnit();
     absl::optional<double> b = operands[1]->ComputeValueInCanonicalUnit();
     DCHECK(a.has_value());
@@ -731,8 +802,11 @@ CSSMathExpressionNode* CSSMathExpressionOperation::CreateSteppedValueFunction(
         value,
         CSSPrimitiveValue::CanonicalUnit(operands.front()->ResolvedUnitType()));
   }
+  const bool can_be_resolved_with_conversion_data =
+      operands.front()->CanBeResolvedWithConversionData() &&
+      operands.back()->CanBeResolvedWithConversionData();
   return MakeGarbageCollected<CSSMathExpressionOperation>(
-      category, std::move(operands), op);
+      category, can_be_resolved_with_conversion_data, std::move(operands), op);
 }
 
 // static
@@ -762,11 +836,12 @@ CSSMathExpressionNode* CSSMathExpressionOperation::CreateExponentialFunction(
     }
     case CSSValueID::kHypot: {
       DCHECK_GE(operands.size(), 1u);
-      CalculationCategory category = DetermineComparisonCategory(operands);
+      CalculationResultCategory category =
+          DetermineComparisonCategory(operands);
       if (category == kCalcOther) {
         return nullptr;
       }
-      if (CanEagerlySimplify(category)) {
+      if (CanEagerlySimplify(operands)) {
         for (const CSSMathExpressionNode* operand : operands) {
           absl::optional<double> a = operand->ComputeValueInCanonicalUnit();
           DCHECK(a.has_value());
@@ -775,8 +850,11 @@ CSSMathExpressionNode* CSSMathExpressionOperation::CreateExponentialFunction(
         unit_type = CSSPrimitiveValue::CanonicalUnit(
             operands.front()->ResolvedUnitType());
       } else {
+        const bool can_be_resolved_with_conversion_data =
+            DetermineCanBeSimplifiedWithConversionData(operands);
         return MakeGarbageCollected<CSSMathExpressionOperation>(
-            category, std::move(operands), CSSMathOperator::kHypot);
+            category, can_be_resolved_with_conversion_data, std::move(operands),
+            CSSMathOperator::kHypot);
       }
       break;
     }
@@ -809,28 +887,43 @@ CSSMathExpressionNode* CSSMathExpressionOperation::CreateExponentialFunction(
   return CSSMathExpressionNumericLiteral::Create(value, unit_type);
 }
 
-CSSMathExpressionNode*
-CSSMathExpressionOperation::CreateSignRelatedFunctionSimplified(
+CSSMathExpressionNode* CSSMathExpressionOperation::CreateSignRelatedFunction(
     Operands&& operands,
     CSSValueID function_id) {
-  if (!RuntimeEnabledFeatures::CSSSignRelatedFunctionsEnabled() ||
-      operands[0]->ResolvedUnitType() ==
-          CSSPrimitiveValue::UnitType::kUnknown) {
+  if (!RuntimeEnabledFeatures::CSSSignRelatedFunctionsEnabled()) {
     return nullptr;
   }
 
-  const double value = operands[0]->DoubleValue();
+  const CSSMathExpressionNode* operand = operands.front();
 
   switch (function_id) {
-    case CSSValueID::kAbs:
-      return CSSMathExpressionNumericLiteral::Create(
-          std::abs(value), operands[0]->ResolvedUnitType());
+    case CSSValueID::kAbs: {
+      if (CanEagerlySimplify(operand)) {
+        const absl::optional<double> opt =
+            operand->ComputeValueInCanonicalUnit();
+        DCHECK(opt.has_value());
+        return CSSMathExpressionNumericLiteral::Create(
+            std::abs(opt.value()), operand->ResolvedUnitType());
+      }
+      return MakeGarbageCollected<CSSMathExpressionOperation>(
+          operand->Category(), operand->CanBeResolvedWithConversionData(),
+          std::move(operands), CSSMathOperator::kAbs);
+    }
     case CSSValueID::kSign: {
-      const double signum =
-          (value == 0 || std::isnan(value)) ? value : ((value > 0) ? 1 : -1);
-      return CSSMathExpressionNumericLiteral::Create(
-          signum, CSSPrimitiveValue::UnitType::kNumber);
-    };
+      if (CanEagerlySimplify(operand)) {
+        const absl::optional<double> opt =
+            operand->ComputeValueInCanonicalUnit();
+        DCHECK(opt.has_value());
+        const double value = opt.value();
+        const double signum =
+            (value == 0 || std::isnan(value)) ? value : ((value > 0) ? 1 : -1);
+        return CSSMathExpressionNumericLiteral::Create(
+            signum, CSSPrimitiveValue::UnitType::kNumber);
+      }
+      return MakeGarbageCollected<CSSMathExpressionOperation>(
+          kCalcNumber, operand->CanBeResolvedWithConversionData(),
+          std::move(operands), CSSMathOperator::kSign);
+    }
     default:
       NOTREACHED();
       return nullptr;
@@ -847,8 +940,8 @@ CSSMathExpressionOperation::CreateArithmeticOperationSimplified(
     return CreateArithmeticOperation(left_side, right_side, op);
   }
 
-  CalculationCategory left_category = left_side->Category();
-  CalculationCategory right_category = right_side->Category();
+  CalculationResultCategory left_category = left_side->Category();
+  CalculationResultCategory right_category = right_side->Category();
   DCHECK_NE(left_category, kCalcOther);
   DCHECK_NE(right_category, kCalcOther);
 
@@ -927,9 +1020,11 @@ CSSMathExpressionOperation::CSSMathExpressionOperation(
     const CSSMathExpressionNode* left_side,
     const CSSMathExpressionNode* right_side,
     CSSMathOperator op,
-    CalculationCategory category)
+    CalculationResultCategory category,
+    const bool can_be_resolved_with_conversion_data)
     : CSSMathExpressionNode(
           category,
+          can_be_resolved_with_conversion_data,
           left_side->HasComparisons() || right_side->HasComparisons(),
           !left_side->IsScopedValue() || !right_side->IsScopedValue()),
       operands_({left_side, right_side}),
@@ -956,20 +1051,27 @@ static bool AnyOperandNeedsTreeScopePopulation(
 }
 
 CSSMathExpressionOperation::CSSMathExpressionOperation(
-    CalculationCategory category,
+    CalculationResultCategory category,
+    const bool can_be_resolved_with_conversion_data,
     Operands&& operands,
     CSSMathOperator op)
     : CSSMathExpressionNode(
           category,
+          can_be_resolved_with_conversion_data,
           IsComparison(op) || AnyOperandHasComparisons(operands),
           AnyOperandNeedsTreeScopePopulation(operands)),
       operands_(std::move(operands)),
       operator_(op) {}
 
 CSSMathExpressionOperation::CSSMathExpressionOperation(
-    CalculationCategory category,
+    CalculationResultCategory category,
+    const bool can_be_resolved_with_conversion_data,
     CSSMathOperator op)
-    : CSSMathExpressionNode(category, IsComparison(op), false), operator_(op) {}
+    : CSSMathExpressionNode(category,
+                            can_be_resolved_with_conversion_data,
+                            IsComparison(op),
+                            false),
+      operator_(op) {}
 
 bool CSSMathExpressionOperation::IsZero() const {
   absl::optional<double> maybe_value = ComputeValueInCanonicalUnit();
@@ -1031,6 +1133,8 @@ absl::optional<PixelsAndPercent> CSSMathExpressionOperation::ToPixelsAndPercent(
     case CSSMathOperator::kMod:
     case CSSMathOperator::kRem:
     case CSSMathOperator::kHypot:
+    case CSSMathOperator::kAbs:
+    case CSSMathOperator::kSign:
       return absl::nullopt;
     case CSSMathOperator::kInvalid:
       NOTREACHED();
@@ -1111,7 +1215,9 @@ CSSMathExpressionOperation::ToCalculationExpression(
     case CSSMathOperator::kRoundToZero:
     case CSSMathOperator::kMod:
     case CSSMathOperator::kRem:
-    case CSSMathOperator::kHypot: {
+    case CSSMathOperator::kHypot:
+    case CSSMathOperator::kAbs:
+    case CSSMathOperator::kSign: {
       Vector<scoped_refptr<const CalculationExpressionNode>> operands;
       operands.reserve(operands_.size());
       for (const CSSMathExpressionNode* operand : operands_) {
@@ -1130,8 +1236,12 @@ CSSMathExpressionOperation::ToCalculationExpression(
         op = CalculationOperator::kMod;
       } else if (operator_ == CSSMathOperator::kRem) {
         op = CalculationOperator::kRem;
-      } else {
+      } else if (operator_ == CSSMathOperator::kHypot) {
         op = CalculationOperator::kHypot;
+      } else if (operator_ == CSSMathOperator::kAbs) {
+        op = CalculationOperator::kAbs;
+      } else {
+        op = CalculationOperator::kSign;
       }
       return CalculationExpressionOperationNode::CreateSimplified(
           std::move(operands), op);
@@ -1152,7 +1262,7 @@ double CSSMathExpressionOperation::DoubleValue() const {
   return Evaluate(double_values);
 }
 
-static bool HasCanonicalUnit(CalculationCategory category) {
+static bool HasCanonicalUnit(CalculationResultCategory category) {
   return category == kCalcNumber || category == kCalcLength ||
          category == kCalcPercent || category == kCalcAngle ||
          category == kCalcTime || category == kCalcFrequency ||
@@ -1177,20 +1287,22 @@ absl::optional<double> CSSMathExpressionOperation::ComputeValueInCanonicalUnit()
   return Evaluate(double_values);
 }
 
-double CSSMathExpressionOperation::ComputeLengthPx(
+double CSSMathExpressionOperation::ComputeDouble(
     const CSSLengthResolver& length_resolver) const {
-  DCHECK_EQ(kCalcLength, Category());
   Vector<double> double_values;
   double_values.reserve(operands_.size());
   for (const CSSMathExpressionNode* operand : operands_) {
-    if (operand->Category() == kCalcLength) {
-      double_values.push_back(operand->ComputeLengthPx(length_resolver));
-    } else {
-      DCHECK_EQ(operand->Category(), kCalcNumber);
-      double_values.push_back(operand->DoubleValue());
-    }
+    double_values.push_back(
+        CSSMathExpressionNode::ComputeDouble(operand, length_resolver));
   }
   return Evaluate(double_values);
+}
+
+double CSSMathExpressionOperation::ComputeLengthPx(
+    const CSSLengthResolver& length_resolver) const {
+  DCHECK(CanBeResolvedWithConversionData());
+  DCHECK_EQ(Category(), kCalcLength);
+  return ComputeDouble(length_resolver);
 }
 
 bool CSSMathExpressionOperation::AccumulateLengthArray(
@@ -1243,6 +1355,8 @@ bool CSSMathExpressionOperation::AccumulateLengthArray(
     case CSSMathOperator::kMod:
     case CSSMathOperator::kRem:
     case CSSMathOperator::kHypot:
+    case CSSMathOperator::kAbs:
+    case CSSMathOperator::kSign:
       // When stepped value functions are involved, we can't resolve the
       // expression into a length array.
       return false;
@@ -1314,7 +1428,9 @@ String CSSMathExpressionOperation::CustomCSSText() const {
     case CSSMathOperator::kRoundNearest:
     case CSSMathOperator::kMod:
     case CSSMathOperator::kRem:
-    case CSSMathOperator::kHypot: {
+    case CSSMathOperator::kHypot:
+    case CSSMathOperator::kAbs:
+    case CSSMathOperator::kSign: {
       StringBuilder result;
       result.Append(ToString(operator_));
       result.Append('(');
@@ -1403,7 +1519,9 @@ CSSPrimitiveValue::UnitType CSSMathExpressionOperation::ResolvedUnitType()
         case CSSMathOperator::kRoundToZero:
         case CSSMathOperator::kMod:
         case CSSMathOperator::kRem:
-        case CSSMathOperator::kHypot: {
+        case CSSMathOperator::kHypot:
+        case CSSMathOperator::kAbs:
+        case CSSMathOperator::kSign: {
           CSSPrimitiveValue::UnitType first_type =
               operands_.front()->ResolvedUnitType();
           if (first_type == CSSPrimitiveValue::UnitType::kUnknown) {
@@ -1523,6 +1641,17 @@ double CSSMathExpressionOperation::EvaluateOperator(
       }
       return value;
     }
+    case CSSMathOperator::kAbs: {
+      DCHECK_EQ(operands.size(), 1u);
+      return std::abs(operands.front());
+    }
+    case CSSMathOperator::kSign: {
+      DCHECK_EQ(operands.size(), 1u);
+      const double value = operands.front();
+      const double signum =
+          (value == 0 || std::isnan(value)) ? value : ((value > 0) ? 1 : -1);
+      return signum;
+    }
     case CSSMathOperator::kInvalid:
       NOTREACHED();
       break;
@@ -1537,7 +1666,8 @@ const CSSMathExpressionNode& CSSMathExpressionOperation::PopulateWithTreeScope(
     populated_operands.push_back(&op->EnsureScopedValue(tree_scope));
   }
   return *MakeGarbageCollected<CSSMathExpressionOperation>(
-      Category(), std::move(populated_operands), operator_);
+      Category(), CanBeResolvedWithConversionData(),
+      std::move(populated_operands), operator_);
 }
 
 #if DCHECK_IS_ON()
@@ -1565,6 +1695,7 @@ CSSMathExpressionAnchorQuery::CSSMathExpressionAnchorQuery(
     const CSSPrimitiveValue* fallback)
     : CSSMathExpressionNode(
           kCalcPercentLength,
+          false,
           false /* has_comparisons */,
           (anchor_specifier && !anchor_specifier->IsScopedValue()) ||
               (fallback && !fallback->IsScopedValue())),
@@ -1606,6 +1737,10 @@ namespace {
 
 CSSAnchorValue CSSValueIDToAnchorValueEnum(CSSValueID value) {
   switch (value) {
+    case CSSValueID::kAuto:
+      return CSSAnchorValue::kAuto;
+    case CSSValueID::kAutoSame:
+      return CSSAnchorValue::kAutoSame;
     case CSSValueID::kTop:
       return CSSAnchorValue::kTop;
     case CSSValueID::kLeft:
@@ -1663,6 +1798,7 @@ CSSMathExpressionAnchorQuery::ToCalculationExpression(
     anchor_specifier = AnchorSpecifierValue::Implicit();
   } else if (const auto* custom_ident =
                  DynamicTo<CSSCustomIdentValue>(anchor_specifier_.Get())) {
+    length_resolver.ReferenceAnchor();
     anchor_specifier = MakeGarbageCollected<AnchorSpecifierValue>(
         *MakeGarbageCollected<ScopedCSSName>(custom_ident->Value(),
                                              custom_ident->GetTreeScope()));
@@ -1717,8 +1853,11 @@ class CSSMathExpressionNodeParser {
 
  public:
   CSSMathExpressionNodeParser(const CSSParserContext& context,
+                              const bool is_percentage_allowed,
                               CSSAnchorQueryTypes allowed_anchor_queries)
-      : context_(context), allowed_anchor_queries_(allowed_anchor_queries) {}
+      : context_(context),
+        allowed_anchor_queries_(allowed_anchor_queries),
+        is_percentage_allowed_(is_percentage_allowed) {}
 
   bool IsSupportedMathFunction(CSSValueID function_id) {
     switch (function_id) {
@@ -1727,8 +1866,6 @@ class CSSMathExpressionNodeParser {
       case CSSValueID::kClamp:
       case CSSValueID::kCalc:
       case CSSValueID::kWebkitCalc:
-        return true;
-      // TODO(crbug.com/1190444): Add other trigonometric functions
       case CSSValueID::kSin:
       case CSSValueID::kCos:
       case CSSValueID::kTan:
@@ -1736,7 +1873,7 @@ class CSSMathExpressionNodeParser {
       case CSSValueID::kAcos:
       case CSSValueID::kAtan:
       case CSSValueID::kAtan2:
-        return RuntimeEnabledFeatures::CSSTrigonometricFunctionsEnabled();
+        return true;
       case CSSValueID::kPow:
       case CSSValueID::kSqrt:
       case CSSValueID::kHypot:
@@ -1792,10 +1929,10 @@ class CSSMathExpressionNodeParser {
     switch (anchor_query_type) {
       case CSSAnchorQueryType::kAnchor:
         value = css_parsing_utils::ConsumeIdent<
-            CSSValueID::kTop, CSSValueID::kLeft, CSSValueID::kRight,
-            CSSValueID::kBottom, CSSValueID::kStart, CSSValueID::kEnd,
-            CSSValueID::kSelfStart, CSSValueID::kSelfEnd, CSSValueID::kCenter>(
-            tokens);
+            CSSValueID::kAuto, CSSValueID::kAutoSame, CSSValueID::kTop,
+            CSSValueID::kLeft, CSSValueID::kRight, CSSValueID::kBottom,
+            CSSValueID::kStart, CSSValueID::kEnd, CSSValueID::kSelfStart,
+            CSSValueID::kSelfEnd, CSSValueID::kCenter>(tokens);
         if (!value) {
           value = css_parsing_utils::ConsumePercent(
               tokens, context_, CSSPrimitiveValue::ValueRange::kAll);
@@ -1830,9 +1967,11 @@ class CSSMathExpressionNodeParser {
         anchor_query_type, anchor_specifier, *value, fallback);
   }
 
-  CSSMathExpressionNode* ParseMathFunction(CSSValueID function_id,
-                                           CSSParserTokenRange& tokens,
-                                           int depth) {
+  CSSMathExpressionNode* ParseMathFunction(
+      CSSValueID function_id,
+      CSSParserTokenRange& tokens,
+      const HashMap<CSSValueID, double> color_channel_keyword_values,
+      int depth) {
     if (!IsSupportedMathFunction(function_id)) {
       return nullptr;
     }
@@ -1865,7 +2004,6 @@ class CSSMathExpressionNodeParser {
       case CSSValueID::kAsin:
       case CSSValueID::kAcos:
       case CSSValueID::kAtan:
-        DCHECK(RuntimeEnabledFeatures::CSSTrigonometricFunctionsEnabled());
         max_argument_count = 1;
         break;
       case CSSValueID::kPow:
@@ -1898,7 +2036,6 @@ class CSSMathExpressionNodeParser {
         min_argument_count = 2;
         break;
       case CSSValueID::kAtan2:
-        DCHECK(RuntimeEnabledFeatures::CSSTrigonometricFunctionsEnabled());
         max_argument_count = 2;
         min_argument_count = 2;
         break;
@@ -1914,6 +2051,14 @@ class CSSMathExpressionNodeParser {
     }
 
     HeapVector<Member<const CSSMathExpressionNode>> nodes;
+    // Parse the initial (optional) <rounding-strategy> argument to the round()
+    // function.
+    if (function_id == CSSValueID::kRound) {
+      CSSMathExpressionNode* rounding_strategy = ParseRoundingStrategy(tokens);
+      if (rounding_strategy) {
+        nodes.push_back(rounding_strategy);
+      }
+    }
 
     while (!tokens.AtEnd() && nodes.size() < max_argument_count) {
       if (nodes.size()) {
@@ -1923,7 +2068,8 @@ class CSSMathExpressionNodeParser {
       }
 
       tokens.ConsumeWhitespace();
-      CSSMathExpressionNode* node = ParseValueExpression(tokens, depth);
+      CSSMathExpressionNode* node =
+          ParseValueExpression(tokens, color_channel_keyword_values, depth);
       if (!node) {
         return nullptr;
       }
@@ -1955,7 +2101,6 @@ class CSSMathExpressionNodeParser {
       case CSSValueID::kAcos:
       case CSSValueID::kAtan:
       case CSSValueID::kAtan2:
-        DCHECK(RuntimeEnabledFeatures::CSSTrigonometricFunctionsEnabled());
         return CSSMathExpressionOperation::
             CreateTrigonometricFunctionSimplified(std::move(nodes),
                                                   function_id);
@@ -1975,31 +2120,24 @@ class CSSMathExpressionNodeParser {
         DCHECK_LE(nodes.size(), 3u);
         CSSMathOperator op;
         if (function_id == CSSValueID::kRound) {
-          if (nodes.size() == 2) {
-            op = CSSMathOperator::kRoundNearest;
-          } else if (const auto* operation =
-                         DynamicTo<CSSMathExpressionOperation>(*nodes[0])) {
-            if (operation->IsRoundingStrategyKeyword()) {
-              op = operation->OperatorType();
-              nodes.EraseAt(0);
-            } else {
-              return nullptr;
-            }
+          // If the first argument is a rounding strategy, use the specified
+          // operation and drop the argument from the list of operands.
+          const auto* maybe_rounding_strategy =
+              DynamicTo<CSSMathExpressionOperation>(*nodes[0]);
+          if (maybe_rounding_strategy &&
+              maybe_rounding_strategy->IsRoundingStrategyKeyword()) {
+            op = maybe_rounding_strategy->OperatorType();
+            nodes.EraseAt(0);
           } else {
+            op = CSSMathOperator::kRoundNearest;
+          }
+          if (nodes.size() != 2) {
             return nullptr;
           }
         } else if (function_id == CSSValueID::kMod) {
           op = CSSMathOperator::kMod;
         } else {
           op = CSSMathOperator::kRem;
-        }
-        for (const auto& node : nodes) {
-          if (const auto* operation =
-                  DynamicTo<CSSMathExpressionOperation>(*node)) {
-            if (operation->IsRoundingStrategyKeyword()) {
-              return nullptr;
-            }
-          }
         }
         return CSSMathExpressionOperation::CreateSteppedValueFunction(
             std::move(nodes), op);
@@ -2010,7 +2148,7 @@ class CSSMathExpressionNodeParser {
         // parsing time. So we should implement cannot be simplified value
         // using CalculationExpressionNode
         DCHECK(RuntimeEnabledFeatures::CSSSignRelatedFunctionsEnabled());
-        return CSSMathExpressionOperation::CreateSignRelatedFunctionSimplified(
+        return CSSMathExpressionOperation::CreateSignRelatedFunction(
             std::move(nodes), function_id);
 
       // TODO(crbug.com/1284199): Support other math functions.
@@ -2020,7 +2158,9 @@ class CSSMathExpressionNodeParser {
   }
 
  private:
-  CSSMathExpressionNode* ParseValue(CSSParserTokenRange& tokens) {
+  CSSMathExpressionNode* ParseValue(
+      CSSParserTokenRange& tokens,
+      const HashMap<CSSValueID, double> color_channel_keyword_values) {
     CSSParserToken token = tokens.ConsumeIncludingWhitespace();
     if (token.Id() == CSSValueID::kInfinity) {
       return CSSMathExpressionNumericLiteral::Create(
@@ -2045,25 +2185,17 @@ class CSSMathExpressionNodeParser {
       return CSSMathExpressionNumericLiteral::Create(
           M_E, CSSPrimitiveValue::UnitType::kNumber);
     }
-    if (token.Id() == CSSValueID::kNearest) {
-      return MakeGarbageCollected<CSSMathExpressionOperation>(
-          CalculationCategory::kCalcNumber, CSSMathOperator::kRoundNearest);
-    }
-    if (token.Id() == CSSValueID::kUp) {
-      return MakeGarbageCollected<CSSMathExpressionOperation>(
-          CalculationCategory::kCalcNumber, CSSMathOperator::kRoundUp);
-    }
-    if (token.Id() == CSSValueID::kDown) {
-      return MakeGarbageCollected<CSSMathExpressionOperation>(
-          CalculationCategory::kCalcNumber, CSSMathOperator::kRoundDown);
-    }
-    if (token.Id() == CSSValueID::kToZero) {
-      return MakeGarbageCollected<CSSMathExpressionOperation>(
-          CalculationCategory::kCalcNumber, CSSMathOperator::kRoundToZero);
-    }
     if (!(token.GetType() == kNumberToken ||
-          token.GetType() == kPercentageToken ||
+          (token.GetType() == kPercentageToken && is_percentage_allowed_) ||
           token.GetType() == kDimensionToken)) {
+      // For relative color syntax. Swap in the associated value of a color
+      // channel here. e.g. color(from color(srgb 1 0 0) calc(r * 2) 0 0) should
+      // swap in "1" for the value of "r" in the calc expression.
+      if (color_channel_keyword_values.Contains(token.Id())) {
+        return CSSMathExpressionNumericLiteral::Create(
+            color_channel_keyword_values.at(token.Id()),
+            CSSPrimitiveValue::UnitType::kNumber);
+      }
       return nullptr;
     }
 
@@ -2076,8 +2208,34 @@ class CSSMathExpressionNodeParser {
         CSSNumericLiteralValue::Create(token.NumericValue(), type));
   }
 
-  CSSMathExpressionNode* ParseValueTerm(CSSParserTokenRange& tokens,
-                                        int depth) {
+  CSSMathExpressionNode* ParseRoundingStrategy(CSSParserTokenRange& tokens) {
+    CSSMathOperator rounding_op = CSSMathOperator::kInvalid;
+    switch (tokens.Peek().Id()) {
+      case CSSValueID::kNearest:
+        rounding_op = CSSMathOperator::kRoundNearest;
+        break;
+      case CSSValueID::kUp:
+        rounding_op = CSSMathOperator::kRoundUp;
+        break;
+      case CSSValueID::kDown:
+        rounding_op = CSSMathOperator::kRoundDown;
+        break;
+      case CSSValueID::kToZero:
+        rounding_op = CSSMathOperator::kRoundToZero;
+        break;
+      default:
+        return nullptr;
+    }
+    tokens.ConsumeIncludingWhitespace();
+    return MakeGarbageCollected<CSSMathExpressionOperation>(
+        CalculationResultCategory::kCalcNumber,
+        true /* can_be_resolved_with_conversion_data */, rounding_op);
+  }
+
+  CSSMathExpressionNode* ParseValueTerm(
+      CSSParserTokenRange& tokens,
+      const HashMap<CSSValueID, double> color_channel_keyword_values,
+      int depth) {
     if (tokens.AtEnd()) {
       return nullptr;
     }
@@ -2087,7 +2245,8 @@ class CSSMathExpressionNodeParser {
       CSSParserTokenRange inner_range = tokens.ConsumeBlock();
       tokens.ConsumeWhitespace();
       inner_range.ConsumeWhitespace();
-      CSSMathExpressionNode* result = ParseValueExpression(inner_range, depth);
+      CSSMathExpressionNode* result = ParseValueExpression(
+          inner_range, color_channel_keyword_values, depth);
       if (!result || !inner_range.AtEnd()) {
         return nullptr;
       }
@@ -2100,20 +2259,23 @@ class CSSMathExpressionNodeParser {
       CSSParserTokenRange inner_range = tokens.ConsumeBlock();
       tokens.ConsumeWhitespace();
       inner_range.ConsumeWhitespace();
-      return ParseMathFunction(function_id, inner_range, depth);
+      return ParseMathFunction(function_id, inner_range,
+                               color_channel_keyword_values, depth);
     }
 
-    return ParseValue(tokens);
+    return ParseValue(tokens, color_channel_keyword_values);
   }
 
   CSSMathExpressionNode* ParseValueMultiplicativeExpression(
       CSSParserTokenRange& tokens,
+      const HashMap<CSSValueID, double> color_channel_keyword_values,
       int depth) {
     if (tokens.AtEnd()) {
       return nullptr;
     }
 
-    CSSMathExpressionNode* result = ParseValueTerm(tokens, depth);
+    CSSMathExpressionNode* result =
+        ParseValueTerm(tokens, color_channel_keyword_values, depth);
     if (!result) {
       return nullptr;
     }
@@ -2126,7 +2288,8 @@ class CSSMathExpressionNodeParser {
       }
       tokens.ConsumeIncludingWhitespace();
 
-      CSSMathExpressionNode* rhs = ParseValueTerm(tokens, depth);
+      CSSMathExpressionNode* rhs =
+          ParseValueTerm(tokens, color_channel_keyword_values, depth);
       if (!rhs) {
         return nullptr;
       }
@@ -2144,13 +2307,14 @@ class CSSMathExpressionNodeParser {
 
   CSSMathExpressionNode* ParseAdditiveValueExpression(
       CSSParserTokenRange& tokens,
+      const HashMap<CSSValueID, double> color_channel_keyword_values,
       int depth) {
     if (tokens.AtEnd()) {
       return nullptr;
     }
 
-    CSSMathExpressionNode* result =
-        ParseValueMultiplicativeExpression(tokens, depth);
+    CSSMathExpressionNode* result = ParseValueMultiplicativeExpression(
+        tokens, color_channel_keyword_values, depth);
     if (!result) {
       return nullptr;
     }
@@ -2170,8 +2334,8 @@ class CSSMathExpressionNodeParser {
       }
       tokens.ConsumeIncludingWhitespace();
 
-      CSSMathExpressionNode* rhs =
-          ParseValueMultiplicativeExpression(tokens, depth);
+      CSSMathExpressionNode* rhs = ParseValueMultiplicativeExpression(
+          tokens, color_channel_keyword_values, depth);
       if (!rhs) {
         return nullptr;
       }
@@ -2187,16 +2351,21 @@ class CSSMathExpressionNodeParser {
     return result;
   }
 
-  CSSMathExpressionNode* ParseValueExpression(CSSParserTokenRange& tokens,
-                                              int depth) {
+  CSSMathExpressionNode* ParseValueExpression(
+      CSSParserTokenRange& tokens,
+      const HashMap<CSSValueID, double> color_channel_keyword_values,
+      int depth) {
     if (++depth > kMaxExpressionDepth) {
       return nullptr;
     }
-    return ParseAdditiveValueExpression(tokens, depth);
+    return ParseAdditiveValueExpression(tokens, color_channel_keyword_values,
+                                        depth);
   }
 
   const CSSParserContext& context_;
   const CSSAnchorQueryTypes allowed_anchor_queries_;
+  // Indicates if percentages are allowed.
+  const bool is_percentage_allowed_;
 };
 
 scoped_refptr<const CalculationValue> CSSMathExpressionNode::ToCalcValue(
@@ -2261,6 +2430,10 @@ CSSValue* AnchorQueryValueToCSSValue(
     const CalculationExpressionAnchorQueryNode& anchor_query) {
   if (anchor_query.Type() == CSSAnchorQueryType::kAnchor) {
     switch (anchor_query.AnchorSide()) {
+      case CSSAnchorValue::kAuto:
+        return CSSIdentifierValue::Create(CSSValueID::kAuto);
+      case CSSAnchorValue::kAutoSame:
+        return CSSIdentifierValue::Create(CSSValueID::kAutoSame);
       case CSSAnchorValue::kTop:
         return CSSIdentifierValue::Create(CSSValueID::kTop);
       case CSSAnchorValue::kLeft:
@@ -2425,6 +2598,16 @@ CSSMathExpressionNode* CSSMathExpressionNode::Create(
       return CSSMathExpressionOperation::CreateExponentialFunction(
           std::move(operands), CSSValueID::kHypot);
     }
+    case CalculationOperator::kAbs:
+    case CalculationOperator::kSign: {
+      DCHECK_EQ(children.size(), 1u);
+      CSSMathExpressionOperation::Operands operands;
+      operands.push_back(Create(*children.front()));
+      CSSValueID op = calc_op == CalculationOperator::kAbs ? CSSValueID::kAbs
+                                                           : CSSValueID::kSign;
+      return CSSMathExpressionOperation::CreateSignRelatedFunction(
+          std::move(operands), op);
+    }
     case CalculationOperator::kInvalid:
       NOTREACHED();
       return nullptr;
@@ -2436,10 +2619,13 @@ CSSMathExpressionNode* CSSMathExpressionNode::ParseMathFunction(
     CSSValueID function_id,
     CSSParserTokenRange tokens,
     const CSSParserContext& context,
-    CSSAnchorQueryTypes allowed_anchor_queries) {
-  CSSMathExpressionNodeParser parser(context, allowed_anchor_queries);
-  CSSMathExpressionNode* result =
-      parser.ParseMathFunction(function_id, tokens, 0);
+    const bool is_percentage_allowed,
+    CSSAnchorQueryTypes allowed_anchor_queries,
+    const HashMap<CSSValueID, double> color_channel_keyword_values) {
+  CSSMathExpressionNodeParser parser(context, is_percentage_allowed,
+                                     allowed_anchor_queries);
+  CSSMathExpressionNode* result = parser.ParseMathFunction(
+      function_id, tokens, color_channel_keyword_values, 0);
 
   // TODO(pjh0718): Do simplificiation for result above.
   return result;

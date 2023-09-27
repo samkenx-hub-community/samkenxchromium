@@ -40,6 +40,7 @@
 #include "components/page_image_service/features.h"
 #include "components/page_image_service/image_service.h"
 #include "components/page_image_service/image_service_handler.h"
+#include "components/policy/core/common/policy_pref_names.h"
 #include "components/prefs/pref_service.h"
 #include "components/strings/grit/components_strings.h"
 #include "content/public/browser/web_contents.h"
@@ -145,12 +146,19 @@ BookmarksSidePanelUI::BookmarksSidePanelUI(content::WebUI* web_ui)
       {"folderMenuLabel", IDS_FOLDER_OPTIONS_LABEL},
       {"openFolderLabel", IDS_BOOKMARKS_OPEN_FOLDER_LABEL},
       {"openBookmarkLabel", IDS_BOOKMARKS_OPEN_BOOKMARK_LABEL},
+      {"selectFolderLabel", IDS_BOOKMARKS_SELECT_FOLDER_LABEL},
+      {"selectBookmarkLabel", IDS_BOOKMARKS_SELECT_BOOKMARK_LABEL},
+      {"deselectFolderLabel", IDS_BOOKMARKS_DESELECT_FOLDER_LABEL},
+      {"deselectBookmarkLabel", IDS_BOOKMARKS_DESELECT_BOOKMARK_LABEL},
       {"a11yDescriptionPriceTracking",
        IDS_BOOKMARK_ACCESSIBLE_DESCRIPTION_PRICE_TRACKING},
       {"a11yDescriptionPriceChange",
        IDS_BOOKMARK_ACCESSIBLE_DESCRIPTION_PRICE_CHANGE},
       {"checkboxA11yLabel", IDS_BOOKMARKS_CHECKBOX_LABEL},
       {"editInvalidUrl", IDS_BOOKMARK_MANAGER_INVALID_URL},
+      {"bookmarkFolderChildCount", IDS_BOOKMARK_FOLDER_CHILD_COUNT},
+      {"primaryFilterHeading", IDS_BOOKMARKS_PRIMARY_FILTER_HEADING},
+      {"secondaryFilterHeading", IDS_BOOKMARKS_SECONDARY_FILTER_HEADING},
   };
   for (const auto& str : kLocalizedStrings)
     webui::AddLocalizedString(source, str.name, str.id);
@@ -172,6 +180,7 @@ BookmarksSidePanelUI::BookmarksSidePanelUI(content::WebUI* web_ui)
 
   source->AddBoolean("guestMode", profile->IsGuestSession());
   source->AddBoolean("incognitoMode", profile->IsIncognitoProfile());
+  source->AddBoolean("isIncognitoModeAvailable", IsIncognitoModeAvailable());
   source->AddInteger(
       "sortOrder",
       prefs->GetInteger(bookmarks_webui::prefs::kBookmarksSortOrder));
@@ -218,8 +227,6 @@ BookmarksSidePanelUI::BookmarksSidePanelUI(content::WebUI* web_ui)
 
   // Add a handler to provide pluralized strings.
   auto plural_string_handler = std::make_unique<PluralStringHandler>();
-  plural_string_handler->AddLocalizedString("bookmarkFolderChildCount",
-                                            IDS_BOOKMARK_FOLDER_CHILD_COUNT);
   plural_string_handler->AddLocalizedString("bookmarkDeletionCount",
                                             IDS_BOOKMARK_DELETION_COUNT);
   web_ui->AddMessageHandler(std::move(plural_string_handler));
@@ -295,4 +302,10 @@ void BookmarksSidePanelUI::CreateShoppingListHandler(
   shopping_list_context_menu_controller_ =
       std::make_unique<commerce::ShoppingListContextMenuController>(
           bookmark_model, shopping_service, shopping_list_handler_.get());
+}
+
+bool BookmarksSidePanelUI::IsIncognitoModeAvailable() {
+  PrefService* prefs = Profile::FromWebUI(web_ui())->GetPrefs();
+  return prefs->GetInteger(policy::policy_prefs::kIncognitoModeAvailability) ==
+         static_cast<int>(policy::IncognitoModeAvailability::kEnabled);
 }

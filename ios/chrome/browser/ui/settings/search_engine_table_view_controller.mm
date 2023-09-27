@@ -6,15 +6,18 @@
 
 #import <memory>
 
-#import "base/mac/foundation_util.h"
+#import "base/apple/foundation_util.h"
 #import "base/metrics/histogram_macros.h"
 #import "base/metrics/user_metrics.h"
 #import "base/metrics/user_metrics_action.h"
 #import "base/ranges/algorithm.h"
 #import "base/strings/sys_string_conversions.h"
 #import "components/password_manager/core/common/password_manager_features.h"
+#import "components/prefs/pref_service.h"
+#import "components/search_engines/search_engine_choice_utils.h"
 #import "components/search_engines/template_url_service.h"
 #import "components/search_engines/template_url_service_observer.h"
+#import "components/strings/grit/components_strings.h"
 #import "ios/chrome/browser/favicon/favicon_loader.h"
 #import "ios/chrome/browser/favicon/ios_chrome_favicon_loader_factory.h"
 #import "ios/chrome/browser/search_engines/search_engine_observer_bridge.h"
@@ -29,10 +32,6 @@
 #import "ios/chrome/common/ui/favicon/favicon_view.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ui/base/l10n/l10n_util_mac.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace {
 typedef NS_ENUM(NSInteger, SectionIdentifier) {
@@ -80,6 +79,8 @@ const char kUmaSelectDefaultSearchEngine[] =
   // FaviconLoader is a keyed service that uses LargeIconService to retrieve
   // favicon images.
   FaviconLoader* _faviconLoader;
+  // Used to retrieve the user's prefs.
+  PrefService* _prefService;
 }
 
 #pragma mark - Initialization
@@ -96,6 +97,7 @@ const char kUmaSelectDefaultSearchEngine[] =
     _templateURLService->Load();
     _faviconLoader =
         IOSChromeFaviconLoaderFactory::GetForBrowserState(browserState);
+    _prefService = browserState->GetPrefs();
     [self setTitle:l10n_util::GetNSString(IDS_IOS_SEARCH_ENGINE_SETTING_TITLE)];
     self.shouldDisableDoneButtonOnEdit = YES;
     [self updateUIForEditState];
@@ -213,6 +215,15 @@ const char kUmaSelectDefaultSearchEngine[] =
   if (_firstList.size() > 0) {
     [model addSectionWithIdentifier:SectionIdentifierFirstList];
 
+    if (search_engines::ShouldShowUpdatedSettings(*_prefService)) {
+      TableViewTextHeaderFooterItem* header =
+          [[TableViewTextHeaderFooterItem alloc] initWithType:ItemTypeHeader];
+      header.subtitle =
+          l10n_util::GetNSString(IDS_SEARCH_ENGINE_CHOICE_SETTINGS_SUBTITLE);
+      [model setHeader:header
+          forSectionWithIdentifier:SectionIdentifierFirstList];
+    }
+
     for (const TemplateURL* templateURL : _firstList) {
       [model addItem:[self createSearchEngineItemFromTemplateURL:templateURL]
           toSectionWithIdentifier:SectionIdentifierFirstList];
@@ -315,7 +326,7 @@ const char kUmaSelectDefaultSearchEngine[] =
 
   // Do nothing if the tapped engine was already the default.
   SearchEngineItem* selectedTextItem =
-      base::mac::ObjCCastStrict<SearchEngineItem>(selectedItem);
+      base::apple::ObjCCastStrict<SearchEngineItem>(selectedItem);
   if (selectedTextItem.accessoryType == UITableViewCellAccessoryCheckmark) {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
     return;
@@ -326,7 +337,7 @@ const char kUmaSelectDefaultSearchEngine[] =
     for (TableViewItem* item in
          [model itemsInSectionWithIdentifier:SectionIdentifierFirstList]) {
       SearchEngineItem* textItem =
-          base::mac::ObjCCastStrict<SearchEngineItem>(item);
+          base::apple::ObjCCastStrict<SearchEngineItem>(item);
       if (textItem.accessoryType == UITableViewCellAccessoryCheckmark) {
         textItem.accessoryType = UITableViewCellAccessoryNone;
         UITableViewCell* cell =
@@ -340,7 +351,7 @@ const char kUmaSelectDefaultSearchEngine[] =
          [model itemsInSectionWithIdentifier:SectionIdentifierSecondList]) {
       DCHECK(item.type == ItemTypeCustomEngine);
       SearchEngineItem* textItem =
-          base::mac::ObjCCastStrict<SearchEngineItem>(item);
+          base::apple::ObjCCastStrict<SearchEngineItem>(item);
       if (textItem.accessoryType == UITableViewCellAccessoryCheckmark) {
         textItem.accessoryType = UITableViewCellAccessoryNone;
         UITableViewCell* cell =
@@ -353,7 +364,7 @@ const char kUmaSelectDefaultSearchEngine[] =
   // Show the checkmark on the new default engine.
 
   SearchEngineItem* newDefaultEngine =
-      base::mac::ObjCCastStrict<SearchEngineItem>(
+      base::apple::ObjCCastStrict<SearchEngineItem>(
           [model itemAtIndexPath:indexPath]);
   newDefaultEngine.accessoryType = UITableViewCellAccessoryCheckmark;
   UITableViewCell* cell = [tableView cellForRowAtIndexPath:indexPath];
@@ -396,8 +407,9 @@ const char kUmaSelectDefaultSearchEngine[] =
   DCHECK(item.type == ItemTypePrepopulatedEngine ||
          item.type == ItemTypeCustomEngine);
   SearchEngineItem* engineItem =
-      base::mac::ObjCCastStrict<SearchEngineItem>(item);
-  TableViewURLCell* urlCell = base::mac::ObjCCastStrict<TableViewURLCell>(cell);
+      base::apple::ObjCCastStrict<SearchEngineItem>(item);
+  TableViewURLCell* urlCell =
+      base::apple::ObjCCastStrict<TableViewURLCell>(cell);
 
   if (item.type == ItemTypePrepopulatedEngine) {
     _faviconLoader->FaviconForPageUrl(
@@ -456,6 +468,8 @@ const char kUmaSelectDefaultSearchEngine[] =
   if (_settingsAreDismissed)
     return;
 
+  // TODO(b/280753739): Fetch the list of URLs used for the search engine choice
+  // screen, when appropriate.
   std::vector<TemplateURL*> urls = _templateURLService->GetTemplateURLs();
   _firstList.clear();
   _firstList.reserve(urls.size());
@@ -609,7 +623,7 @@ const char kUmaSelectDefaultSearchEngine[] =
                                                       inSection:firstSection];
           TableViewItem* item = [model itemAtIndexPath:indexPath];
           SearchEngineItem* engineItem =
-              base::mac::ObjCCastStrict<SearchEngineItem>(item);
+              base::apple::ObjCCastStrict<SearchEngineItem>(item);
           engineItem.accessoryType = UITableViewCellAccessoryCheckmark;
           [strongSelf.tableView
               reloadRowsAtIndexPaths:@[ indexPath ]
@@ -655,7 +669,7 @@ const char kUmaSelectDefaultSearchEngine[] =
   for (NSIndexPath* indexPath in indexPaths) {
     TableViewItem* item = [self.tableViewModel itemAtIndexPath:indexPath];
     SearchEngineItem* engineItem =
-        base::mac::ObjCCastStrict<SearchEngineItem>(item);
+        base::apple::ObjCCastStrict<SearchEngineItem>(item);
     engineItem.enabled = !editing;
     if (!editing && _firstList[indexPath.item] ==
                         _templateURLService->GetDefaultSearchProvider()) {

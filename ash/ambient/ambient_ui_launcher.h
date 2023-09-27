@@ -7,8 +7,8 @@
 
 #include <memory>
 
+#include "ash/ambient/ambient_photo_controller.h"
 #include "ash/ambient/model/ambient_backend_model.h"
-#include "ash/constants/ambient_theme.h"
 #include "base/functional/callback_forward.h"
 #include "ui/views/view.h"
 
@@ -38,6 +38,9 @@ class AmbientUiLauncher {
   // After Initialize() is complete, we call this method to create the view,
   // this can be called multiple times during an ambient UI session in case
   // there are multiple screens.
+  //
+  // Must only be called between a successful `Initialize()` and `Finalize()`
+  // call.
   virtual std::unique_ptr<views::View> CreateView() = 0;
 
   // Stop any processing and ends the current ambient session. This method is
@@ -47,6 +50,10 @@ class AmbientUiLauncher {
   // TODO(esum): Remove when we get rid of the ambient backend model dependency
   // from the ambient controller and PhotoView.
   virtual AmbientBackendModel* GetAmbientBackendModel() = 0;
+
+  // TODO(pzliu): Remove when we get rid of the ambient photo controller
+  // dependency from the ambient controller.
+  virtual AmbientPhotoController* GetAmbientPhotoController() = 0;
 
   // Returns whether an ambient UI session is active.
   virtual bool IsActive() = 0;
@@ -65,7 +72,7 @@ class AmbientUiLauncher {
   void SetReadyState(bool is_ready);
 
  private:
-  base::raw_ptr<Observer> observer_ = nullptr;
+  raw_ptr<Observer> observer_ = nullptr;
 
   // The ready state of the launcher, indicates whether the launcher is ready to
   // be shown or not.

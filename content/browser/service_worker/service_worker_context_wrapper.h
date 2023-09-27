@@ -143,18 +143,22 @@ class CONTENT_EXPORT ServiceWorkerContextWrapper
       int64_t version_id,
       const std::string& uuid,
       GlobalRenderFrameHostId render_frame_host_id) override;
+  void OnStarting(int64_t version_id) override;
   void OnStarted(int64_t version_id,
                  const GURL& scope,
                  int process_id,
                  const GURL& script_url,
                  const blink::ServiceWorkerToken& token,
                  const blink::StorageKey& key) override;
+  void OnStopping(int64_t version_id) override;
   void OnStopped(int64_t version_id) override;
   void OnDeleteAndStartOver() override;
   void OnVersionStateChanged(int64_t version_id,
                              const GURL& scope,
                              const blink::StorageKey& key,
                              ServiceWorkerVersion::Status status) override;
+  void OnWindowOpened(const GURL& script_url, const GURL& url) override;
+  void OnClientNavigated(const GURL& script_url, const GURL& url) override;
 
   // ServiceWorkerContext implementation:
   void AddObserver(ServiceWorkerContextObserver* observer) override;
@@ -174,10 +178,10 @@ class CONTENT_EXPORT ServiceWorkerContextWrapper
   ServiceWorkerExternalRequestResult StartingExternalRequest(
       int64_t service_worker_version_id,
       ServiceWorkerExternalRequestTimeoutType timeout_type,
-      const std::string& request_uuid) override;
+      const base::Uuid& request_uuid) override;
   ServiceWorkerExternalRequestResult FinishedExternalRequest(
       int64_t service_worker_version_id,
-      const std::string& request_uuid) override;
+      const base::Uuid& request_uuid) override;
   size_t CountExternalRequestsForTest(const blink::StorageKey& key) override;
   bool ExecuteScriptForTest(
       const std::string& script,
@@ -521,6 +525,10 @@ class CONTENT_EXPORT ServiceWorkerContextWrapper
   // Observers which live outside content's implementation boundary.
   base::ObserverList<ServiceWorkerContextObserver, true>::Unchecked
       observer_list_;
+
+  // `browser_context_` is maintained to be valid within the lifetime of the
+  // browser context.
+  raw_ptr<BrowserContext, DanglingUntriaged> browser_context_;
 
   const std::unique_ptr<ServiceWorkerProcessManager> process_manager_;
   std::unique_ptr<ServiceWorkerContextCore> context_core_;

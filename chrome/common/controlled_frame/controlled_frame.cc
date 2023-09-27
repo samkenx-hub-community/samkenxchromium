@@ -22,15 +22,11 @@ bool AvailabilityCheck(const std::string& api_full_name,
                        int context_id,
                        bool check_developer_mode,
                        const extensions::ContextData& context_data) {
-  // Verify that Controlled Frame and IWAs are enabled and ensure the invoking
-  // context is correct.
-  if (!base::FeatureList::IsEnabled(features::kIwaControlledFrame) ||
-      !base::FeatureList::IsEnabled(features::kIsolatedWebApps)) {
-    return false;
-  }
-
-  // Verify that the app is isolated and the API name is in our expected list.
-  return context_data.IsIsolatedApplication() &&
+  // Verify that the current context is an Isolated Web App and the API name is
+  // in our expected list.
+  bool is_not_extension = !extension && url.SchemeIs("isolated-app");
+  return is_not_extension && context == extensions::Feature::WEB_PAGE_CONTEXT &&
+         context_data.IsIsolatedApplication() &&
          base::Contains(GetControlledFrameFeatureList(), api_full_name);
 }
 

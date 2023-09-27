@@ -9,7 +9,9 @@
 #include "base/memory/raw_ptr.h"
 
 #include "base/scoped_observation.h"
+#include "chromeos/ash/components/dbus/hermes/hermes_response_status.h"
 #include "chromeos/ash/components/network/metrics/connection_info_metrics_logger.h"
+#include "chromeos/ash/components/network/text_message_suppression_state.h"
 #include "chromeos/services/network_config/public/mojom/cros_network_config.mojom.h"
 
 namespace ash {
@@ -48,6 +50,51 @@ class COMPONENT_EXPORT(CHROMEOS_NETWORK) CellularNetworkMetricsLogger
     kMatchesSelectedApn = 0,
     kDoesNotMatchSelectedApn = 1,
     kMaxValue = kDoesNotMatchSelectedApn
+  };
+
+  // These values are persisted to logs. Entries should not be renumbered and
+  // numeric values should never be reused.
+  enum class ESimInstallResult {
+    kSuccess = 0,
+    kInhibitFailed = 1,
+    kHermesFailed = 2,
+    kMaxValue = kHermesFailed,
+  };
+
+  // These values are persisted to logs. Entries should not be renumbered and
+  // numeric values should never be reused.
+  enum class ESimUserInstallMethod {
+    kViaSmds = 0,
+    kViaQrCodeAfterSmds = 1,
+    kViaQrCodeSkippedSmds = 2,
+    kViaActivationCodeAfterSmds = 3,
+    kViaActivationCodeSkippedSmds = 4,
+    kMaxValue = kViaActivationCodeSkippedSmds,
+  };
+
+  // These values are persisted to logs. Entries should not be renumbered and
+  // numeric values should never be reused.
+  enum class ESimPolicyInstallMethod {
+    kViaSmdp = 0,
+    kViaSmds = 1,
+    kMaxValue = kViaSmds,
+  };
+
+  // These values are persisted to logs. Entries should not be renumbered and
+  // numeric values should never be reused.
+  enum class UserTextMessageSuppressionState {
+    kTextMessagesAllow = 0,
+    kTextMessagesSuppress = 1,
+    kMaxValue = kTextMessagesSuppress,
+  };
+
+  // These values are persisted to logs. Entries should not be renumbered and
+  // numeric values should never be reused.
+  enum class PolicyTextMessageSuppressionState {
+    kUnset = 0,
+    kTextMessagesAllow = 1,
+    kTextMessagesSuppress = 2,
+    kMaxValue = kTextMessagesSuppress,
   };
 
   static constexpr char kCreateCustomApnResultHistogram[] =
@@ -89,6 +136,96 @@ class COMPONENT_EXPORT(CHROMEOS_NETWORK) CellularNetworkMetricsLogger
   static constexpr char kCustomApnsManagedMigrationTypeHistogram[] =
       "Network.Ash.Cellular.Apn.Managed.MigrationType";
 
+  static constexpr char kSmdsScanProfileCount[] =
+      "Network.Ash.Cellular.ESim.SmdsScan.ProfileCount";
+  static constexpr char kSmdsScanOtherDurationSuccess[] =
+      "Network.Ash.Cellular.ESim.SmdsScanDuration.Other.OnSuccess";
+  static constexpr char kSmdsScanOtherDurationFailure[] =
+      "Network.Ash.Cellular.ESim.SmdsScanDuration.Other.OnFailure";
+  static constexpr char kSmdsScanAndroidDurationSuccess[] =
+      "Network.Ash.Cellular.ESim.SmdsScanDuration.Android.OnSuccess";
+  static constexpr char kSmdsScanAndroidDurationFailure[] =
+      "Network.Ash.Cellular.ESim.SmdsScanDuration.Android.OnFailure";
+  static constexpr char kSmdsScanGsmaDurationSuccess[] =
+      "Network.Ash.Cellular.ESim.SmdsScanDuration.Gsma.OnSuccess";
+  static constexpr char kSmdsScanGsmaDurationFailure[] =
+      "Network.Ash.Cellular.ESim.SmdsScanDuration.Gsma.OnFailure";
+  static constexpr char kESimUserInstallMethod[] =
+      "Network.Ash.Cellular.ESim.UserInstall.Method";
+  static constexpr char kESimPolicyInstallMethod[] =
+      "Network.Ash.Cellular.ESim.PolicyInstall.Method";
+  static constexpr char kESimPolicyInstallUserErrorsFilteredAll[] =
+      "Network.Ash.Cellular.ESim.PolicyInstall.UserErrorsFiltered.All";
+  static constexpr char kESimPolicyInstallUserErrorsFilteredViaSmdpInitial[] =
+      "Network.Ash.Cellular.ESim.PolicyInstall.UserErrorsFiltered."
+      "ViaSmdpInitial";
+  static constexpr char kESimPolicyInstallUserErrorsFilteredViaSmdpRetry[] =
+      "Network.Ash.Cellular.ESim.PolicyInstall.UserErrorsFiltered."
+      "ViaSmdpRetry";
+  static constexpr char kESimPolicyInstallUserErrorsFilteredViaSmdsInitial[] =
+      "Network.Ash.Cellular.ESim.PolicyInstall.UserErrorsFiltered."
+      "ViaSmdsInitial";
+  static constexpr char kESimPolicyInstallUserErrorsFilteredViaSmdsRetry[] =
+      "Network.Ash.Cellular.ESim.PolicyInstall.UserErrorsFiltered."
+      "ViaSmdsRetry";
+  static constexpr char kESimPolicyInstallUserErrorsIncludedAll[] =
+      "Network.Ash.Cellular.ESim.PolicyInstall.UserErrorsIncluded.All";
+  static constexpr char kESimPolicyInstallUserErrorsIncludedViaSmdpInitial[] =
+      "Network.Ash.Cellular.ESim.PolicyInstall.UserErrorsIncluded."
+      "ViaSmdpInitial";
+  static constexpr char kESimPolicyInstallUserErrorsIncludedViaSmdpRetry[] =
+      "Network.Ash.Cellular.ESim.PolicyInstall.UserErrorsIncluded."
+      "ViaSmdpRetry";
+  static constexpr char kESimPolicyInstallUserErrorsIncludedViaSmdsInitial[] =
+      "Network.Ash.Cellular.ESim.PolicyInstall.UserErrorsIncluded."
+      "ViaSmdsInitial";
+  static constexpr char kESimPolicyInstallUserErrorsIncludedViaSmdsRetry[] =
+      "Network.Ash.Cellular.ESim.PolicyInstall.UserErrorsIncluded."
+      "ViaSmdsRetry";
+  static constexpr char kESimUserInstallUserErrorsFilteredAll[] =
+      "Network.Ash.Cellular.ESim.UserInstall.UserErrorsFiltered.All";
+  static constexpr char
+      kESimUserInstallUserErrorsFilteredViaActivationCodeAfterSmds[] =
+          "Network.Ash.Cellular.ESim.UserInstall.UserErrorsFiltered."
+          "ViaActivationCodeAfterSmds";
+  static constexpr char
+      kESimUserInstallUserErrorsFilteredViaActivationCodeSkippedSmds[] =
+          "Network.Ash.Cellular.ESim.UserInstall.UserErrorsFiltered."
+          "ViaActivationCodeSkippedSmds";
+  static constexpr char kESimUserInstallUserErrorsFilteredViaQrCodeAfterSmds[] =
+      "Network.Ash.Cellular.ESim.UserInstall.UserErrorsFiltered."
+      "ViaQrCodeAfterSmds";
+  static constexpr char
+      kESimUserInstallUserErrorsFilteredViaQrCodeSkippedSmds[] =
+          "Network.Ash.Cellular.ESim.UserInstall.UserErrorsFiltered."
+          "ViaQrCodeSkippedSmds";
+  static constexpr char kESimUserInstallUserErrorsFilteredViaSmds[] =
+      "Network.Ash.Cellular.ESim.UserInstall.UserErrorsFiltered.ViaSmds";
+  static constexpr char kESimUserInstallUserErrorsIncludedAll[] =
+      "Network.Ash.Cellular.ESim.UserInstall.UserErrorsIncluded.All";
+  static constexpr char
+      kESimUserInstallUserErrorsIncludedViaActivationCodeAfterSmds[] =
+          "Network.Ash.Cellular.ESim.UserInstall.UserErrorsIncluded."
+          "ViaActivationCodeAfterSmds";
+  static constexpr char
+      kESimUserInstallUserErrorsIncludedViaActivationCodeSkippedSmds[] =
+          "Network.Ash.Cellular.ESim.UserInstall.UserErrorsIncluded."
+          "ViaActivationCodeSkippedSmds";
+  static constexpr char kESimUserInstallUserErrorsIncludedViaQrCodeAfterSmds[] =
+      "Network.Ash.Cellular.ESim.UserInstall.UserErrorsIncluded."
+      "ViaQrCodeAfterSmds";
+  static constexpr char
+      kESimUserInstallUserErrorsIncludedViaQrCodeSkippedSmds[] =
+          "Network.Ash.Cellular.ESim.UserInstall.UserErrorsIncluded."
+          "ViaQrCodeSkippedSmds";
+  static constexpr char kESimUserInstallUserErrorsIncludedViaSmds[] =
+      "Network.Ash.Cellular.ESim.UserInstall.UserErrorsIncluded.ViaSmds";
+
+  static constexpr char kUserAllowTextMessagesSuppressionStateHistogram[] =
+      "Network.Ash.Cellular.AllowTextMessages.User.SuppressionState";
+  static constexpr char kPolicyAllowTextMessagesSuppressionStateHistogram[] =
+      "Network.Ash.Cellular.AllowTextMessages.Policy.SuppressionState";
+
   CellularNetworkMetricsLogger(
       NetworkStateHandler* network_state_handler,
       NetworkMetadataStore* network_metadata_store,
@@ -113,6 +250,45 @@ class COMPONENT_EXPORT(CHROMEOS_NETWORK) CellularNetworkMetricsLogger
   static void LogUnmanagedCustomApnMigrationType(
       UnmanagedApnMigrationType type);
   static void LogManagedCustomApnMigrationType(ManagedApnMigrationType type);
+
+  // Logs results from attempting operations related to eSIM.
+  static void LogSmdsScanProfileCount(size_t count);
+  static void LogSmdsScanDuration(const base::TimeDelta& duration,
+                                  bool success,
+                                  const std::string& smds_activation_code);
+
+  static void LogESimUserInstallMethod(ESimUserInstallMethod method);
+  static void LogESimPolicyInstallMethod(ESimPolicyInstallMethod method);
+  // The |is_user_error| parameter is used to indicate that |result| was caused
+  // by something outside the control of ChromeOS, e.g. an invalid activation
+  // code, and is not actionable. We do not include this category of errors in
+  // the "filtered" version of our histograms so that we may have a better
+  // understanding of eSIM installations on ChromeOS with minimal noise.
+  static void LogESimUserInstallResult(ESimUserInstallMethod method,
+                                       ESimInstallResult result,
+                                       bool is_user_error);
+  static void LogESimPolicyInstallResult(ESimPolicyInstallMethod method,
+                                         ESimInstallResult result,
+                                         bool is_initial,
+                                         bool is_user_error);
+
+  // Returns the eSIM installation result for the provided Hermes response
+  // status. When the status is unavailable, assume that we failed to inhibit
+  // the cellular device.
+  static ESimInstallResult ComputeESimInstallResult(
+      absl::optional<HermesResponseStatus> status);
+
+  // Returns whether |status| is considered a "user error" and should be
+  // filtered when emitting to eSIM installation result histograms. An Hermes
+  // response status is considered a "user error" when we believe the result is
+  // due to an error or situation outside the control of ChromeOS, e.g. an
+  // invalid activation code.
+  static bool HermesResponseStatusIsUserError(HermesResponseStatus status);
+
+  static void LogUserTextMessageSuppressionState(
+      ash::UserTextMessageSuppressionState state);
+  static void LogPolicyTextMessageSuppressionState(
+      ash::PolicyTextMessageSuppressionState state);
 
  private:
   // ConnectionInfoMetricsLogger::Observer:

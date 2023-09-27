@@ -11,7 +11,6 @@
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/logging.h"
-#include "base/metrics/histogram_functions.h"
 #include "base/numerics/safe_conversions.h"
 #include "base/ranges/algorithm.h"
 #include "media/base/media_switches.h"
@@ -103,8 +102,13 @@ H264Decoder::H264Accelerator::ParseEncryptedSliceHeader(
 
 H264Decoder::H264Accelerator::Status H264Decoder::H264Accelerator::SetStream(
     base::span<const uint8_t> stream,
-    const DecryptConfig* decrypt_config) {
+    const DecryptConfig* decrypt_config,
+    uint64_t secure_handle) {
   return H264Decoder::H264Accelerator::Status::kNotSupported;
+}
+
+bool H264Decoder::H264Accelerator::RequiresRefLists() {
+  return false;
 }
 
 H264Decoder::H264Decoder(std::unique_ptr<H264Accelerator> accelerator,
@@ -118,7 +122,8 @@ H264Decoder::H264Decoder(std::unique_ptr<H264Accelerator> accelerator,
       max_num_reorder_frames_(0),
       // TODO(hiroh): Set profile to UNKNOWN.
       profile_(profile),
-      accelerator_(std::move(accelerator)) {
+      accelerator_(std::move(accelerator)),
+      requires_ref_lists_(accelerator_->RequiresRefLists()) {
   DCHECK(accelerator_);
   Reset();
 }
@@ -156,6 +161,8 @@ void H264Decoder::Reset() {
 
   recovery_frame_num_.reset();
   recovery_frame_cnt_.reset();
+
+  secure_handle_ = 0;
 
   // If we are in kDecoding, we can resume without processing an SPS.
   // The state becomes kDecoding again, (1) at the first IDR slice or (2) at
@@ -776,7 +783,10 @@ H264Decoder::H264Accelerator::Status H264Decoder::StartNewFrame(
     return H264Accelerator::Status::kFail;
 
   UpdatePicNums(frame_num);
-  PrepareRefPicLists();
+
+  if (requires_ref_lists_) {
+    PrepareRefPicLists();
+  }
 
   return accelerator_->SubmitFrameMetadata(sps, pps, dpb_, ref_pic_list_p0_,
                                            ref_pic_list_b0_, ref_pic_list_b1_,
@@ -1066,6 +1076,8 @@ bool H264Decoder::FinishPicture(scoped_refptr<H264Picture> pic) {
     dpb_.StorePic(std::move(pic));
   }
 
+  secure_handle_ = 0;
+
   return true;
 }
 
@@ -1175,8 +1187,6 @@ bool H264Decoder::ProcessSPS(int sps_id,
   VideoChromaSampling new_chroma_sampling = sps->GetChromaSampling();
   if (new_chroma_sampling != chroma_sampling_) {
     chroma_sampling_ = new_chroma_sampling;
-    base::UmaHistogramEnumeration("Media.PlatformVideoDecoding.ChromaSampling",
-                                  chroma_sampling_);
   }
 
   if (chroma_sampling_ != VideoChromaSampling::k420) {
@@ -1186,9 +1196,13 @@ bool H264Decoder::ProcessSPS(int sps_id,
 
   VideoCodecProfile new_profile =
       H264Parser::ProfileIDCToVideoCodecProfile(sps->profile_idc);
-  uint8_t new_bit_depth = 0;
-  if (!ParseBitDepth(*sps, new_bit_depth))
+  if (new_profile == VIDEO_CODEC_PROFILE_UNKNOWN) {
     return false;
+  }
+  uint8_t new_bit_depth = 0;
+  if (!ParseBitDepth(*sps, new_bit_depth)) {
+    return false;
+  }
   if (!IsValidBitDepth(new_bit_depth, new_profile)) {
     DVLOG(1) << "Invalid bit depth=" << base::strict_cast<int>(new_bit_depth)
              << ", profile=" << GetProfileName(new_profile);
@@ -1224,6 +1238,9 @@ bool H264Decoder::ProcessSPS(int sps_id,
   // then trigger color space change.
   if (new_color_space.IsSpecified() &&
       new_color_space != picture_color_space_) {
+    if (!Flush()) {
+      return false;
+    }
     DVLOG(1) << "New color space: " << new_color_space.ToString();
     picture_color_space_ = new_color_space;
     *color_space_changed = true;
@@ -1374,7 +1391,7 @@ H264Decoder::H264Accelerator::Status H264Decoder::ProcessCurrentSlice() {
   // If we are using full sample encryption then we do not have the information
   // we need to update the ref pic lists here, but that's OK because the
   // accelerator doesn't actually need to submit them in this case.
-  if (!slice_hdr->full_sample_encryption &&
+  if (!slice_hdr->full_sample_encryption && requires_ref_lists_ &&
       !ModifyReferencePicLists(slice_hdr, &ref_pic_list0, &ref_pic_list1)) {
     return H264Accelerator::Status::kFail;
   }
@@ -1433,6 +1450,12 @@ void H264Decoder::SetStream(int32_t id, const DecoderBuffer& decoder_buffer) {
     parser_.SetStream(ptr, size);
     current_decrypt_config_ = nullptr;
   }
+  if (decoder_buffer.has_side_data() &&
+      decoder_buffer.side_data()->secure_handle) {
+    secure_handle_ = decoder_buffer.side_data()->secure_handle;
+  } else {
+    secure_handle_ = 0;
+  }
 }
 
 H264Decoder::DecodeResult H264Decoder::Decode() {
@@ -1446,7 +1469,7 @@ H264Decoder::DecodeResult H264Decoder::Decode() {
     // originally set in case the accelerator needs to return kTryAgain.
     H264Accelerator::Status result = accelerator_->SetStream(
         base::span<const uint8_t>(current_stream_, current_stream_size_),
-        current_decrypt_config_.get());
+        current_decrypt_config_.get(), secure_handle_);
     switch (result) {
       case H264Accelerator::Status::kOk:
       case H264Accelerator::Status::kNotSupported:
@@ -1682,16 +1705,18 @@ H264Decoder::DecodeResult H264Decoder::Decode() {
               // 3. Both container and bitstream.
               // Thus we should also extract HDR metadata here in case we
               // miss the information.
-              if (!hdr_metadata_)
-                hdr_metadata_ = gfx::HDRMetadata();
-              sei_msg.content_light_level_info.PopulateHDRMetadata(
-                  hdr_metadata_.value());
+              if (!hdr_metadata_.has_value()) {
+                hdr_metadata_.emplace();
+              }
+              hdr_metadata_->cta_861_3 =
+                  sei_msg.content_light_level_info.ToGfx();
               break;
             case H264SEIMessage::kSEIMasteringDisplayInfo:
-              if (!hdr_metadata_)
-                hdr_metadata_ = gfx::HDRMetadata();
-              sei_msg.mastering_display_info.PopulateColorVolumeMetadata(
-                  hdr_metadata_->smpte_st_2086);
+              if (!hdr_metadata_.has_value()) {
+                hdr_metadata_.emplace();
+              }
+              hdr_metadata_->smpte_st_2086 =
+                  sei_msg.mastering_display_info.ToGfx();
               break;
             default:
               break;

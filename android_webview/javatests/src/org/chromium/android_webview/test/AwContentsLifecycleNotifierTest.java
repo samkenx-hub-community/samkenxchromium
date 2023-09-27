@@ -11,8 +11,10 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import org.chromium.android_webview.AppState;
 import org.chromium.android_webview.AwContentsLifecycleNotifier;
 import org.chromium.base.test.util.CallbackHelper;
+import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.Feature;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
 
@@ -47,19 +49,50 @@ public class AwContentsLifecycleNotifierTest {
     public void testNotifierCreate() throws Throwable {
         LifecycleObserver observer = new LifecycleObserver();
         TestThreadUtils.runOnUiThreadBlocking(() -> {
-            AwContentsLifecycleNotifier.addObserver(observer);
+            AwContentsLifecycleNotifier.getInstance().addObserver(observer);
+            Assert.assertFalse(AwContentsLifecycleNotifier.getInstance().hasWebViewInstances());
         });
-        Assert.assertFalse(AwContentsLifecycleNotifier.hasWebViewInstances());
 
         AwTestContainerView awTestContainerView =
                 mActivityTestRule.createAwTestContainerViewOnMainSync(mContentsClient);
         observer.mFirstWebViewCreatedCallback.waitForCallback(0, 1);
-        Assert.assertTrue(AwContentsLifecycleNotifier.hasWebViewInstances());
 
-        TestThreadUtils.runOnUiThreadBlocking(
-                () -> mActivityTestRule.getActivity().removeAllViews());
+        TestThreadUtils.runOnUiThreadBlocking(() -> {
+            Assert.assertTrue(AwContentsLifecycleNotifier.getInstance().hasWebViewInstances());
+            mActivityTestRule.getActivity().removeAllViews();
+        });
         mActivityTestRule.destroyAwContentsOnMainSync(awTestContainerView.getAwContents());
         observer.mLastWebViewDestroyedCallback.waitForCallback(0, 1);
-        Assert.assertFalse(AwContentsLifecycleNotifier.hasWebViewInstances());
+        TestThreadUtils.runOnUiThreadBlocking(() -> {
+            Assert.assertFalse(AwContentsLifecycleNotifier.getInstance().hasWebViewInstances());
+        });
+    }
+
+    @Test
+    @SmallTest
+    @Feature({"AndroidWebView"})
+    public void testAppState() throws Throwable {
+        TestThreadUtils.runOnUiThreadBlocking(() -> {
+            Assert.assertFalse(AwContentsLifecycleNotifier.getInstance().hasWebViewInstances());
+            Assert.assertEquals(
+                    AppState.DESTROYED, AwContentsLifecycleNotifier.getInstance().getAppState());
+        });
+
+        AwTestContainerView awTestContainerView =
+                mActivityTestRule.createAwTestContainerViewOnMainSync(mContentsClient);
+
+        CriteriaHelper.pollUiThread(() -> {
+            return AwContentsLifecycleNotifier.getInstance().getAppState() == AppState.FOREGROUND;
+        });
+
+        TestThreadUtils.runOnUiThreadBlocking(
+                () -> { mActivityTestRule.getActivity().removeAllViews(); });
+        mActivityTestRule.destroyAwContentsOnMainSync(awTestContainerView.getAwContents());
+
+        TestThreadUtils.runOnUiThreadBlocking(() -> {
+            Assert.assertFalse(AwContentsLifecycleNotifier.getInstance().hasWebViewInstances());
+            Assert.assertEquals(
+                    AppState.DESTROYED, AwContentsLifecycleNotifier.getInstance().getAppState());
+        });
     }
 }

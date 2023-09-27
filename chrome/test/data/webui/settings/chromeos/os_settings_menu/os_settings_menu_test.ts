@@ -4,43 +4,21 @@
 
 import 'chrome://os-settings/os_settings.js';
 
-import {createPageAvailabilityForTesting, OsSettingsMenuElement, OsSettingsRoutes, Route, Router, routes} from 'chrome://os-settings/os_settings.js';
+import {createPageAvailabilityForTesting, IronCollapseElement, IronSelectorElement, OsSettingsMenuElement, Router, routes, routesMojom} from 'chrome://os-settings/os_settings.js';
 import {IronIconElement} from 'chrome://resources/polymer/v3_0/iron-icon/iron-icon.js';
 import {flush} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
-import {assertEquals, assertFalse, assertNotEquals, assertNull, assertTrue} from 'chrome://webui-test/chai_assert.js';
+import {assertEquals, assertFalse, assertNotEquals, assertTrue} from 'chrome://webui-test/chai_assert.js';
+import {isVisible} from 'chrome://webui-test/test_util.js';
 
 /** @fileoverview Runs tests for the OS settings menu. */
-
-function setupRouter() {
-  const basicRoute = new Route('/');
-  const bluetoothRoute = basicRoute.createSection('/bluetooth', 'bluetooth');
-  const advancedRoute = new Route('/advanced');
-  const resetRoute = advancedRoute.createSection('/osReset', 'osReset');
-
-  const testRoutes = {
-    BASIC: basicRoute,
-    ABOUT: new Route('/about'),
-    ADVANCED: advancedRoute,
-    BLUETOOTH: bluetoothRoute,
-    OS_RESET: resetRoute,
-  };
-
-  Router.resetInstanceForTesting(new Router(testRoutes as OsSettingsRoutes));
-
-  routes.OS_RESET = testRoutes.OS_RESET;
-  routes.BLUETOOTH = testRoutes.BLUETOOTH;
-  routes.ADVANCED = testRoutes.ADVANCED;
-  routes.BASIC = testRoutes.BASIC;
-}
-
 suite('<os-settings-menu>', () => {
   let settingsMenu: OsSettingsMenuElement;
 
   setup(() => {
-    setupRouter();
     settingsMenu = document.createElement('os-settings-menu');
     settingsMenu.pageAvailability = createPageAvailabilityForTesting();
     document.body.appendChild(settingsMenu);
+    flush();
   });
 
   teardown(() => {
@@ -52,11 +30,16 @@ suite('<os-settings-menu>', () => {
     assertFalse(settingsMenu.advancedOpened);
     settingsMenu.advancedOpened = true;
     flush();
-    assertTrue(settingsMenu.$.advancedSubmenu.opened);
+
+    const advancedCollapse =
+        settingsMenu.shadowRoot!.querySelector<IronCollapseElement>(
+            '#advancedCollapse');
+    assertTrue(!!advancedCollapse);
+    assertTrue(advancedCollapse.opened);
 
     settingsMenu.advancedOpened = false;
     flush();
-    assertFalse(settingsMenu.$.advancedSubmenu.opened);
+    assertFalse(advancedCollapse.opened);
   });
 
   test('tapAdvanced', () => {
@@ -69,11 +52,16 @@ suite('<os-settings-menu>', () => {
 
     advancedToggle.click();
     flush();
-    assertTrue(settingsMenu.$.advancedSubmenu.opened);
+
+    const advancedCollapse =
+        settingsMenu.shadowRoot!.querySelector<IronCollapseElement>(
+            '#advancedCollapse');
+    assertTrue(!!advancedCollapse);
+    assertTrue(advancedCollapse.opened);
 
     advancedToggle.click();
     flush();
-    assertFalse(settingsMenu.$.advancedSubmenu.opened);
+    assertFalse(advancedCollapse.opened);
   });
 
   test('upAndDownIcons', () => {
@@ -112,7 +100,6 @@ suite('<os-settings-menu> reset', () => {
   let settingsMenu: OsSettingsMenuElement;
 
   setup(() => {
-    setupRouter();
     Router.getInstance().navigateTo(routes.OS_RESET);
     settingsMenu = document.createElement('os-settings-menu');
     settingsMenu.pageAvailability = createPageAvailabilityForTesting();
@@ -126,42 +113,52 @@ suite('<os-settings-menu> reset', () => {
   });
 
   test('openResetSection', () => {
-    const selector = settingsMenu.$.subMenu;
-    const path = new window.URL(selector.selected as string).pathname;
+    const submenu = settingsMenu.shadowRoot!.querySelector<IronSelectorElement>(
+        '#advancedSubmenu');
+    assertTrue(!!submenu);
+    const path = submenu.selected;
     assertEquals('/osReset', path);
   });
 
   test('navigateToAnotherSection', () => {
-    const selector = settingsMenu.$.subMenu;
-    let path = new window.URL(selector.selected as string).pathname;
+    const submenu = settingsMenu.shadowRoot!.querySelector<IronSelectorElement>(
+        '#advancedSubmenu');
+    assertTrue(!!submenu);
+    let path = submenu.selected;
     assertEquals('/osReset', path);
 
     Router.getInstance().navigateTo(routes.BLUETOOTH);
     flush();
 
-    path = new window.URL(selector.selected as string).pathname;
+    path = submenu.selected;
     assertEquals('/bluetooth', path);
   });
 
   test('navigateToBasic', () => {
-    const selector = settingsMenu.$.subMenu;
-    const path = new window.URL(selector.selected as string).pathname;
+    const submenu = settingsMenu.shadowRoot!.querySelector<IronSelectorElement>(
+        '#advancedSubmenu');
+    assertTrue(!!submenu);
+    const path = submenu.selected;
     assertEquals('/osReset', path);
 
     Router.getInstance().navigateTo(routes.BASIC);
     flush();
 
     // BASIC has no sub page selected.
-    assertEquals('', selector.selected);
+    assertEquals('', submenu.selected);
   });
 });
 
-suite('<os-settings-menu> page availability', () => {
+suite('<os-settings-menu> menu item visibility', () => {
   let settingsMenu: OsSettingsMenuElement;
+
+  const {Section} = routesMojom;
+  type SectionName = keyof typeof Section;
 
   setup(() => {
     settingsMenu = document.createElement('os-settings-menu');
     settingsMenu.pageAvailability = createPageAvailabilityForTesting();
+    settingsMenu.advancedOpened = true;
     document.body.appendChild(settingsMenu);
     flush();
   });
@@ -170,53 +167,123 @@ suite('<os-settings-menu> page availability', () => {
     settingsMenu.remove();
   });
 
-  function queryMenuItemByPageName(pageName: string): HTMLElement|null {
+  function queryMenuItemByPath(path: string): HTMLElement|null {
     return settingsMenu.shadowRoot!.querySelector<HTMLElement>(
-        `a.item[data-page-name='${pageName}']`);
+        `os-settings-menu-item[path="${path}"]`);
   }
 
-  const pages = [
+  test('About page menu item should always be visible', () => {
+    const path = `/${routesMojom.ABOUT_CHROME_OS_SECTION_PATH}`;
+    const menuItem = queryMenuItemByPath(path);
+    assertTrue(isVisible(menuItem));
+  });
+
+  interface MenuItemData {
+    sectionName: SectionName;
+    path: string;
+  }
+
+  const menuItemData: MenuItemData[] = [
     // Basic pages
-    'internet',
-    'bluetooth',
-    'multidevice',
-    'kerberos',
-    'osPeople',
-    'device',
-    'personalization',
-    'osSearch',
-    'osPrivacy',
-    'apps',
-    'osAccessibility',
-    // Advanced section pages
-    'dateTime',
-    'osLanguages',
-    'files',
-    'osPrinting',
-    'crostini',
-    'osReset',
+    {
+      sectionName: 'kNetwork',
+      path: `/${routesMojom.NETWORK_SECTION_PATH}`,
+    },
+    {
+      sectionName: 'kBluetooth',
+      path: `/${routesMojom.BLUETOOTH_SECTION_PATH}`,
+    },
+    {
+      sectionName: 'kMultiDevice',
+      path: `/${routesMojom.MULTI_DEVICE_SECTION_PATH}`,
+    },
+    {
+      sectionName: 'kPeople',
+      path: `/${routesMojom.PEOPLE_SECTION_PATH}`,
+    },
+    {
+      sectionName: 'kKerberos',
+      path: `/${routesMojom.KERBEROS_SECTION_PATH}`,
+    },
+    {
+      sectionName: 'kDevice',
+      path: `/${routesMojom.DEVICE_SECTION_PATH}`,
+    },
+    {
+      sectionName: 'kPersonalization',
+      path: `/${routesMojom.PERSONALIZATION_SECTION_PATH}`,
+    },
+    {
+      sectionName: 'kSearchAndAssistant',
+      path: `/${routesMojom.SEARCH_AND_ASSISTANT_SECTION_PATH}`,
+    },
+    {
+      sectionName: 'kPrivacyAndSecurity',
+      path: `/${routesMojom.PRIVACY_AND_SECURITY_SECTION_PATH}`,
+    },
+    {
+      sectionName: 'kApps',
+      path: `/${routesMojom.APPS_SECTION_PATH}`,
+    },
+    {
+      sectionName: 'kAccessibility',
+      path: `/${routesMojom.ACCESSIBILITY_SECTION_PATH}`,
+    },
+
+    // Advanced pages
+    {
+      sectionName: 'kDateAndTime',
+      path: `/${routesMojom.DATE_AND_TIME_SECTION_PATH}`,
+    },
+    {
+      sectionName: 'kLanguagesAndInput',
+      path: `/${routesMojom.LANGUAGES_AND_INPUT_SECTION_PATH}`,
+    },
+    {
+      sectionName: 'kFiles',
+      path: `/${routesMojom.FILES_SECTION_PATH}`,
+    },
+    {
+      sectionName: 'kPrinting',
+      path: `/${routesMojom.PRINTING_SECTION_PATH}`,
+    },
+    {
+      sectionName: 'kCrostini',
+      path: `/${routesMojom.CROSTINI_SECTION_PATH}`,
+    },
+    {
+      sectionName: 'kReset',
+      path: `/${routesMojom.RESET_SECTION_PATH}`,
+    },
   ];
-  for (const pageName of pages) {
-    test(`${pageName} menu item is controlled by pageAvailability`, () => {
-      // Make page available
-      settingsMenu.pageAvailability = {
-        ...settingsMenu.pageAvailability,
-        [pageName]: true,
-      };
-      flush();
 
-      let menuItem = queryMenuItemByPageName(pageName);
-      assertTrue(!!menuItem, `Menu item for ${pageName} should be stamped.`);
+  for (const {sectionName, path} of menuItemData) {
+    test(
+        `${sectionName} menu item is visible if page is available`, () => {
+          // Make page available
+          settingsMenu.pageAvailability = {
+            ...settingsMenu.pageAvailability,
+            [Section[sectionName]]: true,
+          };
+          flush();
 
-      // Make page unavailable
-      settingsMenu.pageAvailability = {
-        ...settingsMenu.pageAvailability,
-        [pageName]: false,
-      };
-      flush();
+          const menuItem = queryMenuItemByPath(path);
+          assertTrue(isVisible(menuItem));
+        });
 
-      menuItem = queryMenuItemByPageName(pageName);
-      assertNull(menuItem, `Menu item for ${pageName} should not be stamped.`);
-    });
+
+    test(
+        `${sectionName} menu item is not visible if page is unavailable`,
+        () => {
+          // Make page unavailable
+          settingsMenu.pageAvailability = {
+            ...settingsMenu.pageAvailability,
+            [Section[sectionName]]: false,
+          };
+          flush();
+
+          const menuItem = queryMenuItemByPath(path);
+          assertFalse(isVisible(menuItem));
+        });
   }
 });

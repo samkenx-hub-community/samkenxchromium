@@ -36,6 +36,7 @@
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
 #include "base/types/pass_key.h"
+#include "base/unguessable_token.h"
 #include "build/build_config.h"
 #include "cc/input/event_listener_properties.h"
 #include "cc/input/overscroll_behavior.h"
@@ -74,7 +75,7 @@
 #include "third_party/blink/renderer/platform/widget/widget_base_client.h"
 #include "third_party/blink/renderer/platform/wtf/casting.h"
 #include "ui/base/dragdrop/mojom/drag_drop_types.mojom-shared.h"
-#include "ui/base/mojom/ui_base_types.mojom-shared.h"
+#include "ui/base/ui_base_types.h"
 #include "ui/gfx/ca_layer_result.h"
 
 namespace gfx {
@@ -235,6 +236,8 @@ class CORE_EXPORT WebFrameWidgetImpl
   cc::EventListenerProperties EventListenerProperties(
       cc::EventListenerClass) const final;
   mojom::blink::DisplayMode DisplayMode() const override;
+  ui::WindowShowState WindowShowState() const override;
+  bool Resizable() const override;
   const WebVector<gfx::Rect>& WindowSegments() const override;
   void SetDelegatedInkMetadata(
       std::unique_ptr<gfx::DelegatedInkMetadata> metadata) final;
@@ -250,6 +253,9 @@ class CORE_EXPORT WebFrameWidgetImpl
   void DidChangeCursor(const ui::Cursor&) override;
   void GetCompositionCharacterBoundsInWindow(
       Vector<gfx::Rect>* bounds_in_dips) override;
+  // Return the last calculated line bounds.
+  Vector<gfx::Rect>& GetVisibleLineBoundsOnScreen() override;
+  void UpdateLineBounds() override;
   gfx::Range CompositionRange() override;
   WebTextInputInfo TextInputInfo() override;
   ui::mojom::VirtualKeyboardVisibilityRequest
@@ -373,15 +379,19 @@ class CORE_EXPORT WebFrameWidgetImpl
   void PrepareForFinalLifecyclUpdateForTesting() override;
 
   // Called when a drag-n-drop operation should begin.
-  virtual void StartDragging(const WebDragData&,
+  virtual void StartDragging(LocalFrame* source_frame,
+                             const WebDragData&,
                              DragOperationsMask,
                              const SkBitmap& drag_image,
                              const gfx::Vector2d& cursor_offset,
                              const gfx::Rect& drag_obj_rect);
 
   bool DoingDragAndDrop() { return doing_drag_and_drop_; }
-  static void SetIgnoreInputEvents(bool value) { ignore_input_events_ = value; }
-  static bool IgnoreInputEvents() { return ignore_input_events_; }
+  static void SetIgnoreInputEvents(
+      const base::UnguessableToken& browsing_context_group_token,
+      bool value);
+  static bool IgnoreInputEvents(
+      const base::UnguessableToken& browsing_context_group_token);
 
   // Resets the layout tracking steps for the main frame. When
   // `UpdateLifecycle()` is called it generates `WebMeaningfulLayout` events
@@ -451,6 +461,11 @@ class CORE_EXPORT WebFrameWidgetImpl
   // Sets the display mode, which comes from the top-level browsing context and
   // is applied to all widgets.
   void SetDisplayMode(mojom::blink::DisplayMode);
+
+  // Sets the window show state.
+  void SetWindowShowState(ui::WindowShowState);
+
+  void SetResizable(bool);
 
   absl::optional<gfx::Point> GetAndResetContextMenuLocation();
 
@@ -588,6 +603,10 @@ class CORE_EXPORT WebFrameWidgetImpl
   // Called when the main frame navigates.
   void DidNavigate();
 
+  // Ensures all queued input in the widget has been processed and the queues
+  // emptied.
+  void FlushInputForTesting(base::OnceClosure done_callback);
+
   // Called when the widget should get targeting input.
   void SetMouseCapture(bool capture);
 
@@ -658,6 +677,10 @@ class CORE_EXPORT WebFrameWidgetImpl
 
   // Ask compositor to create the shared memory for smoothness ukm region.
   base::ReadOnlySharedMemoryRegion CreateSharedMemoryForSmoothnessUkm();
+
+  // Calculate and cache the most up to date line bounding boxes in the document
+  // coordinate space.
+  Vector<gfx::Rect> CalculateVisibleLineBoundsOnScreen();
 
  protected:
   // WidgetBaseClient overrides:
@@ -946,6 +969,14 @@ class CORE_EXPORT WebFrameWidgetImpl
   // Satisfy the render blocking condition for cross-document view transitions.
   void NotifyViewTransitionRenderingHasBegun();
 
+  // True when `this` should ignore input events.
+  bool ShouldIgnoreInputEvents();
+
+  // Stores the current composition line bounds. These bounds are rectangles
+  // which surround each line of text in a currently focused input or textarea
+  // element.
+  Vector<gfx::Rect> input_visible_line_bounds_;
+
   // A copy of the web drop data object we received from the browser.
   Member<DataObject> current_drag_data_;
 
@@ -998,6 +1029,8 @@ class CORE_EXPORT WebFrameWidgetImpl
   Member<WebLocalFrameImpl> local_root_;
 
   mojom::blink::DisplayMode display_mode_;
+  ui::WindowShowState window_show_state_;
+  bool resizable_;
 
   WebVector<gfx::Rect> window_segments_;
 

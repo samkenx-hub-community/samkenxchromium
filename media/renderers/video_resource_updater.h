@@ -17,10 +17,10 @@
 #include "base/trace_event/memory_dump_provider.h"
 #include "base/unguessable_token.h"
 #include "components/viz/common/resources/release_callback.h"
-#include "components/viz/common/resources/resource_format.h"
 #include "components/viz/common/resources/resource_id.h"
 #include "components/viz/common/resources/transferable_resource.h"
 #include "gpu/command_buffer/client/gles2_interface.h"
+#include "gpu/command_buffer/client/raster_interface.h"
 #include "media/base/media_export.h"
 #include "media/base/video_frame.h"
 #include "ui/gfx/buffer_types.h"
@@ -33,7 +33,6 @@ class Transform;
 
 namespace viz {
 class ClientResourceProvider;
-class ContextProvider;
 class RasterContextProvider;
 class CompositorRenderPass;
 class SharedBitmapReporter;
@@ -88,8 +87,7 @@ class MEDIA_EXPORT VideoResourceUpdater
   // For GPU compositing |context_provider| should be provided and for software
   // compositing |shared_bitmap_reporter| should be provided. If there is a
   // non-null |context_provider| we assume GPU compositing.
-  VideoResourceUpdater(viz::ContextProvider* context_provider,
-                       viz::RasterContextProvider* raster_context_provider,
+  VideoResourceUpdater(viz::RasterContextProvider* context_provider,
                        viz::SharedBitmapReporter* shared_bitmap_reporter,
                        viz::ClientResourceProvider* resource_provider,
                        bool use_stream_video_draw_quad,
@@ -148,9 +146,7 @@ class MEDIA_EXPORT VideoResourceUpdater
     gfx::Size size_in_pixels;
   };
 
-  bool software_compositor() const {
-    return context_provider_ == nullptr && raster_context_provider_ == nullptr;
-  }
+  bool software_compositor() const { return context_provider_ == nullptr; }
 
   // Reallocate |upload_pixels_| with the requested size.
   bool ReallocateUploadPixels(size_t needed_size);
@@ -194,6 +190,8 @@ class MEDIA_EXPORT VideoResourceUpdater
       scoped_refptr<VideoFrame> video_frame);
 
   gpu::gles2::GLES2Interface* ContextGL();
+  gpu::raster::RasterInterface* RasterInterface();
+  gpu::InterfaceBase* InterfaceBase();
 
   void RecycleResource(uint32_t plane_resource_id,
                        const gpu::SyncToken& sync_token,
@@ -207,8 +205,7 @@ class MEDIA_EXPORT VideoResourceUpdater
   bool OnMemoryDump(const base::trace_event::MemoryDumpArgs& args,
                     base::trace_event::ProcessMemoryDump* pmd) override;
 
-  const raw_ptr<viz::ContextProvider, DanglingUntriaged> context_provider_;
-  const raw_ptr<viz::RasterContextProvider> raster_context_provider_;
+  const raw_ptr<viz::RasterContextProvider> context_provider_;
   const raw_ptr<viz::SharedBitmapReporter> shared_bitmap_reporter_;
   const raw_ptr<viz::ClientResourceProvider, DanglingUntriaged>
       resource_provider_;

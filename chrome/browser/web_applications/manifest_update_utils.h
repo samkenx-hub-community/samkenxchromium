@@ -12,6 +12,7 @@
 #include "chrome/browser/web_applications/web_app_icon_generator.h"
 #include "chrome/browser/web_applications/web_app_id.h"
 #include "chrome/browser/web_applications/web_app_install_info.h"
+#include "components/webapps/common/web_app_id.h"
 
 namespace web_app {
 
@@ -40,7 +41,8 @@ enum class ManifestUpdateResult {
   kSystemShutdown = 15,
   kAppIdentityUpdateRejectedAndUninstalled = 16,
   kAppIsIsolatedWebApp = 17,
-  kMaxValue = kAppIsIsolatedWebApp,
+  kCancelledDueToMainFrameNavigation = 18,
+  kMaxValue = kCancelledDueToMainFrameNavigation,
 };
 
 std::ostream& operator<<(std::ostream& os, ManifestUpdateResult result);
@@ -68,6 +70,7 @@ enum class ManifestUpdateCheckResult {
   kIconDownloadFailed,
   kIconReadFromDiskFailed,
   kWebContentsDestroyed,
+  kCancelledDueToMainFrameNavigation,
 };
 
 std::ostream& operator<<(std::ostream& os, ManifestUpdateCheckResult result);

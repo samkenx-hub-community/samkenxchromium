@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include "chrome/browser/k_anonymity_service/k_anonymity_service_factory.h"
+#include <cstddef>
 
 #include "build/branding_buildflags.h"
 #include "build/build_config.h"
@@ -15,6 +16,7 @@
 #include "components/keyed_service/core/keyed_service.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/k_anonymity_service_delegate.h"
+#include "k_anonymity_service_client.h"
 
 namespace {
 ProfileSelections BuildKAnonymityServiceProfileSelections() {
@@ -57,7 +59,13 @@ KAnonymityServiceFactory::KAnonymityServiceFactory()
 KAnonymityServiceFactory::~KAnonymityServiceFactory() = default;
 
 // BrowserContextKeyedServiceFactory:
-KeyedService* KAnonymityServiceFactory::BuildServiceInstanceFor(
+std::unique_ptr<KeyedService>
+KAnonymityServiceFactory::BuildServiceInstanceForBrowserContext(
     content::BrowserContext* context) const {
-  return new KAnonymityServiceClient(Profile::FromBrowserContext(context));
+  Profile* profile = Profile::FromBrowserContext(context);
+  if (!KAnonymityServiceClient::CanUseKAnonymityService(profile)) {
+    return nullptr;
+  }
+  return std::make_unique<KAnonymityServiceClient>(
+      Profile::FromBrowserContext(context));
 }

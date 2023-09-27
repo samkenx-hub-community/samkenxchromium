@@ -13,9 +13,9 @@
 #include "base/allocator/partition_allocator/partition_alloc_buildflags.h"
 #include "base/allocator/partition_allocator/partition_alloc_config.h"
 #include "base/allocator/partition_allocator/partition_bucket_lookup.h"
+#include "base/allocator/partition_allocator/shim/nonscannable_allocator.h"
 #include "base/debug/profiler.h"
 #include "base/format_macros.h"
-#include "base/memory/nonscannable_memory.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/numerics/safe_conversions.h"
 #include "base/strings/stringprintf.h"
@@ -86,7 +86,7 @@ void ReportWinHeapStats(MemoryDumpLevelOfDetail level_of_detail,
                         size_t* allocated_objects_size,
                         size_t* allocated_objects_count) {
   // This is too expensive on Windows, crbug.com/780735.
-  if (level_of_detail == MemoryDumpLevelOfDetail::DETAILED) {
+  if (level_of_detail == MemoryDumpLevelOfDetail::kDetailed) {
     WinHeapInfo main_heap_info = {};
     WinHeapMemoryDumpImpl(&main_heap_info);
     *total_virtual_size +=
@@ -122,7 +122,7 @@ void ReportPartitionAllocStats(ProcessMemoryDump* pmd,
                                size_t* cumulative_brp_quarantined_count) {
   MemoryDumpPartitionStatsDumper partition_stats_dumper("malloc", pmd,
                                                         level_of_detail);
-  bool is_light_dump = level_of_detail == MemoryDumpLevelOfDetail::BACKGROUND;
+  bool is_light_dump = level_of_detail == MemoryDumpLevelOfDetail::kBackground;
 
   auto* allocator = allocator_shim::internal::PartitionAllocMalloc::Allocator();
   allocator->DumpStats("allocator", is_light_dump, &partition_stats_dumper);
@@ -139,11 +139,12 @@ void ReportPartitionAllocStats(ProcessMemoryDump* pmd,
     aligned_allocator->DumpStats("aligned", is_light_dump,
                                  &partition_stats_dumper);
   }
-  auto& nonscannable_allocator = internal::NonScannableAllocator::Instance();
+  auto& nonscannable_allocator =
+      allocator_shim::NonScannableAllocator::Instance();
   if (auto* root = nonscannable_allocator.root())
     root->DumpStats("nonscannable", is_light_dump, &partition_stats_dumper);
   auto& nonquarantinable_allocator =
-      internal::NonQuarantinableAllocator::Instance();
+      allocator_shim::NonQuarantinableAllocator::Instance();
   if (auto* root = nonquarantinable_allocator.root())
     root->DumpStats("nonquarantinable", is_light_dump, &partition_stats_dumper);
 
@@ -476,7 +477,7 @@ MemoryDumpPartitionStatsDumper::MemoryDumpPartitionStatsDumper(
     MemoryDumpLevelOfDetail level_of_detail)
     : root_name_(root_name),
       memory_dump_(memory_dump),
-      detailed_(level_of_detail != MemoryDumpLevelOfDetail::BACKGROUND) {}
+      detailed_(level_of_detail != MemoryDumpLevelOfDetail::kBackground) {}
 
 void MemoryDumpPartitionStatsDumper::PartitionDumpTotals(
     const char* partition_name,

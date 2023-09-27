@@ -101,11 +101,10 @@ constexpr base::TimeDelta kTimeOutForCommitUpdate = base::Milliseconds(1000);
 // Appends the common switches to each shell link.
 void AppendCommonSwitches(const base::FilePath& cmd_line_profile_dir,
                           ShellLinkItem* shell_link) {
-  const char* kSwitchNames[] = { switches::kUserDataDir };
+  static constexpr const char* kSwitchNames[] = {switches::kUserDataDir};
   const base::CommandLine& command_line =
       *base::CommandLine::ForCurrentProcess();
-  shell_link->GetCommandLine()->CopySwitchesFrom(command_line, kSwitchNames,
-                                                 std::size(kSwitchNames));
+  shell_link->GetCommandLine()->CopySwitchesFrom(command_line, kSwitchNames);
   if (!cmd_line_profile_dir.empty()) {
     shell_link->GetCommandLine()->AppendSwitchPath(switches::kProfileDirectory,
                                                    cmd_line_profile_dir);
@@ -136,9 +135,7 @@ bool CreateIconFile(const gfx::ImageSkia& image_skia,
   // save it as the temporary file.
   gfx::ImageFamily image_family;
   if (!image_skia.isNull()) {
-    const std::vector<ui::ResourceScaleFactor> supported_scales =
-        ui::GetSupportedResourceScaleFactors();
-    for (const auto scale : supported_scales) {
+    for (const auto scale : ui::GetSupportedResourceScaleFactors()) {
       gfx::ImageSkiaRep image_skia_rep = image_skia.GetRepresentation(
           ui::GetScaleForResourceScaleFactor(scale));
       if (!image_skia_rep.is_null()) {
@@ -170,7 +167,7 @@ bool UpdateTaskCategory(
   if (!base::PathService::Get(base::FILE_EXE, &chrome_path))
     return false;
 
-  int icon_index = install_static::GetIconResourceIndex();
+  int icon_index = install_static::GetAppIconResourceIndex();
 
   ShellLinkItemList items;
 

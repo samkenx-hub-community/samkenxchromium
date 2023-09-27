@@ -19,6 +19,8 @@
 
 #include "base/at_exit.h"
 #include "base/command_line.h"
+#include "base/dcheck_is_on.h"
+#include "base/debug/handle_hooks_win.h"
 #include "base/file_version_info.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
@@ -34,15 +36,16 @@
 #include "base/process/memory.h"
 #include "base/process/process.h"
 #include "base/process/process_metrics.h"
+#include "base/strings/strcat_win.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
-#include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/single_thread_task_executor.h"
 #include "base/threading/platform_thread.h"
 #include "base/time/time.h"
 #include "base/values.h"
 #include "base/version.h"
+#include "base/win/current_module.h"
 #include "base/win/process_startup_helper.h"
 #include "base/win/registry.h"
 #include "base/win/scoped_com_initializer.h"
@@ -153,17 +156,17 @@ LONG OverwriteDisplayVersions(const std::wstring& product,
                               const std::wstring& value) {
   // The version is held in two places.  First change it in the MSI Installer
   // registry entry.  It is held under a "squashed guid" key.
-  std::wstring reg_path = base::StringPrintf(
-      L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Installer\\UserData\\"
-      L"%ls\\Products\\%ls\\InstallProperties",
-      kSystemPrincipalSid, InstallUtil::GuidToSquid(product).c_str());
+  std::wstring reg_path = base::StrCat(
+      {L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Installer\\UserData\\",
+       kSystemPrincipalSid, L"\\Products\\", InstallUtil::GuidToSquid(product),
+       L"\\InstallProperties"});
   LONG result1 = OverwriteDisplayVersion(reg_path, value, KEY_WOW64_64KEY);
 
   // The display version also exists under the Unininstall registry key with
   // the original guid.  Check both WOW64_64 and WOW64_32.
-  reg_path = base::StringPrintf(
-      L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{%ls}",
-      product.c_str());
+  reg_path = base::StrCat(
+      {L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{", product,
+       L"}"});
   // Consider the operation a success if either of these succeeds.
   LONG result2 = OverwriteDisplayVersion(reg_path, value, KEY_WOW64_64KEY);
   LONG result3 = OverwriteDisplayVersion(reg_path, value, KEY_WOW64_32KEY);
@@ -664,7 +667,7 @@ bool CheckPreInstallConditions(const InstallationState& original_state,
       // Instruct Google Update to launch the existing system-level Chrome.
       // There should be no error dialog.
       base::FilePath install_path(
-          installer::GetChromeInstallPath(true /* system_install */));
+          installer::GetInstalledDirectory(/*system_install=*/true));
       if (install_path.empty()) {
         // Give up if we failed to construct the install path.
         *status = installer::OS_ERROR;
@@ -722,9 +725,12 @@ installer::InstallStatus UninstallProducts(InstallationState& original_state,
 
   if (cmd_line.HasSwitch(installer::switches::kSelfDestruct) &&
       !installer_state.system_install()) {
-    const base::FilePath system_exe_path(
-        installer::GetChromeInstallPath(true).Append(installer::kChromeExe));
-    system_level_cmd.SetProgram(system_exe_path);
+    const base::FilePath system_install_dir(
+        installer::GetInstalledDirectory(/*system_install=*/true));
+    if (!system_install_dir.empty()) {
+      system_level_cmd.SetProgram(
+          system_install_dir.Append(installer::kChromeExe));
+    }
   }
 
   installer::InstallStatus install_status = installer::UNINSTALL_SUCCESSFUL;
@@ -868,12 +874,11 @@ installer::InstallStatus RegisterDevChrome(
   if (!existing_chrome)
     existing_chrome = original_state.GetProductState(true);
   if (existing_chrome) {
-    static const wchar_t kPleaseUninstallYourChromeMessage[] =
-        L"You already have a full-installation (non-dev) of %1ls, please "
-        L"uninstall it first using Add/Remove Programs in the control panel.";
-    std::wstring name(InstallUtil::GetDisplayName());
-    std::wstring message(
-        base::StringPrintf(kPleaseUninstallYourChromeMessage, name.c_str()));
+    const std::wstring name = InstallUtil::GetDisplayName();
+    const std::wstring message = base::StrCat(
+        {L"You already have a full-installation (non-dev) of ", name,
+         L", please uninstall it first using Add/Remove Programs in the "
+         L"control panel."});
 
     LOG(ERROR) << "Aborting operation: another installation of " << name
                << " was found, as a last resort (if the product is not present "
@@ -1485,10 +1490,9 @@ InstallStatus InstallProductsHelper(InstallationState& original_state,
 
 }  // namespace installer
 
-int WINAPI wWinMain(HINSTANCE instance,
-                    HINSTANCE prev_instance,
-                    wchar_t* command_line,
-                    int show_command) {
+namespace {
+
+int SetupMain() {
   // Check to see if the CPU is supported before doing anything else. There's
   // very little than can safely be accomplished if the CPU isn't supported
   // since dependent libraries (e.g., base) may use invalid instructions.
@@ -1554,10 +1558,18 @@ int WINAPI wWinMain(HINSTANCE instance,
   base::win::RegisterInvalidParamHandler();
   base::win::SetupCRT(cmd_line);
 
-#if defined(ARCH_CPU_64_BITS) || defined(NDEBUG)
-  // Disable the handle verifier for all but 32-bit debug builds.
+  // HandleVerifier detects and reports incorrect handle manipulations. It
+  // tracks handle operations on builds that support DCHECK only.
+#if !DCHECK_IS_ON()
   base::win::DisableHandleVerifier();
-#endif
+#elif !defined(COMPONENT_BUILD)
+  // Patch the main EXE on non-component builds when DCHECKs are enabled. This
+  // allows detection of third party code that might attempt to meddle with the
+  // process's handles. This must be done when single-threaded to avoid other
+  // threads attempting to make calls through the hooks while they are being
+  // emplaced.
+  base::debug::HandleHooks::AddIATPatch(CURRENT_MODULE());
+#endif  // !defined(COMPONENT_BUILD)
 
   const bool is_uninstall = cmd_line.HasSwitch(installer::switches::kUninstall);
 
@@ -1730,4 +1742,16 @@ int WINAPI wWinMain(HINSTANCE instance,
   VLOG(1) << "Installation complete, returning: " << return_code;
 
   return return_code;
+}
+
+}  // namespace
+
+int WINAPI wWinMain(HINSTANCE instance,
+                    HINSTANCE prev_instance,
+                    wchar_t* command_line,
+                    int show_command) {
+  // https://crbug.com/896565: Graceful shutdown sometimes fails for reasons out
+  // of the installer's control. Crashes from such failures are inactionable, so
+  // terminate the process forthwith.
+  base::Process::TerminateCurrentProcessImmediately(SetupMain());
 }

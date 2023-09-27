@@ -94,11 +94,27 @@ class CORE_EXPORT NGLineInfo {
   void SetBreakToken(const NGInlineBreakToken* break_token) {
     break_token_ = break_token;
   }
-  HeapVector<Member<const NGBlockBreakToken>>& PropagatedBreakTokens() {
-    return propagated_break_tokens_;
+  // True if this line ends a paragraph; i.e., ends a block or has a forced
+  // break.
+  bool IsEndParagraph() const { return !BreakToken() || HasForcedBreak(); }
+
+  HeapVector<Member<const NGBreakToken>>& ParallelFlowBreakTokens() {
+    return parallel_flow_break_tokens_;
   }
-  void PropagateBreakToken(const NGBlockBreakToken* token) {
-    propagated_break_tokens_.push_back(token);
+  void PropagateParallelFlowBreakToken(const NGBreakToken* token) {
+    parallel_flow_break_tokens_.push_back(token);
+  }
+
+  absl::optional<LayoutUnit> MinimumSpaceShortage() const {
+    return minimum_space_shortage_;
+  }
+  void PropagateMinimumSpaceShortage(LayoutUnit shortage) {
+    DCHECK_GT(shortage, LayoutUnit());
+    if (minimum_space_shortage_) {
+      minimum_space_shortage_ = std::min(*minimum_space_shortage_, shortage);
+    } else {
+      minimum_space_shortage_ = shortage;
+    }
   }
 
   void SetTextIndent(LayoutUnit indent) { text_indent_ = indent; }
@@ -146,10 +162,10 @@ class CORE_EXPORT NGLineInfo {
   bool HasOverflow() const { return has_overflow_; }
   void SetHasOverflow(bool value = true) { has_overflow_ = value; }
 
+  // True if this line is hyphenated.
+  bool IsHyphenated() const;
+
   void SetBfcOffset(const NGBfcOffset& bfc_offset) { bfc_offset_ = bfc_offset; }
-  void SetBfcBlockOffset(LayoutUnit block_offset) {
-    bfc_offset_.block_offset = block_offset;
-  }
   void SetWidth(LayoutUnit available_width, LayoutUnit width) {
     available_width_ = available_width;
     width_ = width;
@@ -243,15 +259,17 @@ class CORE_EXPORT NGLineInfo {
       unsigned* end_offset_out = nullptr) const;
 
   const NGInlineItemsData* items_data_ = nullptr;
-  scoped_refptr<const ComputedStyle> line_style_;
+  const ComputedStyle* line_style_{nullptr};
   NGInlineItemResults results_;
 
   NGBfcOffset bfc_offset_;
 
   const NGInlineBreakToken* break_token_ = nullptr;
-  HeapVector<Member<const NGBlockBreakToken>> propagated_break_tokens_;
+  HeapVector<Member<const NGBreakToken>> parallel_flow_break_tokens_;
 
   const NGLayoutResult* block_in_inline_layout_result_ = nullptr;
+
+  absl::optional<LayoutUnit> minimum_space_shortage_;
 
   LayoutUnit available_width_;
   LayoutUnit width_;

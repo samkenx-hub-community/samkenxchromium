@@ -10,12 +10,16 @@
 
 #include "ash/ash_export.h"
 #include "ash/public/cpp/tablet_mode_observer.h"
+#include "ash/shell_observer.h"
 #include "ash/wm/desks/desk_bar_view_base.h"
+#include "ash/wm/desks/desk_button/desk_button.h"
 #include "ash/wm/desks/desks_controller.h"
 #include "ash/wm/overview/overview_observer.h"
-#include "base/observer_list.h"
-#include "ui/gfx/geometry/rect.h"
+#include "base/memory/raw_ptr.h"
+#include "ui/display/display_observer.h"
+#include "ui/events/event_handler.h"
 #include "ui/views/widget/widget.h"
+#include "ui/wm/public/activation_change_observer.h"
 
 namespace aura {
 class Window;
@@ -28,9 +32,39 @@ namespace ash {
 // bar, but eventually, it will support all bars. Please note this controller is
 // owned by `DesksController`.
 class ASH_EXPORT DeskBarController : public DesksController::Observer,
+                                     public ui::EventHandler,
                                      public OverviewObserver,
-                                     public TabletModeObserver {
+                                     public ShellObserver,
+                                     public TabletModeObserver,
+                                     public wm::ActivationChangeObserver,
+                                     public display::DisplayObserver {
  public:
+  struct BarWidgetAndView {
+    BarWidgetAndView(DeskBarViewBase* bar_view,
+                     std::unique_ptr<views::Widget> bar_widget);
+    BarWidgetAndView(BarWidgetAndView&& other);
+    BarWidgetAndView& operator=(BarWidgetAndView&& other);
+    BarWidgetAndView(const BarWidgetAndView&) = delete;
+    BarWidgetAndView& operator=(const BarWidgetAndView&) = delete;
+    ~BarWidgetAndView();
+
+    // Returns the next focusable view based on `starting_view`, which is a
+    // focusable view in `bar_view`, and `reverse`. If `reverse` is false, it
+    // returns the traversible view after `starting_view`; otherwise, it returns
+    // the traversible view before `starting_view`.
+    views::View* GetNextFocusableView(views::View* starting_view,
+                                      bool reverse) const;
+
+    // Returns the first focusable view in `bar_view`.
+    views::View* GetFirstFocusableView() const;
+
+    // Returns the last focusable view in `bar_view`.
+    views::View* GetLastFocusableView() const;
+
+    std::unique_ptr<views::Widget> bar_widget;
+    raw_ptr<DeskBarViewBase> bar_view;
+  };
+
   DeskBarController();
 
   DeskBarController(const DeskBarController&) = delete;
@@ -41,44 +75,69 @@ class ASH_EXPORT DeskBarController : public DesksController::Observer,
   // DesksController::Observer:
   void OnDeskSwitchAnimationLaunching() override;
 
+  // ui::EventHandler:
+  void OnMouseEvent(ui::MouseEvent* event) override;
+  void OnTouchEvent(ui::TouchEvent* event) override;
+  void OnKeyEvent(ui::KeyEvent* event) override;
+
   // OverviewObserver:
   void OnOverviewModeWillStart() override;
 
+  // ShellObserver:
+  void OnShellDestroying() override;
+
   // TabletModeObserver:
   void OnTabletModeStarting() override;
+
+  // wm::ActivationChangeObserver:
+  void OnWindowActivated(ActivationReason reason,
+                         aura::Window* gained_active,
+                         aura::Window* lost_active) override;
+
+  // display::DisplayObserver:
+  void OnDisplayMetricsChanged(const display::Display& display,
+                               uint32_t changed_metrics) override;
 
   // Returns desk bar view in `root`. If there is no such desk bar, nullptr is
   // returned.
   DeskBarViewBase* GetDeskBarView(aura::Window* root) const;
 
-  // Creates desk bar(both bar widget and bar view) in `root`. If there is
-  // another bar in `root`, it will get rid of the existing one and then
-  // create a new one.
-  void CreateDeskBar(aura::Window* root);
+  // Returns true when there is a visible desk bar.
+  bool IsShowingDeskBar() const;
 
-  // Destroys desk bar in `root`. Please note, this assumes a valid bar always
-  // exists.
-  void DestroyDeskBar(aura::Window* root);
+  // Creates and shows the desk bar in 'root'.
+  void OpenDeskBar(aura::Window* root);
 
-  // Destroys all desk bars.
-  void DestroyAllDeskBars();
+  // Hides and destroys the desk bar in 'root'.
+  void CloseDeskBar(aura::Window* root);
 
-  // Shows the desk bar in 'root'. Please note, this assumes a valid bar
-  // always exists.
-  void ShowDeskBar(aura::Window* root);
-
-  // Hides the desk bar in 'root'. Please note, this assumes a valid bar
-  // always exists.
-  void HideDeskBar(aura::Window* root);
+  // Hides and destroys all desk bars.
+  void CloseAllDeskBars();
 
  private:
-  // Returns bounds for desk bar widget in `root`.
-  gfx::Rect GetDeskBarWidgetBounds(aura::Window* root) const;
+  void CloseDeskBarInternal(BarWidgetAndView& desk_bar);
+
+  // When pressing off the bar, it should either commit desk name change, or
+  // hide the bar.
+  void OnMaybePressOffBar(ui::LocatedEvent& event);
+
+  // Returns desk button for `root`.
+  DeskButton* GetDeskButton(aura::Window* root);
+
+  // Updates desk button activation.
+  void SetDeskButtonActivation(aura::Window* root, bool is_activated);
 
   // Bar widgets and bar views for the desk bars. Right now, it supports only
   // desk button desk bar. Support for overview desk bar will be added later.
-  std::vector<std::unique_ptr<views::Widget>> desk_bar_widgets_;
-  std::vector<DeskBarViewBase*> desk_bar_views_;
+  std::vector<BarWidgetAndView> desk_bars_;
+
+  // Observes display configuration changes.
+  display::ScopedDisplayObserver display_observer_{this};
+
+  // Indicates that shell is destroying.
+  bool is_shell_destroying_ = false;
+
+  bool should_ignore_activation_change_ = false;
 };
 
 }  // namespace ash

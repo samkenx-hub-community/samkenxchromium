@@ -16,10 +16,10 @@
 #import "base/strings/sys_string_conversions.h"
 #import "components/password_manager/core/browser/password_form.h"
 #import "components/password_manager/core/browser/password_manager_features_util.h"
+#import "components/password_manager/core/browser/password_sync_util.h"
 #import "components/password_manager/core/browser/ui/credential_ui_entry.h"
 #import "components/password_manager/core/common/password_manager_features.h"
 #import "components/signin/public/identity_manager/account_info.h"
-#import "components/sync/base/features.h"
 #import "components/sync/service/sync_service.h"
 #import "ios/chrome/browser/passwords/password_check_observer_bridge.h"
 #import "ios/chrome/browser/passwords/password_checkup_metrics.h"
@@ -27,22 +27,15 @@
 #import "ios/chrome/browser/ui/settings/password/account_storage_utils.h"
 #import "ios/chrome/browser/ui/settings/password/password_details/password_details.h"
 #import "ios/chrome/browser/ui/settings/password/password_details/password_details_consumer.h"
+#import "ios/chrome/browser/ui/settings/password/password_details/password_details_mediator+private.h"
 #import "ios/chrome/browser/ui/settings/password/password_details/password_details_mediator_delegate.h"
 #import "ios/chrome/browser/ui/settings/password/password_details/password_details_metrics_utils.h"
 #import "ios/chrome/browser/ui/settings/password/password_details/password_details_table_view_controller_delegate.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 using base::SysNSStringToUTF16;
 using password_manager::CredentialUIEntry;
 
 namespace {
-
-bool IsPasswordNotesWithBackupEnabled() {
-  return base::FeatureList::IsEnabled(syncer::kPasswordNotesWithBackup);
-}
 
 bool MatchesRealmUsernameAndPassword(PasswordDetails* password,
                                      const CredentialUIEntry& credential) {
@@ -115,17 +108,11 @@ bool ShouldDisplayCredentialAsMuted(
 @interface PasswordDetailsMediator () <
     PasswordCheckObserver,
     PasswordDetailsTableViewControllerDelegate> {
-  // The credentials to be displayed in the page.
-  std::vector<CredentialUIEntry> _credentials;
-
   // Password Check manager.
   scoped_refptr<IOSChromePasswordCheckManager> _manager;
 
   // Listens to compromised passwords changes.
   std::unique_ptr<PasswordCheckObserverBridge> _passwordCheckObserver;
-
-  // The context in which the password details are accessed.
-  DetailsContext _context;
 
   // The BrowserState pref service.
   raw_ptr<PrefService> _prefService;
@@ -184,7 +171,7 @@ bool ShouldDisplayCredentialAsMuted(
       manager->GetSavedPasswordsPresenter()->GetSavedCredentials();
 
   // Store all usernames by domain.
-  for (const auto& credential : _credentials) {
+  for (const auto& credential : self.credentials) {
     [signonRealms
         addObject:[NSString
                       stringWithCString:credential.GetFirstSignonRealm().c_str()
@@ -221,9 +208,13 @@ bool ShouldDisplayCredentialAsMuted(
 
   [self providePasswordsToConsumer];
 
-  if (_credentials[0].blocked_by_user) {
-    DCHECK_EQ(_credentials.size(), 1u);
+  if (self.credentials[0].blocked_by_user) {
+    DCHECK_EQ(self.credentials.size(), 1u);
     [_consumer setIsBlockedSite:YES];
+  }
+
+  if ([self isUserEligibleForSendingPasswords]) {
+    [_consumer setupRightShareButton];
   }
 }
 
@@ -236,9 +227,9 @@ bool ShouldDisplayCredentialAsMuted(
   // When details was opened from the Password Manager, only log password
   // check actions if the password is compromised.
   if (password_manager::ShouldRecordPasswordCheckUserAction(
-          _context, password.compromised)) {
+          self.context, password.compromised)) {
     password_manager::LogDeletePassword(
-        password_manager::GetWarningTypeForDetailsContext(_context));
+        password_manager::GetWarningTypeForDetailsContext(self.context));
   }
 
   // Map from PasswordDetails to CredentialUIEntry. Should support blocklists.
@@ -323,6 +314,10 @@ bool ShouldDisplayCredentialAsMuted(
   _manager->MuteCredential(*it);
 }
 
+- (password_manager::SavedPasswordsPresenter*)savedPasswordsPresenter {
+  return _manager->GetSavedPasswordsPresenter();
+}
+
 #pragma mark - PasswordDetailsTableViewControllerDelegate
 
 - (void)passwordDetailsViewController:
@@ -346,9 +341,8 @@ bool ShouldDisplayCredentialAsMuted(
                                                credential.username)] &&
               [oldPassword isEqualToString:base::SysUTF16ToNSString(
                                                credential.password)] &&
-              (!IsPasswordNotesWithBackupEnabled() ||
-               [oldNote
-                   isEqualToString:base::SysUTF16ToNSString(credential.note)]);
+              [oldNote
+                  isEqualToString:base::SysUTF16ToNSString(credential.note)];
         });
 
     // There should be no reason not to find the credential in the vector of
@@ -359,9 +353,7 @@ bool ShouldDisplayCredentialAsMuted(
     CredentialUIEntry updated_credential = original_credential;
     updated_credential.username = SysNSStringToUTF16(password.username);
     updated_credential.password = SysNSStringToUTF16(password.password);
-    if (IsPasswordNotesWithBackupEnabled()) {
-      updated_credential.note = SysNSStringToUTF16(password.note);
-    }
+    updated_credential.note = SysNSStringToUTF16(password.note);
     if (_manager->GetSavedPasswordsPresenter()->EditSavedCredentials(
             original_credential, updated_credential) ==
         password_manager::SavedPasswordsPresenter::EditResult::kSuccess) {
@@ -435,8 +427,8 @@ bool ShouldDisplayCredentialAsMuted(
   // Restoring a warning is only available in the
   // DetailsContext::kDismissedWarnings context, which is always showing only 1
   // credential.
-  CHECK(_credentials.size() == 1);
-  password_manager::CredentialUIEntry credential = _credentials[0];
+  CHECK(self.credentials.size() == 1);
+  password_manager::CredentialUIEntry credential = self.credentials[0];
   _manager->UnmuteCredential(credential);
   base::Erase(_credentials, credential);
   [self providePasswordsToConsumer];
@@ -461,18 +453,18 @@ bool ShouldDisplayCredentialAsMuted(
   // Fetch the insecure credentials to get their updated version.
   std::vector<password_manager::CredentialUIEntry> insecureCredentials =
       _manager->GetInsecureCredentials();
-  for (const CredentialUIEntry& credential : _credentials) {
+  for (const CredentialUIEntry& credential : self.credentials) {
     PasswordDetails* password =
         [[PasswordDetails alloc] initWithCredential:credential];
-    password.context = _context;
+    password.context = self.context;
     password.compromised = ShouldDisplayCredentialAsCompromised(
-        _context, credential, insecureCredentials);
+        self.context, credential, insecureCredentials);
 
     // `password.isCompromised` is always false for muted credentials, so
     // short-circuit to avoid unnecessary computation in
     // ShouldDisplayCredentialAsMuted.
     password.muted = !password.isCompromised &&
-                     ShouldDisplayCredentialAsMuted(_context, credential,
+                     ShouldDisplayCredentialAsMuted(self.context, credential,
                                                     insecureCredentials);
 
     // Only offer moving to the account if all of these hold.
@@ -481,7 +473,7 @@ bool ShouldDisplayCredentialAsMuted(
     // - The user is interested in saving passwords to the account, i.e. they
     // are opted in to account storage.
     password.shouldOfferToMoveToAccount =
-        _context == DetailsContext::kPasswordSettings &&
+        self.context == DetailsContext::kPasswordSettings &&
         password_manager::features_util::IsOptedInForAccountStorage(
             _prefService, _syncService) &&
         ShouldShowLocalOnlyIcon(credential, _syncService);
@@ -528,6 +520,16 @@ bool ShouldDisplayCredentialAsMuted(
     return absl::nullopt;
   }
   return *it;
+}
+
+// Returns YES if all of the following conditions are met:
+// * User is syncing or signed in and opted in to account storage.
+// * Password sending feature is enabled.
+- (BOOL)isUserEligibleForSendingPasswords {
+  return password_manager::sync_util::GetAccountForSaving(_prefService,
+                                                          _syncService) &&
+         base::FeatureList::IsEnabled(
+             password_manager::features::kSendPasswords);
 }
 
 @end

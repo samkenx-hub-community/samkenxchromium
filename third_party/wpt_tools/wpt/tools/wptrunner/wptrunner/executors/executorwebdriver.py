@@ -43,6 +43,7 @@ here = os.path.dirname(__file__)
 
 class WebDriverCallbackHandler(CallbackHandler):
     unimplemented_exc = (NotImplementedError, error.UnknownCommandException)
+    expected_exc = (error.WebDriverException,)
 
 
 class WebDriverBaseProtocolPart(BaseProtocolPart):
@@ -684,7 +685,7 @@ class WebDriverCrashtestExecutor(CrashtestExecutor):
     def __init__(self, logger, browser, server_config, timeout_multiplier=1,
                  screenshot_cache=None, close_after_done=True,
                  debug_info=None, capabilities=None, **kwargs):
-        """WebDriver-based executor for reftests"""
+        """WebDriver-based executor for crashtests"""
         CrashtestExecutor.__init__(self,
                                    logger,
                                    browser,

@@ -7,31 +7,45 @@ import argparse
 import collections
 import contextlib
 import enum
+import functools
 import inspect
 import io
 import logging
+import multiprocessing
 import optparse
 import pathlib
+import random
+import re
 import textwrap
+import typing
 import urllib.parse
-from typing import Hashable, List, Optional, Set, Tuple, Type, Union
+from typing import (
+    Dict,
+    FrozenSet,
+    Hashable,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    Type,
+    Union,
+)
 
 from blinkpy.common import path_finder
 from blinkpy.common.host import Host
+from blinkpy.common.system import command_line
 from blinkpy.common.system.filesystem import FileSystem
 from blinkpy.tool.commands.command import Command
-from blinkpy.tool.commands.update_metadata import (
-    BUG_PATTERN,
-    TestConfigurations,
-)
+from blinkpy.w3c import wpt_metadata
 from blinkpy.w3c.common import is_basename_skipped
 from blinkpy.w3c.wpt_manifest import WPTManifest
 from blinkpy.web_tests.port.base import Port
+from blinkpy.web_tests.port.factory import add_common_wpt_options
 
 path_finder.bootstrap_wpt_imports()
 from tools.lint import lint as wptlint
 from tools.lint import rules
-from wptrunner import manifestupdate, metadata, wptmanifest
+from wptrunner import manifestupdate, metadata, wptmanifest, wpttest
 from wptrunner.manifestexpected import fuzzy_prop
 from wptrunner.wptmanifest import node as wptnode
 from wptrunner.wptmanifest.backends import conditional, static
@@ -153,22 +167,6 @@ class MetadataBadValue(MetadataRule):
     Check that the value satisfies any required formats:
     https://web-platform-tests.org/tools/wptrunner/docs/expectation.html#web-platform-tests-metadata
     """
-    subtest_statuses = {
-        'PASS',
-        'FAIL',
-        'PRECONDITION_FAILED',
-        'TIMEOUT',
-        'NOTRUN',
-    }
-    common_test_statuses = {
-        'PRECONDITION_FAILED',
-        'TIMEOUT',
-        'CRASH',
-        'ERROR',
-    }
-    harness_statuses = common_test_statuses | {'OK'}
-    # Statuses for tests without subtests.
-    test_statuses = common_test_statuses | {'PASS', 'FAIL'}
     implementation_statuses = {'implementing', 'not-implementing', 'default'}
 
 
@@ -272,27 +270,36 @@ class WebPlatformTestRegexp(rules.WebPlatformTestRegexp):
 
 class LintWPT(Command):
     name = 'lint-wpt'
-    show_in_main_help = False  # TODO(crbug.com/1406669): To be switched on.
+    show_in_main_help = True
     help_text = __doc__.strip().splitlines()[0]
     long_help = __doc__
     ignorelist_filename: str = 'lint.ignore'
 
     def __init__(self,
                  tool: Host,
-                 configs: Optional[TestConfigurations] = None):
+                 configs: Optional[wpt_metadata.TestConfigurations] = None):
         super().__init__()
         self._tool = tool
         self._fs = self._tool.filesystem
         self._default_port = self._tool.port_factory.get()
+        # Ensure that `self._default_port`, which is shared among child
+        # processes, never updates the manifest, as doing so could race.
+        self._default_port.set_option_default('manifest_update', False)
+        self._default_port.set_option_default(
+            'test_types', typing.get_args(wpt_metadata.TestType))
         self._finder = path_finder.PathFinder(self._fs)
-        self._configs = configs or TestConfigurations.generate(self._tool)
+        self._configs = configs or wpt_metadata.TestConfigurations.generate(
+            self._tool)
 
     def parse_args(self, args: List[str]) -> Tuple[optparse.Values, List[str]]:
         # TODO(crbug.com/1431070): Migrate `blink_tool.py` to stdlib's
-        # `argparse`. `optparse` is deprecated.
-        parser = argparse.ArgumentParser(description=self.long_help,
-                                         parents=[wptlint.create_parser()],
-                                         conflict_handler='resolve')
+        # `argparse`. `optparse` is deprecated. Also, consider making our own
+        # command subparser [1] instead of using the `wpt lint` one.
+        #
+        # [1]: https://docs.python.org/3/library/argparse.html#argparse.ArgumentParser.add_subparsers
+        parser = command_line.ArgumentParser(description=self.long_help,
+                                             parents=[wptlint.create_parser()],
+                                             conflict_handler='resolve')
         # Hide formatting parameters that won't be used.
         parser.add_argument('--markdown',
                             action='store_true',
@@ -302,6 +309,7 @@ class LintWPT(Command):
                             help=argparse.SUPPRESS)
         parser.add_argument('--github-checks-text-file',
                             help=argparse.SUPPRESS)
+        add_common_wpt_options(parser)
         parameters = parser.parse_args(args)
         if not parameters.repo_root:
             parameters.repo_root = self._finder.path_from_wpt_tests()
@@ -309,6 +317,9 @@ class LintWPT(Command):
 
     def execute(self, options: optparse.Values, _args: List[str],
                 _tool: Host) -> Optional[int]:
+        if options.manifest_update:
+            for path in Port.WPT_DIRS:
+                WPTManifest.ensure_manifest(self._default_port, path)
         # Pipe `wpt lint`'s logs into `blink_tool.py`'s formatter.
         wptlint.logger = _log
         # Repurpose the `json` format to collect all lint errors, including
@@ -317,16 +328,25 @@ class LintWPT(Command):
         options.json = True
         wptlint.output_errors_json = (
             lambda _log, worker_errors: errors.extend(worker_errors))
+        # This is ugly, but it works around crbug.com/1470511 while still
+        # allowing for parallelism.
+        self._initialize_rule_registry()
+        wptlint.multiprocessing.Pool = functools.partial(
+            multiprocessing.Pool, initializer=self._initialize_rule_registry)
+        exit_code = wptlint.main(**vars(options))
+        self._log_errors(errors, options.repo_root)
+        return exit_code
+
+    def _initialize_rule_registry(self):
+        """Add custom rules to the linter rule registry. Must be idempotent."""
         # Replace `web-platform.test` regexp rule with a metadata-aware one.
         wptlint.regexps = [
             regexp for regexp in wptlint.regexps
             if not isinstance(regexp, rules.WebPlatformTestRegexp)
         ]
         wptlint.regexps.append(WebPlatformTestRegexp(self._fs))
-        wptlint.file_lints.append(self.check_metadata)
-        exit_code = wptlint.main(**vars(options))
-        self._log_errors(errors, options.repo_root)
-        return exit_code
+        if self.check_metadata not in wptlint.file_lints:
+            wptlint.file_lints.append(self.check_metadata)
 
     def _log_errors(self, errors: List[LintError], repo_root: str):
         if not errors:
@@ -427,6 +447,9 @@ class LintWPT(Command):
 
 
 class MetadataLinter(static.Compiler):
+    _disable_pattern = re.compile(
+        r'\s*lint-wpt:\s*disable\s*=\s*(?P<rules>[^;]*)')
+
     def __init__(
         self,
         path: str,
@@ -434,7 +457,7 @@ class MetadataLinter(static.Compiler):
         test_type: Optional[str],
         manifest: WPTManifest,
         metadata_root: str,
-        configs: TestConfigurations,
+        configs: wpt_metadata.TestConfigurations,
     ):
         super().__init__()
         self.path = path
@@ -444,8 +467,9 @@ class MetadataLinter(static.Compiler):
         # `context` contains information about the current section type,
         # heading, and key as it becomes available during the traversal. It's
         # also provided to the error message formatter.
-        self.context = {}
-        self.errors = set()
+        self.context: Dict[str, str] = {}
+        self.disabled_rules: Set[str] = set()
+        self.errors: Set[LintError] = set()
         # Check that all configurations have the same keys.
         assert len({frozenset(config.data) for config in configs}) == 1
 
@@ -487,20 +511,42 @@ class MetadataLinter(static.Compiler):
                 test_id = test_id[1:]
             if not self.manifest.is_slow_test(test_id):
                 continue
+            if not any(condition.value == 'TIMEOUT'
+                       for condition in test.get_conditions('expected')):
+                # This is an optimization to skip evaluating the condition on
+                # every config (slow) if there are no consistent timeouts in the
+                # first place. The main check is still necessary in case all
+                # `TIMEOUT`s are only taken by disabled configs.
+                continue
             configs = self.configs.enabled_configs(test, self.metadata_root)
             for config in configs:
                 with contextlib.suppress(KeyError):
                     if test.get('expected', config) == 'TIMEOUT':
                         self._error(MetadataLongTimeout, test=test_id)
+                        break
 
     def visit(self, node: wptnode.Node):
+        with self._disable_rules(node):
+            try:
+                return super().visit(node)
+            except AttributeError:
+                # When no handler is explicitly specified, default to traversing
+                # the node's children.
+                for child in node.children:
+                    self.visit(child)
+
+    @contextlib.contextmanager
+    def _disable_rules(self, node: wptnode.Node):
+        disabled_rules = set(self.disabled_rules)
         try:
-            return super().visit(node)
-        except AttributeError:
-            # When no handler is explicitly specified, default to traversing
-            # the node's children.
-            for child in node.children:
-                self.visit(child)
+            for _, comment in node.comments:
+                disable_match = self._disable_pattern.match(comment)
+                if disable_match:
+                    rules = disable_match['rules'].split(',')
+                    self.disabled_rules.update(rule.strip() for rule in rules)
+            yield
+        finally:
+            self.disabled_rules = disabled_rules
 
     def visit_DataNode(self, node: wptnode.DataNode):
         section_type = self.context.get('next_type')
@@ -519,10 +565,9 @@ class MetadataLinter(static.Compiler):
                     pathlib.Path(self.path).as_posix(), node.data)
                 if not self.manifest.is_test_url(test_id):
                     self._error(MetadataUnknownTest, test=test_id)
-                if self.test_type == 'testharness':
+                if wpt_metadata.can_have_subtests(self.test_type):
                     next_type = SectionType.SUBTEST
-            if not node.children:
-                assert heading
+            if heading and not node.children:
                 self._error(MetadataEmptySection)
             self._check_section_sorted(node)
             with self.using_context(next_type=next_type):
@@ -565,8 +610,30 @@ class MetadataLinter(static.Compiler):
         conditions_not_taken = set(range(len(conditions)))
         unique_values = set(map(self.visit, values))
         implicit_default = self._implicit_default_value(key_value_node.data)
+        if unique_values == {implicit_default}:
+            self._error(MetadataUnnecessaryKey, value=_format_node(values[0]))
+            return
+        if conditions == [None]:  # Early out for unconditional values
+            return
+
         # Simulate conditional value resolution for each test configuration.
-        for config in self.configs:
+        # Randomly shuffling the configs is an optimization to try to exercise
+        # every branch and take the early out as quickly as possible (sometimes
+        # with >8x speedups). Most conditions are very simple:
+        #   expected:
+        #     if os == "win": FAIL
+        #
+        # However, if we rely on the default lexographical order, we may get
+        # unlucky and need to iterate almost the entire `TestConfigurations`,
+        # which shuffling mitigates:
+        #   os=linux virtual_suite=threaded
+        #   ...
+        #   os=linux virtual_suite=webgpu
+        #   os=mac virtual_suite=threaded
+        #   ...
+        #   os=mac virtual_suite=webgpu
+        #   os=win virtual_suite=threaded   <= First (os == "win") config
+        for config in self._shuffled_configs:
             for i, condition in enumerate(conditions):
                 try:
                     if self._eval_condition_taken(condition, config):
@@ -584,12 +651,13 @@ class MetadataLinter(static.Compiler):
                     conditions_not_taken.discard(i)
             else:
                 unique_values.add(implicit_default)
+            if not conditions_not_taken and (conditions[-1] is None
+                                             or implicit_default
+                                             in unique_values):
+                break
 
-        if unique_values == {implicit_default}:
-            self._error(MetadataUnnecessaryKey, value=_format_node(values[0]))
-            return
-        elif (len([condition for condition in conditions if condition]) > 0
-              and len(unique_values) == 1):
+        if (len([condition for condition in conditions if condition]) > 0
+                and len(unique_values) == 1):
             self._error(MetadataConditionsUnnecessary,
                         value=_format_node(values[0]))
             return
@@ -599,20 +667,25 @@ class MetadataLinter(static.Compiler):
             self._error(MetadataUnreachableValue,
                         condition=_format_condition(conditions[i]))
         for prop, values in self.context['prop_comparisons'].items():
-            unknown_values = values - {config[prop] for config in self.configs}
+            unknown_values = values - self.configs.possible_values(prop)
             for value in unknown_values:
                 self._error(MetadataUnknownPropValue,
                             prop=prop,
                             value=value,
                             condition=_format_condition(condition))
 
+    @functools.cached_property
+    def _shuffled_configs(self) -> List[metadata.RunInfo]:
+        configs = list(self.configs)
+        random.shuffle(configs)
+        return configs
+
     def _implicit_default_value(self, key: str) -> Hashable:
         """Return the value wptrunner infers when no conditions match."""
         if key == 'expected':
-            if (self.context['section_type'] is SectionType.TEST
-                    and self.test_type == 'testharness'):
-                return 'OK'
-            return 'PASS'
+            is_subtest = self.context['section_type'] is not SectionType.TEST
+            default_expected = wpt_metadata.default_expected_by_type()
+            return default_expected[self.test_type, is_subtest]
         elif key == 'disabled' or key == 'restart-after':
             return False
         # Add a sentinel object to simulate no explicit default. This unique
@@ -668,7 +741,7 @@ class MetadataLinter(static.Compiler):
                 fuzzy_prop({'fuzzy': node.data})
             except ValueError:
                 self._error(MetadataBadValue, value=node.data)
-        if key == 'bug' and not BUG_PATTERN.fullmatch(node.data):
+        if key == 'bug' and not wpt_metadata.BUG_PATTERN.fullmatch(node.data):
             self._error(MetadataBadValue, value=node.data)
         return node.data
 
@@ -683,7 +756,11 @@ class MetadataLinter(static.Compiler):
         section_type = context.get('section_type')
         if section_type:
             context['section_type'] = section_type.name.capitalize()
-        self.errors.add(rule.error(self.path, context))
+        error = name, description, path, _ = rule.error(self.path, context)
+        if {'*', rule.name} & self.disabled_rules:
+            _log.debug('Skipping rule %s in %s: %s', name, path, description)
+        else:
+            self.errors.add(error)
 
     def _check_section_sorted(self, node: wptnode.DataNode):
         sort_key = lambda child: (isinstance(child, wptnode.DataNode), child.
@@ -703,14 +780,15 @@ class MetadataLinter(static.Compiler):
                 break
 
     @property
-    def allowed_statuses(self) -> Set[str]:
+    def allowed_statuses(self) -> FrozenSet[str]:
+        test_cls = wpttest.manifest_test_cls[self.test_type]
         section_type = self.context['section_type']
         if section_type is SectionType.SUBTEST:
-            return MetadataBadValue.subtest_statuses
-        assert section_type is SectionType.TEST
-        if self.test_type == 'testharness':
-            return MetadataBadValue.harness_statuses
-        return MetadataBadValue.test_statuses
+            result_cls = test_cls.subtest_result_cls
+            assert result_cls, f'{self.test_type!r} test cannot have subtests'
+        else:
+            result_cls = test_cls.result_cls
+        return frozenset(result_cls.statuses)
 
 
 def _format_condition(condition: Condition) -> str:
@@ -721,4 +799,5 @@ def _format_condition(condition: Condition) -> str:
 
 
 def _format_node(node: wptnode.Node) -> str:
-    return wptmanifest.serialize(node).splitlines()[0].strip()
+    node, _, _ = wptmanifest.serialize(node).splitlines()[0].partition('#')
+    return node.strip()

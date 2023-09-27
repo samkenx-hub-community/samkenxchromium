@@ -34,6 +34,7 @@
 #include "chrome/browser/win/titlebar_config.h"
 #include "chrome/common/chrome_constants.h"
 #include "components/policy/core/common/policy_pref_names.h"
+#include "content/public/browser/browser_thread.h"
 #include "ui/base/theme_provider.h"
 #include "ui/base/win/hwnd_metrics.h"
 #include "ui/display/win/screen_win.h"
@@ -395,13 +396,6 @@ void BrowserDesktopWindowTreeHostWin::HandleCreate() {
 void BrowserDesktopWindowTreeHostWin::HandleDestroying() {
   browser_window_property_manager_.reset();
   DesktopWindowTreeHostWin::HandleDestroying();
-}
-
-void BrowserDesktopWindowTreeHostWin::HandleFrameChanged() {
-  // Reinitialize the status bubble, since it needs to be initialized
-  // differently depending on whether or not DWM composition is enabled
-  browser_view_->InitStatusBubble();
-  DesktopWindowTreeHostWin::HandleFrameChanged();
 }
 
 void BrowserDesktopWindowTreeHostWin::HandleWindowScaleFactorChanged(

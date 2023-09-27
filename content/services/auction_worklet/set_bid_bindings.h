@@ -13,6 +13,7 @@
 #include "content/services/auction_worklet/context_recycler.h"
 #include "content/services/auction_worklet/public/mojom/bidder_worklet.mojom-forward.h"
 #include "content/services/auction_worklet/public/mojom/reject_reason.mojom.h"
+#include "content/services/auction_worklet/webidl_compat.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/blink/public/common/interest_group/ad_auction_currencies.h"
 #include "third_party/blink/public/common/interest_group/interest_group.h"
@@ -49,11 +50,11 @@ class CONTENT_EXPORT SetBidBindings : public Bindings {
 
   mojom::RejectReason reject_reason() const { return reject_reason_; }
 
-  // Returns true if there was no error, and false on error. Note that a valid
-  // value that results in no bid is not considered an error.
-  bool SetBid(v8::Local<v8::Value> generate_bid_result,
-              std::string error_prefix,
-              std::vector<std::string>& errors_out);
+  // Attempts to set the pending bid value, overwriting any previously set
+  // bid. Returns whether any errors were raise. Note that a valid value that
+  // results in no bid is not considered an error.
+  IdlConvert::Status SetBidImpl(v8::Local<v8::Value> generate_bid_result,
+                                std::string error_prefix);
 
  private:
   static void SetBid(const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -64,7 +65,7 @@ class CONTENT_EXPORT SetBidBindings : public Bindings {
   bool has_top_level_seller_origin_ = false;
   mojom::RejectReason reject_reason_ = mojom::RejectReason::kNotAvailable;
 
-  raw_ptr<const mojom::BidderWorkletNonSharedParams, DanglingUntriaged>
+  raw_ptr<const mojom::BidderWorkletNonSharedParams>
       bidder_worklet_non_shared_params_ = nullptr;
 
   absl::optional<blink::AdCurrency> per_buyer_currency_;

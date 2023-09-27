@@ -135,7 +135,10 @@ class MockSurfaceDelegate : public SurfaceDelegate {
   MOCK_METHOD(void, UnsetCanGoBack, (), (override));
   MOCK_METHOD(void, SetPip, (), (override));
   MOCK_METHOD(void, UnsetPip, (), (override));
-  MOCK_METHOD(void, SetFloat, (), (override));
+  MOCK_METHOD(void,
+              SetFloatToLocation,
+              (chromeos::FloatStartLocation),
+              (override));
   MOCK_METHOD(void,
               SetAspectRatio,
               (const gfx::SizeF& aspect_ratio),
@@ -149,6 +152,7 @@ class MockSurfaceDelegate : public SurfaceDelegate {
   MOCK_METHOD(void, Pin, (bool trusted), (override));
   MOCK_METHOD(void, Unpin, (), (override));
   MOCK_METHOD(void, SetSystemModal, (bool modal), (override));
+  MOCK_METHOD(void, SetTopInset, (int height), (override));
   MOCK_METHOD(SecurityDelegate*, GetSecurityDelegate, (), (override));
 };
 

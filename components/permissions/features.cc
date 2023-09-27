@@ -8,6 +8,12 @@
 namespace permissions {
 namespace features {
 
+// Enables or disables whether pages with pending permission requests will
+// go into back/forward cache.
+BASE_FEATURE(kBackForwardCacheUnblockPermissionRequest,
+             "BackForwardCacheUnblockPermissionRequest",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Enables or disables whether permission prompts are automatically blocked
 // after the user has explicitly dismissed them too many times.
 BASE_FEATURE(kBlockPromptsIfDismissedOften,
@@ -40,6 +46,10 @@ BASE_FEATURE(kConfirmationChip,
 BASE_FEATURE(kChipLocationBarIconOverride,
              "ChipLocationIconOverride",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+BASE_FEATURE(kPermissionElement,
+             "PermissionElement",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kNotificationInteractionHistory,
              "NotificationInteractionHistory",
@@ -93,6 +103,10 @@ BASE_FEATURE(kPermissionOnDeviceGeolocationPredictions,
              "PermissionOnDeviceGeolocationPredictions",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+BASE_FEATURE(kPermissionDedicatedCpssSetting,
+             "PermissionDedicatedCpssSettings",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 #if BUILDFLAG(IS_ANDROID)
 
 // When enabled, blocks notifications permission prompt when Chrome doesn't
@@ -126,6 +140,11 @@ BASE_FEATURE(kRecordPermissionExpirationTimestamps,
              "RecordPermissionExpirationTimestamps",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+// Kill switch for the mitigation for https://crbug.com/1462709
+BASE_FEATURE(kMitigateUnpartitionedWebviewPermissions,
+             "MitigateUnpartitionedWebviewPermissions",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
 #endif  // BUILDFLAG(IS_ANDROID)
 
 // When enabled, permission grants for Storage Access API will be enabled.
@@ -135,11 +154,11 @@ BASE_FEATURE(kPermissionStorageAccessAPI,
              "PermissionStorageAccessAPI",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// When enabled "window-management" may be used as an alias for
-// "window-placement". Additionally, reverse mappings (i.e. enum to string) will
-// default to the new alias.
-BASE_FEATURE(kWindowManagementPermissionAlias,
-             "WindowManagementPermissionAlias",
+// When enabled "window-placement" may be used as an alias for
+// "window-management". Additionally, reverse mappings (i.e. enum to string)
+// will default to the legacy strings ("window-placement").
+BASE_FEATURE(kWindowPlacementPermissionAlias,
+             "WindowPlacementPermissionAlias",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables disallowing MIDI permission by default.
@@ -156,6 +175,10 @@ const base::FeatureParam<bool> kUseStrongerPromptLanguage{
 const base::FeatureParam<base::TimeDelta> kOneTimePermissionTimeout{
     &features::kOneTimePermission, "one_time_permission_timeout",
     base::Minutes(5)};
+
+const base::FeatureParam<base::TimeDelta> kOneTimePermissionLongTimeout{
+    &features::kOneTimePermission, "one_time_permission_long_timeout",
+    base::Hours(16)};
 
 const base::FeatureParam<std::string> kPermissionPredictionServiceUrlOverride{
     &permissions::features::kPermissionPredictionServiceUseUrlOverride,

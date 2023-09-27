@@ -99,10 +99,6 @@ public class NewTabPageUma {
     /** The number of possible NTP impression types */
     private static final int NUM_NTP_IMPRESSION = 2;
 
-    /** The maximal number of suggestions per section. Keep in sync with kMaxSuggestionsPerCategory
-     * in content_suggestions_metrics.cc. */
-    private static final int MAX_SUGGESTIONS_PER_SECTION = 20;
-
     /**
      * Possible results when updating content suggestions list in the UI. Keep in sync with the
      * ContentSuggestionsUIUpdateResult2 enum in enums.xml. Do not remove or change existing
@@ -140,14 +136,16 @@ public class NewTabPageUma {
     // the ContentSuggestionsDisplayStatus enum defined in tools/metrics/enums.xml.
     @IntDef({ContentSuggestionsDisplayStatus.VISIBLE, ContentSuggestionsDisplayStatus.COLLAPSED,
             ContentSuggestionsDisplayStatus.DISABLED_BY_POLICY,
-            ContentSuggestionsDisplayStatus.DISABLED})
+            ContentSuggestionsDisplayStatus.DISABLED,
+            ContentSuggestionsDisplayStatus.DISABLED_BY_DSE})
     @Retention(RetentionPolicy.SOURCE)
     private @interface ContentSuggestionsDisplayStatus {
         int VISIBLE = 0;
         int COLLAPSED = 1;
         int DISABLED_BY_POLICY = 2;
         int DISABLED = 3;
-        int NUM_ENTRIES = 4;
+        int DISABLED_BY_DSE = 4;
+        int NUM_ENTRIES = 5;
     }
 
     private final TabModelSelector mTabModelSelector;
@@ -216,17 +214,6 @@ public class NewTabPageUma {
     }
 
     /**
-     * Records number of prefetched article suggestions, which were available when content
-     * suggestions surface was opened and there was no network connection.
-     */
-    public static void recordPrefetchedArticleSuggestionsCount(int count) {
-        RecordHistogram.recordEnumeratedHistogram(
-                "NewTabPage.ContentSuggestions.CountOnNtpOpenedIfVisible."
-                        + "Articles.Prefetched.Offline2",
-                count, MAX_SUGGESTIONS_PER_SECTION);
-    }
-
-    /**
      * Records Content Suggestions Display Status when NTPs opened.
      */
     public void recordContentSuggestionsDisplayStatus(Profile profile) {
@@ -235,6 +222,9 @@ public class NewTabPageUma {
         if (!UserPrefs.get(profile).getBoolean(Pref.ENABLE_SNIPPETS)) {
             // Disabled by policy.
             status = ContentSuggestionsDisplayStatus.DISABLED_BY_POLICY;
+        } else if (!UserPrefs.get(profile).getBoolean(Pref.ENABLE_SNIPPETS_BY_DSE)) {
+            // Disabled when swapping NTP is enabled and the default search engine isn't Google.
+            status = ContentSuggestionsDisplayStatus.DISABLED_BY_DSE;
         } else if (!FeedFeatures.isFeedEnabled()) {
             status = ContentSuggestionsDisplayStatus.DISABLED;
         } else if (!UserPrefs.get(profile).getBoolean(Pref.ARTICLES_LIST_VISIBLE)) {

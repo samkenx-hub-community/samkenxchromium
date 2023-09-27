@@ -44,6 +44,20 @@ class AutofillProfileImportProcessTest : public testing::Test {
     }
   }
 
+  // Returns all profiles stored in the `personal_data_manager_` after
+  // finalizing the `import_process`'s import.
+  std::vector<AutofillProfile> ApplyImportAndGetProfiles(
+      ProfileImportProcess& import_process) const {
+    import_process.ApplyImport();
+    // For convenience, return plain objects rather than pointers.
+    std::vector<AutofillProfile> profiles;
+    for (const AutofillProfile* pdm_profile :
+         personal_data_manager_.GetProfiles()) {
+      profiles.push_back(*pdm_profile);
+    }
+    return profiles;
+  }
+
   TestPersonalDataManager personal_data_manager_;
   GURL url_{"https://www.import.me/now.html"};
 };
@@ -97,7 +111,7 @@ TEST_F(AutofillProfileImportProcessTest, ImportFirstProfile_UserAccepts) {
   EXPECT_EQ(import_data.import_type(), AutofillProfileImportType::kNewProfile);
 
   std::vector<AutofillProfile> resulting_profiles =
-      import_data.GetResultingProfiles();
+      ApplyImportAndGetProfiles(import_data);
   ASSERT_EQ(resulting_profiles.size(), 1U);
   EXPECT_THAT(resulting_profiles,
               testing::UnorderedElementsAre(observed_profile));
@@ -128,7 +142,7 @@ TEST_F(AutofillProfileImportProcessTest, ImportFirstProfile_ImportIsBlocked) {
   EXPECT_EQ(import_data.import_type(),
             AutofillProfileImportType::kSuppressedNewProfile);
 
-  EXPECT_THAT(import_data.GetResultingProfiles(),
+  EXPECT_THAT(ApplyImportAndGetProfiles(import_data),
               testing::UnorderedElementsAre());
 }
 
@@ -159,7 +173,7 @@ TEST_F(AutofillProfileImportProcessTest,
   EXPECT_TRUE(import_data.ProfilesChanged());
   EXPECT_EQ(import_data.import_type(), AutofillProfileImportType::kNewProfile);
 
-  EXPECT_THAT(import_data.GetResultingProfiles(),
+  EXPECT_THAT(ApplyImportAndGetProfiles(import_data),
               testing::UnorderedElementsAre(edited_profile));
 }
 
@@ -186,7 +200,7 @@ TEST_F(AutofillProfileImportProcessTest, ImportFirstProfile_UserRejects) {
   // profile.
   EXPECT_EQ(import_data.import_type(), AutofillProfileImportType::kNewProfile);
 
-  EXPECT_THAT(import_data.GetResultingProfiles(),
+  EXPECT_THAT(ApplyImportAndGetProfiles(import_data),
               testing::UnorderedElementsAre());
 }
 
@@ -215,7 +229,7 @@ TEST_F(AutofillProfileImportProcessTest, ImportDuplicateProfile) {
   // There should be no change to the profiles.
   EXPECT_FALSE(import_data.ProfilesChanged());
 
-  EXPECT_THAT(import_data.GetResultingProfiles(),
+  EXPECT_THAT(ApplyImportAndGetProfiles(import_data),
               testing::UnorderedElementsAre(existing_profiles.at(0)));
 }
 
@@ -273,7 +287,7 @@ TEST_F(AutofillProfileImportProcessTest,
   // Verify that this operation does not result in a change of the profiles.
   EXPECT_FALSE(import_data.ProfilesChanged());
 
-  EXPECT_THAT(import_data.GetResultingProfiles(),
+  EXPECT_THAT(ApplyImportAndGetProfiles(import_data),
               testing::UnorderedElementsAre(duplicate_existing_profile,
                                             distinct_existing_profile));
 }
@@ -295,7 +309,7 @@ TEST_F(AutofillProfileImportProcessTest, ImportDuplicateProfile_kAccount) {
             AutofillProfileImportType::kDuplicateImport);
   import_data.AcceptWithoutPrompt();
   EXPECT_FALSE(import_data.ProfilesChanged());
-  EXPECT_THAT(import_data.GetResultingProfiles(),
+  EXPECT_THAT(ApplyImportAndGetProfiles(import_data),
               testing::ElementsAreArray(existing_profiles));
 }
 
@@ -316,7 +330,7 @@ TEST_F(AutofillProfileImportProcessTest, ImportSubsetProfile_kAccount) {
             AutofillProfileImportType::kDuplicateImport);
   import_data.AcceptWithoutPrompt();
   EXPECT_FALSE(import_data.ProfilesChanged());
-  EXPECT_THAT(import_data.GetResultingProfiles(),
+  EXPECT_THAT(ApplyImportAndGetProfiles(import_data),
               testing::ElementsAreArray(existing_profiles));
 }
 
@@ -341,7 +355,7 @@ TEST_F(AutofillProfileImportProcessTest,
             AutofillProfileImportType::kDuplicateImport);
   import_data.AcceptWithoutPrompt();
   EXPECT_FALSE(import_data.ProfilesChanged());
-  EXPECT_THAT(import_data.GetResultingProfiles(),
+  EXPECT_THAT(ApplyImportAndGetProfiles(import_data),
               testing::ElementsAreArray(existing_profiles));
 }
 
@@ -350,11 +364,8 @@ TEST_F(AutofillProfileImportProcessTest,
 // The source of resulting profile remains kAccount.
 TEST_F(AutofillProfileImportProcessTest,
        ImportSupersetProfile_kAccount_PostStorage) {
-  base::test::ScopedFeatureList feature;
-  feature.InitWithFeatures(
-      /*enabled_features=*/{features::kAutofillAccountProfilesUnionView,
-                            features::kAutofillAccountProfileStorage},
-      /*disabled_features=*/{});
+  base::test::ScopedFeatureList feature(
+      features::kAutofillAccountProfileStorage);
 
   AutofillProfile account_profile = test::SubsetOfStandardProfile();
   account_profile.set_source_for_testing(AutofillProfile::Source::kAccount);
@@ -373,48 +384,12 @@ TEST_F(AutofillProfileImportProcessTest,
   AutofillProfile expected_profile = test::StandardProfile();
   expected_profile.set_guid(account_profile.guid());
   expected_profile.set_source_for_testing(AutofillProfile::Source::kAccount);
-  EXPECT_THAT(import_data.GetResultingProfiles(),
+  EXPECT_THAT(ApplyImportAndGetProfiles(import_data),
               testing::ElementsAre(expected_profile));
 }
 
-// Tests that an import cannot cause a silent update of a `kAccount` profile, if
-// the feature parameter is disabled.
-TEST_F(AutofillProfileImportProcessTest,
-       ImportSilentUpdate_kAccount_DisabledFeature) {
-  base::test::ScopedFeatureList feature;
-  feature.InitAndEnableFeatureWithParameters(
-      features::kAutofillAccountProfilesUnionView,
-      {{features::kAutofillEnableSilentUpdatesForAccountProfiles.name,
-        "false"}});
-
-  AutofillProfile account_profile = test::UpdateableStandardProfile();
-  account_profile.set_source_for_testing(AutofillProfile::Source::kAccount);
-  std::vector<AutofillProfile> existing_profiles = {account_profile};
-  personal_data_manager_.SetProfilesForAllSources(&existing_profiles);
-
-  // The `observed_profile` is of type `kLocalOrSyncable`. This should not
-  // prevent silent-updating a `kAccount` profile.
-  ProfileImportProcess import_data(
-      /*observed_profile=*/test::StandardProfile(), "en_US", url_,
-      &personal_data_manager_,
-      /*allow_only_silent_updates=*/true);
-
-  import_data.AcceptWithoutPrompt();
-
-  EXPECT_FALSE(import_data.ProfilesChanged());
-  EXPECT_THAT(import_data.GetResultingProfiles(),
-              testing::ElementsAre(account_profile));
-}
-
-// Tests that an import can cause a silent update of a `kAccount` profile, if
-// the feature parameter is enabled.
+// Tests that an import can cause a silent update of a `kAccount` profile.
 TEST_F(AutofillProfileImportProcessTest, ImportSilentUpdate_kAccount) {
-  base::test::ScopedFeatureList feature;
-  feature.InitAndEnableFeatureWithParameters(
-      features::kAutofillAccountProfilesUnionView,
-      {{features::kAutofillEnableSilentUpdatesForAccountProfiles.name,
-        "true"}});
-
   AutofillProfile account_profile = test::UpdateableStandardProfile();
   account_profile.set_source_for_testing(AutofillProfile::Source::kAccount);
   std::vector<AutofillProfile> existing_profiles = {account_profile};
@@ -436,7 +411,7 @@ TEST_F(AutofillProfileImportProcessTest, ImportSilentUpdate_kAccount) {
   AutofillProfile expected_profile = test::StandardProfile();
   expected_profile.set_source_for_testing(AutofillProfile::Source::kAccount);
   expected_profile.set_guid(account_profile.guid());
-  EXPECT_THAT(import_data.GetResultingProfiles(),
+  EXPECT_THAT(ApplyImportAndGetProfiles(import_data),
               testing::ElementsAre(expected_profile));
 }
 
@@ -485,7 +460,7 @@ TEST_F(AutofillProfileImportProcessTest, MergeWithExistingProfile_Accepted) {
   test::CopyGUID(mergeable_profile, &final_profile);
 
   std::vector<AutofillProfile> resulting_profiles =
-      import_data.GetResultingProfiles();
+      ApplyImportAndGetProfiles(import_data);
   ASSERT_EQ(resulting_profiles.size(), 1U);
   EXPECT_THAT(resulting_profiles, testing::UnorderedElementsAre(final_profile));
   EXPECT_EQ(resulting_profiles.at(0).modification_date(), current_time);
@@ -533,7 +508,7 @@ TEST_F(AutofillProfileImportProcessTest,
   EXPECT_TRUE(import_data.ProfilesChanged());
 
   std::vector<AutofillProfile> resulting_profiles =
-      import_data.GetResultingProfiles();
+      ApplyImportAndGetProfiles(import_data);
   ASSERT_EQ(resulting_profiles.size(), 1U);
   EXPECT_THAT(resulting_profiles,
               testing::UnorderedElementsAre(edited_profile));
@@ -578,7 +553,7 @@ TEST_F(AutofillProfileImportProcessTest,
   AutofillProfile merged_profile = test::StandardProfile();
   test::CopyGUID(mergeable_profile, &merged_profile);
 
-  EXPECT_THAT(import_data.GetResultingProfiles(),
+  EXPECT_THAT(ApplyImportAndGetProfiles(import_data),
               testing::UnorderedElementsAre(merged_profile, distinct_profile));
 }
 
@@ -614,7 +589,7 @@ TEST_F(AutofillProfileImportProcessTest, MergeWithExistingProfile_Rejected) {
   ASSERT_TRUE(import_data.merge_candidate().has_value());
   EXPECT_EQ(import_data.merge_candidate(), mergeable_profile);
   // But there should be no further updates profiles.
-  EXPECT_EQ(import_data.updated_profiles().size(), 0u);
+  EXPECT_EQ(import_data.silently_updated_profiles().size(), 0u);
 
   // Simulate the decline by the user.
   import_data.Declined();
@@ -624,7 +599,7 @@ TEST_F(AutofillProfileImportProcessTest, MergeWithExistingProfile_Rejected) {
   EXPECT_FALSE(import_data.ProfilesChanged());
 
   std::vector<AutofillProfile> resulting_profiles =
-      import_data.GetResultingProfiles();
+      ApplyImportAndGetProfiles(import_data);
   ASSERT_EQ(resulting_profiles.size(), 1U);
   EXPECT_THAT(resulting_profiles,
               testing::UnorderedElementsAre(mergeable_profile));
@@ -660,7 +635,7 @@ TEST_F(AutofillProfileImportProcessTest, SilentlyUpdateProfile) {
   // There should be no merge candidate since this is only a silent update.
   EXPECT_FALSE(import_data.merge_candidate().has_value());
   // But there should be one updated profiles.
-  EXPECT_EQ(import_data.updated_profiles().size(), 1u);
+  EXPECT_EQ(import_data.silently_updated_profiles().size(), 1u);
 
   // In this scenario, the user should not be prompted.
   import_data.AcceptWithoutPrompt();
@@ -673,7 +648,7 @@ TEST_F(AutofillProfileImportProcessTest, SilentlyUpdateProfile) {
   updated_profile.set_guid(updateable_profile.guid());
 
   std::vector<AutofillProfile> resulting_profiles =
-      import_data.GetResultingProfiles();
+      ApplyImportAndGetProfiles(import_data);
   ASSERT_EQ(resulting_profiles.size(), 1U);
   EXPECT_THAT(resulting_profiles,
               testing::UnorderedElementsAre(updated_profile));
@@ -706,7 +681,7 @@ TEST_F(AutofillProfileImportProcessTest, BothMergeAndSilentUpdate_Accepted) {
   ASSERT_TRUE(import_data.merge_candidate().has_value());
   EXPECT_EQ(import_data.merge_candidate(), mergeable_profile);
   // And also an updated profile.
-  EXPECT_EQ(import_data.updated_profiles().size(), 1u);
+  EXPECT_EQ(import_data.silently_updated_profiles().size(), 1u);
 
   // Simulate that the user accepts the prompt without edits.
   import_data.AcceptWithoutEdits();
@@ -719,7 +694,7 @@ TEST_F(AutofillProfileImportProcessTest, BothMergeAndSilentUpdate_Accepted) {
   AutofillProfile merged_profile = observed_profile;
   test::CopyGUID(mergeable_profile, &merged_profile);
 
-  EXPECT_THAT(import_data.GetResultingProfiles(),
+  EXPECT_THAT(ApplyImportAndGetProfiles(import_data),
               testing::UnorderedElementsAre(merged_profile, updated_profile));
 }
 
@@ -749,7 +724,7 @@ TEST_F(AutofillProfileImportProcessTest, BothMergeAndSilentUpdate_Rejected) {
   ASSERT_TRUE(import_data.merge_candidate().has_value());
   EXPECT_EQ(import_data.merge_candidate(), mergeable_profile);
   // And also an updated profile.
-  EXPECT_EQ(import_data.updated_profiles().size(), 1u);
+  EXPECT_EQ(import_data.silently_updated_profiles().size(), 1u);
 
   // Simulate that the user declines the merge.
   import_data.Declined();
@@ -762,7 +737,7 @@ TEST_F(AutofillProfileImportProcessTest, BothMergeAndSilentUpdate_Rejected) {
   test::CopyGUID(updateable_profile, &updated_profile);
 
   EXPECT_THAT(
-      import_data.GetResultingProfiles(),
+      ApplyImportAndGetProfiles(import_data),
       testing::UnorderedElementsAre(mergeable_profile, updated_profile));
 }
 
@@ -794,7 +769,7 @@ TEST_F(AutofillProfileImportProcessTest, BlockedMergeAndSilentUpdate) {
   // There should be no merge candidate because the only potential candidate is
   // blocked but there should be a silent update.
   EXPECT_FALSE(import_data.merge_candidate().has_value());
-  EXPECT_EQ(import_data.updated_profiles().size(), 1u);
+  EXPECT_EQ(import_data.silently_updated_profiles().size(), 1u);
 
   // The user should not be asked.
   import_data.AcceptWithoutPrompt();
@@ -807,7 +782,7 @@ TEST_F(AutofillProfileImportProcessTest, BlockedMergeAndSilentUpdate) {
   test::CopyGUID(updateable_profile, &updated_profile);
 
   EXPECT_THAT(
-      import_data.GetResultingProfiles(),
+      ApplyImportAndGetProfiles(import_data),
       testing::UnorderedElementsAre(mergeable_profile, updated_profile));
 }
 
@@ -835,14 +810,14 @@ TEST_F(AutofillProfileImportProcessTest, BlockedMerge) {
   // There should be no merge candidate because the only potential candidate is
   // blocked and also no silent update.
   EXPECT_FALSE(import_data.merge_candidate().has_value());
-  EXPECT_EQ(import_data.updated_profiles().size(), 0u);
+  EXPECT_EQ(import_data.silently_updated_profiles().size(), 0u);
 
   // The user should not be asked.
   import_data.AcceptWithoutPrompt();
 
   EXPECT_FALSE(import_data.ProfilesChanged());
 
-  EXPECT_THAT(import_data.GetResultingProfiles(),
+  EXPECT_THAT(ApplyImportAndGetProfiles(import_data),
               testing::UnorderedElementsAre(mergeable_profile));
 }
 
@@ -877,7 +852,7 @@ TEST_F(AutofillProfileImportProcessTest,
   // There should be no merge candidate since this is only a silent update.
   EXPECT_FALSE(import_data.merge_candidate().has_value());
   // But there should be one updated profiles.
-  EXPECT_EQ(import_data.updated_profiles().size(), 1u);
+  EXPECT_EQ(import_data.silently_updated_profiles().size(), 1u);
 
   // In this scenario, the user should not be prompted.
   import_data.AcceptWithoutPrompt();
@@ -890,7 +865,7 @@ TEST_F(AutofillProfileImportProcessTest,
   updated_profile.set_guid(updateable_profile.guid());
 
   std::vector<AutofillProfile> resulting_profiles =
-      import_data.GetResultingProfiles();
+      ApplyImportAndGetProfiles(import_data);
   ASSERT_EQ(resulting_profiles.size(), 1U);
   EXPECT_THAT(resulting_profiles,
               testing::UnorderedElementsAre(updated_profile));
@@ -919,7 +894,7 @@ TEST_F(AutofillProfileImportProcessTest, SilentlyUpdateProfile_WithNewProfile) {
   // There should be no merge candidate since this is only a silent update.
   EXPECT_FALSE(import_data.merge_candidate().has_value());
   // But there should be one updated profiles.
-  EXPECT_TRUE(import_data.updated_profiles().empty());
+  EXPECT_TRUE(import_data.silently_updated_profiles().empty());
 
   // In this scenario, the user should not be prompted.
   import_data.AcceptWithoutPrompt();
@@ -954,7 +929,7 @@ TEST_F(AutofillProfileImportProcessTest,
   // There should be no merge candidate because the only potential candidate is
   // blocked but there should be a silent update.
   EXPECT_FALSE(import_data.merge_candidate().has_value());
-  EXPECT_EQ(import_data.updated_profiles().size(), 1u);
+  EXPECT_EQ(import_data.silently_updated_profiles().size(), 1u);
 
   // The user should not be asked.
   import_data.AcceptWithoutPrompt();
@@ -967,7 +942,7 @@ TEST_F(AutofillProfileImportProcessTest,
   test::CopyGUID(updateable_profile, &updated_profile);
 
   EXPECT_THAT(
-      import_data.GetResultingProfiles(),
+      ApplyImportAndGetProfiles(import_data),
       testing::UnorderedElementsAre(mergeable_profile, updated_profile));
 }
 
@@ -1026,7 +1001,7 @@ TEST_F(AutofillProfileImportProcessTest, MigrateProfileToAccount) {
   import_data.AcceptWithoutEdits();
   EXPECT_TRUE(import_data.ProfilesChanged());
   EXPECT_THAT(
-      import_data.GetResultingProfiles(),
+      ApplyImportAndGetProfiles(import_data),
       testing::UnorderedPointwise(
           CompareWithSource(),
           {profile_to_migrate.ConvertToAccountProfile(), other_profile}));
@@ -1057,7 +1032,7 @@ TEST_F(AutofillProfileImportProcessTest, MigrateProfileToAccount_SilentUpdate) {
   import_data.AcceptWithoutEdits();
   EXPECT_TRUE(import_data.ProfilesChanged());
   EXPECT_THAT(
-      import_data.GetResultingProfiles(),
+      ApplyImportAndGetProfiles(import_data),
       testing::UnorderedPointwise(
           CompareWithSource(), {observed_profile.ConvertToAccountProfile()}));
 }
@@ -1079,7 +1054,7 @@ TEST_F(AutofillProfileImportProcessTest,
   import_data.Declined();
   EXPECT_TRUE(import_data.ProfilesChanged());
   EXPECT_THAT(
-      import_data.GetResultingProfiles(),
+      ApplyImportAndGetProfiles(import_data),
       testing::UnorderedPointwise(CompareWithSource(), {observed_profile}));
 }
 

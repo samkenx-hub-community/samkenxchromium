@@ -6,6 +6,7 @@ import("//build/config/features.gni")
 import("//build/config/ozone.gni")
 import("//build/config/ui.gni")
 import("//device/vr/buildflags/buildflags.gni")
+import("//gpu/vulkan/features.gni")
 import("//testing/libfuzzer/fuzzer_test.gni")
 import("//testing/test.gni")
 
@@ -16,6 +17,7 @@ if (is_ios) {
 if (is_android) {
   import("//build/config/android/config.gni")
   import("//build/config/android/rules.gni")
+  import("//third_party/jni_zero/jni_zero.gni")
 }
 
 # Several targets want to include this header file, and some of them are
@@ -54,6 +56,17 @@ component("gfx_skia") {
     "//skia",
   ]
   defines = [ "GFX_SKIA_IMPLEMENTATION" ]
+}
+
+if (is_win) {
+  config("gfx_win_linker_flags") {
+    # This is in a separate config so the flags can be applied to dependents.
+    # ldflags in GN aren't automatically inherited.
+    ldflags = [
+      # Linking with OneCore.lib causes the following dlls to load.
+      "/DELAYLOAD:api-ms-win-core-handle-l1-1-0.dll",
+    ]
+  }
 }
 
 component("gfx") {
@@ -112,12 +125,11 @@ component("gfx") {
     "image/image_util.h",
     "interpolated_transform.cc",
     "interpolated_transform.h",
-    "nine_image_painter.cc",
-    "nine_image_painter.h",
     "overlay_plane_data.cc",
     "overlay_plane_data.h",
     "overlay_transform_utils.cc",
     "overlay_transform_utils.h",
+    "platform_font.cc",
     "platform_font.h",
     "scrollbar_size.cc",
     "scrollbar_size.h",
@@ -204,6 +216,8 @@ component("gfx") {
       "system_fonts_win.h",
       "win/crash_id_helper.cc",
       "win/crash_id_helper.h",
+      "win/d3d_shared_fence.cc",
+      "win/d3d_shared_fence.h",
       "win/direct_write.cc",
       "win/direct_write.h",
       "win/hwnd_util.cc",
@@ -279,10 +293,6 @@ component("gfx") {
     "//build/config:precompiled_headers",
     "//build/config/compiler:wexit_time_destructors",
   ]
-
-  if (is_apple) {
-    configs += [ "//build/config/compiler:enable_arc" ]
-  }
 
   # This is part of the gfx component in the component build.
   defines = [ "GFX_IMPLEMENTATION" ]
@@ -389,7 +399,10 @@ component("gfx") {
       "setupapi.lib",
       "dwmapi.lib",
       "dwrite.lib",
+      "onecore.lib",
     ]
+
+    all_dependent_configs = [ ":gfx_win_linker_flags" ]
     public_deps += [ "//components/crash/core/common" ]
   } else {
     sources -= [
@@ -423,8 +436,8 @@ component("gfx") {
     ]
   }
 
-  if ((!use_aura && !toolkit_views) || is_ios) {
-    sources -= [
+  if (use_aura || toolkit_views) {
+    sources += [
       "nine_image_painter.cc",
       "nine_image_painter.h",
     ]
@@ -481,7 +494,6 @@ component("color_space") {
       "CoreFoundation.framework",
       "CoreGraphics.framework",
     ]
-    configs += [ "//build/config/compiler:enable_arc" ]
     if (is_mac) {
       sources += [
         "mac/display_icc_profiles.cc",
@@ -513,7 +525,6 @@ source_set("native_widget_types_sources") {
   visibility = [ ":*" ]  # Depend on through ":native_widget_types".
 
   public = [ "native_widget_types.h" ]
-  sources = [ "native_widget_types.cc" ]
 
   public_deps = [
     ":gfx_export",
@@ -525,9 +536,8 @@ source_set("native_widget_types_sources") {
   defines = [ "GFX_IMPLEMENTATION" ]
 
   if (is_mac) {
-    sources += [ "native_widget_types_mac.mm" ]
+    sources = [ "native_widget_types_mac.mm" ]
     frameworks = [ "AppKit.framework" ]
-    deps += [ "//base:base_arc" ]
   }
 }
 
@@ -628,6 +638,7 @@ source_set("memory_buffer_sources") {
     "//base",
     "//build:chromecast_buildflags",
     "//build:chromeos_buildflags",
+    "//gpu/vulkan:buildflags",
     "//ui/gfx/geometry",
   ]
 
@@ -641,6 +652,7 @@ source_set("memory_buffer_sources") {
       "linux/client_native_pixmap_dmabuf.h",
       "linux/client_native_pixmap_factory_dmabuf.cc",
       "linux/client_native_pixmap_factory_dmabuf.h",
+      "linux/dmabuf_uapi.h",
       "linux/native_pixmap_dmabuf.cc",
       "linux/native_pixmap_dmabuf.h",
     ]
@@ -670,6 +682,11 @@ source_set("memory_buffer_sources") {
       "native_pixmap_handle.cc",
       "native_pixmap_handle.h",
     ]
+  }
+
+  if (enable_vulkan) {
+    public_deps +=
+        [ "//third_party/vulkan-deps/vulkan-headers/src:vulkan_headers" ]
   }
 }
 
@@ -708,7 +725,6 @@ static_library("test_support") {
   ]
   if (is_apple) {
     sources += [ "image/image_unittest_util_apple.mm" ]
-    configs += [ "//build/config/compiler:enable_arc" ]
   }
   if (use_fuzzing_engine) {
     sources += [
@@ -767,7 +783,6 @@ test("gfx_unittests") {
     sources += [ "font_fallback_linux_unittest.cc" ]
   }
   if (is_apple) {
-    configs += [ "//build/config/compiler:enable_arc" ]
     frameworks = [ "IOSurface.framework" ]
   }
   if (is_mac) {
@@ -798,7 +813,7 @@ test("gfx_unittests") {
 
   data = [ "test/data/" ]
 
-  if (!is_ios) {
+  if (use_blink) {
     sources += [
       "animation/animation_container_unittest.cc",
       "animation/animation_runner_unittest.cc",
@@ -806,6 +821,7 @@ test("gfx_unittests") {
       "animation/multi_animation_unittest.cc",
       "animation/slide_animation_unittest.cc",
       "animation/tween_unittest.cc",
+      "bidi_line_iterator_unittest.cc",
       "blit_unittest.cc",
       "break_list_unittest.cc",
       "canvas_unittest.cc",
@@ -848,13 +864,14 @@ test("gfx_unittests") {
       "image/image_skia_operations_unittest.cc",
       "image/image_util_unittest.cc",
       "mojom/mojom_traits_unittest.cc",
-      "nine_image_painter_unittest.cc",
       "overlay_transform_utils_unittest.cc",
       "paint_vector_icon_unittest.cc",
       "range/range_unittest.cc",
+      "render_text_unittest.cc",
       "selection_bound_unittest.cc",
       "selection_model_unittest.cc",
       "sequential_id_generator_unittest.cc",
+      "shadow_util_unittest.cc",
       "shadow_value_unittest.cc",
       "skbitmap_operations_unittest.cc",
       "skia_util_unittest.cc",
@@ -890,11 +907,6 @@ test("gfx_unittests") {
   ]
 
   if (use_blink) {
-    sources += [
-      "bidi_line_iterator_unittest.cc",
-      "render_text_unittest.cc",
-    ]
-
     deps += [ "//third_party:freetype_harfbuzz" ]
   }
 
@@ -912,8 +924,8 @@ test("gfx_unittests") {
     sources += [ "font_fallback_skia_unittest.cc" ]
   }
 
-  if (!use_aura && !is_ios) {
-    sources -= [ "nine_image_painter_unittest.cc" ]
+  if (use_aura || toolkit_views) {
+    sources += [ "nine_image_painter_unittest.cc" ]
   }
 
   if (is_win) {

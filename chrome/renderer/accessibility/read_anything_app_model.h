@@ -18,6 +18,10 @@ class AXNode;
 class AXSerializableTree;
 }  // namespace ui
 
+namespace ukm {
+class MojoUkmRecorder;
+}
+
 // A class that holds state for the ReadAnythingAppController for the Read
 // Anything WebUI app.
 class ReadAnythingAppModel {
@@ -35,6 +39,18 @@ class ReadAnythingAppModel {
   void set_requires_post_process_selection(bool value) {
     requires_post_process_selection_ = value;
   }
+  bool selection_from_action() { return selection_from_action_; }
+  void set_selection_from_action(bool value) { selection_from_action_ = value; }
+
+  const std::string& default_language_code() const {
+    return default_language_code_;
+  }
+
+  void set_default_language_code(const std::string code) {
+    default_language_code_ = code;
+  }
+
+  std::vector<std::string> GetSupportedFonts() const;
 
   // TODO(b/1266555): Ensure there is proper test coverage for all methods.
   // Theme
@@ -42,8 +58,11 @@ class ReadAnythingAppModel {
   float font_size() const { return font_size_; }
   float letter_spacing() const { return letter_spacing_; }
   float line_spacing() const { return line_spacing_; }
+  int color_theme() const { return color_theme_; }
+  int highlight_granularity() const { return highlight_granularity_; }
   const SkColor& foreground_color() const { return foreground_color_; }
   const SkColor& background_color() const { return background_color_; }
+  float speech_rate() const { return speech_rate_; }
 
   // Selection.
   bool has_selection() const { return has_selection_; }
@@ -54,6 +73,13 @@ class ReadAnythingAppModel {
 
   bool distillation_in_progress() const { return distillation_in_progress_; }
   bool active_tree_selectable() const { return active_tree_selectable_; }
+  bool is_empty() const {
+    return display_node_ids_.empty() && selection_node_ids_.empty();
+  }
+
+  bool page_finished_loading_for_data_collection() const {
+    return page_finished_loading_for_data_collection_;
+  }
 
   const ukm::SourceId& active_ukm_source_id() const {
     return active_ukm_source_id_;
@@ -76,9 +102,7 @@ class ReadAnythingAppModel {
   void SetActiveTreeSelectable(bool active_tree_selectable) {
     active_tree_selectable_ = active_tree_selectable;
   }
-  void SetActiveUkmSourceId(ukm::SourceId source_id) {
-    active_ukm_source_id_ = source_id;
-  }
+  void SetActiveUkmSourceId(ukm::SourceId source_id);
 
   void SetActiveTreeId(ui::AXTreeID tree_id) { active_tree_id_ = tree_id; }
 
@@ -86,6 +110,14 @@ class ReadAnythingAppModel {
   bool IsNodeIgnoredForReadAnything(ui::AXNodeID ax_node_id) const;
   bool NodeIsContentNode(ui::AXNodeID ax_node_id) const;
   void OnThemeChanged(read_anything::mojom::ReadAnythingThemePtr new_theme);
+  void OnSettingsRestoredFromPrefs(
+      read_anything::mojom::LineSpacing line_spacing,
+      read_anything::mojom::LetterSpacing letter_spacing,
+      const std::string& font,
+      double font_size,
+      read_anything::mojom::Colors color,
+      double speech_rate,
+      read_anything::mojom::HighlightGranularity granularity);
   void OnScroll(bool on_selection, bool from_reading_mode) const;
 
   void Reset(const std::vector<ui::AXNodeID>& content_node_ids);
@@ -129,13 +161,17 @@ class ReadAnythingAppModel {
 
   void EraseTreeForTesting(ui::AXTreeID tree_id);
 
- private:
-  void EraseTree(ui::AXTreeID tree_id);
-
-  double GetLetterSpacingValue(
-      read_anything::mojom::LetterSpacing letter_spacing) const;
   double GetLineSpacingValue(
       read_anything::mojom::LineSpacing line_spacing) const;
+  double GetLetterSpacingValue(
+      read_anything::mojom::LetterSpacing letter_spacing) const;
+
+  void IncreaseTextSize();
+  void DecreaseTextSize();
+  void ResetTextSize();
+
+ private:
+  void EraseTree(ui::AXTreeID tree_id);
 
   void InsertDisplayNode(ui::AXNodeID node);
   void ResetSelection();
@@ -195,14 +231,20 @@ class ReadAnythingAppModel {
   // contains all nodes between the start and end nodes of the selection.
   std::set<ui::AXNodeID> selection_node_ids_;
 
+  std::string default_language_code_ = "en-US";
+
   // Theme information.
-  std::string font_name_ = string_constants::kReadAnythingDefaultFontName;
+  std::string font_name_ = string_constants::kReadAnythingPlaceholderFontName;
   float font_size_ = kReadAnythingDefaultFontScale;
   float letter_spacing_ =
       (int)read_anything::mojom::LetterSpacing::kDefaultValue;
   float line_spacing_ = (int)read_anything::mojom::LineSpacing::kDefaultValue;
   SkColor background_color_ = (int)read_anything::mojom::Colors::kDefaultValue;
   SkColor foreground_color_ = (int)read_anything::mojom::Colors::kDefaultValue;
+  int color_theme_ = (int)read_anything::mojom::Colors::kDefaultValue;
+  float speech_rate_ = kReadAnythingDefaultSpeechRate;
+  int highlight_granularity_ =
+      (int)read_anything::mojom::HighlightGranularity::kDefaultValue;
 
   // Selection information.
   bool has_selection_ = false;
@@ -212,6 +254,19 @@ class ReadAnythingAppModel {
   int32_t end_offset_ = -1;
   bool requires_distillation_ = false;
   bool requires_post_process_selection_ = false;
+  bool selection_from_action_ = false;
+
+  std::unique_ptr<ukm::MojoUkmRecorder> ukm_recorder_;
+
+  // Used to keep track of how many selections were made for the
+  // active_ukm_source_id_. Only recorded during the select-to-distill flow
+  // (when the empty state page is shown).
+  int32_t num_selections_ = 0;
+
+  // For screen2x data collection, Chrome is launched from the CLI to open one
+  // webpage. We record the result of the distill() call for this entire
+  // webpage, so we only make the call once the webpage finished loading.
+  bool page_finished_loading_for_data_collection_ = false;
 };
 
 #endif  // CHROME_RENDERER_ACCESSIBILITY_READ_ANYTHING_APP_MODEL_H_

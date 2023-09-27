@@ -233,8 +233,8 @@ class FocusActivationStore {
   raw_ptr<aura::client::CaptureClient, ExperimentalAsh> capture_client_;
   raw_ptr<aura::client::FocusClient, ExperimentalAsh> focus_client_;
   aura::WindowTracker tracker_;
-  raw_ptr<aura::Window, ExperimentalAsh> focused_;
-  raw_ptr<aura::Window, ExperimentalAsh> active_;
+  raw_ptr<aura::Window, DanglingUntriaged | ExperimentalAsh> focused_;
+  raw_ptr<aura::Window, DanglingUntriaged | ExperimentalAsh> active_;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -677,13 +677,19 @@ void WindowTreeHostManager::OnDisplayRemoved(const display::Display& display) {
     GetRootWindowSettings(GetWindow(primary_host))->display_id =
         primary_display_id;
 
+    // Ensure that color spaces for the root windows reflect those of their new
+    // displays. If these go out of sync, we can lose the ability to composite
+    // HDR content.
+    const display::Display& new_primary_display =
+        GetDisplayManager()->GetDisplayForId(primary_display_id);
+    primary_host->AsWindowTreeHost()->compositor()->SetDisplayColorSpaces(
+        new_primary_display.GetColorSpaces());
+
     // Since window tree hosts have been swapped between displays, we need to
     // update the WTH the RoundedDisplayProviders are attached to.
     UpdateHostOfDisplayProviders();
 
-    OnDisplayMetricsChanged(
-        GetDisplayManager()->GetDisplayForId(primary_display_id),
-        DISPLAY_METRIC_BOUNDS);
+    OnDisplayMetricsChanged(new_primary_display, DISPLAY_METRIC_BOUNDS);
   }
 
   DeleteHost(host_to_delete);
@@ -891,9 +897,9 @@ void WindowTreeHostManager::SetPrimaryDisplayId(int64_t id) {
   // displays. If these go out of sync, we can lose the ability to composite
   // HDR content.
   primary_host->AsWindowTreeHost()->compositor()->SetDisplayColorSpaces(
-      new_primary_display.color_spaces());
+      new_primary_display.GetColorSpaces());
   non_primary_host->AsWindowTreeHost()->compositor()->SetDisplayColorSpaces(
-      old_primary_display.color_spaces());
+      old_primary_display.GetColorSpaces());
 
   std::u16string old_primary_title = primary_window->GetTitle();
   primary_window->SetTitle(non_primary_window->GetTitle());

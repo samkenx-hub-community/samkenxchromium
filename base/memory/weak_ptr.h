@@ -81,6 +81,7 @@
 #include "base/dcheck_is_on.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/ref_counted.h"
+#include "base/memory/safe_ref_traits.h"
 #include "base/sequence_checker.h"
 #include "base/synchronization/atomic_flag.h"
 #include "base/types/pass_key.h"
@@ -91,8 +92,6 @@ namespace sequence_manager::internal {
 class TaskQueueImpl;
 }
 
-template <typename T>
-class SafeRef;
 template <typename T> class SupportsWeakPtr;
 template <typename T> class WeakPtr;
 
@@ -177,9 +176,9 @@ class BASE_EXPORT WeakReferenceOwner {
 class SupportsWeakPtrBase {
  public:
   // A safe static downcast of a WeakPtr<Base> to WeakPtr<Derived>. This
-  // conversion will only compile if there is exists a Base which inherits
-  // from SupportsWeakPtr<Base>. See base::AsWeakPtr() below for a helper
-  // function that makes calling this easier.
+  // conversion will only compile if Derived singly inherits from
+  // SupportsWeakPtr<Base>. See base::AsWeakPtr() below for a helper function
+  // that makes calling this easier.
   //
   // Precondition: t != nullptr
   template<typename Derived>
@@ -187,19 +186,27 @@ class SupportsWeakPtrBase {
     static_assert(
         std::is_base_of<internal::SupportsWeakPtrBase, Derived>::value,
         "AsWeakPtr argument must inherit from SupportsWeakPtr");
-    return AsWeakPtrImpl<Derived>(t);
-  }
-
- private:
-  // This template function uses type inference to find a Base of Derived
-  // which is an instance of SupportsWeakPtr<Base>. We can then safely
-  // static_cast the Base* to a Derived*.
-  template <typename Derived, typename Base>
-  static WeakPtr<Derived> AsWeakPtrImpl(SupportsWeakPtr<Base>* t) {
-    WeakPtr<Base> weak = t->AsWeakPtr();
+    using Base = typename decltype(ExtractSinglyInheritedBase(t))::Base;
+    // Ensure SupportsWeakPtr<Base>::AsWeakPtr() is called even if the subclass
+    // hides or overloads it.
+    WeakPtr<Base> weak = static_cast<SupportsWeakPtr<Base>*>(t)->AsWeakPtr();
     return WeakPtr<Derived>(weak.CloneWeakReference(),
                             static_cast<Derived*>(weak.ptr_));
   }
+
+ private:
+  // This class can only be instantiated if the constructor argument inherits
+  // from SupportsWeakPtr<T> in exactly one way.
+  template <typename T>
+  struct ExtractSinglyInheritedBase;
+  template <typename T>
+  struct ExtractSinglyInheritedBase<SupportsWeakPtr<T>> {
+    using Base = T;
+    explicit ExtractSinglyInheritedBase(SupportsWeakPtr<T>*);
+  };
+  template <typename T>
+  ExtractSinglyInheritedBase(SupportsWeakPtr<T>*)
+      -> ExtractSinglyInheritedBase<SupportsWeakPtr<T>>;
 };
 
 // Forward declaration from safe_ptr.h.

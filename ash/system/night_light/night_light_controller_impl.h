@@ -10,6 +10,7 @@
 #include "ash/ash_export.h"
 #include "ash/display/window_tree_host_manager.h"
 #include "ash/public/cpp/night_light_controller.h"
+#include "ash/public/cpp/schedule_enums.h"
 #include "ash/public/cpp/session/session_observer.h"
 #include "ash/system/time/time_of_day.h"
 #include "base/containers/flat_map.h"
@@ -152,9 +153,6 @@ class ASH_EXPORT NightLightControllerImpl
   TimeOfDay GetCustomStartTime() const;
   TimeOfDay GetCustomEndTime() const;
   bool GetAmbientColorEnabled() const;
-
-  // Get whether the current time is after sunset and before sunrise.
-  bool IsNowWithinSunsetSunrise() const;
 
   // Update |ambient_rgb_scaling_factors_| from the current
   // |ambient_temperature_|.

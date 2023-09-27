@@ -4,6 +4,7 @@
 
 #include "components/autofill/content/renderer/form_autofill_util.h"
 
+#include "base/feature_list.h"
 #include "base/metrics/field_trial.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
@@ -23,6 +24,7 @@
 #include "content/public/test/test_utils.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "third_party/blink/public/common/features.h"
 #include "third_party/blink/public/platform/web_string.h"
 #include "third_party/blink/public/platform/web_vector.h"
 #include "third_party/blink/public/web/web_document.h"
@@ -89,15 +91,14 @@ void VerifyButtonTitleCache(const WebFormElement& form_target,
 
 bool HaveSameFormControlId(const WebFormControlElement& element,
                            const FormFieldData& field) {
-  FieldRendererId element_renderer_id(element.UniqueRendererFormControlId());
-  return element_renderer_id == field.unique_renderer_id;
+  return GetFieldRendererId(element) == field.unique_renderer_id;
 }
 
 class FormAutofillUtilsTest : public content::RenderViewTest {
  public:
   FormAutofillUtilsTest() {
     scoped_feature_list_.InitAndEnableFeature(
-        features::kAutofillEnableSelectMenu);
+        features::kAutofillEnableSelectList);
   }
   ~FormAutofillUtilsTest() override = default;
 
@@ -214,8 +215,8 @@ TEST_F(FormAutofillUtilsTest, FindChildTextSkipElementTest) {
     WebVector<WebElement> web_to_skip =
         web_frame->GetDocument().QuerySelectorAll("div[class='skip']");
     std::set<WebNode> to_skip;
-    for (size_t i = 0; i < web_to_skip.size(); ++i) {
-      to_skip.insert(web_to_skip[i]);
+    for (const WebElement& element : web_to_skip) {
+      to_skip.insert(element);
     }
 
     EXPECT_EQ(test_case.expected_label,
@@ -417,7 +418,8 @@ TEST_F(FormAutofillUtilsTest, GetButtonTitles_DisabledIfNoCache) {
   WebFormElement form_target;
   ASSERT_FALSE(web_frame->GetDocument().Body().IsNull());
 
-  autofill::ButtonTitleList actual = GetButtonTitles(form_target, nullptr);
+  autofill::ButtonTitleList actual =
+      GetButtonTitles(form_target, /*button_titles_cache=*/nullptr);
 
   EXPECT_TRUE(actual.empty());
 }
@@ -443,8 +445,9 @@ TEST_F(FormAutofillUtilsTest, IsEnabled) {
 
   autofill::FormData target;
   EXPECT_TRUE(UnownedFormElementsToFormData(
-      control_elements, iframe_elements, nullptr, web_frame->GetDocument(),
-      nullptr, EXTRACT_NONE, &target, nullptr));
+      control_elements, iframe_elements, /*element=*/nullptr,
+      web_frame->GetDocument(), nullptr, EXTRACT_NONE, &target,
+      /*field=*/nullptr));
   const struct {
     const char16_t* const name;
     bool enabled;
@@ -483,8 +486,9 @@ TEST_F(FormAutofillUtilsTest, IsReadonly) {
 
   autofill::FormData target;
   EXPECT_TRUE(UnownedFormElementsToFormData(
-      control_elements, iframe_elements, nullptr, web_frame->GetDocument(),
-      nullptr, EXTRACT_NONE, &target, nullptr));
+      control_elements, iframe_elements, /*element=*/nullptr,
+      web_frame->GetDocument(), nullptr, EXTRACT_NONE, &target,
+      /*field=*/nullptr));
   const struct {
     const char16_t* const name;
     bool readonly;
@@ -525,8 +529,9 @@ TEST_F(FormAutofillUtilsTest, IsFocusable) {
 
   autofill::FormData target;
   EXPECT_TRUE(UnownedFormElementsToFormData(
-      control_elements, iframe_elements, nullptr, web_frame->GetDocument(),
-      nullptr, EXTRACT_NONE, &target, nullptr));
+      control_elements, iframe_elements, /*element=*/nullptr,
+      web_frame->GetDocument(), nullptr, EXTRACT_NONE, &target,
+      /*field=*/nullptr));
   ASSERT_EQ(2u, target.fields.size());
   EXPECT_EQ(u"name1", target.fields[0].name);
   EXPECT_TRUE(target.fields[0].is_focusable);
@@ -543,8 +548,9 @@ TEST_F(FormAutofillUtilsTest, FindFormByUniqueId) {
     EXPECT_EQ(form, FindFormByUniqueRendererId(doc, GetFormRendererId(form)));
 
   // Expect null form element for non-existing form id.
-  FormRendererId non_existing_id(forms[0].UniqueRendererFormId() + 1000);
-  EXPECT_TRUE(FindFormByUniqueRendererId(doc, non_existing_id).IsNull());
+  FormRendererId non_existing_form_id(GetFormRendererId(forms[0]).value() +
+                                      1000);
+  EXPECT_TRUE(FindFormByUniqueRendererId(doc, non_existing_form_id).IsNull());
 }
 
 // Used in ParameterizedFindFormControlByRendererIdTest.
@@ -605,27 +611,23 @@ INSTANTIATE_TEST_SUITE_P(
            FindFormControlTestParam{"nonexistentField", "form1", false},
            FindFormControlTestParam{"nonexistentField", "form2", false},
            FindFormControlTestParam{"ownedField1", absl::nullopt, true},
-           FindFormControlTestParam{"ownedField1", std::string(), false},
            FindFormControlTestParam{"ownedField1", "form1", true},
-           FindFormControlTestParam{"ownedField1", "form2", false},
            FindFormControlTestParam{"ownedField2", absl::nullopt, true},
-           FindFormControlTestParam{"ownedField2", std::string(), false},
-           FindFormControlTestParam{"ownedField2", "form1", false},
            FindFormControlTestParam{"ownedField2", "form2", true},
            FindFormControlTestParam{"unownedField", absl::nullopt, true},
-           FindFormControlTestParam{"unownedField", std::string(), true},
-           FindFormControlTestParam{"unownedField", "form1", false},
-           FindFormControlTestParam{"unownedField", "form2", false}));
+           FindFormControlTestParam{"unownedField", std::string(), true}));
 
-TEST_F(FormAutofillUtilsTest, FindFormControlElementsByUniqueIdNoForm) {
+TEST_F(FormAutofillUtilsTest, FindFormControlElementsByUniqueId) {
   LoadHTML("<body><input id='i1'><input id='i2'><input id='i3'></body>");
   WebDocument doc = GetMainFrame()->GetDocument();
   auto input1 = GetFormControlElementById(doc, "i1");
   auto input3 = GetFormControlElementById(doc, "i3");
-  FieldRendererId non_existing_id(input3.UniqueRendererFormControlId() + 1000);
+  FieldRendererId non_existing_field_id(GetFieldRendererId(input3).value() +
+                                        1000);
 
-  std::vector<FieldRendererId> renderer_ids = {
-      GetFieldRendererId(input3), non_existing_id, GetFieldRendererId(input1)};
+  std::vector<FieldRendererId> renderer_ids = {GetFieldRendererId(input3),
+                                               non_existing_field_id,
+                                               GetFieldRendererId(input1)};
 
   auto elements = FindFormControlElementsByUniqueRendererId(doc, renderer_ids);
 
@@ -633,38 +635,6 @@ TEST_F(FormAutofillUtilsTest, FindFormControlElementsByUniqueIdNoForm) {
   EXPECT_EQ(input3, elements[0]);
   EXPECT_TRUE(elements[1].IsNull());
   EXPECT_EQ(input1, elements[2]);
-}
-
-TEST_F(FormAutofillUtilsTest, FindFormControlElementsByUniqueIdWithForm) {
-  LoadHTML(
-      "<body><form id='f1'><input id='i1'><input id='i2'></form><input "
-      "id='i3'></body>");
-  WebDocument doc = GetMainFrame()->GetDocument();
-  auto form = GetFormElementById(doc, "f1");
-  auto input1 = GetFormControlElementById(doc, "i1");
-  auto input3 = GetFormControlElementById(doc, "i3");
-  FieldRendererId non_existing_id(input3.UniqueRendererFormControlId() + 1000);
-
-  std::vector<FieldRendererId> renderer_ids = {
-      GetFieldRendererId(input3), non_existing_id, GetFieldRendererId(input1)};
-
-  auto elements = FindFormControlElementsByUniqueRendererId(
-      doc, GetFormRendererId(form), renderer_ids);
-
-  // |input3| is not in the form, so it shouldn't be returned.
-  ASSERT_EQ(3u, elements.size());
-  EXPECT_TRUE(elements[0].IsNull());
-  EXPECT_TRUE(elements[1].IsNull());
-  EXPECT_EQ(input1, elements[2]);
-
-  // Expect that no elements are returned for non existing form id.
-  FormRendererId non_existing_form_id(form.UniqueRendererFormId() + 1000);
-  elements = FindFormControlElementsByUniqueRendererId(
-      doc, non_existing_form_id, renderer_ids);
-  ASSERT_EQ(3u, elements.size());
-  EXPECT_TRUE(elements[0].IsNull());
-  EXPECT_TRUE(elements[1].IsNull());
-  EXPECT_TRUE(elements[2].IsNull());
 }
 
 // Tests the extraction of the aria-label attribute.
@@ -797,9 +767,9 @@ TEST_F(FormAutofillUtilsTest, IsOwnedByFrame) {
   content::RenderFrame* child_frame = GetIframeById(doc, "child_frame");
   WebElement div = GetElementById(doc, "div");
 
-  EXPECT_FALSE(IsOwnedByFrame(WebElement(), nullptr));
+  EXPECT_FALSE(IsOwnedByFrame(WebElement(), /*frame=*/nullptr));
   EXPECT_FALSE(IsOwnedByFrame(WebElement(), main_frame));
-  EXPECT_FALSE(IsOwnedByFrame(div, nullptr));
+  EXPECT_FALSE(IsOwnedByFrame(div, /*frame=*/nullptr));
   EXPECT_FALSE(IsOwnedByFrame(div, child_frame));
   EXPECT_TRUE(IsOwnedByFrame(div, main_frame));
   ExecuteJavaScriptForTests(R"(document.getElementById('div').remove();)");
@@ -816,8 +786,9 @@ TEST_F(FormAutofillUtilsTest, IsActionEmptyFalse) {
 
   FormData form_data;
   ASSERT_TRUE(WebFormElementToFormData(
-      web_form, WebFormControlElement(), nullptr /*field_data_manager*/,
-      EXTRACT_VALUE, &form_data, nullptr /* FormFieldData */));
+      web_form, WebFormControlElement(),
+      /*field_data_manager=*/nullptr /*field_data_manager=*/, EXTRACT_VALUE,
+      &form_data, /*field=*/nullptr));
 
   EXPECT_FALSE(form_data.is_action_empty);
 }
@@ -829,8 +800,9 @@ TEST_F(FormAutofillUtilsTest, IsActionEmptyTrue) {
 
   FormData form_data;
   ASSERT_TRUE(WebFormElementToFormData(
-      web_form, WebFormControlElement(), nullptr /*field_data_manager*/,
-      EXTRACT_VALUE, &form_data, nullptr /* FormFieldData */));
+      web_form, WebFormControlElement(),
+      /*field_data_manager=*/nullptr /*field_data_manager=*/, EXTRACT_VALUE,
+      &form_data, /*field=*/nullptr));
 
   EXPECT_TRUE(form_data.is_action_empty);
 }
@@ -842,8 +814,9 @@ TEST_F(FormAutofillUtilsTest, ExtractBounds) {
 
   FormData form_data;
   ASSERT_TRUE(FindFormAndFieldForFormControlElement(
-      web_control, nullptr /*field_data_manager*/, EXTRACT_BOUNDS, &form_data,
-      nullptr /* FormFieldData */));
+      web_control, /*field_data_manager=*/nullptr /*field_data_manager=*/,
+      EXTRACT_BOUNDS, &form_data,
+      /*field=*/nullptr));
 
   EXPECT_FALSE(form_data.fields.back().bounds.IsEmpty());
 }
@@ -855,8 +828,9 @@ TEST_F(FormAutofillUtilsTest, NotExtractBounds) {
 
   FormData form_data;
   ASSERT_TRUE(FindFormAndFieldForFormControlElement(
-      web_control, nullptr /*field_data_manager*/, &form_data,
-      nullptr /* FormFieldData */));
+      web_control, /*field_data_manager=*/nullptr /*field_data_manager=*/,
+      &form_data,
+      /*field=*/nullptr));
 
   EXPECT_TRUE(form_data.fields.back().bounds.IsEmpty());
 }
@@ -868,8 +842,9 @@ TEST_F(FormAutofillUtilsTest, ExtractUnownedBounds) {
 
   FormData form_data;
   ASSERT_TRUE(FindFormAndFieldForFormControlElement(
-      web_control, nullptr /*field_data_manager*/, EXTRACT_BOUNDS, &form_data,
-      nullptr /* FormFieldData */));
+      web_control, /*field_data_manager=*/nullptr /*field_data_manager=*/,
+      EXTRACT_BOUNDS, &form_data,
+      /*field=*/nullptr));
 
   EXPECT_FALSE(form_data.fields.back().bounds.IsEmpty());
 }
@@ -920,8 +895,8 @@ TEST_F(FormAutofillUtilsTest, ExtractDataList) {
   FormData form_data;
   FormFieldData form_field_data;
   ASSERT_TRUE(FindFormAndFieldForFormControlElement(
-      web_control, nullptr /*field_data_manager*/, EXTRACT_DATALIST, &form_data,
-      &form_field_data));
+      web_control, /*field_data_manager=*/nullptr /*field_data_manager=*/,
+      EXTRACT_DATALIST, &form_data, &form_field_data));
 
   auto& values = form_data.fields.back().datalist_values;
   auto& labels = form_data.fields.back().datalist_labels;
@@ -945,8 +920,8 @@ TEST_F(FormAutofillUtilsTest, NotExtractDataList) {
   FormData form_data;
   FormFieldData form_field_data;
   ASSERT_TRUE(FindFormAndFieldForFormControlElement(
-      web_control, nullptr /*field_data_manager*/, &form_data,
-      &form_field_data));
+      web_control, /*field_data_manager=*/nullptr /*field_data_manager=*/,
+      &form_data, &form_field_data));
 
   EXPECT_TRUE(form_data.fields.back().datalist_values.empty());
   EXPECT_TRUE(form_data.fields.back().datalist_labels.empty());
@@ -1325,7 +1300,7 @@ TEST_F(FormAutofillUtilsTest, GetUnownedFormFieldElements) {
       <option value='first'>first</option>
       <option value='second' selected>second</option>
     </select>
-    <select id='unowned_selectmenu'>
+    <select id='unowned_selectlist'>
       <option value='first'>first</option>
       <option value='second' selected>second</option>
     </select>
@@ -1343,10 +1318,10 @@ TEST_F(FormAutofillUtilsTest, GetUnownedFormFieldElements) {
         <option value='june'>june</option>
         <option value='july' selected>july</option>
       </select>
-      <selectmenu name='form_selectmenu' id='form_selectmenu'>
+      <selectlist name='form_selectlist' id='form_selectlist'>
         <option value='june'>june</option>
         <option value='july' selected>july</option>
-      </selectmenu>
+      </selectlist>
       <object id='form_object'></object>
     </form>
   )");
@@ -1363,7 +1338,7 @@ TEST_F(FormAutofillUtilsTest, GetUnownedFormFieldElements) {
                   GetFormControlElementById(doc, "unowned_textarea"),
                   GetFormControlElementById(doc, "unowned_output"),
                   GetFormControlElementById(doc, "unowned_select"),
-                  GetFormControlElementById(doc, "unowned_selectmenu")));
+                  GetFormControlElementById(doc, "unowned_selectlist")));
 }
 
 // Tests that FormData::fields and FormData::child_frames are extracted fully
@@ -1383,15 +1358,17 @@ TEST_P(FieldFramesTest, ExtractFieldsAndFrames) {
     std::vector<WebElement> iframe_elements =
         form_util::GetUnownedIframeElements(doc);
     ASSERT_TRUE(UnownedFormElementsToFormData(
-        control_elements, iframe_elements, nullptr, doc, nullptr, EXTRACT_NONE,
-        &form_data, nullptr));
+        control_elements, iframe_elements, /*element=*/nullptr, doc,
+        /*field_data_manager=*/nullptr, EXTRACT_NONE, &form_data,
+        /*field=*/nullptr));
     host_form = FormRendererId();
   } else {  // Real <form>.
     ASSERT_GT(std::strlen(test_case.form_id), 0u);
     auto form_element = GetFormElementById(doc, test_case.form_id);
     ASSERT_TRUE(WebFormElementToFormData(form_element, WebFormControlElement(),
-                                         nullptr, EXTRACT_NONE, &form_data,
-                                         nullptr));
+                                         /*field_data_manager=*/nullptr,
+                                         EXTRACT_NONE, &form_data,
+                                         /*field=*/nullptr));
     host_form = GetFormRendererId(form_element);
   }
 
@@ -1526,36 +1503,36 @@ INSTANTIATE_TEST_SUITE_P(
     }()));
 
 // FormAutofillUtilsTest subclass for testing with and without
-// features::kAutofillEnableSelectMenu feature enabled.
-class SelectMenuAutofillParamTest : public FormAutofillUtilsTest,
+// features::kAutofillEnableSelectList feature enabled.
+class SelectListAutofillParamTest : public FormAutofillUtilsTest,
                                     public testing::WithParamInterface<bool> {
  public:
-  SelectMenuAutofillParamTest() {
+  SelectListAutofillParamTest() {
     scoped_feature_list_.InitWithFeatureState(
-        features::kAutofillEnableSelectMenu, IsAutofillingSelectMenuEnabled());
+        features::kAutofillEnableSelectList, IsAutofillingSelectListEnabled());
   }
-  ~SelectMenuAutofillParamTest() override = default;
+  ~SelectListAutofillParamTest() override = default;
 
-  bool IsAutofillingSelectMenuEnabled() const { return GetParam(); }
+  bool IsAutofillingSelectListEnabled() const { return GetParam(); }
 
  private:
   base::test::ScopedFeatureList scoped_feature_list_;
 };
 
 INSTANTIATE_TEST_SUITE_P(FormAutofillUtilsTest,
-                         SelectMenuAutofillParamTest,
+                         SelectListAutofillParamTest,
                          ::testing::Bool());
 
-// Test that WebFormElementToFormData() ignores <selectmenu> if
-// features::kAutofillEnableSelectMenu is disabled.
-TEST_P(SelectMenuAutofillParamTest, WebFormElementToFormData) {
+// Test that WebFormElementToFormData() ignores <selectlist> if
+// features::kAutofillEnableSelectList is disabled.
+TEST_P(SelectListAutofillParamTest, WebFormElementToFormData) {
   LoadHTML(R"(
     <form id='form'>
       <input id='input'>
-      <selectmenu name='form_selectmenu' id='selectmenu'>
+      <selectlist name='form_selectlist' id='selectlist'>
         <option value='june'>june</option>
         <option value='july' selected>july</option>
-      </selectmenu>
+      </selectlist>
     </form>
   )");
 
@@ -1564,10 +1541,11 @@ TEST_P(SelectMenuAutofillParamTest, WebFormElementToFormData) {
   auto form_element = GetFormElementById(doc, "form");
   FormData form_data;
   ASSERT_TRUE(WebFormElementToFormData(form_element, WebFormControlElement(),
-                                       nullptr, EXTRACT_NONE, &form_data,
-                                       nullptr));
+                                       /*field_data_manager=*/nullptr,
+                                       EXTRACT_NONE, &form_data,
+                                       /*field=*/nullptr));
   EXPECT_EQ(form_data.fields.size(),
-            IsAutofillingSelectMenuEnabled() ? 2u : 1u);
+            IsAutofillingSelectListEnabled() ? 2u : 1u);
 
   {
     WebElement element = GetElementById(doc, "input");
@@ -1577,8 +1555,8 @@ TEST_P(SelectMenuAutofillParamTest, WebFormElementToFormData) {
                                       form_data.fields[0]));
   }
 
-  if (IsAutofillingSelectMenuEnabled()) {
-    WebElement element = GetElementById(doc, "selectmenu");
+  if (IsAutofillingSelectListEnabled()) {
+    WebElement element = GetElementById(doc, "selectlist");
     ASSERT_FALSE(element.IsNull());
     ASSERT_TRUE(element.IsFormControlElement());
     EXPECT_TRUE(HaveSameFormControlId(element.To<WebFormControlElement>(),
@@ -1610,8 +1588,9 @@ TEST_F(FormAutofillUtilsTest, ExtractNoFramesIfTooManyIframes) {
   WebFormElement form = GetFormElementById(doc, "f");
   {
     FormData form_data;
-    ASSERT_TRUE(WebFormElementToFormData(form, WebFormControlElement(), nullptr,
-                                         EXTRACT_NONE, &form_data, nullptr));
+    ASSERT_TRUE(WebFormElementToFormData(
+        form, WebFormControlElement(), /*field_data_manager_=*/nullptr,
+        EXTRACT_NONE, &form_data, /*field=*/nullptr));
     EXPECT_EQ(form_data.fields.size(), kMaxExtractableFields - 1);
     EXPECT_EQ(form_data.child_frames.size(), kMaxExtractableChildFrames);
   }
@@ -1622,8 +1601,9 @@ TEST_F(FormAutofillUtilsTest, ExtractNoFramesIfTooManyIframes) {
   for (int i = 0; i < 3; ++i) {
     CreateFormElement("iframe");
     FormData form_data;
-    ASSERT_TRUE(WebFormElementToFormData(form, WebFormControlElement(), nullptr,
-                                         EXTRACT_NONE, &form_data, nullptr));
+    ASSERT_TRUE(WebFormElementToFormData(
+        form, WebFormControlElement(), /*field_data_manager=*/nullptr,
+        EXTRACT_NONE, &form_data, /*field=*/nullptr));
     EXPECT_EQ(form_data.fields.size(), kMaxExtractableFields - 1);
     EXPECT_TRUE(form_data.child_frames.empty());
   }
@@ -1653,8 +1633,9 @@ TEST_F(FormAutofillUtilsTest, ExtractNoFieldsOrFramesIfTooManyFields) {
   WebFormElement form = GetFormElementById(doc, "f");
   {
     FormData form_data;
-    ASSERT_TRUE(WebFormElementToFormData(form, WebFormControlElement(), nullptr,
-                                         EXTRACT_NONE, &form_data, nullptr));
+    ASSERT_TRUE(WebFormElementToFormData(
+        form, WebFormControlElement(), /*field_data_manager=*/nullptr,
+        EXTRACT_NONE, &form_data, /*field=*/nullptr));
     EXPECT_EQ(form_data.fields.size(), kMaxExtractableFields - 1);
     EXPECT_EQ(form_data.child_frames.size(), kMaxExtractableChildFrames);
   }
@@ -1668,84 +1649,10 @@ TEST_F(FormAutofillUtilsTest, ExtractNoFieldsOrFramesIfTooManyFields) {
     FormData form_data;
     ASSERT_FALSE(WebFormElementToFormData(form, WebFormControlElement(),
                                           nullptr, EXTRACT_NONE, &form_data,
-                                          nullptr));
+                                          /*field=*/nullptr));
     EXPECT_TRUE(form_data.fields.empty());
     EXPECT_TRUE(form_data.child_frames.empty());
   }
-}
-
-// Fills a form, resets the form using <input type=reset>, and fills it again.
-// Tests that the form is actually filled on the second fill
-// (crbug.com/1291619).
-TEST_F(FormAutofillUtilsTest, FillAndResetAndFillAgainForm) {
-  // TODO(crbug.com/1422114): Make test work without explicit <selectmenu>
-  // tabindex.
-  LoadHTML(R"(
-    <body>
-      <form id="f">
-        <input id="text_id">
-        <select id="select_id">
-          <option value="Bar">Bar</option>
-          <option value="Foo">Foo</option>
-          <option value="Zoo">Zoo</option>
-        </select>
-        <selectmenu id="selectmenu_id" tabindex=0>
-          <option value="Bar">Bar</option>
-          <option value="Foo">Foo</option>
-          <option value="Zoo">Zoo</option>
-        </selectmenu>
-        <input id="reset" type="reset">
-      </form>
-    </body>
-  )");
-  WebDocument doc = GetMainFrame()->GetDocument();
-  auto field_manager = base::MakeRefCounted<FieldDataManager>();
-
-  FormData form;
-  ExtractFormData(GetFormElementById(doc, "f"), *field_manager, &form);
-  ASSERT_EQ(form.fields.size(), 3u);
-  for (FormFieldData& field : form.fields) {
-    field.value = u"Foo";
-    field.is_autofilled = true;
-  }
-
-  // First fill of the form.
-  FillOrPreviewForm(form, GetFormControlElementById(doc, "text_id"),
-                    mojom::RendererFormDataAction::kFill);
-
-  WebFormControlElement textfield = GetFormControlElementById(doc, "text_id");
-  WebFormControlElement select = GetFormControlElementById(doc, "select_id");
-  WebFormControlElement selectmenu =
-      GetFormControlElementById(doc, "selectmenu_id");
-
-  // Autofilling `textfield` leaves textfield.UserHasEditedTheField() == false.
-  // TODO(crbug.com/1291619): Is this desired?
-  EXPECT_TRUE(select.UserHasEditedTheField());
-  EXPECT_TRUE(selectmenu.UserHasEditedTheField());
-  EXPECT_EQ(textfield.Value().Ascii(), "Foo");
-  EXPECT_EQ(select.Value().Ascii(), "Foo");
-  EXPECT_EQ(selectmenu.Value().Ascii(), "Foo");
-
-  // Click reset button.
-  GetFormControlElementById(doc, "reset").SimulateClick();
-  content::RunAllTasksUntilIdle();
-  EXPECT_FALSE(textfield.UserHasEditedTheField());
-  EXPECT_FALSE(select.UserHasEditedTheField());
-  EXPECT_FALSE(selectmenu.UserHasEditedTheField());
-  EXPECT_EQ(textfield.Value().Ascii(), "");
-  EXPECT_EQ(select.Value().Ascii(), "Bar");
-  EXPECT_EQ(selectmenu.Value().Ascii(), "Bar");
-
-  // Fill form again.
-  FillOrPreviewForm(form, GetFormControlElementById(doc, "text_id"),
-                    mojom::RendererFormDataAction::kFill);
-  // Autofilling `textfield` leaves textfield.UserHasEditedTheField() == false.
-  // TODO(crbug.com/1291619): Is this desired?
-  EXPECT_TRUE(select.UserHasEditedTheField());
-  EXPECT_TRUE(selectmenu.UserHasEditedTheField());
-  EXPECT_EQ(textfield.Value().Ascii(), "Foo");
-  EXPECT_EQ(select.Value().Ascii(), "Foo");
-  EXPECT_EQ(selectmenu.Value().Ascii(), "Foo");
 }
 
 // Verifies that the callback happens even if no sequences of 4 digits are

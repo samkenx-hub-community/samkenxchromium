@@ -5,6 +5,7 @@
 import("//build/config/android/config.gni")
 import("//build/config/android/rules.gni")
 import("//components/safe_browsing/buildflags.gni")
+import("//third_party/jni_zero/jni_zero.gni")
 import("//third_party/libprotobuf-mutator/fuzzable_proto_library.gni")
 
 android_library("safe_browsing_java") {
@@ -14,11 +15,24 @@ android_library("safe_browsing_java") {
     "//build/android:build_java",
     "//third_party/androidx:androidx_annotation_annotation_java",
   ]
-  annotation_processor_deps = [ "//base/android/jni_generator:jni_processor" ]
+
+  srcjar_deps = [
+    ":jni_headers",
+    ":sb_java_features_srcjar",
+  ]
+
   sources = [
     "java/src/org/chromium/components/safe_browsing/SafeBrowsingApiBridge.java",
+    "java/src/org/chromium/components/safe_browsing/SafeBrowsingApiHandler.java",
     "java/src/org/chromium/components/safe_browsing/SafetyNetApiHandler.java",
   ]
+}
+
+# Expose Safe Browsing feature flags to Java code
+java_cpp_features("sb_java_features_srcjar") {
+  visibility = [ ":*" ]
+  sources = [ "//components/safe_browsing/core/common/features.cc" ]
+  template = "java/src/org/chromium/components/safe_browsing/SafeBrowsingFeatures.java.tmpl"
 }
 
 fuzzable_proto_library("realtimeallowlist_proto") {
@@ -138,7 +152,8 @@ android_library("native_java_unittests_java") {
     "//base:jni_java",
     "//third_party/junit",
   ]
-  annotation_processor_deps = [ "//base/android/jni_generator:jni_processor" ]
+
+  srcjar_deps = [ ":native_j_unittests_jni_headers" ]
   sources = [ "native_java_unittests/src/org/chromium/components/safe_browsing/SafeBrowsingApiHandlerBridgeNativeUnitTestHelper.java" ]
 }
 
@@ -163,6 +178,7 @@ source_set("unit_tests_mobile") {
     "//base",
     "//components/resources:components_resources_grit",
     "//components/safe_browsing/android:realtimeallowlist_proto",
+    "//components/safe_browsing/core/browser/db:database_manager",
     "//components/safe_browsing/core/browser/db:metadata_proto",
     "//components/safe_browsing/core/browser/db:unit_tests_shared",
     "//components/safe_browsing/core/browser/db:util",

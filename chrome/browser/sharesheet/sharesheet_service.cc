@@ -11,7 +11,7 @@
 #include "base/ranges/algorithm.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
-#include "chrome/browser/apps/app_service/app_icon/app_icon_util.h"
+#include "chrome/browser/apps/app_service/app_icon/icon_effects.h"
 #include "chrome/browser/apps/app_service/app_service_proxy.h"
 #include "chrome/browser/apps/app_service/app_service_proxy_factory.h"
 #include "chrome/browser/apps/app_service/launch_utils.h"
@@ -115,7 +115,7 @@ void SharesheetService::ShowNearbyShareBubbleForArc(
     LaunchSource source,
     DeliveredCallback delivered_callback,
     CloseCallback close_callback,
-    ActionCleanupCallback action_cleanup_callback) {
+    ActionCleanupCallback cleanup_callback) {
   DCHECK(intent);
   DCHECK(intent->IsShareIntent());
 
@@ -126,8 +126,7 @@ void SharesheetService::ShowNearbyShareBubbleForArc(
     std::move(delivered_callback).Run(SharesheetResult::kCancel);
     return;
   }
-  share_action->SetActionCleanupCallbackForArc(
-      std::move(action_cleanup_callback));
+  share_action->SetActionCleanupCallbackForArc(std::move(cleanup_callback));
   SharesheetMetrics::RecordSharesheetLaunchSource(source);
 
   if (!native_window) {
@@ -299,24 +298,17 @@ void SharesheetService::LoadAppIcons(
 
   // Making a copy because we move |intent_launch_info| out below.
   auto app_id = intent_launch_info[index].app_id;
-  absl::optional<apps::IconKey> icon_key =
-      app_service_proxy_->GetIconKey(app_id);
-  if (icon_key.has_value()) {
-    if (intent_launch_info[index].is_dlp_blocked) {
-      icon_key->icon_effects |= apps::IconEffects::kBlocked;
-    }
-    app_service_proxy_->LoadIconFromIconKey(
-        app_service_proxy_->AppRegistryCache().GetAppType(app_id), app_id,
-        icon_key.value(), apps::IconType::kStandard, kIconSize,
-        /*allow_placeholder_icon=*/false,
-        base::BindOnce(&SharesheetService::OnIconLoaded,
-                       weak_factory_.GetWeakPtr(),
-                       std::move(intent_launch_info), std::move(targets), index,
-                       std::move(callback)));
-  } else {
-    OnIconLoaded(std::move(intent_launch_info), std::move(targets), index,
-                 std::move(callback), std::make_unique<apps::IconValue>());
+  uint32_t icon_effects = app_service_proxy_->GetIconEffects(app_id);
+  if (intent_launch_info[index].is_dlp_blocked) {
+    icon_effects |= apps::IconEffects::kBlocked;
   }
+  app_service_proxy_->LoadIconWithIconEffects(
+      app_service_proxy_->AppRegistryCache().GetAppType(app_id), app_id,
+      icon_effects, apps::IconType::kStandard, kIconSize,
+      /*allow_placeholder_icon=*/false,
+      base::BindOnce(&SharesheetService::OnIconLoaded,
+                     weak_factory_.GetWeakPtr(), std::move(intent_launch_info),
+                     std::move(targets), index, std::move(callback)));
 }
 
 void SharesheetService::OnIconLoaded(

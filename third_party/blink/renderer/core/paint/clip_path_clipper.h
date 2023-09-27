@@ -14,6 +14,7 @@ namespace blink {
 
 class DisplayItemClient;
 class GraphicsContext;
+class HitTestLocation;
 class LayoutObject;
 
 class CORE_EXPORT ClipPathClipper {
@@ -24,9 +25,7 @@ class CORE_EXPORT ClipPathClipper {
                                        const LayoutObject&,
                                        const DisplayItemClient&);
 
-  // Returns the reference box used by CSS clip-path. For HTML objects,
-  // this is the border box of the element. For SVG objects this is the
-  // object bounding box.
+  // Returns the reference box used by CSS clip-path.
   static gfx::RectF LocalReferenceBox(const LayoutObject&);
 
   // Returns the bounding box of the computed clip path, which could be
@@ -43,6 +42,18 @@ class CORE_EXPORT ClipPathClipper {
   static absl::optional<Path> PathBasedClip(
       const LayoutObject& clip_path_owner,
       const bool is_in_block_fragmentation);
+
+  // Returns true if `location` intersects the `clip_path_owner`'s clip-path.
+  // `reference_box`, which should be calculated from `reference_box_object`, is
+  // used to resolve 'objectBoundingBox' units/percentages.
+  static bool HitTest(const LayoutObject& clip_path_owner,
+                      const gfx::RectF& reference_box,
+                      const LayoutObject& reference_box_object,
+                      const HitTestLocation& location);
+
+  // Like the above, but derives the reference box from the LayoutObject using
+  // `LocalReferenceBox()`.
+  static bool HitTest(const LayoutObject&, const HitTestLocation& location);
 };
 
 }  // namespace blink

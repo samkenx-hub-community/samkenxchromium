@@ -52,6 +52,7 @@
 #include "ui/views/controls/textfield/textfield.h"
 #include "ui/views/layout/box_layout.h"
 #include "ui/views/style/typography.h"
+#include "ui/views/style/typography_provider.h"
 
 namespace {
 
@@ -65,7 +66,7 @@ ui::ImageModel GetProfileAvatar(AccountInfo account_info) {
         profiles::GetPlaceholderAvatarIconResourceID());
   }
 
-  int avatar_size = views::style::GetLineHeight(
+  int avatar_size = views::TypographyProvider::Get().GetLineHeight(
       views::style::CONTEXT_DIALOG_BODY_TEXT, views::style::STYLE_SECONDARY);
 
   return ui::ImageModel::FromImage(profiles::GetSizedAvatarIcon(
@@ -236,15 +237,14 @@ std::unique_ptr<views::View> SaveCardOfferBubbleViews::CreateMainContentView() {
     // active. Otherwise, this tooltip's info will appear in CreateExtraView()'s
     // tooltip.
     if (!prefilled_name.empty() &&
-        controller()->GetSyncState() !=
-            AutofillSyncSigninState::kSignedInAndWalletSyncTransportEnabled) {
+        !controller()->IsPaymentsSyncTransportEnabledWithoutSyncFeature()) {
       constexpr int kTooltipIconSize = 12;
       std::unique_ptr<views::TooltipIcon> cardholder_name_tooltip =
           std::make_unique<views::TooltipIcon>(
               l10n_util::GetStringUTF16(
                   IDS_AUTOFILL_SAVE_CARD_PROMPT_CARDHOLDER_NAME_TOOLTIP),
               kTooltipIconSize);
-      cardholder_name_tooltip->set_anchor_point_arrow(
+      cardholder_name_tooltip->SetAnchorPointArrow(
           views::BubbleBorder::Arrow::TOP_LEFT);
       cardholder_name_tooltip->SetID(DialogViewId::CARDHOLDER_NAME_TOOLTIP);
       cardholder_name_label_row->AddChildView(
@@ -381,8 +381,7 @@ SaveCardOfferBubbleViews::CreateUploadExplanationView() {
   // Only show the (i) info icon for upload saves using implicit sync.
   // GetLegalMessageLines() being empty denotes a local save.
   if (controller()->GetLegalMessageLines().empty() ||
-      controller()->GetSyncState() !=
-          AutofillSyncSigninState::kSignedInAndWalletSyncTransportEnabled) {
+      !controller()->IsPaymentsSyncTransportEnabledWithoutSyncFeature()) {
     return nullptr;
   }
 
@@ -394,10 +393,10 @@ SaveCardOfferBubbleViews::CreateUploadExplanationView() {
        !cardholder_name_textfield_->GetText().empty())
           ? IDS_AUTOFILL_SAVE_CARD_PROMPT_UPLOAD_EXPLANATION_AND_CARDHOLDER_NAME_TOOLTIP
           : IDS_AUTOFILL_SAVE_CARD_PROMPT_UPLOAD_EXPLANATION_TOOLTIP));
-  upload_explanation_tooltip->set_bubble_width(
+  upload_explanation_tooltip->SetBubbleWidth(
       ChromeLayoutProvider::Get()->GetDistanceMetric(
           views::DISTANCE_BUBBLE_PREFERRED_WIDTH));
-  upload_explanation_tooltip->set_anchor_point_arrow(
+  upload_explanation_tooltip->SetAnchorPointArrow(
       views::BubbleBorder::Arrow::TOP_RIGHT);
   upload_explanation_tooltip->SetID(DialogViewId::UPLOAD_EXPLANATION_TOOLTIP);
   return upload_explanation_tooltip;

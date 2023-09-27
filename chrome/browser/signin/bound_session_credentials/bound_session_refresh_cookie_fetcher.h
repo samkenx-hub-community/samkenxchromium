@@ -5,21 +5,30 @@
 #ifndef CHROME_BROWSER_SIGNIN_BOUND_SESSION_CREDENTIALS_BOUND_SESSION_REFRESH_COOKIE_FETCHER_H_
 #define CHROME_BROWSER_SIGNIN_BOUND_SESSION_CREDENTIALS_BOUND_SESSION_REFRESH_COOKIE_FETCHER_H_
 
+#include <ostream>
+
 #include "base/functional/callback_forward.h"
-#include "net/base/net_errors.h"
-#include "third_party/abseil-cpp/absl/types/optional.h"
 
 // This class makes the network request to the Gaia cookie rotation endpoint to
 // refresh bound Google authentication cookies. A new fetcher instance should be
 // created per request.
 class BoundSessionRefreshCookieFetcher {
  public:
+  // These values are persisted to logs. Entries should not be renumbered and
+  // numeric values should never be reused.
   enum class Result {
     kSuccess = 0,
     kConnectionError = 1,
     kServerTransientError = 2,
     kServerPersistentError = 3,
+    kServerUnexepectedResponse = 4,
+    kChallengeRequiredUnexpectedFormat = 5,
+    kChallengeRequiredLimitExceeded = 6,
+    kSignChallengeFailed = 7,
+    kMaxValue = kSignChallengeFailed,
   };
+
+  static bool IsPersistentError(Result result);
 
   // Reports the result of the fetch request.
   using RefreshCookieCompleteCallback = base::OnceCallback<void(Result)>;
@@ -37,5 +46,9 @@ class BoundSessionRefreshCookieFetcher {
   // than once per instance.
   virtual void Start(RefreshCookieCompleteCallback callback) = 0;
 };
+
+std::ostream& operator<<(
+    std::ostream& os,
+    const BoundSessionRefreshCookieFetcher::Result& result);
 
 #endif  // CHROME_BROWSER_SIGNIN_BOUND_SESSION_CREDENTIALS_BOUND_SESSION_REFRESH_COOKIE_FETCHER_H_

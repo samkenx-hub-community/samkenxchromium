@@ -22,6 +22,7 @@
 #include "base/command_line.h"
 #include "base/files/file_path.h"
 #include "base/functional/callback.h"
+#include "base/functional/function_ref.h"
 #include "base/logging.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/native_library.h"
@@ -29,6 +30,7 @@
 #include "base/strings/strcat.h"
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
 #include "base/win/scoped_bstr.h"
 #include "base/win/scoped_co_mem.h"
@@ -58,15 +60,18 @@ const size_t kDeleteRetryDelayInMs = 100;
          hr == HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND);
 }
 
-// Return |timestamp| in the following string format YYYY-MM-DDTHH:MM:SS.
+// Returns |timestamp| in the format YYYY-MM-DDTHH:MM:SS.
 std::wstring GetTimestampString(const base::Time& timestamp) {
+  // This intentionally avoids depending on the facilities in
+  // base/i18n/time_formatting.h so the updater will not need to depend on the
+  // ICU data file.
   base::Time::Exploded exploded_time;
   // The Z timezone info at the end of the string means UTC.
   timestamp.UTCExplode(&exploded_time);
-  return base::StringPrintf(L"%04d-%02d-%02dT%02d:%02d:%02dZ",
-                            exploded_time.year, exploded_time.month,
-                            exploded_time.day_of_month, exploded_time.hour,
-                            exploded_time.minute, exploded_time.second);
+  return base::ASCIIToWide(base::StringPrintf(
+      "%04d-%02d-%02dT%02d:%02d:%02dZ", exploded_time.year, exploded_time.month,
+      exploded_time.day_of_month, exploded_time.hour, exploded_time.minute,
+      exploded_time.second));
 }
 
 [[nodiscard]] bool UTCFileTimeToLocalSystemTime(const FILETIME& file_time_utc,
@@ -134,7 +139,10 @@ class TaskSchedulerV2 final : public TaskScheduler {
                   bool use_task_subfolders)
       : scope_(scope), use_task_subfolders_(use_task_subfolders) {
     task_service_ = GetTaskService();
-    VLOG_IF(2, !task_service_) << "Can't get the task service.";
+    if (!task_service_) {
+      VLOG(2) << "Can't get the task service.";
+      return;
+    }
     task_folder_ = GetUpdaterTaskFolder();
     VLOG_IF(2, !task_folder_) << "Can't get the task scheduler folder.";
   }
@@ -733,7 +741,7 @@ class TaskSchedulerV2 final : public TaskScheduler {
 
   void ForEachTaskWithPrefix(
       const std::wstring& prefix,
-      base::RepeatingCallback<void(const std::wstring&)> callback) override {
+      base::FunctionRef<void(const std::wstring&)> callback) override {
     if (!task_folder_) {
       return;
     }
@@ -745,7 +753,7 @@ class TaskSchedulerV2 final : public TaskScheduler {
 
     for (const std::wstring& task_name : task_names) {
       if (base::StartsWith(task_name, prefix)) {
-        callback.Run(task_name);
+        callback(task_name);
       }
     }
   }

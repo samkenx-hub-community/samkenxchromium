@@ -8,11 +8,11 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include <cctype>  // std::isupper()
 #include <iostream>
 #include <memory>
 #include <sstream>
 #include <string>
+#include <string_view>
 
 #include "third_party/jsoncpp/source/include/json/json.h"
 #include "third_party/re2/src/re2/re2.h"
@@ -33,7 +33,7 @@ class FilterBuffer {
 
   size_t remaining() { return kFilterBufferSize - (cursor_ - data_); }
   void Reset() { cursor_ = data_; }
-  re2::StringPiece Get() { return re2::StringPiece(data_, cursor_ - data_); }
+  std::string_view Get() { return std::string_view(data_, cursor_ - data_); }
 
   void Append(char c) {
     if (remaining() > 0) {
@@ -74,13 +74,9 @@ std::string JsonSerialize(const Json::Value& value) {
   return s.str();
 }
 
-re2::StringPiece Re2StringPiece(std::string_view str) {
-  return re2::StringPiece(str.data(), str.size());
-}
-
 bool ContainsUpper(const char* str) {
   while (*str) {
-    if (std::isupper(*str)) {
+    if (*str >= 'A' && *str <= 'Z') {
       return true;
     }
     ++str;
@@ -110,7 +106,7 @@ bool MatchesRegex(const GroupedPath& id_path,
     return true;
   }
 
-  return RE2::PartialMatch(Re2StringPiece(sym.ContainerName()), regex);
+  return RE2::PartialMatch(sym.ContainerName(), regex);
 }
 
 bool IsMultiContainer() {
@@ -293,22 +289,22 @@ bool BuildTree(bool method_count_mode,
 
 // Returns a JSON string representing root data.
 const char* Open(const char* path) {
-  static std::string result;
+  static std::string cached_result;
   Json::Value v = builder->Open(path);
-  result = JsonSerialize(v);
-  return result.c_str();
+  cached_result = JsonSerialize(v);
+  return cached_result.c_str();
 }
 
 // Returns a JSON string representing the metadata.
 const char* GetMetadata() {
-  static std::string cached_json;
+  static std::string cached_result;
   Json::Value v;
   v["size_file"] = info->fields;
   if (before_info != nullptr) {
     v["before_size_file"] = before_info->fields;
   }
-  cached_json = JsonSerialize(v);
-  return cached_json.c_str();
+  cached_result = JsonSerialize(v);
+  return cached_result.c_str();
 }
 
 // Returns global properties.
@@ -318,6 +314,14 @@ const char* QueryProperty(const char* key) {
   }
   std::cerr << "Unknown property: " << key << std::endl;
   exit(1);
+}
+
+const char* QueryAncestryById(uint32_t id) {
+  static std::string cached_result;
+  Json::Value v;
+  v["ancestorIds"] = builder->GetAncestryById(id);
+  cached_result = JsonSerialize(v);
+  return cached_result.c_str();
 }
 
 }  // extern "C"

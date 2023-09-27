@@ -25,6 +25,7 @@ export class TestCrostiniBrowserProxy extends TestBrowserProxy {
       'activateCrostiniPortForward',
       'deactivateCrostiniPortForward',
       'getCrostiniActivePorts',
+      'getCrostiniActiveNetworkInfo',
       'checkCrostiniIsRunning',
       'shutdownCrostini',
       'setCrostiniMicSharingEnabled',
@@ -43,6 +44,7 @@ export class TestCrostiniBrowserProxy extends TestBrowserProxy {
       'isVmDeviceShared',
       'setVmDeviceShared',
       'requestBruschettaInstallerView',
+      'requestBruschettaUninstallerView',
     ]);
     this.crostiniMicSharingEnabled = false;
     this.crostiniIsRunning = true;
@@ -178,6 +180,11 @@ export class TestCrostiniBrowserProxy extends TestBrowserProxy {
     return Promise.resolve([]);
   }
 
+  getCrostiniActiveNetworkInfo() {
+    this.methodCalled('getCrostiniActiveNetworkInfo');
+    return Promise.resolve([]);
+  }
+
   /** @override */
   getCrostiniDiskInfo(vmName, requestFullInfo) {
     this.methodCalled('getCrostiniDiskInfo', vmName, requestFullInfo);
@@ -268,5 +275,10 @@ export class TestCrostiniBrowserProxy extends TestBrowserProxy {
   /** @override */
   requestBruschettaInstallerView() {
     this.methodCalled('requestBruschettaInstallerView');
+  }
+
+  /** @override */
+  requestBruschettaUninstallerView() {
+    this.methodCalled('requestBruschettaUninstallerView');
   }
 }

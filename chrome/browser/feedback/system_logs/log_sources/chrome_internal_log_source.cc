@@ -16,7 +16,6 @@
 #include "base/path_service.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
-#include "base/strings/stringprintf.h"
 #include "base/system/sys_info.h"
 #include "base/task/thread_pool.h"
 #include "base/time/time.h"
@@ -43,6 +42,7 @@
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
 #include "ash/public/ash_interfaces.h"
+#include "base/i18n/time_formatting.h"
 #include "chrome/browser/ash/arc/arc_util.h"
 #include "chrome/browser/ash/arc/policy/arc_policy_bridge.h"
 #include "chrome/browser/ash/crosapi/browser_manager.h"
@@ -57,14 +57,18 @@
 #include "chromeos/ash/components/settings/cros_settings_names.h"
 #include "chromeos/ash/components/system/statistics_provider.h"
 #include "chromeos/version/version_loader.h"
+#include "third_party/icu/source/i18n/unicode/timezone.h"
 #endif
 
 #if BUILDFLAG(IS_WIN)
 #include "base/win/win_util.h"
+#include "base/win/windows_version.h"
+#include "ui/base/win/hidden_window.h"
+
 #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+#include "base/strings/stringprintf.h"
 #include "chrome/browser/google/google_update_win.h"
 #endif
-#include "ui/base/win/hidden_window.h"
 #endif
 
 #if BUILDFLAG(IS_MAC)
@@ -107,6 +111,7 @@ constexpr char kTotalDiskSpace[] = "TOTAL_DISK_SPACE";
 constexpr char kChronosHomeDirectory[] = "/home/chronos/user";
 constexpr char kFailedKnowledgeFactorAttempts[] =
     "FAILED_KNOWLEDGE_FACTOR_ATTEMPTS";
+constexpr char kRecordedAuthEvents[] = "RECORDED_AUTH_EVENTS";
 #else
 constexpr char kOsVersionTag[] = "OS VERSION";
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
@@ -123,7 +128,7 @@ constexpr char kInstallLocation[] = "install_location";
 #endif
 #endif  // BUILDFLAG(IS_WIN)
 
-#if BUILDFLAG(IS_MAC)
+#if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
 constexpr char kCpuArch[] = "cpu_arch";
 #endif
 
@@ -151,8 +156,6 @@ std::string GetPrimaryAccountTypeString() {
       return "child";
     case user_manager::USER_TYPE_ARC_KIOSK_APP:
       return "arc_kiosk_app";
-    case user_manager::USER_TYPE_ACTIVE_DIRECTORY:
-      return "active_directory";
     case user_manager::USER_TYPE_WEB_KIOSK_APP:
       return "web_kiosk_app";
     case user_manager::NUM_USER_TYPES:
@@ -369,6 +372,25 @@ std::string MacCpuArchAsString() {
       return "arm64";
   }
 }
+#elif BUILDFLAG(IS_WIN)
+std::string WinCpuArchAsString() {
+#if defined(ARCH_CPU_ARM64)
+  return "arm64";
+#else
+  bool emulated = base::win::OSInfo::IsRunningEmulatedOnArm64();
+#if defined(ARCH_CPU_X86)
+  if (emulated) {
+    return "32-bit emulated";
+  }
+  return "32-bit";
+#else   // defined(ARCH_CPU_X86)
+  if (emulated) {
+    return "64-bit emulated";
+  }
+  return "64-bit";
+#endif  // defined(ARCH_CPU_X86)
+#endif  // defined(ARCH_CPU_ARM64)
+}
 #endif
 
 }  // namespace
@@ -412,6 +434,8 @@ void ChromeInternalLogSource::Fetch(SysLogsSourceCallback callback) {
 
 #if BUILDFLAG(IS_MAC)
   response->emplace(kCpuArch, MacCpuArchAsString());
+#elif BUILDFLAG(IS_WIN)
+  response->emplace(kCpuArch, WinCpuArchAsString());
 #endif
 
   if (ProfileManager::GetLastUsedProfile()->IsChild())
@@ -435,6 +459,8 @@ void ChromeInternalLogSource::Fetch(SysLogsSourceCallback callback) {
       kFailedKnowledgeFactorAttempts,
       base::NumberToString(ash::AuthEventsRecorder::Get()
                                ->knowledge_factor_auth_failure_count()));
+  response->emplace(kRecordedAuthEvents,
+                    ash::AuthEventsRecorder::Get()->GetAuthEventsLog());
   PopulateLocalStateSettings(response.get());
   PopulateOnboardingTime(response.get());
 
@@ -570,12 +596,9 @@ void ChromeInternalLogSource::PopulateOnboardingTime(
       profile->GetPrefs()->GetTime(ash::prefs::kOobeOnboardingTime);
   if (time.is_null())
     return;
-
-  base::Time::Exploded exploded;
-  time.UTCExplode(&exploded);
   response->emplace(kOnboardingTime,
-                    base::StringPrintf("%04d-%02d-%02d", exploded.year,
-                                       exploded.month, exploded.day_of_month));
+                    base::UnlocalizedTimeFormatWithPattern(
+                        time, "yyyy-MM-dd", icu::TimeZone::getGMT()));
 }
 
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)

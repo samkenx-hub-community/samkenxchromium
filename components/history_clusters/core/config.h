@@ -319,16 +319,6 @@ struct Config {
   // which is the pre-M115 behavior.
   bool named_new_tab_groups = true;
 
-  // The `kUseUrlForDisplayCache` feature and child params.
-
-  // Whether to use a cache to store the site engagement scores per host. Used
-  // in both the old (OnDeviceClusteringBackend) and new
-  // (ContextClustererHistoryServiceObserver) clustering paths.
-  bool use_url_for_display_cache = false;
-
-  // The max number of URLs that should be stored in the URL for display cache.
-  int url_for_display_cache_size = 100;
-
   // The `kJourneysZeroStateFiltering` feature and child params.
 
   bool apply_zero_state_filtering = false;
@@ -381,7 +371,7 @@ struct Config {
   bool include_synced_visits = false;
 
   // Whether keyword caches should be written to and read from prefs.
-  bool persist_caches_to_prefs = false;
+  bool persist_caches_to_prefs = true;
 
   // Order consistently with features.h.
 

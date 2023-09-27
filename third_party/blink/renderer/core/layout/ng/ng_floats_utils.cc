@@ -95,12 +95,6 @@ NGConstraintSpace CreateConstraintSpaceForFloat(
     builder.SetFragmentationType(NGFragmentationType::kFragmentNone);
   }
 
-  // If we're resuming layout of this float after a fragmentainer break, the
-  // margins of its children may be adjoining with the fragmentainer
-  // block-start, in which case they may get truncated.
-  if (IsBreakInside(unpositioned_float.token))
-    builder.SetDiscardingMarginStrut();
-
   builder.SetAvailableSize(unpositioned_float.available_size);
   builder.SetPercentageResolutionSize(unpositioned_float.percentage_size);
   builder.SetReplacedPercentageResolutionSize(
@@ -286,14 +280,7 @@ NGPositionedFloat PositionFloat(NGUnpositionedFloat* unpositioned_float,
       is_at_fragmentainer_start = space.IsAtFragmentainerStart();
 
       layout_result = node.Layout(space, unpositioned_float->token);
-
-      if (layout_result->Status() != NGLayoutResult::kSuccess) {
-        DCHECK_EQ(layout_result->Status(),
-                  NGLayoutResult::kOutOfFragmentainerSpace);
-        need_break_before = true;
-        return NGPositionedFloat(layout_result, NGBfcOffset(),
-                                 need_break_before);
-      }
+      DCHECK_EQ(layout_result->Status(), NGLayoutResult::kSuccess);
 
       // If we knew the right block-offset up front, we're done.
       if (!optimistically_placed)
@@ -348,20 +335,41 @@ NGPositionedFloat PositionFloat(NGUnpositionedFloat* unpositioned_float,
           FragmentainerOffsetAtBfc(parent_space) +
           opportunity.rect.start_offset.block_offset +
           fragment_margins.block_start;
+      const auto* break_token =
+          To<NGBlockBreakToken>(layout_result->PhysicalFragment().BreakToken());
+      bool is_at_block_end = !break_token || break_token->IsAtBlockEnd();
+      if (!is_at_block_end) {
+        // We need to resume in the next fragmentainer (or even push the whole
+        // thing there), which means that there'll be no block-end margin here.
+        fragment_margins.block_end = LayoutUnit();
+      }
+
       if (!MovePastBreakpoint(parent_space, node, *layout_result,
                               fragmentainer_block_offset, kBreakAppealPerfect,
                               /* builder */ nullptr)) {
         need_break_before = true;
-      } else if (layout_result->PhysicalFragment().BreakToken()) {
-        // We need to resume in the next fragmentainer, which means that
-        // there'll be no block-end margin here.
-        fragment_margins.block_end = LayoutUnit();
+      } else if (is_at_block_end &&
+                 parent_space.HasKnownFragmentainerBlockSize()) {
+        NGFragment float_fragment(parent_space.GetWritingDirection(),
+                                  layout_result->PhysicalFragment());
+        LayoutUnit outer_block_end = fragmentainer_block_offset +
+                                     float_fragment.BlockSize() +
+                                     fragment_margins.block_end;
+        if (outer_block_end > FragmentainerCapacity(parent_space) &&
+            !IsBreakInside(unpositioned_float->token)) {
+          // Avoid breaking inside the block-end margin of a float. They are not
+          // to collapse with the fragmentainer boundary, unlike margins on
+          // regular boxes.
+          need_break_before = true;
+        }
       }
     }
   }
 
+  const auto& physical_fragment =
+      To<NGPhysicalBoxFragment>(layout_result->PhysicalFragment());
   NGFragment float_fragment(parent_space.GetWritingDirection(),
-                            layout_result->PhysicalFragment());
+                            physical_fragment);
 
   // Calculate the float's margin box BFC offset.
   NGBfcOffset float_margin_bfc_offset = opportunity.rect.start_offset;
@@ -404,8 +412,7 @@ NGPositionedFloat PositionFloat(NGUnpositionedFloat* unpositioned_float,
     // If the float broke inside and will continue to take up layout space in
     // the next fragmentainer, it means that we cannot fit any subsequent
     // content that wants clearance past this float.
-    if (const auto* break_token = To<NGBlockBreakToken>(
-            layout_result->PhysicalFragment().BreakToken())) {
+    if (const NGBlockBreakToken* break_token = physical_fragment.BreakToken()) {
       if (!break_token->IsAtBlockEnd())
         exclusion_space->SetHasBreakInsideFloat(float_type);
     }
@@ -417,7 +424,27 @@ NGPositionedFloat PositionFloat(NGUnpositionedFloat* unpositioned_float,
           fragment_margins.LineLeft(parent_space.Direction()),
       float_margin_bfc_offset.block_offset + fragment_margins.block_start);
 
-  return NGPositionedFloat(layout_result, float_bfc_offset, need_break_before);
+  const NGBlockBreakToken* break_before_token = nullptr;
+  if (need_break_before) {
+    break_before_token =
+        NGBlockBreakToken::CreateBreakBefore(node, /* is_forced_break */ false);
+  }
+
+  LayoutUnit minimum_space_shortage;
+  if (break_before_token || physical_fragment.BreakToken()) {
+    // Broke before or inside the float.
+    if (parent_space.HasKnownFragmentainerBlockSize() &&
+        parent_space.BlockFragmentationType() == kFragmentColumn) {
+      LayoutUnit fragmentainer_block_offset =
+          FragmentainerOffsetAtBfc(parent_space) +
+          float_bfc_offset.block_offset;
+      minimum_space_shortage = CalculateSpaceShortage(
+          parent_space, layout_result, fragmentainer_block_offset);
+    }
+  }
+
+  return NGPositionedFloat(layout_result, break_before_token, float_bfc_offset,
+                           minimum_space_shortage);
 }
 
 }  // namespace blink

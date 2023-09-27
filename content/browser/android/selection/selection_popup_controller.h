@@ -29,6 +29,11 @@ class SelectionPopupController : public RenderWidgetHostConnector {
                            const base::android::JavaParamRef<jobject>& obj,
                            WebContents* web_contents);
 
+  void SetTextHandlesHiddenForDropdownMenu(
+      JNIEnv* env,
+      const base::android::JavaParamRef<jobject>& obj,
+      jboolean hidden);
+
   void SetTextHandlesTemporarilyHidden(
       JNIEnv* env,
       const base::android::JavaParamRef<jobject>& obj,
@@ -51,7 +56,9 @@ class SelectionPopupController : public RenderWidgetHostConnector {
   void OnSelectAroundCaretAck(blink::mojom::SelectAroundCaretResultPtr result);
   void HidePopupsAndPreserveSelection();
   void RestoreSelectionPopupsIfNecessary();
-  std::unique_ptr<ui::TouchHandleDrawable> CreateTouchHandleDrawable();
+  std::unique_ptr<ui::TouchHandleDrawable> CreateTouchHandleDrawable(
+      gfx::NativeView parent_native_view,
+      cc::slim::Layer* parent_layer);
   void MoveRangeSelectionExtent(const gfx::PointF& extent);
 
   void SelectBetweenCoordinates(const gfx::PointF& base,

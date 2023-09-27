@@ -17,7 +17,6 @@
 #include "components/optimization_guide/core/optimization_guide_decision.h"
 #include "components/page_image_service/mojom/page_image_service.mojom.h"
 #include "components/sync/service/sync_service.h"
-#include "components/unified_consent/consent_throttle.h"
 
 class AutocompleteSchemeClassifier;
 class RemoteSuggestionsService;
@@ -26,10 +25,13 @@ class TemplateURL;
 class TemplateURLService;
 
 namespace optimization_guide {
-class NewOptimizationGuideDecider;
+class OptimizationGuideDecider;
 }  // namespace optimization_guide
 
 namespace page_image_service {
+
+class ImageServiceConsentHelper;
+enum class PageImageServiceConsentStatus;
 
 // Through my manual testing, 16ms (which is about a frame at 60hz) allowed
 // for decent aggregation without introducing any perceptible lag.
@@ -44,7 +46,7 @@ class ImageService : public KeyedService {
 
   ImageService(TemplateURLService* template_url_service,
                RemoteSuggestionsService* remote_suggestions_service,
-               optimization_guide::NewOptimizationGuideDecider* opt_guide,
+               optimization_guide::OptimizationGuideDecider* opt_guide,
                syncer::SyncService* sync_service,
                std::unique_ptr<AutocompleteSchemeClassifier>
                    autocomplete_scheme_classifier);
@@ -67,8 +69,9 @@ class ImageService : public KeyedService {
 
   // Asynchronously returns whether `client_id` has consent to fetch an image.
   // Public for testing purposes only.
-  void GetConsentToFetchImage(mojom::ClientId client_id,
-                              base::OnceCallback<void(bool)> callback);
+  void GetConsentToFetchImage(
+      mojom::ClientId client_id,
+      base::OnceCallback<void(PageImageServiceConsentStatus)> callback);
 
  private:
   class SuggestEntityImageURLFetcher;
@@ -87,7 +90,7 @@ class ImageService : public KeyedService {
                        const GURL& page_url,
                        const mojom::Options& options,
                        ResultCallback callback,
-                       bool consent_is_enabled);
+                       PageImageServiceConsentStatus status);
 
   // Fetches an image from Suggest appropriate for `search_query` and
   // `entity_id`, returning the result asynchronously to `callback`.
@@ -128,13 +131,13 @@ class ImageService : public KeyedService {
   // Non-owning pointers to service dependencies. They may be nullptr.
   raw_ptr<TemplateURLService> template_url_service_ = nullptr;
   raw_ptr<RemoteSuggestionsService> remote_suggestions_service_ = nullptr;
-  raw_ptr<optimization_guide::NewOptimizationGuideDecider> opt_guide_ = nullptr;
+  raw_ptr<optimization_guide::OptimizationGuideDecider> opt_guide_ = nullptr;
 
   // The History consent throttle, used for most clients.
-  unified_consent::ConsentThrottle history_consent_throttle_;
+  std::unique_ptr<ImageServiceConsentHelper> history_consent_helper_;
 
   // The Bookmarks consent throttle.
-  unified_consent::ConsentThrottle bookmarks_consent_throttle_;
+  std::unique_ptr<ImageServiceConsentHelper> bookmarks_consent_helper_;
 
   // Used to make proper suggest requests.
   std::unique_ptr<AutocompleteSchemeClassifier> autocomplete_scheme_classifier_;

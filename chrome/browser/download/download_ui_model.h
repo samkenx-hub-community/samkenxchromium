@@ -116,7 +116,7 @@ class DownloadUIModel {
       std::u16string label;
       bool is_prominent = false;
 
-      // Controls the text color of the button. Only applied for secondary
+      // Controls the text color of the button. Only applied for some secondary
       // buttons.
       absl::optional<ui::ColorId> color;
 
@@ -133,6 +133,25 @@ class DownloadUIModel {
       QuickAction(DownloadCommands::Command command,
                   const std::u16string& hover_text,
                   const gfx::VectorIcon* icon);
+    };
+
+    struct LabelWithLink {
+      struct LinkedRange {
+        // The offset where the link text (i.e. "Chrome blocks some downloads")
+        // starts, with respect to the label string containing it.
+        size_t start_offset = 0;
+        // Link text length.
+        size_t length = 0;
+        // Action to perform when the link is clicked.
+        DownloadCommands::Command command = DownloadCommands::Command::MAX;
+      };
+
+      // The entire label string with link, i.e. "Learn why Chrome blocks some
+      // downloads".
+      std::u16string label_and_link_text;
+      // The link info. Note this assumes that the text contains exactly one
+      // link.
+      LinkedRange linked_range;
     };
 
     // has a progress bar and a cancel button.
@@ -152,6 +171,12 @@ class DownloadUIModel {
     // Subpage summary of the download warning
     std::u16string warning_summary;
 
+    // Secondary label for the subpage summary
+    std::u16string warning_secondary_text;
+
+    // Icon for the secondary text in the subpage
+    raw_ptr<const gfx::VectorIcon> warning_secondary_icon = nullptr;
+
     // Label for the checkbox, empty if no checkbox is needed
     std::u16string checkbox_label;
 
@@ -164,10 +189,23 @@ class DownloadUIModel {
     // Subpage buttons
     std::vector<SubpageButton> subpage_buttons;
 
+    // Text with link to go at the bottom of the subpage summary, such as "Learn
+    // why Chrome blocks some downloads".
+    absl::optional<LabelWithLink> learn_more_link;
+
+    // Whether the main button should be enabled. When true, the main button
+    // will either:
+    // - Open the subpage, if it exists
+    // - Open the download, if no subpage exists
+    bool main_button_enabled = true;
+
     BubbleUIInfo();
     ~BubbleUIInfo();
     BubbleUIInfo(const BubbleUIInfo&);
     BubbleUIInfo& AddSubpageSummary(const std::u16string& summary);
+    BubbleUIInfo& AddSubpageSecondaryIconAndText(
+        const gfx::VectorIcon& icon,
+        const std::u16string& secondary_text);
     BubbleUIInfo& AddProgressBar();
     BubbleUIInfo& AddIconAndColor(const gfx::VectorIcon& vector_icon,
                                   ui::ColorId color_id);
@@ -179,13 +217,34 @@ class DownloadUIModel {
     // The checkbox, if present, controls the secondary.
     BubbleUIInfo& AddPrimarySubpageButton(const std::u16string& label,
                                           DownloadCommands::Command command);
-    BubbleUIInfo& AddSecondarySubpageButton(const std::u16string& label,
-                                            DownloadCommands::Command command,
-                                            ui::ColorId color);
+    BubbleUIInfo& AddSecondarySubpageButton(
+        const std::u16string& label,
+        DownloadCommands::Command command,
+        absl::optional<ui::ColorId> color = absl::nullopt);
     BubbleUIInfo& SetProgressBarLooping();
     BubbleUIInfo& AddQuickAction(DownloadCommands::Command command,
                                  const std::u16string& label,
                                  const gfx::VectorIcon* icon);
+    // Add a learn_more_link with the specified message ids and command when
+    // clicked. Assumes that the message given by label_text_id has a
+    // placeholder where the message specified by link_text_id should go.
+    BubbleUIInfo& AddLearnMoreLink(int label_text_id,
+                                   int link_text_id,
+                                   DownloadCommands::Command command);
+    // Same as above but takes the link text string itself, and assumes that
+    // the whole string should be linked, rather than a substring.
+    BubbleUIInfo& AddLearnMoreLink(const std::u16string& link_text,
+                                   DownloadCommands::Command command);
+
+    BubbleUIInfo& DisableMainButton();
+
+    // Set common characteristics for dangerous or suspicious downloads.
+    static BubbleUIInfo DangerousUiPattern(
+        const std::u16string& subpage_summary);
+    static BubbleUIInfo SuspiciousUiPattern(
+        const std::u16string& subpage_summary,
+        const std::u16string& secondary_subpage_button_label);
+
     ui::ColorId GetColorForSecondaryText() const;
     bool HasSubpage() const;
     bool HasCheckbox() const;
@@ -522,6 +581,7 @@ class DownloadUIModel {
   BubbleUIInfo GetBubbleUIInfoForInProgressOrComplete(
       bool is_download_bubble_v2) const;
   virtual BubbleUIInfo GetBubbleUIInfoForTailoredWarning() const;
+  BubbleUIInfo GetBubbleUIInfoForFileTypeWarningNoSafeBrowsing() const;
 
   // Returns |true| if this download should be displayed in the download bubble.
   virtual bool ShouldShowInBubble() const;
@@ -558,6 +618,10 @@ class DownloadUIModel {
   // Returns the accessible alert text that should be announced when the
   // download is in progress.
   virtual std::u16string GetInProgressAccessibleAlertText() const;
+
+  // Determines whether the file is an encrypted archive. This is used to
+  // specialize certain strings.
+  virtual bool IsEncryptedArchive() const;
 
  protected:
   // Returns the MIME type of the download.

@@ -35,6 +35,10 @@ struct AdminTemplateWindowUpdate {
 
   // Optional new display ID for the window.
   absl::optional<int64_t> display_id;
+
+  // Optional new Z index for the window, relative to the other tracked
+  // windows.
+  absl::optional<int32_t> activation_index;
 };
 
 // Apply changes in `update` to `admin_template`. If `update` has specified a
@@ -84,6 +88,18 @@ class ASH_EXPORT AdminTemplateLaunchTracker {
   // Sets up window observers for windows that are expected to be launched. It
   // then launches the template using `delegate`.
   void LaunchTemplate(SavedDeskDelegate* delegate, int64_t default_display_id);
+
+  // If there is an existing pending update to this template, it will be
+  // dispatched using the update callback. If there are no pending updates, then
+  // this is a no-op.
+  void FlushPendingUpdate();
+
+  // Returns true if there are launched windows from this tracker that are still
+  // open. When this returns false, there are no more windows that can generate
+  // updates. Note that there may still be a pending update, so
+  // `FlushPendingUpdate` should typically be called before the tracker is
+  // destroyed.
+  bool IsActive() const;
 
  private:
   // Called when an observer is created (either a desk or window observer).

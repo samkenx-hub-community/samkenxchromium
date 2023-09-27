@@ -14,9 +14,13 @@ static_assert(static_cast<int>(
                   attribution_reporting::mojom::ReportType::kEventLevel) == 0,
               "update `report_type=0` clause below");
 inline constexpr const char kMinPrioritySql[] =
-    "SELECT metadata,trigger_time,report_id FROM reports "
+    "SELECT metadata,report_id FROM reports "
     "WHERE source_id=? AND report_time=? AND report_type=0";
 
+// Rows are ordered by source_id instead of source_time because the former is
+// strictly increasing while the latter is subject to clock adjustments. This
+// property is only guaranteed because of the use of AUTOINCREMENT on the
+// source_id column, which prevents reuse upon row deletion.
 inline constexpr const char kGetMatchingSourcesSql[] =
     "SELECT I.source_id,I.num_attributions,I.aggregatable_budget_consumed "
     "FROM sources I "
@@ -25,7 +29,7 @@ inline constexpr const char kGetMatchingSourcesSql[] =
     "WHERE I.reporting_origin=? "
     "AND(I.event_level_active=1 OR I.aggregatable_active=1)"
     "AND I.expiry_time>? "
-    "ORDER BY I.priority DESC,I.source_time DESC";
+    "ORDER BY I.priority DESC,I.source_id DESC";
 
 inline constexpr const char kSelectExpiredSourcesSql[] =
     "SELECT source_id FROM sources "
@@ -54,10 +58,12 @@ inline constexpr const char kScanReportsData[] =
 inline constexpr const char kDeleteVestigialConversionSql[] =
     "DELETE FROM reports WHERE source_id=? RETURNING report_type";
 
-inline constexpr const char kCountSourcesSql[] =
+inline constexpr const char kCountActiveSourcesFromSourceOriginSql[] =
     "SELECT COUNT(*)FROM sources "
     "WHERE source_origin=? "
     "AND(event_level_active=1 OR aggregatable_active=1)";
+
+inline constexpr const char kCountSourcesSql[] = "SELECT COUNT(*)FROM sources";
 
 inline constexpr const char kCountReportsSql[] =
     "SELECT COUNT(*)FROM dedup_keys "
@@ -110,7 +116,6 @@ inline constexpr const char kSetReportTimeSql[] =
   prefix "reporting_origin,"                   \
   prefix "source_time,"                        \
   prefix "expiry_time,"                        \
-  prefix "event_report_window_time,"           \
   prefix "aggregatable_report_window_time,"    \
   prefix "source_type,"                        \
   prefix "attribution_logic,"                  \
@@ -122,7 +127,8 @@ inline constexpr const char kSetReportTimeSql[] =
   prefix "aggregatable_source,"                \
   prefix "filter_data,"                        \
   prefix "event_level_active,"                 \
-  prefix "aggregatable_active"
+  prefix "aggregatable_active,"                \
+  prefix "read_only_source_data"
 
 inline constexpr const char kReadSourceToAttributeSql[] =
     "SELECT " ATTRIBUTION_SOURCE_COLUMNS_SQL("")
@@ -176,6 +182,15 @@ inline constexpr const char kRateLimitSourceAllowedSql[] =
     "AND source_site=? "
     "AND reporting_site=? "
     "AND source_expiry_or_attribution_time>?";
+
+static_assert(static_cast<int>(RateLimitTable::Scope::kSource) == 0,
+              "update `scope=0` query below");
+inline constexpr const char kRateLimitSourceAllowedDestinationRateLimitSql[] =
+    "SELECT destination_site,reporting_site FROM rate_limits "
+    "WHERE scope=0 "
+    "AND source_site=? "
+    "AND source_expiry_or_attribution_time>? "
+    "AND time>?";
 
 inline constexpr const char kRateLimitSelectReportingOriginsSql[] =
     "SELECT reporting_origin FROM rate_limits "

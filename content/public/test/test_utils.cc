@@ -39,7 +39,6 @@
 #include "content/public/browser/site_isolation_policy.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/content_client.h"
-#include "content/public/common/content_features.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/common/process_type.h"
 #include "content/public/common/url_constants.h"
@@ -219,12 +218,15 @@ void IsolateAllSitesForTesting(base::CommandLine* command_line) {
 }
 
 bool CanSameSiteMainFrameNavigationsChangeRenderFrameHosts() {
-  return ShouldCreateNewHostForAllFrames() ||
+  return ShouldCreateNewRenderFrameHostOnSameSiteNavigation(
+             /*is_main_frame=*/true, /*is_local_root=*/true) ||
          CanSameSiteMainFrameNavigationsChangeSiteInstances();
 }
 
-bool WillSameSiteNavigationsChangeRenderFrameHosts() {
-  return ShouldCreateNewHostForAllFrames();
+bool WillSameSiteNavigationChangeRenderFrameHosts(bool is_main_frame,
+                                                  bool is_local_root) {
+  return ShouldCreateNewRenderFrameHostOnSameSiteNavigation(is_main_frame,
+                                                            is_local_root);
 }
 
 bool CanSameSiteMainFrameNavigationsChangeSiteInstances() {

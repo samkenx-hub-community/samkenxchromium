@@ -64,7 +64,7 @@ component("gpu") {
     "//remoting/host:common",
   ]
 
-  if (is_mac) {
+  if (is_apple) {
     # On Mac, content/common reaches into here to do some pre-sandbox
     # initialization.
     visibility += [ "//content/common" ]
@@ -153,6 +153,8 @@ component("gpu") {
       "android/media_codec_video_decoder.cc",
       "android/media_codec_video_decoder.h",
       "android/ndk_constants.cc",
+      "android/ndk_media_codec_wrapper.cc",
+      "android/ndk_media_codec_wrapper.h",
       "android/ndk_video_encode_accelerator.cc",
       "android/ndk_video_encode_accelerator.h",
       "android/pooled_shared_image_video_provider.cc",
@@ -228,12 +230,12 @@ component("gpu") {
       "windows/d3d11_video_decoder.cc",
       "windows/d3d11_video_decoder.h",
       "windows/d3d11_video_decoder_client.h",
-      "windows/d3d11_video_decoder_impl.cc",
-      "windows/d3d11_video_decoder_impl.h",
       "windows/d3d11_video_decoder_wrapper.cc",
       "windows/d3d11_video_decoder_wrapper.h",
       "windows/d3d11_video_device_format_support.cc",
       "windows/d3d11_video_device_format_support.h",
+      "windows/d3d11_video_frame_mailbox_release_helper.cc",
+      "windows/d3d11_video_frame_mailbox_release_helper.h",
       "windows/d3d11_video_processor_proxy.cc",
       "windows/d3d11_video_processor_proxy.h",
       "windows/d3d11_vp9_accelerator.cc",
@@ -244,14 +246,6 @@ component("gpu") {
       "windows/d3d_accelerator.h",
       "windows/d3d_video_decoder_wrapper.cc",
       "windows/d3d_video_decoder_wrapper.h",
-      "windows/dxva_picture_buffer_win.cc",
-      "windows/dxva_picture_buffer_win.h",
-      "windows/dxva_video_decode_accelerator_win.cc",
-      "windows/dxva_video_decode_accelerator_win.h",
-      "windows/gl_image_egl_stream.cc",
-      "windows/gl_image_egl_stream.h",
-      "windows/gl_image_pbuffer.cc",
-      "windows/gl_image_pbuffer.h",
       "windows/init_guid.cc",
       "windows/media_foundation_video_encode_accelerator_win.cc",
       "windows/media_foundation_video_encode_accelerator_win.h",
@@ -328,6 +322,8 @@ source_set("common") {
     "h264_decoder.h",
     "h264_dpb.cc",
     "h264_dpb.h",
+    "hrd_buffer.cc",
+    "hrd_buffer.h",
     "macros.h",
     "vp9_decoder.cc",
     "vp9_decoder.h",
@@ -378,8 +374,6 @@ source_set("common") {
 
   if (is_win || use_vaapi) {
     sources += [
-      "video_rate_control.cc",
-      "video_rate_control.h",
       "vp9_svc_layers.cc",
       "vp9_svc_layers.h",
     ]
@@ -534,6 +528,7 @@ source_set("android_video_decode_accelerator_unittests") {
       "android/mock_promotion_hint_aggregator.h",
       "android/mock_shared_image_video_provider.cc",
       "android/mock_shared_image_video_provider.h",
+      "android/ndk_media_codec_wrapper_unittest.cc",
       "android/ndk_video_encode_accelerator_tests.cc",
       "android/pooled_shared_image_video_provider_unittest.cc",
       "android/promotion_hint_aggregator_impl_unittest.cc",
@@ -584,7 +579,10 @@ source_set("unit_tests") {
     "//testing/gtest",
     "//ui/gl:test_support",
   ]
-  sources = [ "h264_decoder_unittest.cc" ]
+  sources = [
+    "h264_decoder_unittest.cc",
+    "hrd_buffer_unittest.cc",
+  ]
   if (enable_hevc_parser_and_hw_decoder) {
     sources += [ "h265_decoder_unittest.cc" ]
   }
@@ -634,7 +632,7 @@ source_set("unit_tests") {
     libs = [ "dxguid.lib" ]
   }
 
-  if (is_mac) {
+  if (is_apple) {
     deps += [ "//media/gpu/mac:unit_tests" ]
   }
 

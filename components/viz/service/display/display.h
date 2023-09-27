@@ -124,6 +124,10 @@ class VIZ_SERVICE_EXPORT Display : public DisplaySchedulerClient,
   void SetVisible(bool visible);
   void Resize(const gfx::Size& new_size);
 
+  // Sets additional clip rect for the OutputSurface. DirectRenderer will not
+  // draw outside of this rect.
+  void SetOutputSurfaceClipRect(const gfx::Rect& clip_rect);
+
   // Sets the current SurfaceId to an invalid value. Additionally, the display
   // will fail to draw until SetLocalSurfaceId() is called.
   void InvalidateCurrentSurfaceId();
@@ -183,6 +187,8 @@ class VIZ_SERVICE_EXPORT Display : public DisplaySchedulerClient,
       mojom::CompositorFrameSinkType* type) override;
 
   bool has_scheduler() const { return !!scheduler_; }
+  bool visible() const { return visible_; }
+  const RendererSettings& settings() const { return settings_; }
   DirectRenderer* renderer_for_testing() const { return renderer_.get(); }
 
   bool resize_based_on_root_surface() const {
@@ -211,6 +217,10 @@ class VIZ_SERVICE_EXPORT Display : public DisplaySchedulerClient,
   void InitDelegatedInkPointRendererReceiver(
       mojo::PendingReceiver<gfx::mojom::DelegatedInkPointRenderer>
           pending_receiver);
+
+  // `old_client` is used to guarantee that the callee is a correct owner of
+  // this Display instance.
+  void ResetDisplayClientForTesting(DisplayClient* old_client);
 
  protected:
   friend class DisplayTest;
@@ -265,7 +275,7 @@ class VIZ_SERVICE_EXPORT Display : public DisplaySchedulerClient,
   // Points to the viz-global singleton.
   const raw_ptr<const DebugRendererSettings> debug_settings_;
 
-  raw_ptr<DisplayClient, DanglingUntriaged> client_ = nullptr;
+  raw_ptr<DisplayClient> client_ = nullptr;
   base::ObserverList<DisplayObserver>::Unchecked observers_;
   raw_ptr<SurfaceManager> surface_manager_ = nullptr;
   const FrameSinkId frame_sink_id_;

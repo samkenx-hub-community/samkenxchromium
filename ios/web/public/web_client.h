@@ -16,7 +16,7 @@
 #include "ios/web/common/user_agent.h"
 #include "mojo/public/cpp/bindings/generic_pending_receiver.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
-#include "ui/base/layout.h"
+#include "ui/base/resource/resource_scale_factor.h"
 
 namespace base {
 class RefCountedMemory;
@@ -28,6 +28,7 @@ class GURL;
 @protocol UITraitEnvironment;
 @class NSString;
 @class NSData;
+@class UIView;
 
 namespace net {
 class SSLInfo;
@@ -116,24 +117,6 @@ class WebClient {
   virtual std::vector<JavaScriptFeature*> GetJavaScriptFeatures(
       BrowserState* browser_state) const;
 
-  // Gives the embedder a chance to provide the JavaScript to be injected into
-  // the web view as early as possible. Result must not be nil.
-  // The script returned will be injected in all frames (main and subframes).
-  //
-  // TODO(crbug.com/703964): Change the return value to NSArray<NSString*> to
-  // improve performance.
-  virtual NSString* GetDocumentStartScriptForAllFrames(
-      BrowserState* browser_state) const;
-
-  // Gives the embedder a chance to provide the JavaScript to be injected into
-  // the web view as early as possible. Result must not be nil.
-  // The script returned will only be injected in the main frame.
-  //
-  // TODO(crbug.com/703964): Change the return value to NSArray<NSString*> to
-  // improve performance.
-  virtual NSString* GetDocumentStartScriptForMainFrame(
-      BrowserState* browser_state) const;
-
   // Allows the embedder to bind an interface request for a WebState-scoped
   // interface that originated from the main frame of `web_state`. Called if
   // `web_state` could not bind the receiver itself.
@@ -160,6 +143,9 @@ class WebClient {
 
   // Instructs the embedder to return a container that is attached to a window.
   virtual UIView* GetWindowedContainer();
+
+  // Enables the web-exposed Fullscreen API.
+  virtual bool EnableFullscreenAPI() const;
 
   // Enables the logic to handle long press context menu with UIContextMenu.
   virtual bool EnableLongPressUIContextMenu() const;
@@ -194,16 +180,6 @@ class WebClient {
   virtual bool IsPointingToSameDocument(const GURL& url1,
                                         const GURL& url2) const;
 
-  // Provides a searchable object for the given `web_state` instance.
-  virtual id<CRWFindSession> CreateFindSessionForWebState(
-      web::WebState* web_state) const API_AVAILABLE(ios(16));
-
-  // Starts a text search in `web_state`.
-  virtual void StartTextSearchInWebState(web::WebState* web_state);
-
-  // Stops the ongoing text search in `web_state`.
-  virtual void StopTextSearchInWebState(web::WebState* web_state);
-
   // Returns true if mixed content on HTTPS documents should be upgraded if
   // possible.
   virtual bool IsMixedContentAutoupgradeEnabled(
@@ -212,6 +188,11 @@ class WebClient {
   // Returns true if browser lockdown mode is enabled. Default return value is
   // false.
   virtual bool IsBrowserLockdownModeEnabled(web::BrowserState* browser_state);
+
+  // Sets OS lockdown mode preference value. By default, no preference value is
+  // set.
+  virtual void SetOSLockdownModeEnabled(web::BrowserState* browser_state,
+                                        bool enabled);
 };
 
 }  // namespace web

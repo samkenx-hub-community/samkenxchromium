@@ -77,8 +77,9 @@
 #include "url/gurl.h"
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
+#include "chrome/browser/ash/login/test/local_state_mixin.h"
 #include "chrome/browser/ash/login/users/fake_chrome_user_manager.h"
-#include "chromeos/ash/components/login/login_state/login_state.h"
+#include "chromeos/components/kiosk/kiosk_test_utils.h"  // nogncheck
 #include "chromeos/dbus/power/fake_power_manager_client.h"
 #include "components/user_manager/scoped_user_manager.h"
 #endif
@@ -549,8 +550,6 @@ IN_PROC_BROWSER_TEST_F(PlatformAppBrowserTest, MAYBE_Iframes) {
 
 // Tests that platform apps can perform filesystem: URL navigations.
 IN_PROC_BROWSER_TEST_F(PlatformAppBrowserTest, AllowFileSystemURLNavigation) {
-  // TODO(https://crbug.com/1332598): Remove this test when removing filesystem:
-  // navigation for good.
   if (!base::FeatureList::IsEnabled(
           blink::features::kFileSystemUrlNavigationForChromeAppsOnly)) {
     GTEST_SKIP();
@@ -1394,11 +1393,22 @@ IN_PROC_BROWSER_TEST_F(PlatformAppIncognitoBrowserTest,
   }
 }
 
-class RestartDeviceTest : public PlatformAppBrowserTest {
+class RestartKioskDeviceTest : public PlatformAppBrowserTest,
+                               public ash::LocalStateMixin::Delegate {
  public:
-  void SetUpOnMainThread() override {
-    PlatformAppBrowserTest::SetUpOnMainThread();
+  void SetUpLocalState() override {
+    // Until EnterKioskSession is called, the setup and the test run in a
+    // regular user session. Marking another user as the owner prevents the
+    // current user from taking ownership and overriding the kiosk mode.
+    user_manager::UserManager::Get()->RecordOwner(
+        AccountId::FromUserEmail("not_current_user@example.com"));
+  }
 
+  void SetUpOnMainThread() override {
+    user_manager_.Reset(std::make_unique<ash::FakeChromeUserManager>());
+    chromeos::SetUpFakeKioskSession();
+
+    PlatformAppBrowserTest::SetUpOnMainThread();
     // Disable "faked" shutdown of Chrome if the OS was supposed to restart.
     // The fakes this test injects would cause it to crash.
     chromeos::FakePowerManagerClient* fake_power_manager_client =
@@ -1409,7 +1419,7 @@ class RestartDeviceTest : public PlatformAppBrowserTest {
 
   void TearDownOnMainThread() override {
     PlatformAppBrowserTest::TearDownOnMainThread();
-    user_manager_enabler_.reset();
+    user_manager_.Reset();
   }
 
  protected:
@@ -1417,20 +1427,15 @@ class RestartDeviceTest : public PlatformAppBrowserTest {
     return chromeos::FakePowerManagerClient::Get()->num_request_restart_calls();
   }
 
-  void EnterKioskSession() {
-    ash::LoginState::Get()->SetLoggedInState(
-        ash::LoginState::LoggedInState::LOGGED_IN_ACTIVE,
-        ash::LoginState::LoggedInUserType::LOGGED_IN_USER_KIOSK);
-  }
-
  private:
-  std::unique_ptr<user_manager::ScopedUserManager> user_manager_enabler_;
+  ash::LocalStateMixin local_state_mixin_{&mixin_host_, this};
+  user_manager::TypedScopedUserManager<ash::FakeChromeUserManager>
+      user_manager_;
 };
 
 // Tests that chrome.runtime.restart would request device restart in
 // ChromeOS kiosk mode.
-IN_PROC_BROWSER_TEST_F(RestartDeviceTest, Restart) {
-  EnterKioskSession();
+IN_PROC_BROWSER_TEST_F(RestartKioskDeviceTest, Restart) {
   ASSERT_EQ(0, num_request_restart_calls());
 
   ExtensionTestMessageListener launched_listener("Launched",

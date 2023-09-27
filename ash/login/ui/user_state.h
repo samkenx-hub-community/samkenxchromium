@@ -31,12 +31,12 @@ class UserState {
   bool disable_auth = false;
   bool show_pin_pad_for_password = false;
   size_t autosubmit_pin_length = 0;
-  absl::optional<EasyUnlockIconInfo> easy_unlock_icon_info = absl::nullopt;
   FingerprintState fingerprint_state = FingerprintState::UNAVAILABLE;
   SmartLockState smart_lock_state = SmartLockState::kDisabled;
   bool auth_factor_is_hiding_password = false;
   // When present, indicates that the TPM is locked.
   absl::optional<base::TimeDelta> time_until_tpm_unlock = absl::nullopt;
+  bool is_recovery_configured = false;
 };
 
 }  // namespace ash

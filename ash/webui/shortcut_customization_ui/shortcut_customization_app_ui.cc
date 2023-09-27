@@ -8,6 +8,8 @@
 #include <utility>
 
 #include "ash/constants/ash_features.h"
+#include "ash/shell.h"
+#include "ash/webui/common/trusted_types_util.h"
 #include "ash/webui/grit/ash_shortcut_customization_app_resources.h"
 #include "ash/webui/grit/ash_shortcut_customization_app_resources_map.h"
 #include "ash/webui/shortcut_customization_ui/backend/accelerator_configuration_provider.h"
@@ -49,10 +51,13 @@ void AddLocalizedStrings(content::WebUIDataSource* source) {
       {"keyboardSettings", IDS_SHORTCUT_CUSTOMIZATION_KEYBOARD_SETTINGS},
       {"addShortcut", IDS_SHORTCUT_CUSTOMIZATION_ADD_SHORTCUT},
       {"restoreDefaults", IDS_SHORTCUT_CUSTOMIZATION_RESTORE_DEFAULTS},
+      {"edit", IDS_SHORTCUT_CUSTOMIZATION_EDIT},
       {"editDialogDone", IDS_SHORTCUT_CUSTOMIZATION_EDIT_DIALOG_DONE},
       {"cancel", IDS_SHORTCUT_CUSTOMIZATION_CANCEL},
       {"editViewStatusMessage",
        IDS_SHORTCUT_CUSTOMIZATION_EDIT_VIEW_STATUS_MESSAGE},
+      {"restoreDefaultConflictMessage",
+       IDS_SHORTCUT_CUSTOMIZATION_RESTORE_DEFAULT_ERROR_MESSAGE},
       {"resetAllShortcuts", IDS_SHORTCUT_CUSTOMIZATION_RESET_ALL_SHORTCUTS},
       {"confirmResetAllShortcutsTitle",
        IDS_SHORTCUT_CUSTOMIZATION_CONFIRM_RESET_ALL_SHORTCUTS_TITLE},
@@ -72,13 +77,27 @@ void AddLocalizedStrings(content::WebUIDataSource* source) {
        IDS_SHORTCUT_CUSTOMIZATION_SHORTCUT_WITH_CONFILICT_STATUS_MESSAGE},
       {"lockedShortcutStatusMessage",
        IDS_SHORTCUT_CUSTOMIZATION_LOCKED_SHORTCUT_STATUS_MESSAGE},
+      {"maxAcceleratorsReachedHint",
+       IDS_SHORTCUT_CUSTOMIZATION_MAX_ACCELERATORS_REACHED_HINT},
+      {"shiftOnlyNotAllowedStatusMessage",
+       IDS_SHORTCUT_CUSTOMIZATION_SHIFT_ONLY_NOT_ALLOWED_STATUS_MESSAGE},
+      {"missingModifierStatusMessage",
+       IDS_SHORTCUT_CUSTOMIZATION_MISSING_MODIFIER_STATUS_MESSAGE},
+      {"keyNotAllowedStatusMessage",
+       IDS_SHORTCUT_CUSTOMIZATION_KEY_NOT_ALLOWED_STATUS_MESSAGE},
+      {"searchWithFunctionKeyNotAllowedStatusMessage",
+       IDS_SHORTCUT_CUSTOMIZATION_SEACH_WITH_FUNCTION_KEY_NOT_ALLOWED_STATUS_MESSAGE},
+      {"warningSearchNotIncluded",
+       IDS_SHORTCUT_CUSTOMIZATION_NON_SEARCH_SHORTCUT_WARNING},
       {"searchNoResults", IDS_SHORTCUT_CUSTOMIZATION_SEARCH_NO_RESULTS},
       {"searchClearQueryLabel",
        IDS_SHORTCUT_CUSTOMIZATION_SEARCH_CLEAR_QUERY_LABEL},
       {"searchPlaceholderLabel",
        IDS_SHORTCUT_CUSTOMIZATION_SEARCH_PLACEHOLDER_LABEL},
-      {"searchAcceleratorTextDivider",
-       IDS_SHORTCUT_CUSTOMIZATION_SEARCH_ACCELERATOR_TEXT_DIVIDER},
+      {"acceleratorTextDivider",
+       IDS_SHORTCUT_CUSTOMIZATION_ACCELERATOR_TEXT_DIVIDER},
+      {"acceleratorRowAriaLabel",
+       IDS_SHORTCUT_CUSTOMIZATION_ACCELERATOR_ROW_A11Y},
       {"searchResultSelectedAriaLabel",
        IDS_SHORTCUT_CUSTOMIZATION_SEARCH_RESULT_ROW_A11Y_RESULT_SELECTED},
       {"subcategoryGeneralControls",
@@ -128,12 +147,16 @@ void AddLocalizedStrings(content::WebUIDataSource* source) {
        IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_BROWSER_BACK},
       {"iconLabelBrowserForward",
        IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_BROWSER_FORWARD},
+      {"iconLabelBrowserHome",
+       IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_BROWSER_HOME},
       {"iconLabelBrowserRefresh",
        IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_BROWSER_REFRESH},
       {"iconLabelBrowserSearch",
        IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_BROWSER_SEARCH},
-      {"iconLabelToggleDictation",
-       IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_TOGGLE_DICTATION},
+      {"iconLabelContextMenu",
+       IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_CONTEXT_MENU},
+      {"iconLabelEnableOrToggleDictation",
+       IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_ENABLE_OR_TOGGLE_DICTATION},
       {"iconLabelEmojiPicker",
        IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_EMOJI_PICKER},
       {"iconLabelKeyboardBacklightToggle",
@@ -148,6 +171,8 @@ void AddLocalizedStrings(content::WebUIDataSource* source) {
        IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_LAUNCH_APPLICATION2},
       {"iconLabelLaunchAssistant",
        IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_LAUNCH_ASSISTANT},
+      {"iconLabelLaunchMail",
+       IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_LAUNCH_MAIL},
       {"iconLabelMediaFastForward",
        IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_MEDIA_FAST_FORWARD},
       {"iconLabelMediaPause",
@@ -173,6 +198,7 @@ void AddLocalizedStrings(content::WebUIDataSource* source) {
       {"iconLabelPrivacyScreenToggle",
        IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_PRIVACY_SCREEN_TOGGLE},
       {"iconLabelSettings", IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_SETTINGS},
+      {"iconLabelStandby", IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_STAND_BY},
       {"iconLabelViewAllApps",
        IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_VIEW_ALL_APPS},
       {"iconLabelZoomToggle",
@@ -184,10 +210,9 @@ void AddLocalizedStrings(content::WebUIDataSource* source) {
 }
 
 void AddFeatureFlags(content::WebUIDataSource* html_source) {
-  html_source->AddBoolean("isCustomizationEnabled",
-                          ::features::IsShortcutCustomizationEnabled());
-  html_source->AddBoolean("isSearchEnabled",
-                          features::IsSearchInShortcutsAppEnabled());
+  html_source->AddBoolean(
+      "isCustomizationAllowed",
+      Shell::Get()->accelerator_prefs()->IsCustomizationAllowed());
   html_source->AddBoolean(
       "isJellyEnabledForShortcutCustomization",
       ash::features::IsJellyEnabledForShortcutCustomization());
@@ -207,7 +232,7 @@ ShortcutCustomizationAppUI::ShortcutCustomizationAppUI(content::WebUI* web_ui)
       "script-src chrome://resources chrome://test chrome://webui-test "
       "'self';");
 
-  source->DisableTrustedTypesCSP();
+  ash::EnableTrustedTypesCSP(source);
 
   const auto resources =
       base::make_span(kAshShortcutCustomizationAppResources,
@@ -217,9 +242,28 @@ ShortcutCustomizationAppUI::ShortcutCustomizationAppUI(content::WebUI* web_ui)
   AddLocalizedStrings(source);
 
   AddFeatureFlags(source);
+
+  // Observe shortcut policy changes.
+  if (Shell::Get()->accelerator_prefs()->IsUserEnterpriseManaged()) {
+    Shell::Get()->accelerator_prefs()->AddObserver(this);
+  }
 }
 
-ShortcutCustomizationAppUI::~ShortcutCustomizationAppUI() = default;
+ShortcutCustomizationAppUI::~ShortcutCustomizationAppUI() {
+  if (Shell::Get()->accelerator_prefs()->IsUserEnterpriseManaged()) {
+    Shell::Get()->accelerator_prefs()->RemoveObserver(this);
+  }
+}
+
+void ShortcutCustomizationAppUI::OnShortcutPolicyUpdated() {
+  base::Value::Dict update_data;
+  // Update 'isCustomizationAllowed" when policy changes.
+  update_data.Set("isCustomizationAllowed",
+                  Shell::Get()->accelerator_prefs()->IsCustomizationAllowed());
+  content::WebUIDataSource::Update(
+      web_ui()->GetWebContents()->GetBrowserContext(),
+      kChromeUIShortcutCustomizationAppHost, std::move(update_data));
+}
 
 void ShortcutCustomizationAppUI::BindInterface(
     mojo::PendingReceiver<
@@ -234,9 +278,6 @@ void ShortcutCustomizationAppUI::BindInterface(
 void ShortcutCustomizationAppUI::BindInterface(
     mojo::PendingReceiver<shortcut_customization::mojom::SearchHandler>
         receiver) {
-  // BindInterface should not be called unless the search flag is enabled.
-  DCHECK(features::IsSearchInShortcutsAppEnabled());
-
   shortcut_ui::SearchHandler* search_handler =
       shortcut_ui::ShortcutsAppManagerFactory::GetForBrowserContext(
           web_ui()->GetWebContents()->GetBrowserContext())

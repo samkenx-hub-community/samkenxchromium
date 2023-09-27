@@ -19,6 +19,7 @@
 #include "third_party/blink/renderer/core/core_export.h"
 #include "third_party/blink/renderer/core/css/css_keyframes_rule.h"
 #include "third_party/blink/renderer/core/css/css_property_equality.h"
+#include "third_party/blink/renderer/core/style/computed_style.h"
 #include "third_party/blink/renderer/core/style/scoped_css_name.h"
 #include "third_party/blink/renderer/platform/heap/collection_support/heap_hash_map.h"
 #include "third_party/blink/renderer/platform/heap/collection_support/heap_hash_set.h"
@@ -180,13 +181,12 @@ class CORE_EXPORT CSSAnimationUpdate final {
     updated_compositor_keyframes_.push_back(animation);
   }
 
-  void StartTransition(
-      const PropertyHandle&,
-      scoped_refptr<const ComputedStyle> from,
-      scoped_refptr<const ComputedStyle> to,
-      scoped_refptr<const ComputedStyle> reversing_adjusted_start_value,
-      double reversing_shortening_factor,
-      const InertEffect&);
+  void StartTransition(const PropertyHandle&,
+                       const ComputedStyle* from,
+                       const ComputedStyle* to,
+                       const ComputedStyle* reversing_adjusted_start_value,
+                       double reversing_shortening_factor,
+                       const InertEffect&);
   void UnstartTransition(const PropertyHandle&);
   void CancelTransition(const PropertyHandle& property) {
     cancelled_transitions_.insert(property);
@@ -211,11 +211,6 @@ class CORE_EXPORT CSSAnimationUpdate final {
     changed_timeline_attachments_ = std::move(attachments);
   }
 
-  // TODO(crbug.com/1446702): Remove scroll/view-timeline-attachment.
-  void SetChangedAttachingTimelines(AttachingTimelineMap timelines) {
-    changed_attaching_timelines_ = std::move(timelines);
-  }
-
   const HeapVector<NewCSSAnimation>& NewAnimations() const {
     return new_animations_;
   }
@@ -237,14 +232,29 @@ class CORE_EXPORT CSSAnimationUpdate final {
 
   struct NewTransition : public GarbageCollected<NewTransition> {
    public:
-    NewTransition();
-    virtual ~NewTransition();
-    void Trace(Visitor* visitor) const { visitor->Trace(effect); }
+    NewTransition(const PropertyHandle& property,
+                  const ComputedStyle* from,
+                  const ComputedStyle* to,
+                  const ComputedStyle* reversing_adjusted_start_value,
+                  double reversing_shortening_factor,
+                  const InertEffect* effect)
+        : property(property),
+          from(from),
+          to(to),
+          reversing_adjusted_start_value(reversing_adjusted_start_value),
+          reversing_shortening_factor(reversing_shortening_factor),
+          effect(effect) {}
+    void Trace(Visitor* visitor) const {
+      visitor->Trace(from);
+      visitor->Trace(to);
+      visitor->Trace(reversing_adjusted_start_value);
+      visitor->Trace(effect);
+    }
 
     PropertyHandle property = HashTraits<blink::PropertyHandle>::EmptyValue();
-    scoped_refptr<const ComputedStyle> from;
-    scoped_refptr<const ComputedStyle> to;
-    scoped_refptr<const ComputedStyle> reversing_adjusted_start_value;
+    Member<const ComputedStyle> from;
+    Member<const ComputedStyle> to;
+    Member<const ComputedStyle> reversing_adjusted_start_value;
     double reversing_shortening_factor;
     Member<const InertEffect> effect;
   };
@@ -273,11 +283,6 @@ class CORE_EXPORT CSSAnimationUpdate final {
   }
   const TimelineAttachmentMap& ChangedTimelineAttachments() const {
     return changed_timeline_attachments_;
-  }
-
-  // TODO(crbug.com/1446702): Remove scroll/view-timeline-attachment.
-  const AttachingTimelineMap& ChangedAttachingTimelines() const {
-    return changed_attaching_timelines_;
   }
 
   void AdoptActiveInterpolationsForAnimations(
@@ -310,8 +315,7 @@ class CORE_EXPORT CSSAnimationUpdate final {
            !changed_scroll_timelines_.empty() ||
            !changed_view_timelines_.empty() ||
            !changed_deferred_timelines_.empty() ||
-           !changed_timeline_attachments_.empty() ||
-           !changed_attaching_timelines_.empty();
+           !changed_timeline_attachments_.empty();
   }
 
   void Trace(Visitor* visitor) const {
@@ -326,9 +330,6 @@ class CORE_EXPORT CSSAnimationUpdate final {
     visitor->Trace(changed_view_timelines_);
     visitor->Trace(changed_deferred_timelines_);
     visitor->Trace(changed_timeline_attachments_);
-
-    // TODO(crbug.com/1446702): Remove scroll/view-timeline-attachment.
-    visitor->Trace(changed_attaching_timelines_);
   }
 
  private:
@@ -356,9 +357,6 @@ class CORE_EXPORT CSSAnimationUpdate final {
   CSSViewTimelineMap changed_view_timelines_;
   CSSDeferredTimelineMap changed_deferred_timelines_;
   TimelineAttachmentMap changed_timeline_attachments_;
-
-  // TODO(crbug.com/1446702): Remove scroll/view-timeline-attachment.
-  AttachingTimelineMap changed_attaching_timelines_;
 
   ActiveInterpolationsMap active_interpolations_for_animations_;
   ActiveInterpolationsMap active_interpolations_for_transitions_;

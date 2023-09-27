@@ -277,9 +277,8 @@ bool HTMLFormElement::ValidateInteractively() {
       ConsoleMessage* console_message = MakeGarbageCollected<ConsoleMessage>(
           mojom::blink::ConsoleMessageSource::kRendering,
           mojom::blink::ConsoleMessageLevel::kError, message);
-      console_message->SetNodes(
-          GetDocument().GetFrame(),
-          {DOMNodeIds::IdForNode(&unhandled->ToHTMLElement())});
+      console_message->SetNodes(GetDocument().GetFrame(),
+                                {unhandled->ToHTMLElement().GetDomNodeId()});
       GetDocument().AddConsoleMessage(console_message);
     }
   }
@@ -335,6 +334,12 @@ void HTMLFormElement::PrepareForSubmission(
         DispatchEvent(*Event::Create(event_type_names::kError));
         return;
       }
+    }
+  }
+
+  for (ListedElement* element : ListedElements()) {
+    if (auto* form_control = DynamicTo<HTMLFormControlElement>(element)) {
+      form_control->SetInteractedSinceLastFormSubmit(true);
     }
   }
 

@@ -18,12 +18,15 @@
 #include "components/page_load_metrics/browser/page_load_metrics_update_dispatcher.h"
 #include "components/page_load_metrics/browser/resource_tracker.h"
 #include "components/page_load_metrics/common/page_end_reason.h"
+#include "components/page_load_metrics/common/page_load_metrics.mojom.h"
 #include "components/page_load_metrics/common/page_load_timing.h"
 #include "content/public/browser/global_request_id.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "net/cookies/canonical_cookie.h"
 #include "services/metrics/public/cpp/ukm_source.h"
+#include "services/metrics/public/cpp/ukm_source_id.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
+#include "third_party/blink/public/common/performance/performance_timeline_constants.h"
 #include "ui/base/scoped_visibility_tracker.h"
 #include "ui/gfx/geometry/size.h"
 
@@ -237,7 +240,8 @@ class PageLoadTracker : public PageLoadMetricsUpdateDispatcher::Client,
   void OnMainFrameMetadataChanged() override;
   void OnSubframeMetadataChanged(content::RenderFrameHost* rfh,
                                  const mojom::FrameMetadata& metadata) override;
-  void OnSoftNavigationCountChanged(uint32_t soft_navigation_count) override;
+  void OnSoftNavigationChanged(
+      const mojom::SoftNavigationMetrics& soft_navigation_metrics) override;
   void UpdateFeaturesUsage(
       content::RenderFrameHost* rfh,
       const std::vector<blink::UseCounterFeature>& new_features) override;
@@ -281,8 +285,12 @@ class PageLoadTracker : public PageLoadMetricsUpdateDispatcher::Client,
   const PageRenderData& GetPageRenderData() const override;
   const NormalizedCLSData& GetNormalizedCLSData(
       BfcacheStrategy bfcache_strategy) const override;
+  const NormalizedCLSData& GetSoftNavigationIntervalNormalizedCLSData()
+      const override;
   const NormalizedResponsivenessMetrics& GetNormalizedResponsivenessMetrics()
       const override;
+  const NormalizedResponsivenessMetrics&
+  GetSoftNavigationIntervalNormalizedResponsivenessMetrics() const override;
   const mojom::InputTiming& GetPageInputTiming() const override;
   const absl::optional<blink::SubresourceLoadMetrics>&
   GetSubresourceLoadMetrics() const override;
@@ -294,8 +302,12 @@ class PageLoadTracker : public PageLoadMetricsUpdateDispatcher::Client,
   const LargestContentfulPaintHandler&
   GetExperimentalLargestContentfulPaintHandler() const override;
   ukm::SourceId GetPageUkmSourceId() const override;
-  uint32_t GetSoftNavigationCount() const override;
+  mojom::SoftNavigationMetrics& GetSoftNavigationMetrics() const override;
+  ukm::SourceId GetUkmSourceIdForSoftNavigation() const override;
+  ukm::SourceId GetPreviousUkmSourceIdForSoftNavigation() const override;
   bool IsFirstNavigationInWebContents() const override;
+  bool IsOriginVisit() const override;
+  bool IsTerminalVisit() const override;
 
   void Redirect(content::NavigationHandle* navigation_handle);
   void WillProcessNavigationResponse(
@@ -440,12 +452,15 @@ class PageLoadTracker : public PageLoadMetricsUpdateDispatcher::Client,
                      mojom::InputTimingPtr input_timing_delta,
                      const absl::optional<blink::SubresourceLoadMetrics>&
                          subresource_load_metrics,
-                     uint32_t soft_navigation_count);
+                     mojom::SoftNavigationMetricsPtr soft_navigation_metrics);
 
-  // Set RenderFrameHost for the main frame of the page this tracker instance is
-  // bound. This is called on moving the tracker to the active / inactive
+  // Sets RenderFrameHost for the main frame of the page this tracker instance
+  // is bound. This is called on moving the tracker to the active / inactive
   // tracker list after the provisional load is committed.
   void SetPageMainFrame(content::RenderFrameHost* rfh);
+
+  // Records the fact link navigation from the tracking page happens.
+  void RecordLinkNavigation();
 
   // Gets a bound ukm::SourceId without any check for testing.
   ukm::SourceId GetPageUkmSourceIdForTesting() const { return source_id_; }
@@ -561,16 +576,24 @@ class PageLoadTracker : public PageLoadMetricsUpdateDispatcher::Client,
   // Holds the RenderFrameHost for the main frame of the page that this tracker
   // instance is bound. Safe to use raw_ptr as the tracker instance is accessed
   // via a map that uses the RenderFrameHost as the key while it's valid.
-  raw_ptr<content::RenderFrameHost, DanglingUntriaged> page_main_frame_;
+  raw_ptr<content::RenderFrameHost, AcrossTasksDanglingUntriaged>
+      page_main_frame_;
 
   const bool is_first_navigation_in_web_contents_;
+  const bool is_origin_visit_;
+  bool is_terminal_visit_ = true;
 
   page_load_metrics::LargestContentfulPaintHandler
       largest_contentful_paint_handler_;
   page_load_metrics::LargestContentfulPaintHandler
       experimental_largest_contentful_paint_handler_;
 
-  uint32_t soft_navigation_count_ = 0;
+  mojom::SoftNavigationMetricsPtr soft_navigation_metrics_;
+
+  GURL potential_soft_navigation_url_;
+
+  ukm::SourceId potential_soft_navigation_source_id_ = ukm::kInvalidSourceId;
+  ukm::SourceId previous_soft_navigation_source_id_ = ukm::kInvalidSourceId;
 
   absl::optional<base::TimeTicks> main_frame_receive_headers_start_;
 

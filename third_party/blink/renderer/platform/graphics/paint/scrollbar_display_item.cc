@@ -51,11 +51,10 @@ PaintRecord ScrollbarDisplayItem::Paint() const {
   recorder.beginRecording();
   auto* canvas = recorder.getRecordingCanvas();
   auto* scrollbar = data_->scrollbar_.get();
-  scrollbar->PaintPart(canvas, cc::ScrollbarPart::TRACK_BUTTONS_TICKMARKS,
-                       rect);
+  scrollbar->PaintPart(canvas, cc::ScrollbarPart::kTrackButtonsTickmarks, rect);
   gfx::Rect thumb_rect = scrollbar->ThumbRect();
   thumb_rect.Offset(rect.OffsetFromOrigin());
-  scrollbar->PaintPart(canvas, cc::ScrollbarPart::THUMB, thumb_rect);
+  scrollbar->PaintPart(canvas, cc::ScrollbarPart::kThumb, thumb_rect);
 
   scrollbar->ClearNeedsUpdateDisplay();
   data_->record_ = recorder.finishRecordingAsPicture();
@@ -77,8 +76,10 @@ scoped_refptr<cc::ScrollbarLayerBase> ScrollbarDisplayItem::CreateOrReuseLayer(
   auto layer = cc::ScrollbarLayerBase::CreateOrReuse(scrollbar, existing_layer);
   layer->SetIsDrawable(true);
   layer->SetContentsOpaque(IsOpaque());
-  if (!scrollbar->IsSolidColor())
-    layer->SetHitTestable(true);
+  // Android scrollbars can't be interacted with by user input.
+  layer->SetHitTestOpaqueness(scrollbar->IsSolidColor()
+                                  ? cc::HitTestOpaqueness::kTransparent
+                                  : cc::HitTestOpaqueness::kOpaque);
   layer->SetElementId(data_->element_id_);
   layer->SetScrollElementId(
       data_->scroll_translation_
@@ -140,7 +141,6 @@ void ScrollbarDisplayItem::Record(
       std::move(scroll_translation), element_id,
       client.VisualRectOutsetForRasterEffects(),
       client.GetPaintInvalidationReason());
-  paint_controller.RecordDebugInfo(client);
 }
 
 }  // namespace blink

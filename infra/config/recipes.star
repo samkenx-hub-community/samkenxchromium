@@ -202,11 +202,11 @@ build_recipe(
 )
 
 build_recipe(
-    name = "recipe:chromium_libfuzzer",
+    name = "recipe:chromium_rts/create_model",
 )
 
 build_recipe(
-    name = "recipe:chromium_rts/create_model",
+    name = "recipe:chromium_rts/rts_analyze",
 )
 
 build_recipe(
@@ -227,15 +227,16 @@ build_recipe(
 )
 
 build_recipe(
-    name = "recipe:flakiness/generate_builder_test_data",
-)
-
-build_recipe(
     name = "recipe:flakiness/reproducer",
 )
 
 build_recipe(
     name = "recipe:gofindit/chromium/single_revision",
+    bootstrappable = POLYMORPHIC,
+)
+
+build_recipe(
+    name = "recipe:gofindit/chromium/test_single_revision",
     bootstrappable = POLYMORPHIC,
 )
 
@@ -266,10 +267,6 @@ build_recipe(
 
 build_recipe(
     name = "recipe:swarming/deterministic_build",
-)
-
-build_recipe(
-    name = "recipe:swarming/staging",
 )
 
 build_recipe(

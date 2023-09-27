@@ -9,6 +9,7 @@
 
 #include "chrome/browser/apps/app_service/package_id.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
+#include "third_party/skia/include/core/SkBitmap.h"
 
 namespace apps {
 
@@ -17,6 +18,8 @@ enum class PromiseStatus {
   kUnknown,
   kPending,     // Waiting for the installation process to start.
   kInstalling,  // Installing app package.
+  kSuccess,     // Installation successfully completed.
+  kCancelled,   // Installation failed or was cancelled.
 };
 
 std::string EnumToString(PromiseStatus);
@@ -34,7 +37,6 @@ struct PromiseApp {
 
   PackageId package_id;
 
-  absl::optional<std::string> name;
   absl::optional<float> progress;
   PromiseStatus status = PromiseStatus::kUnknown;
 
@@ -57,9 +59,10 @@ class PromiseAppIcon {
   PromiseAppIcon(const PromiseAppIcon&) = delete;
   PromiseAppIcon& operator=(const PromiseAppIcon&) = delete;
 
-  gfx::ImageSkia icon;
-  absl::optional<int> width_in_pixels;
-  bool is_masking_allowed;
+  // Store the icon as a SkBitmap, which will form one of the several
+  // representations of an ImageSkia for a DIP size.
+  SkBitmap icon;
+  int width_in_pixels;
 };
 
 using PromiseAppIconPtr = std::unique_ptr<PromiseAppIcon>;

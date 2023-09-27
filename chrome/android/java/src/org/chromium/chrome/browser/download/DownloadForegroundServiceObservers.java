@@ -30,12 +30,6 @@ public final class DownloadForegroundServiceObservers {
      */
     public interface Observer {
         /**
-         * Called when the foreground service was automatically restarted because of START_STICKY.
-         * @param pinnedNotificationId Id of the notification pinned to the service when it died.
-         */
-        void onForegroundServiceRestarted(int pinnedNotificationId);
-
-        /**
          * Called when any task (service or activity) is removed from the service's application.
          */
         void onForegroundServiceTaskRemoved();
@@ -91,17 +85,6 @@ public final class DownloadForegroundServiceObservers {
                 ChromePreferenceKeys.DOWNLOAD_FOREGROUND_SERVICE_OBSERVERS, observers);
     }
 
-    static void alertObserversServiceRestarted(int pinnedNotificationId) {
-        Set<String> observers = getAllObservers();
-        removeAllObservers();
-
-        for (String observerClassName : observers) {
-            DownloadForegroundServiceObservers.Observer observer =
-                    DownloadForegroundServiceObservers.getObserverFromClassName(observerClassName);
-            if (observer != null) observer.onForegroundServiceRestarted(pinnedNotificationId);
-        }
-    }
-
     static void alertObserversServiceDestroyed() {
         Set<String> observers = getAllObservers();
 
@@ -131,8 +114,7 @@ public final class DownloadForegroundServiceObservers {
                 ChromePreferenceKeys.DOWNLOAD_FOREGROUND_SERVICE_OBSERVERS);
     }
 
-    @Nullable
-    private static Observer getObserverFromClassName(String observerClassName) {
+    private static @Nullable Observer getObserverFromClassName(String observerClassName) {
         try {
             Class<?> observerClass = Class.forName(observerClassName);
             return (Observer) observerClass.newInstance();

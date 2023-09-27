@@ -1,4 +1,4 @@
-# Copyright 2022 The Chromium Authors. All rights reserved.
+# Copyright 2022 The Chromium Authors
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 """Definitions of builders in the presubmit.linux builder group."""
@@ -8,8 +8,10 @@ load("//lib/ci.star", "ci")
 load("//lib/consoles.star", "consoles")
 
 ci.defaults.set(
+    pool = ci.DEFAULT_POOL,
     console_view = "checks",
     service_account = ci.DEFAULT_SERVICE_ACCOUNT,
+    shadow_service_account = ci.DEFAULT_SHADOW_SERVICE_ACCOUNT,
 )
 
 consoles.console_view(
@@ -28,6 +30,7 @@ ci.builder(
         category = "presubmit",
         short_name = "linux",
     ),
+    contact_team_email = "chrome-browser-infra-team@google.com",
     execution_timeout = ci.DEFAULT_EXECUTION_TIMEOUT,
     properties = {
         "$depot_tools/presubmit": {
@@ -50,6 +53,7 @@ ci.builder(
         category = "presubmit",
         short_name = "win",
     ),
+    contact_team_email = "chrome-browser-infra-team@google.com",
     execution_timeout = 6 * time.hour,
     properties = {
         "$depot_tools/presubmit": {

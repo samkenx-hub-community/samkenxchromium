@@ -4,6 +4,9 @@
 
 #include "content/browser/attribution_reporting/combinatorics.h"
 
+#include <stdint.h>
+
+#include <cmath>
 #include <functional>
 
 #include "base/check_op.h"
@@ -12,7 +15,7 @@
 
 namespace content {
 
-int BinomialCoefficient(int n, int k) {
+int64_t BinomialCoefficient(int n, int k) {
   DCHECK_GE(n, 0);
   DCHECK_GE(k, 0);
 
@@ -39,7 +42,7 @@ int BinomialCoefficient(int n, int k) {
   // true for a very simple reason. Imagine a value of `i` causes division with
   // remainder in the below algorithm. This immediately implies that
   // (n choose i) is fractional, which we know is not the case.
-  int result = 1;
+  int64_t result = 1;
   for (int i = 1; i <= k; i++) {
     result = base::CheckMul(result, n + 1 - i).ValueOrDie();
     DCHECK_EQ(0, result % i);
@@ -65,9 +68,11 @@ int BinomialCoefficient(int n, int k) {
 //
 // We find this set via a simple greedy algorithm.
 // http://math0.wvstateu.edu/~baker/cs405/code/Combinadics.html
-std::vector<int> GetKCombinationAtIndex(int combination_index, int k) {
+std::vector<int> GetKCombinationAtIndex(int64_t combination_index, int k) {
   DCHECK_GE(combination_index, 0);
   DCHECK_GE(k, 0);
+  // `k` can be no more than max number of event level reports per source (20).
+  DCHECK_LE(k, 20);
 
   std::vector<int> output_k_combination;
   output_k_combination.reserve(k);
@@ -122,13 +127,13 @@ std::vector<int> GetKCombinationAtIndex(int combination_index, int k) {
   }
 }
 
-int GetNumberOfStarsAndBarsSequences(int num_stars, int num_bars) {
+int64_t GetNumberOfStarsAndBarsSequences(int num_stars, int num_bars) {
   return BinomialCoefficient(num_stars + num_bars, num_stars);
 }
 
 std::vector<int> GetStarIndices(int num_stars,
                                 int num_bars,
-                                int sequence_index) {
+                                int64_t sequence_index) {
   DCHECK_LT(sequence_index,
             GetNumberOfStarsAndBarsSequences(num_stars, num_bars));
   return GetKCombinationAtIndex(sequence_index, num_stars);
@@ -145,6 +150,29 @@ std::vector<int> GetBarsPrecedingEachStar(std::vector<int> out) {
     out[i] = star_index - (out.size() - 1 - i);
   }
   return out;
+}
+
+double GetRandomizedResponseRate(int64_t num_states, double epsilon) {
+  DCHECK_GT(num_states, 0);
+  return num_states / (num_states - 1 + std::exp(epsilon));
+}
+
+double BinaryEntropy(double p) {
+  if (p == 0 || p == 1) {
+    return 0;
+  }
+
+  return -p * log2(p) - (1 - p) * log2(1 - p);
+}
+
+double ComputeChannelCapacity(int64_t num_states,
+                              double randomized_response_rate) {
+  DCHECK_GT(num_states, 0);
+  DCHECK_GE(randomized_response_rate, 0);
+  DCHECK_LE(randomized_response_rate, 1);
+
+  double p = randomized_response_rate * (num_states - 1) / num_states;
+  return log2(num_states) - BinaryEntropy(p) - p * log2(num_states - 1);
 }
 
 }  // namespace content

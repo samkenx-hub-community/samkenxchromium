@@ -30,9 +30,8 @@ bool DeviceHasEnoughMemoryForBackForwardCache() {
   // It is important to check the base::FeatureList to avoid activating any
   // field trial groups if BFCache is disabled due to memory threshold.
   if (base::FeatureList::IsEnabled(features::kBackForwardCacheMemoryControls)) {
-    // On Android, BackForwardCache is only enabled for 2GB+ high memory
-    // devices. The default threshold value is set to 1700 MB to account for all
-    // 2GB devices which report lower RAM due to carveouts.
+    // On Android, BackForwardCache is enabled for devices with 1200MB memory or
+    // above.
     int default_memory_threshold_mb =
 #if BUILDFLAG(IS_ANDROID)
         1200;
@@ -167,6 +166,7 @@ const char kRenderDocumentLevelParameterName[] = "level";
 constexpr base::FeatureParam<RenderDocumentLevel>::Option
     render_document_levels[] = {
         {RenderDocumentLevel::kCrashedFrame, "crashed-frame"},
+        {RenderDocumentLevel::kNonLocalRootSubframe, "non-local-root-subframe"},
         {RenderDocumentLevel::kSubframe, "subframe"},
         {RenderDocumentLevel::kAllFrames, "all-frames"}};
 const base::FeatureParam<RenderDocumentLevel> render_document_level{
@@ -183,8 +183,26 @@ std::string GetRenderDocumentLevelName(RenderDocumentLevel level) {
   return render_document_level.GetName(level);
 }
 
-bool ShouldCreateNewHostForSameSiteSubframe() {
-  return GetRenderDocumentLevel() >= RenderDocumentLevel::kSubframe;
+bool ShouldCreateNewRenderFrameHostOnSameSiteNavigation(
+    bool is_main_frame,
+    bool is_local_root,
+    bool has_committed_any_navigation,
+    bool must_be_replaced) {
+  if (must_be_replaced) {
+    return true;
+  }
+  if (!has_committed_any_navigation) {
+    return false;
+  }
+  RenderDocumentLevel level = GetRenderDocumentLevel();
+  if (is_main_frame) {
+    CHECK(is_local_root);
+    return level >= RenderDocumentLevel::kAllFrames;
+  }
+  if (is_local_root) {
+    return level >= RenderDocumentLevel::kSubframe;
+  }
+  return level >= RenderDocumentLevel::kNonLocalRootSubframe;
 }
 
 bool ShouldCreateNewHostForAllFrames() {
@@ -211,6 +229,11 @@ const base::FeatureParam<NavigationQueueingFeatureLevel>
         &kNavigationQueueingFeatureLevels};
 
 NavigationQueueingFeatureLevel GetNavigationQueueingFeatureLevel() {
+  if (GetRenderDocumentLevel() >= RenderDocumentLevel::kNonLocalRootSubframe) {
+    // When RenderDocument is enabled with a level of "non-local-root-subframe"
+    // or more, navigation queueing needs to be enabled too, to avoid crashes.
+    return NavigationQueueingFeatureLevel::kFull;
+  }
   if (base::FeatureList::IsEnabled(
           features::kQueueNavigationsWhileWaitingForCommit)) {
     return kNavigationQueueingFeatureLevelParam.Get();
@@ -219,6 +242,15 @@ NavigationQueueingFeatureLevel GetNavigationQueueingFeatureLevel() {
 }
 
 bool ShouldAvoidRedundantNavigationCancellations() {
+  // If the experimental early RenderFrameHost swap for history navigations is
+  // turned on, this must return true so that when the old RFH is unloaded as
+  // part of the early swap, this doesn't cancel the navigation that's still
+  // ongoing in the new RFH.
+  if (base::FeatureList::IsEnabled(
+          features::kEarlyDocumentSwapForBackForwardTransitions)) {
+    return true;
+  }
+
   return GetNavigationQueueingFeatureLevel() >=
          NavigationQueueingFeatureLevel::kAvoidRedundantCancellations;
 }
@@ -232,8 +264,13 @@ bool ShouldRestrictCanAccessDataForOriginToUIThread() {
   // Only restrict calls to the UI thread if the feature is enabled, and if the
   // new blob URL support is enabled.
   return base::FeatureList::IsEnabled(
-             kRestrictCanAccessDataForOriginToUIThread) &&
+             features::kRestrictCanAccessDataForOriginToUIThread) &&
          base::FeatureList::IsEnabled(
              net::features::kSupportPartitionedBlobUrl);
 }
+
+bool ShouldCreateSiteInstanceForDataUrls() {
+  return base::FeatureList::IsEnabled(features::kSiteInstanceGroupsForDataUrls);
+}
+
 }  // namespace content

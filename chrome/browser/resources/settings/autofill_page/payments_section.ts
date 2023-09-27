@@ -102,14 +102,6 @@ export class SettingsPaymentsSectionElement extends
       },
 
       /**
-       * An array of all saved UPI IDs.
-       */
-      upiIds: {
-        type: Array,
-        value: () => [],
-      },
-
-      /**
        * Set to true if user can be verified through FIDO authentication.
        */
       userIsFidoVerifiable_: {
@@ -147,6 +139,7 @@ export class SettingsPaymentsSectionElement extends
       showLocalIbanRemoveConfirmationDialog_: Boolean,
       showVirtualCardUnenrollDialog_: Boolean,
       migratableCreditCardsInfo_: String,
+      showBulkRemoveCvcConfirmationDialog_: Boolean,
 
       /**
        * Whether migration local card on settings page is enabled.
@@ -155,29 +148,6 @@ export class SettingsPaymentsSectionElement extends
         type: Boolean,
         value() {
           return loadTimeData.getBoolean('migrationEnabled');
-        },
-        readOnly: true,
-      },
-
-      /**
-       * Whether the removal of Expiration and Type titles on settings page
-       * is enabled.
-       */
-      removeCardExpirationAndTypeTitlesEnabled_: {
-        type: Boolean,
-        value() {
-          return loadTimeData.getBoolean('removeCardExpirationAndTypeTitles');
-        },
-        readOnly: true,
-      },
-
-      /**
-       * Whether virtual card enroll management on settings page is enabled.
-       */
-      virtualCardEnrollmentEnabled_: {
-        type: Boolean,
-        value() {
-          return loadTimeData.getBoolean('virtualCardEnrollmentEnabled');
         },
         readOnly: true,
       },
@@ -193,13 +163,33 @@ export class SettingsPaymentsSectionElement extends
         },
       },
       // </if>
+
+      /**
+       * Whether the feature flag for mandatory re-auth is enabled.
+       */
+      mandatoryReauthFeatureEnabled_: {
+        type: Boolean,
+        value() {
+          return loadTimeData.getBoolean(
+              'autofillEnablePaymentsMandatoryReauth');
+        },
+      },
+
+      /**
+       * Checks if CVC storage is available based on the feature flag.
+       */
+      cvcStorageAvailable_: {
+        type: Boolean,
+        value() {
+          return loadTimeData.getBoolean('cvcStorageAvailable');
+        },
+      },
     };
   }
 
   prefs: {[key: string]: any};
   creditCards: chrome.autofillPrivate.CreditCardEntry[];
   ibans: chrome.autofillPrivate.IbanEntry[];
-  upiIds: string[];
   private showIbanSettingsEnabled_: boolean;
   private userIsFidoVerifiable_: boolean;
   private activeCreditCard_: chrome.autofillPrivate.CreditCardEntry|null;
@@ -211,11 +201,14 @@ export class SettingsPaymentsSectionElement extends
   private showVirtualCardUnenrollDialog_: boolean;
   private migratableCreditCardsInfo_: string;
   private migrationEnabled_: boolean;
-  private removeCardExpirationAndTypeTitlesEnabled_: boolean;
-  private virtualCardEnrollmentEnabled_: boolean;
+  // <if expr="is_win or is_macosx">
   private deviceAuthAvailable_: boolean;
+  // </if>
+  private cvcStorageAvailable_: boolean;
+  private showBulkRemoveCvcConfirmationDialog_: boolean;
   private paymentsManager_: PaymentsManagerProxy =
       PaymentsManagerImpl.getInstance();
+  private mandatoryReauthFeatureEnabled_: boolean;
   private setPersonalDataListener_: PersonalDataChangedListener|null = null;
 
   override connectedCallback() {
@@ -248,21 +241,21 @@ export class SettingsPaymentsSectionElement extends
       this.ibans = ibanList;
     };
 
-    const setUpiIdsListener = (upiIdList: string[]) => {
-      this.upiIds = upiIdList;
-    };
-
     // Remember the bound reference in order to detach.
     this.setPersonalDataListener_ = setPersonalDataListener;
 
     // Request initial data.
     this.paymentsManager_.getCreditCardList().then(setCreditCardsListener);
     this.paymentsManager_.getIbanList().then(setIbansListener);
-    this.paymentsManager_.getUpiIdList().then(setUpiIdsListener);
 
     // Listen for changes.
     this.paymentsManager_.setPersonalDataManagerListener(
         setPersonalDataListener);
+
+    // <if expr="is_win or is_macosx">
+    this.paymentsManager_.checkIfDeviceAuthAvailable().then(
+        result => this.deviceAuthAvailable_ = result);
+    // </if>
 
     // Record that the user opened the payments settings.
     chrome.metricsPrivate.recordUserAction('AutofillCreditCardsViewed');
@@ -274,15 +267,6 @@ export class SettingsPaymentsSectionElement extends
     this.paymentsManager_.removePersonalDataManagerListener(
         this.setPersonalDataListener_!);
     this.setPersonalDataListener_ = null;
-  }
-
-  /**
-   * Calculate the class style for `paymentsList` based on flags.
-   */
-  private computeCssClass_(): string {
-    return this.removeCardExpirationAndTypeTitlesEnabled_ ?
-        'payment-list-margin-start' :
-        '';
   }
 
   /**
@@ -523,9 +507,9 @@ export class SettingsPaymentsSectionElement extends
   /**
    * @return Whether the user is verifiable through FIDO authentication.
    */
-  private shouldShowFidoToggle_(
-      creditCardEnabled: boolean, userIsFidoVerifiable: boolean): boolean {
-    return creditCardEnabled && userIsFidoVerifiable;
+  private shouldShowFidoToggle_(creditCardEnabled: boolean): boolean {
+    return creditCardEnabled && this.userIsFidoVerifiable_ &&
+        !this.mandatoryReauthFeatureEnabled_;
   }
 
   /**
@@ -575,8 +559,7 @@ export class SettingsPaymentsSectionElement extends
   }
 
   private shouldShowAddVirtualCardButton_(): boolean {
-    if (!this.virtualCardEnrollmentEnabled_ ||
-        this.activeCreditCard_ === null || !this.activeCreditCard_!.metadata) {
+    if (this.activeCreditCard_ === null || !this.activeCreditCard_!.metadata) {
       return false;
     }
     return !!this.activeCreditCard_!.metadata!
@@ -585,8 +568,7 @@ export class SettingsPaymentsSectionElement extends
   }
 
   private shouldShowRemoveVirtualCardButton_(): boolean {
-    if (!this.virtualCardEnrollmentEnabled_ ||
-        this.activeCreditCard_ === null || !this.activeCreditCard_!.metadata) {
+    if (this.activeCreditCard_ === null || !this.activeCreditCard_!.metadata) {
       return false;
     }
     return !!this.activeCreditCard_!.metadata!
@@ -601,18 +583,19 @@ export class SettingsPaymentsSectionElement extends
     this.paymentsManager_.removeVirtualCard(event.detail);
   }
 
+  // <if expr="is_win or is_macosx">
   /**
-   * Checks if we can show the Mandatory reauth toggle.
-   * This method checks if pref autofill.credit_card_enabled is true and either
-   * there is support for device authentication or the mandatory auth toggle is
-   * already enabled.
+   * Checks if we should disable the mandatory reauth toggle.
+   * This method checks that one of the following conditions are met:
+   * 1) Pref autofill.credit_card_enabled is false
+   * 2) There is no support for device authentication
+   * Under any of these circumstances, we should display a disabled mandatory
+   * re-auth toggle to the user.
    */
-  private shouldShowMandatoryAuthToggle_(
-      deviceAuthAvailable: boolean, creditCardEnabled: boolean,
-      mandatoryReauthToggleEnabled: boolean): boolean {
-    return creditCardEnabled &&
-        (deviceAuthAvailable || mandatoryReauthToggleEnabled);
+  private shouldDisableAuthToggle_(creditCardEnabled: boolean): boolean {
+    return !creditCardEnabled || !this.deviceAuthAvailable_;
   }
+  // </if>
 
   private focusHeaderControls_(): void {
     const element =
@@ -632,6 +615,23 @@ export class SettingsPaymentsSectionElement extends
     // It will be flipped afterwards if the user auth is successful.
     mandatoryAuthToggle.checked = !mandatoryAuthToggle.checked;
     this.paymentsManager_.authenticateUserAndFlipMandatoryAuthToggle();
+  }
+
+  /**
+   * Method to handle the clicking of bulk delete all the CVCs.
+   */
+  private onBulkRemoveCvcClick_() {
+    assert(this.cvcStorageAvailable_);
+    this.showBulkRemoveCvcConfirmationDialog_ = true;
+  }
+
+  /**
+   * Method to bulk delete all the CVCs present on the local DB.
+   * TODO(crbug/1464441): Add the code to delete all the CVCs from the local DB.
+   */
+  private onShowBulkRemoveCvcConfirmationDialogClose_() {
+    assert(this.cvcStorageAvailable_);
+    this.showBulkRemoveCvcConfirmationDialog_ = false;
   }
 }
 

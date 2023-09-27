@@ -43,7 +43,7 @@ class ElementInternals;
 class ExceptionState;
 class FormAssociated;
 class HTMLFormElement;
-class HTMLSelectMenuElement;
+class HTMLSelectListElement;
 class KeyboardEvent;
 class V8UnionStringLegacyNullToEmptyStringOrTrustedScript;
 
@@ -158,6 +158,8 @@ class CORE_EXPORT HTMLElement : public Element {
 
   bool HasDirectionAuto() const;
 
+  static bool ElementAffectsDirectionality(const Node* node);
+
   virtual bool IsHTMLBodyElement() const { return false; }
   // TODO(crbug.com/1123606): Remove this virtual method once the fenced frame
   // origin trial is over.
@@ -183,7 +185,6 @@ class CORE_EXPORT HTMLElement : public Element {
   static const AtomicString& EventNameForAttributeName(
       const QualifiedName& attr_name);
 
-  bool SupportsFocus() const override;
   bool IsDisabledFormControl() const override;
   bool MatchesEnabledPseudoClass() const override;
   bool MatchesReadOnlyPseudoClass() const override;
@@ -214,8 +215,15 @@ class CORE_EXPORT HTMLElement : public Element {
   void UpdateDescendantHasDirAutoAttribute(bool has_dir_auto);
   void UpdateDirectionalityAndDescendant(TextDirection direction);
   void UpdateDescendantDirectionality(TextDirection direction);
+  void UpdateDirectionalityAfterInputTypeChange(const AtomicString& old_value,
+                                                const AtomicString& new_value);
+  enum class UpdateAncestorTraversal {
+    IncludeSelf,  // self and ancestors
+    ExcludeSelf,  // ancestors, but not self
+  };
+  void UpdateAncestorWithDirAuto(UpdateAncestorTraversal traversal);
   void AdjustDirectionalityIfNeededAfterShadowRootChanged();
-  void ParserDidSetAttributes() override;
+  void AdjustDirectionAutoAfterRecalcAssignedNodes();
 
   V8UnionBooleanOrStringOrUnrestrictedDouble* hidden() const;
   void setHidden(const V8UnionBooleanOrStringOrUnrestrictedDouble*);
@@ -242,8 +250,8 @@ class CORE_EXPORT HTMLElement : public Element {
                       ExceptionState* exception_state,
                       bool include_event_handler_text,
                       Document* expected_document) const;
-  void togglePopover(ExceptionState& exception_state);
-  void togglePopover(bool force, ExceptionState& exception_state);
+  bool togglePopover(ExceptionState& exception_state);
+  bool togglePopover(bool force, ExceptionState& exception_state);
   void showPopover(ExceptionState& exception_state);
   void hidePopover(ExceptionState& exception_state);
   // |exception_state| can be nullptr when exceptions can't be thrown, such as
@@ -254,7 +262,9 @@ class CORE_EXPORT HTMLElement : public Element {
                            HidePopoverTransitionBehavior event_firing,
                            ExceptionState* exception_state);
   void PopoverHideFinishIfNeeded(bool immediate);
-  static const HTMLElement* FindTopmostPopoverAncestor(HTMLElement&);
+  static const HTMLElement* FindTopmostPopoverAncestor(
+      HTMLElement& new_popover,
+      Element* new_popovers_invoker);
 
   // Retrieves the element pointed to by this element's 'anchor' content
   // attribute, if that element exists.
@@ -275,8 +285,8 @@ class CORE_EXPORT HTMLElement : public Element {
   void MaybeQueuePopoverHideEvent();
   static void HoveredElementChanged(Element* old_element, Element* new_element);
 
-  void SetOwnerSelectMenuElement(HTMLSelectMenuElement* element);
-  HTMLSelectMenuElement* ownerSelectMenuElement() const;
+  void SetPopoverOwnerSelectListElement(HTMLSelectListElement* element);
+  HTMLSelectListElement* popoverOwnerSelectListElement() const;
 
   bool DispatchFocusEvent(
       Element* old_focused_element,
@@ -284,6 +294,8 @@ class CORE_EXPORT HTMLElement : public Element {
       InputDeviceCapabilities* source_capabilities) override;
 
  protected:
+  bool SupportsFocus() const override;
+
   enum AllowPercentage { kDontAllowPercentageValues, kAllowPercentageValues };
   enum AllowZero { kDontAllowZeroValues, kAllowZeroValues };
   void AddHTMLLengthToStyle(MutableCSSPropertyValueSet*,
@@ -334,7 +346,6 @@ class CORE_EXPORT HTMLElement : public Element {
   void FinishParsingChildren() override;
 
  private:
-  String DebugNodeName() const final;
   String nodeName() const final;
 
   bool IsHTMLElement() const =

@@ -86,13 +86,13 @@ void HistoryClientImpl::UpdateBookmarkLastUsedTime(
       continue;
     }
     const bookmarks::BookmarkNode* node =
-        bookmarks::GetBookmarkNodeByUuid(bookmark_model, bookmark_node_uuid);
+        bookmark_model->GetNodeByUuid(bookmark_node_uuid);
     if (!node) {
       continue;
     }
     // In the unlikely scenario where the two bookmark models have a bookmark
     // node with the same UUID, they are both updated.
-    bookmark_model->UpdateLastUsedTime(node, time);
+    bookmark_model->UpdateLastUsedTime(node, time, /*just_opened=*/true);
   }
 }
 

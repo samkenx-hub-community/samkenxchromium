@@ -13,16 +13,53 @@ import {sendWithPromise} from 'chrome://resources/js/cr.js';
 import {ContentSettingsTypes} from '../site_settings/constants.js';
 // clang-format on
 
+/**
+ * Constants used in safety hub C++ to JS communication.
+ * Their values need be kept in sync with their counterparts in
+ * chrome/browser/ui/webui/settings/safety_hub_handler.h and
+ * chrome/browser/ui/webui/settings/safety_hub_handler.cc
+ */
+export enum SafetyHubEvent {
+  UNUSED_PERMISSIONS_MAYBE_CHANGED =
+      'unused-permission-review-list-maybe-changed',
+  NOTIFICATION_PERMISSIONS_MAYBE_CHANGED =
+      'notification-permission-review-list-maybe-changed',
+  EXTENSIONS_CHANGED = 'extensions-review-list-maybe-changed',
+}
+
+// The notification permission information passed from safety_hub_handler.cc.
+export interface NotificationPermission {
+  origin: string;
+  notificationInfoString: string;
+}
+
+// The unused site permission information passed from safety_hub_handler.cc.
 export interface UnusedSitePermissions {
   origin: string;
   permissions: ContentSettingsTypes[];
   expiration: string;
 }
 
+// The information for top cards in Safety Hub page.
+export interface CardInfo {
+  header: string;
+  subheader: string;
+  state: CardState;
+}
+
 /**
- * TODO(crbug.com/1383197): Move functions related to notification permission
- * review here as well.
+ * A Safety Hub card has 4 different states as represented below. Depending on
+ * the card state, the card will be updated.
+ * Should be kept in sync with the corresponding enum in
+ * chrome/browser/ui/safety_hub/safety_hub_constants.h.
  */
+export enum CardState {
+  WARNING,
+  WEAK,
+  INFO,
+  SAFE,
+}
+
 export interface SafetyHubBrowserProxy {
   /**
    * Mark revoked permissions of unused sites as reviewed by the user so they
@@ -56,6 +93,45 @@ export interface SafetyHubBrowserProxy {
    */
   undoAllowPermissionsAgainForUnusedSite(unusedSitePermissions:
                                              UnusedSitePermissions): void;
+
+  /** Gets the site list that send a lot of notifications. */
+  getNotificationPermissionReview(): Promise<NotificationPermission[]>;
+
+  /** Blocks the notification permission for all origins in the list. */
+  blockNotificationPermissionForOrigins(origins: string[]): void;
+
+  /** Allows the notification permission for all origins in the list */
+  allowNotificationPermissionForOrigins(origins: string[]): void;
+
+  /** Adds the origins to blocklist for the notification permissions feature. */
+  ignoreNotificationPermissionForOrigins(origins: string[]): void;
+
+  /**
+   * Removes the origins from the blocklist for the notification permissions
+   * feature.
+   */
+  undoIgnoreNotificationPermissionForOrigins(origins: string[]): void;
+
+  /** Resets the notification permission for the origins. */
+  resetNotificationPermissionForOrigins(origin: string[]): void;
+
+  /** Gets data for the password top card. */
+  getPasswordCardData(): Promise<CardInfo>;
+
+  /** Gets data for the Safe Browsing top card. */
+  getSafeBrowsingCardData(): Promise<CardInfo>;
+
+  /** Gets data for the version top card. */
+  getVersionCardData(): Promise<CardInfo>;
+
+  /** Get the number of extensions that should be reviewed by the user. */
+  getNumberOfExtensionsThatNeedReview(): Promise<number>;
+
+  /** Returns true if Safety Hub has recommendations for the user. */
+  getSafetyHubHasRecommendations(): Promise<boolean>;
+
+  /** Get the subheader for Safety Hub entry point in settings. */
+  getSafetyHubEntryPointSubheader(): Promise<string>;
 }
 
 export class SafetyHubBrowserProxyImpl implements SafetyHubBrowserProxy {
@@ -82,6 +158,54 @@ export class SafetyHubBrowserProxyImpl implements SafetyHubBrowserProxy {
                                              UnusedSitePermissions) {
     chrome.send(
         'undoAllowPermissionsAgainForUnusedSite', [unusedSitePermissions]);
+  }
+
+  getNotificationPermissionReview() {
+    return sendWithPromise('getNotificationPermissionReview');
+  }
+
+  blockNotificationPermissionForOrigins(origins: string[]) {
+    chrome.send('blockNotificationPermissionForOrigins', [origins]);
+  }
+
+  allowNotificationPermissionForOrigins(origins: string[]) {
+    chrome.send('allowNotificationPermissionForOrigins', [origins]);
+  }
+
+  ignoreNotificationPermissionForOrigins(origins: string[]) {
+    chrome.send('ignoreNotificationPermissionReviewForOrigins', [origins]);
+  }
+
+  undoIgnoreNotificationPermissionForOrigins(origins: string[]) {
+    chrome.send('undoIgnoreNotificationPermissionReviewForOrigins', [origins]);
+  }
+
+  resetNotificationPermissionForOrigins(origins: string[]) {
+    chrome.send('resetNotificationPermissionForOrigins', [origins]);
+  }
+
+  getPasswordCardData() {
+    return sendWithPromise('getPasswordCardData');
+  }
+
+  getSafeBrowsingCardData() {
+    return sendWithPromise('getSafeBrowsingCardData');
+  }
+
+  getVersionCardData() {
+    return sendWithPromise('getVersionCardData');
+  }
+
+  getNumberOfExtensionsThatNeedReview() {
+    return sendWithPromise('getNumberOfExtensionsThatNeedReview');
+  }
+
+  getSafetyHubHasRecommendations() {
+    return sendWithPromise('getSafetyHubHasRecommendations');
+  }
+
+  getSafetyHubEntryPointSubheader() {
+    return sendWithPromise('getSafetyHubEntryPointSubheader');
   }
 
   static getInstance(): SafetyHubBrowserProxy {

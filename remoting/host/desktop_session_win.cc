@@ -17,6 +17,7 @@
 #include "base/base_switches.h"
 #include "base/command_line.h"
 #include "base/files/file_path.h"
+#include "base/i18n/time_formatting.h"
 #include "base/logging.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/weak_ptr.h"
@@ -63,7 +64,7 @@ const wchar_t kDaemonIpcSecurityDescriptor[] =
 
 // The command line parameters that should be copied from the service's command
 // line to the desktop process.
-const char* kCopiedSwitchNames[] = {switches::kV, switches::kVModule};
+const char* const kCopiedSwitchNames[] = {switches::kV, switches::kVModule};
 
 // The default screen dimensions for an RDP session.
 const int kDefaultRdpScreenWidth = 1280;
@@ -647,7 +648,7 @@ void DesktopSessionWin::OnSessionAttached(uint32_t session_id) {
   target->AppendSwitchASCII(kProcessTypeSwitchName, kProcessTypeDesktop);
   // Copy the command line switches enabling verbose logging.
   target->CopySwitchesFrom(*base::CommandLine::ForCurrentProcess(),
-                           kCopiedSwitchNames, std::size(kCopiedSwitchNames));
+                           kCopiedSwitchNames);
 
   // Create a delegate capable of launching a process in a different session.
   // Launch elevated to enable injection of Alt+Tab and Ctrl+Alt+Del.
@@ -715,12 +716,10 @@ void DesktopSessionWin::ReportElapsedTime(const std::string& event) {
                                 (now - last_timestamp_).InSecondsF());
   }
 
-  base::Time::Exploded exploded;
-  now.LocalExplode(&exploded);
-  VLOG(1) << base::StringPrintf("session(%d): %s at %02d:%02d:%02d.%03d%s",
-                                id(), event.c_str(), exploded.hour,
-                                exploded.minute, exploded.second,
-                                exploded.millisecond, passed.c_str());
+  VLOG(1) << base::StringPrintf(
+      "session(%d): %s at %s%s", id(), event.c_str(),
+      base::UnlocalizedTimeFormatWithPattern(now, "HH:mm:ss.SSS").c_str(),
+      passed.c_str());
 
   last_timestamp_ = now;
 }

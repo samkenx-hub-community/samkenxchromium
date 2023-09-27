@@ -22,7 +22,8 @@
 #include "testing/gtest/include/gtest/gtest.h"
 
 #if BUILDFLAG(IS_APPLE)
-#include "base/mac/scoped_nsautorelease_pool.h"
+#include "base/apple/scoped_nsautorelease_pool.h"
+#include "base/memory/stack_allocated.h"
 #endif
 
 using net::test::IsError;
@@ -95,8 +96,9 @@ class UploadFileElementReaderTest : public testing::TestWithParam<bool>,
   }
 
 #if BUILDFLAG(IS_APPLE)
-  // May be needed to avoid leaks on OSX.
-  base::mac::ScopedNSAutoreleasePool scoped_pool_;
+  // May be needed to avoid leaks on the Mac.
+  STACK_ALLOCATED_IGNORE("https://crbug.com/1424190")
+  base::apple::ScopedNSAutoreleasePool scoped_pool_;
 #endif
 
   std::vector<char> bytes_;

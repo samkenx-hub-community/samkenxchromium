@@ -17,6 +17,7 @@ ci.defaults.set(
     reclient_instance = reclient.instance.DEFAULT_TRUSTED,
     reclient_jobs = reclient.jobs.DEFAULT,
     service_account = ci.gpu.SERVICE_ACCOUNT,
+    shadow_service_account = ci.gpu.SHADOW_SERVICE_ACCOUNT,
 )
 
 consoles.console_view(
@@ -61,6 +62,39 @@ ci.gpu.linux_builder(
         category = "Chromium|Linux",
         short_name = "x64",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
+    reclient_jobs = reclient.jobs.HIGH_JOBS_FOR_CI,
+)
+
+ci.gpu.linux_builder(
+    name = "linux-swangle-chromium-x64-exp",
+    executable = ci.DEFAULT_EXECUTABLE,
+    builder_spec = builder_config.builder_spec(
+        gclient_config = builder_config.gclient_config(
+            config = "chromium",
+            apply_configs = [
+                "angle_top_of_tree",
+                "swiftshader_top_of_tree",
+            ],
+        ),
+        chromium_config = builder_config.chromium_config(
+            config = "chromium",
+            apply_configs = [
+                "mb",
+            ],
+            build_config = builder_config.build_config.RELEASE,
+            target_bits = 64,
+        ),
+        build_gs_bucket = "chromium-swangle-archive",
+        run_tests_serially = True,
+    ),
+    # Uncomment this entry when this experimental tester is actually in use.
+    # console_view_entry = consoles.console_view_entry(
+    #     category = "Chromium|Linux",
+    #     short_name = "exp",
+    # ),
+    list_view = "chromium.gpu.experimental",
+    contact_team_email = "chrome-gpu-infra@google.com",
     reclient_jobs = reclient.jobs.HIGH_JOBS_FOR_CI,
 )
 
@@ -88,6 +122,7 @@ ci.gpu.linux_builder(
         category = "ToT SwiftShader|Linux",
         short_name = "x64",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
     reclient_jobs = reclient.jobs.HIGH_JOBS_FOR_CI,
 )
 
@@ -113,6 +148,35 @@ ci.gpu.linux_builder(
         category = "DEPS|Linux",
         short_name = "x64",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
+    reclient_jobs = reclient.jobs.HIGH_JOBS_FOR_CI,
+)
+
+ci.gpu.linux_builder(
+    name = "linux-swangle-x64-exp",
+    executable = ci.DEFAULT_EXECUTABLE,
+    builder_spec = builder_config.builder_spec(
+        gclient_config = builder_config.gclient_config(
+            config = "chromium",
+        ),
+        chromium_config = builder_config.chromium_config(
+            config = "chromium",
+            apply_configs = [
+                "mb",
+            ],
+            build_config = builder_config.build_config.RELEASE,
+            target_bits = 64,
+        ),
+        build_gs_bucket = "chromium-swangle-archive",
+        run_tests_serially = True,
+    ),
+    # Uncomment this entry when this experimental tester is actually in use.
+    # console_view_entry = consoles.console_view_entry(
+    #     category = "DEPS|Linux",
+    #     short_name = "exp",
+    # ),
+    list_view = "chromium.gpu.experimental",
+    contact_team_email = "chrome-gpu-infra@google.com",
     reclient_jobs = reclient.jobs.HIGH_JOBS_FOR_CI,
 )
 
@@ -142,6 +206,7 @@ ci.gpu.mac_builder(
         category = "Chromium|Mac",
         short_name = "x64",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.gpu.windows_builder(
@@ -170,6 +235,7 @@ ci.gpu.windows_builder(
         category = "Chromium|Windows",
         short_name = "x86",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
     reclient_jobs = reclient.jobs.LOW_JOBS_FOR_CI,
 )
 
@@ -197,6 +263,7 @@ ci.gpu.windows_builder(
         category = "ToT SwiftShader|Windows",
         short_name = "x64",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
     reclient_jobs = reclient.jobs.LOW_JOBS_FOR_CI,
 )
 
@@ -224,6 +291,7 @@ ci.gpu.windows_builder(
         category = "ToT SwiftShader|Windows",
         short_name = "x86",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
     reclient_jobs = reclient.jobs.LOW_JOBS_FOR_CI,
 )
 
@@ -249,6 +317,7 @@ ci.gpu.windows_builder(
         category = "DEPS|Windows",
         short_name = "x64",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
     reclient_jobs = reclient.jobs.LOW_JOBS_FOR_CI,
 )
 
@@ -274,5 +343,6 @@ ci.gpu.windows_builder(
         category = "DEPS|Windows",
         short_name = "x86",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
     reclient_jobs = reclient.jobs.LOW_JOBS_FOR_CI,
 )

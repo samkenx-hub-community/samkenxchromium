@@ -6,7 +6,6 @@ package org.chromium.chrome.browser.tab;
 
 import androidx.annotation.Nullable;
 
-import org.chromium.chrome.browser.tab.state.CriticalPersistedTabData;
 import org.chromium.content_public.browser.LoadUrlParams;
 import org.chromium.content_public.browser.WebContents;
 import org.chromium.url.GURL;
@@ -22,6 +21,9 @@ public class MockTab extends TabImpl {
     private boolean mIsBeingRestored;
 
     private boolean mIsCustomTab;
+
+    private Long mTimestampMillis;
+    private Integer mParentId;
 
     /**
      * Create a new Tab for testing and initializes Tab UserData objects.
@@ -42,23 +44,16 @@ public class MockTab extends TabImpl {
         return tab;
     }
 
-    public static TabImpl initializeWithCriticalPersistedTabData(
-            TabImpl tab, CriticalPersistedTabData criticalPersistedTabData) {
-        tab.getUserDataHost().setUserData(CriticalPersistedTabData.class, criticalPersistedTabData);
-        tab.initialize(null, null, null, null, null, false, null, false);
-        return tab;
-    }
-
     /**
      * Constructor for id and incognito attribute. Tests often need to initialize
      * these two fields only.
      */
     public MockTab(int id, boolean incognito) {
-        super(id, incognito, null, null);
+        super(id, incognito, null);
     }
 
     public MockTab(int id, boolean incognito, @TabLaunchType Integer type) {
-        super(id, incognito, type, null);
+        super(id, incognito, type);
     }
 
     @Override
@@ -68,7 +63,6 @@ public class MockTab extends TabImpl {
             TabState tabState, boolean initializeRenderer) {
         if (loadUrlParams != null) {
             mGurlOverride = new GURL(loadUrlParams.getUrl());
-            CriticalPersistedTabData.from(this).setUrl(mGurlOverride);
         }
         TabHelpers.initTabHelpers(this, parent);
     }
@@ -127,5 +121,34 @@ public class MockTab extends TabImpl {
 
     public void setIsBeingRestored(boolean isBeingRestored) {
         mIsBeingRestored = isBeingRestored;
+    }
+
+    @Override
+    public long getTimestampMillis() {
+        if (mTimestampMillis == null) {
+            return super.getTimestampMillis();
+        }
+        return mTimestampMillis;
+    }
+
+    public void setTimestampMillis(long timestampMillis) {
+        mTimestampMillis = timestampMillis;
+    }
+
+    @Override
+    public int getParentId() {
+        if (mParentId == null) {
+            return super.getParentId();
+        }
+        return mParentId;
+    }
+
+    public void setParentId(int parentId) {
+        mParentId = parentId;
+    }
+
+    @Override
+    public void setTitle(String title) {
+        super.setTitle(title);
     }
 }

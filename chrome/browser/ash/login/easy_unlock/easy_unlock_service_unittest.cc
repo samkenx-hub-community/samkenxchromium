@@ -11,14 +11,12 @@
 #include <string>
 #include <utility>
 
-#include "ash/constants/ash_features.h"
 #include "base/functional/bind.h"
 #include "base/logging.h"
 #include "base/memory/ptr_util.h"
 #include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
 #include "base/test/metrics/histogram_tester.h"
-#include "base/test/scoped_feature_list.h"
 #include "base/values.h"
 #include "chrome/browser/ash/login/easy_unlock/easy_unlock_notification_controller.h"
 #include "chrome/browser/ash/login/easy_unlock/easy_unlock_service_factory.h"
@@ -334,7 +332,8 @@ class EasyUnlockServiceTest : public testing::Test {
 
   std::unique_ptr<TestingProfile> profile_;
   AccountId account_id_;
-  raw_ptr<FakeChromeUserManager, ExperimentalAsh> fake_chrome_user_manager_;
+  raw_ptr<FakeChromeUserManager, DanglingUntriaged | ExperimentalAsh>
+      fake_chrome_user_manager_;
   std::unique_ptr<user_manager::ScopedUserManager> scoped_user_manager_;
 
   const multidevice::RemoteDeviceRef test_local_device_;
@@ -354,7 +353,7 @@ class EasyUnlockServiceTest : public testing::Test {
   scoped_refptr<testing::NiceMock<MockBluetoothAdapter>> mock_adapter_;
 
   raw_ptr<testing::StrictMock<MockEasyUnlockNotificationController>,
-          ExperimentalAsh>
+          DanglingUntriaged | ExperimentalAsh>
       mock_notification_controller_;
 
   views::TestViewsDelegate view_delegate_;

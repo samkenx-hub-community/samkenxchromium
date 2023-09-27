@@ -5,6 +5,7 @@
 #include "ash/system/unified/unified_system_tray.h"
 
 #include "ash/accessibility/accessibility_controller_impl.h"
+#include "ash/ash_element_identifiers.h"
 #include "ash/constants/ash_features.h"
 #include "ash/constants/tray_background_view_catalog.h"
 #include "ash/focus_cycler.h"
@@ -46,11 +47,12 @@
 #include "ash/system/unified/notification_icons_controller.h"
 #include "ash/system/unified/screen_capture_tray_item_view.h"
 #include "ash/system/unified/unified_slider_bubble_controller.h"
+#include "ash/system/unified/unified_slider_view.h"
 #include "ash/system/unified/unified_system_tray_bubble.h"
 #include "ash/system/unified/unified_system_tray_model.h"
 #include "ash/system/unified/unified_system_tray_view.h"
 #include "ash/user_education/user_education_class_properties.h"
-#include "ash/user_education/user_education_constants.h"
+#include "ash/user_education/welcome_tour/welcome_tour_metrics.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/metrics/histogram_functions.h"
@@ -59,6 +61,7 @@
 #include "base/strings/string_util.h"
 #include "base/time/time.h"
 #include "base/timer/timer.h"
+#include "chromeos/constants/chromeos_features.h"
 #include "media/capture/video/chromeos/video_capture_features_chromeos.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/compositor/presentation_time_recorder.h"
@@ -94,10 +97,6 @@ class UnifiedSystemTray::UiDelegate : public MessageCenterUiDelegate {
   void HideMessageCenter() override;
 
   MessageCenterUiController* ui_controller() { return ui_controller_.get(); }
-
-  void NotifySecondaryBubbleHeight(int height) {
-    message_popup_collection_->SetBaselineOffset(height);
-  }
 
   message_center::MessagePopupView* GetPopupViewForNotificationID(
       const std::string& notification_id) {
@@ -161,9 +160,7 @@ bool UnifiedSystemTray::UiDelegate::ShowPopups() {
   return true;
 }
 
-void UnifiedSystemTray::UiDelegate::HidePopups() {
-  message_popup_collection_->SetBaselineOffset(0);
-}
+void UnifiedSystemTray::UiDelegate::HidePopups() {}
 
 bool UnifiedSystemTray::UiDelegate::ShowMessageCenter() {
   if (owner_->IsBubbleShown()) {
@@ -191,15 +188,15 @@ UnifiedSystemTray::UnifiedSystemTray(Shelf* shelf)
               ? nullptr
               : std::make_unique<NotificationIconsController>(shelf,
                                                               model_.get())) {
-  SetPressedCallback(base::BindRepeating(&UnifiedSystemTray::OnButtonPressed,
-                                         base::Unretained(this)));
+  SetCallback(base::BindRepeating(&UnifiedSystemTray::OnButtonPressed,
+                                  base::Unretained(this)));
 
   if (features::IsUserEducationEnabled()) {
     // NOTE: Set `kHelpBubbleContextKey` before `views::kElementIdentifierKey`
     // in case registration causes a help bubble to be created synchronously.
     SetProperty(kHelpBubbleContextKey, HelpBubbleContext::kAsh);
-    SetProperty(views::kElementIdentifierKey, kUnifiedSystemTrayElementId);
   }
+  SetProperty(views::kElementIdentifierKey, kUnifiedSystemTrayElementId);
 
   if (media::ShouldEnableAutoFraming()) {
     autozoom_toast_controller_ = std::make_unique<AutozoomToastController>(
@@ -323,6 +320,12 @@ void UnifiedSystemTray::OnButtonPressed(const ui::Event& event) {
         /*restore_focus=*/true);
   } else {
     CloseBubble();
+    return;
+  }
+
+  if (features::IsWelcomeTourEnabled()) {
+    welcome_tour_metrics::RecordInteraction(
+        welcome_tour_metrics::Interaction::kQuickSettings);
   }
 }
 
@@ -334,8 +337,8 @@ bool UnifiedSystemTray::IsSliderBubbleShown() const {
   return slider_bubble_controller_->IsBubbleShown();
 }
 
-int UnifiedSystemTray::GetSliderBubbleHeight() const {
-  return slider_bubble_controller_->GetBubbleHeight();
+UnifiedSliderView* UnifiedSystemTray::GetSliderView() const {
+  return slider_bubble_controller_->slider_view();
 }
 
 bool UnifiedSystemTray::IsMessageCenterBubbleShown() const {
@@ -415,7 +418,6 @@ void UnifiedSystemTray::ShowNetworkDetailedViewBubble() {
 }
 
 void UnifiedSystemTray::NotifySecondaryBubbleHeight(int height) {
-  ui_delegate_->NotifySecondaryBubbleHeight(height);
   for (auto& observer : observers_) {
     observer.OnSliderBubbleHeightChanged();
   }
@@ -496,6 +498,10 @@ bool UnifiedSystemTray::ShouldEnableExtraKeyboardAccessibility() {
 
 views::Widget* UnifiedSystemTray::GetBubbleWidget() const {
   return bubble_ ? bubble_->GetBubbleWidget() : nullptr;
+}
+
+TrayBubbleView* UnifiedSystemTray::GetBubbleView() {
+  return bubble_ ? bubble_->GetBubbleView() : nullptr;
 }
 
 const char* UnifiedSystemTray::GetClassName() const {
@@ -661,8 +667,12 @@ std::u16string UnifiedSystemTray::GetAccessibleNameForQuickSettingsBubble() {
 }
 
 void UnifiedSystemTray::HandleLocaleChange() {
+  // Re-adds the child views to force the layer's bounds to be updated
+  // (`SetLayerBounds`) for text direction (if needed).
+  tray_container()->RemoveAllChildViewsWithoutDeleting();
   for (TrayItemView* item : tray_items_) {
     item->HandleLocaleChange();
+    tray_container()->AddChildView(item);
   }
 }
 
@@ -679,14 +689,21 @@ std::u16string UnifiedSystemTray::GetAccessibleNameForTray() {
                        ? channel_indicator_view_->GetAccessibleNameString()
                        : base::EmptyString16());
 
-  status.push_back(network_tray_view_->GetVisible()
-                       ? network_tray_view_->GetAccessibleNameString()
-                       : base::EmptyString16());
-
-  if (hotspot_tray_view_) {
-    status.push_back(hotspot_tray_view_->GetVisible()
-                         ? hotspot_tray_view_->GetAccessibleNameString()
-                         : base::EmptyString16());
+  std::u16string network_string, hotspot_string;
+  if (network_tray_view_->GetVisible()) {
+    network_string = network_tray_view_->GetAccessibleNameString();
+  }
+  if (hotspot_tray_view_ && hotspot_tray_view_->GetVisible()) {
+    hotspot_string = hotspot_tray_view_->GetAccessibleNameString();
+  }
+  if (!network_string.empty() && !hotspot_string.empty()) {
+    status.push_back(l10n_util::GetStringFUTF16(
+        IDS_ASH_STATUS_TRAY_NETWORK_ACCESSIBLE_DESCRIPTION,
+        {hotspot_string, network_string}, /*offsets=*/nullptr));
+  } else if (!hotspot_string.empty()) {
+    status.push_back(hotspot_string);
+  } else {
+    status.push_back(network_string);
   }
 
   // For privacy string, we use either `privacy_indicators_view_` or the combo
@@ -856,6 +873,13 @@ void UnifiedSystemTray::DestroyBubbles() {
     bubble_->unified_system_tray_controller()->RemoveObserver(this);
   }
   bubble_.reset();
+}
+
+void UnifiedSystemTray::UpdateTrayItemColor(bool is_active) {
+  DCHECK(chromeos::features::IsJellyEnabled());
+  for (auto* tray_item : tray_items_) {
+    tray_item->UpdateLabelOrImageViewColor(is_active);
+  }
 }
 
 }  // namespace ash

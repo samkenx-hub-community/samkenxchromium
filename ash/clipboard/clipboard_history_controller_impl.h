@@ -26,6 +26,8 @@
 #include "base/values.h"
 #include "chromeos/crosapi/mojom/clipboard_history.mojom.h"
 
+class PrefRegistrySimple;
+
 namespace aura {
 class Window;
 }  // namespace aura
@@ -36,12 +38,15 @@ class Rect;
 
 namespace ash {
 
+class ClipboardHistoryControllerDelegate;
 class ClipboardHistoryItem;
 class ClipboardHistoryMenuModelAdapter;
 class ClipboardHistoryResourceManager;
+class ClipboardHistoryUrlTitleFetcher;
+class ClipboardImageModelFactory;
 class ClipboardNudgeController;
-enum class LoginStatus;
 class ScopedClipboardHistoryPause;
+enum class LoginStatus;
 
 // Shows a menu with the last few things saved in the clipboard when the
 // keyboard shortcut is pressed.
@@ -65,15 +70,21 @@ class ASH_EXPORT ClipboardHistoryControllerImpl
     kRichTextTouch = 7,             // Rich text paste triggered by gesture tap
     kPlainTextVirtualKeyboard = 8,  // Plain text paste triggered by VK request
     kRichTextVirtualKeyboard = 9,   // Rich text paste triggered by VK request
-    kMaxValue = 9
+    kPlainTextCtrlV = 10,           // Plain text paste triggered by Ctrl+V
+    kRichTextCtrlV = 11,            // Rich text paste triggered by Ctrl+V
+    kMaxValue = 11
   };
 
-  ClipboardHistoryControllerImpl();
+  explicit ClipboardHistoryControllerImpl(
+      std::unique_ptr<ClipboardHistoryControllerDelegate> delegate);
   ClipboardHistoryControllerImpl(const ClipboardHistoryControllerImpl&) =
       delete;
   ClipboardHistoryControllerImpl& operator=(
       const ClipboardHistoryControllerImpl&) = delete;
   ~ClipboardHistoryControllerImpl() override;
+
+  // Registers clipboard history profile prefs with the specified `registry`.
+  static void RegisterProfilePrefs(PrefRegistrySimple* registry);
 
   // Clean up the child widgets prior to destruction.
   void Shutdown();
@@ -251,6 +262,18 @@ class ASH_EXPORT ClipboardHistoryControllerImpl
 
   // Called when the contextual menu is closed.
   void OnMenuClosed();
+
+  // Either the browser-implemented or test-implemented delegate depending on
+  // whether we are running in an Ash-only test context.
+  const std::unique_ptr<ClipboardHistoryControllerDelegate> delegate_;
+
+  // The browser-implemented image model factory that renders html. This will be
+  // `nullptr` if and only if we are running in an Ash-only test context.
+  const std::unique_ptr<ClipboardImageModelFactory> image_model_factory_;
+
+  // The browser-implemented URL title fetcher. This will be `nullptr` if and
+  // only if we are running in an Ash-only test context.
+  const std::unique_ptr<ClipboardHistoryUrlTitleFetcher> url_title_fetcher_;
 
   // Observers notified when clipboard history is shown, used, or updated.
   base::ObserverList<ClipboardHistoryController::Observer> observers_;

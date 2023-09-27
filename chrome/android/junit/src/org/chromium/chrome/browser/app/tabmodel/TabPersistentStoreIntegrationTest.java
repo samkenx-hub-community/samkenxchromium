@@ -37,7 +37,6 @@ import org.chromium.base.test.util.Feature;
 import org.chromium.base.test.util.JniMocker;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
 import org.chromium.chrome.browser.compositor.layouts.content.TabContentManager;
-import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.homepage.HomepageManager;
 import org.chromium.chrome.browser.ntp.RecentlyClosedBridge;
 import org.chromium.chrome.browser.ntp.RecentlyClosedBridgeJni;
@@ -51,6 +50,8 @@ import org.chromium.chrome.browser.tab.TabLaunchType;
 import org.chromium.chrome.browser.tab.TabState;
 import org.chromium.chrome.browser.tab.TabStateExtractor;
 import org.chromium.chrome.browser.tab.WebContentsState;
+import org.chromium.chrome.browser.tab.state.PersistedTabData;
+import org.chromium.chrome.browser.tab.state.PersistedTabDataJni;
 import org.chromium.chrome.browser.tabmodel.ChromeTabCreator;
 import org.chromium.chrome.browser.tabmodel.NextTabPolicy.NextTabPolicySupplier;
 import org.chromium.chrome.browser.tabmodel.TabCreatorManager;
@@ -112,6 +113,8 @@ public class TabPersistentStoreIntegrationTest {
     private Resources mResources;
     @Mock
     private TabImpl.Natives mTabImplJni;
+    @Mock
+    private PersistedTabData.Natives mPersistedTabDataJni;
 
     private PausedExecutorService mExecutor = new PausedExecutorService();
 
@@ -138,6 +141,7 @@ public class TabPersistentStoreIntegrationTest {
         jniMocker.mock(TabModelJniBridgeJni.TEST_HOOKS, mTabModelJniBridgeJni);
         jniMocker.mock(RecentlyClosedBridgeJni.TEST_HOOKS, mRecentlyClosedBridgeJni);
         jniMocker.mock(TabImplJni.TEST_HOOKS, mTabImplJni);
+        jniMocker.mock(PersistedTabDataJni.TEST_HOOKS, mPersistedTabDataJni);
         mOrchestrator.onNativeLibraryReady(mTabContentManager);
     }
 
@@ -156,16 +160,7 @@ public class TabPersistentStoreIntegrationTest {
     @Test
     @SmallTest
     @Feature({"TabPersistentStore"})
-    @Features.DisableFeatures(ChromeFeatureList.CRITICAL_PERSISTED_TAB_DATA)
     public void testOpenAndCloseTabCreatesAndDeletesFile_tabState() {
-        doTestOpenAndCloseTabCreatesAndDeletesFile();
-    }
-
-    @Test
-    @SmallTest
-    @Feature({"TabPersistentStore"})
-    @Features.EnableFeatures(ChromeFeatureList.CRITICAL_PERSISTED_TAB_DATA)
-    public void testOpenAndCloseTabCreatesAndDeletesFile_persistedTabData() {
         doTestOpenAndCloseTabCreatesAndDeletesFile();
     }
 
@@ -204,16 +199,7 @@ public class TabPersistentStoreIntegrationTest {
     @Test
     @SmallTest
     @Feature({"TabPersistentStore"})
-    @Features.DisableFeatures(ChromeFeatureList.CRITICAL_PERSISTED_TAB_DATA)
     public void testUndoTabClosurePersistsState_tabState() {
-        doTestUndoTabClosurePersistsState();
-    }
-
-    @Test
-    @SmallTest
-    @Feature({"TabPersistentStore"})
-    @Features.EnableFeatures(ChromeFeatureList.CRITICAL_PERSISTED_TAB_DATA)
-    public void testUndoTabClosurePersistsState_persistedTabData() {
         doTestUndoTabClosurePersistsState();
     }
 
@@ -240,7 +226,6 @@ public class TabPersistentStoreIntegrationTest {
     @Test
     @SmallTest
     @Feature({"TabPersistentStore"})
-    @Features.EnableFeatures(ChromeFeatureList.CRITICAL_PERSISTED_TAB_DATA)
     public void testCloseTabPersistsState() {
         AtomicInteger timesMetadataSaved = new AtomicInteger();
         observeOnMetadataSavedAsynchronously(timesMetadataSaved);
@@ -267,7 +252,6 @@ public class TabPersistentStoreIntegrationTest {
     @SmallTest
     @Feature({"TabPersistentStore"})
     @Config(manifest = Config.NONE, shadows = {ShadowHomepageManager.class})
-    @Features.EnableFeatures(ChromeFeatureList.CRITICAL_PERSISTED_TAB_DATA)
     public void testCloseAllTabsPersistsState() {
         AtomicInteger timesMetadataSaved = new AtomicInteger();
         observeOnMetadataSavedAsynchronously(timesMetadataSaved);

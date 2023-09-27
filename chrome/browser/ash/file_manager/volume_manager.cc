@@ -5,6 +5,7 @@
 #include "chrome/browser/ash/file_manager/volume_manager.h"
 
 #include "ash/components/arc/arc_util.h"
+#include "base/auto_reset.h"
 #include "base/base64url.h"
 #include "base/files/file_util.h"
 #include "base/metrics/histogram_functions.h"
@@ -34,6 +35,10 @@
 #include "crypto/sha2.h"
 #include "services/device/public/mojom/mtp_storage_info.mojom.h"
 #include "storage/browser/file_system/external_mount_points.h"
+#include "ui/base/clipboard/clipboard_data.h"
+#include "ui/base/clipboard/clipboard_format_type.h"
+#include "ui/base/clipboard/clipboard_monitor.h"
+#include "ui/base/clipboard/clipboard_non_backed.h"
 
 namespace file_manager {
 namespace {
@@ -241,7 +246,7 @@ void VolumeManager::Initialize() {
       base::BindOnce(&RecordDownloadsDiskUsageStats, std::move(localVolume)));
 
   // Subscribe to DriveIntegrationService.
-  drive_integration_service_->AddObserver(this);
+  drive_observer_.Observe(drive_integration_service_);
   if (drive_integration_service_->IsMounted()) {
     DoMountEvent(Volume::CreateForDrive(GetDriveMountPointPath()));
   }
@@ -300,6 +305,9 @@ void VolumeManager::Initialize() {
         arc::IsArcPlayStoreEnabledForProfile(profile_));
   }
 
+  // Subscribe to clipboard events.
+  ui::ClipboardMonitor::GetInstance()->AddObserver(this);
+
   RegisterShareCacheMountPoint(profile_);
   DoMountEvent(
       Volume::CreateForShareCache(util::GetShareCacheFilePath(profile_)));
@@ -325,9 +333,7 @@ void VolumeManager::Shutdown() {
     p->RemoveObserver(this);
   }
 
-  if (drive_integration_service_) {
-    drive_integration_service_->RemoveObserver(this);
-  }
+  drive_observer_.Reset();
 
   if (file_system_provider_service_) {
     file_system_provider_service_->RemoveObserver(this);
@@ -343,6 +349,8 @@ void VolumeManager::Shutdown() {
       session_manager->RemoveObserver(this);
     }
   }
+
+  ui::ClipboardMonitor::GetInstance()->RemoveObserver(this);
 }
 
 void VolumeManager::AddObserver(VolumeManagerObserver* observer) {
@@ -547,6 +555,11 @@ void VolumeManager::RemoveVolumeForTesting(
   DoUnmountEvent(*Volume::CreateForTesting(path, volume_type, device_type,
                                            read_only, device_path, drive_label,
                                            file_system_type));
+}
+
+void VolumeManager::OnDriveIntegrationServiceDestroyed() {
+  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+  drive_observer_.Reset();
 }
 
 void VolumeManager::OnFileSystemMounted() {
@@ -1268,6 +1281,36 @@ void VolumeManager::OnDocumentsProviderRootRemoved(
   // Detach the fusebox ADP storage device from the fusebox daemon.
   if (fusebox_daemon_) {
     fusebox_daemon_->DetachStorage(subdir);
+  }
+}
+
+void VolumeManager::OnClipboardDataChanged() {
+  // Ignore the event created when we change the clipboard.
+  if (ignore_clipboard_changed_) {
+    return;
+  }
+
+  auto* clipboard = ui::ClipboardNonBacked::GetForCurrentThread();
+  if (!clipboard) {
+    return;
+  }
+
+  ui::DataTransferEndpoint dte(ui::EndpointType::kClipboardHistory);
+  const auto* data = clipboard->GetClipboardData(&dte);
+  if (!data || data->custom_data_format() !=
+                   ui::ClipboardFormatType::WebCustomDataType().GetName()) {
+    return;
+  }
+
+  base::Pickle pickle(data->custom_data_data().data(),
+                      data->custom_data_data().size());
+  std::vector<ui::FileInfo> file_info =
+      file_manager::util::ParseFileSystemSources(data->source(), pickle);
+  if (!file_info.empty()) {
+    auto with_files = std::make_unique<ui::ClipboardData>(*data);
+    with_files->set_filenames(std::move(file_info));
+    base::AutoReset<bool> reset(&ignore_clipboard_changed_, true);
+    clipboard->WriteClipboardData(std::move(with_files));
   }
 }
 

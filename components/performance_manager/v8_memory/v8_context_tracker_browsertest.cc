@@ -52,7 +52,13 @@ class V8ContextTrackerTest : public PerformanceManagerBrowserTestHarness {
   }
 };
 
-IN_PROC_BROWSER_TEST_F(V8ContextTrackerTest, AboutBlank) {
+// TODO(crbug.com/1482180): Re-enable on Mac.
+#if BUILDFLAG(IS_MAC)
+#define MAYBE_AboutBlank DISABLED_AboutBlank
+#else
+#define MAYBE_AboutBlank AboutBlank
+#endif
+IN_PROC_BROWSER_TEST_F(V8ContextTrackerTest, MAYBE_AboutBlank) {
   ExpectCounts(0, 0, 0, 0);
   ASSERT_TRUE(NavigateToURL(shell(), GURL("about:blank")));
   ExpectCounts(1, 1, 0, 0);
@@ -121,6 +127,8 @@ IN_PROC_BROWSER_TEST_F(V8ContextTrackerTest, SameSiteNavigation) {
   // Get pointers to the RFHs for each frame.
   content::RenderFrameHost* rfha = contents->GetPrimaryMainFrame();
   content::RenderFrameHost* rfhb = ChildFrameAt(rfha, 0);
+  bool rfh_should_change =
+      rfhb->ShouldChangeRenderFrameHostOnSameSiteNavigation();
 
   // Execute a same site navigation in the child frame. This causes a
   // v8 context to be detached, and new context attached to the execution
@@ -130,7 +138,7 @@ IN_PROC_BROWSER_TEST_F(V8ContextTrackerTest, SameSiteNavigation) {
       rfhb, base::StringPrintf("location.href = \"%s\"", urlb.spec().c_str())));
   WaitForLoad(contents);
 
-  if (content::WillSameSiteNavigationsChangeRenderFrameHosts()) {
+  if (rfh_should_change) {
     // When RenderDocument is enabled, a new RenderFrameHost will be created for
     // the navigation to `urlb`. Both a new V8 context and ExecutionContext are
     // created, and the old ExecutionContext is destroyed.

@@ -47,7 +47,6 @@ import org.chromium.base.FeatureList;
 import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.base.supplier.ObservableSupplierImpl;
 import org.chromium.base.test.BaseRobolectricTestRunner;
-import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.Feature;
 import org.chromium.chrome.browser.omnibox.LocationBarDataProvider;
 import org.chromium.chrome.browser.omnibox.suggestions.AutocompleteController;
@@ -83,9 +82,8 @@ import java.util.concurrent.ExecutionException;
 @Config(manifest = Config.NONE,
         shadows = {ShadowLog.class, RecognitionTestHelper.ShadowUserPrefs.class})
 public class VoiceRecognitionHandlerUnitTest {
-    private static final GURL DEFAULT_URL = JUnitTestGURLs.getGURL(JUnitTestGURLs.URL_1);
-    private static final GURL DEFAULT_SEARCH_URL =
-            JUnitTestGURLs.getGURL(JUnitTestGURLs.SEARCH_URL);
+    private static final GURL DEFAULT_URL = JUnitTestGURLs.URL_1;
+    private static final GURL DEFAULT_SEARCH_URL = JUnitTestGURLs.SEARCH_URL;
     public @Rule MockitoRule mMockitoRule = MockitoJUnit.rule();
 
     private @Mock Intent mIntent;
@@ -143,20 +141,15 @@ public class VoiceRecognitionHandlerUnitTest {
 
     @After
     public void tearDown() {
-        AutocompleteControllerProvider.setControllerForTesting(null);
         mWindowAndroid.destroy();
         // Make sure destroy() propagates.
         // Any cleanup code scheduled for execution via the means of a Handler or PostTask
         // will be taken care of here.
         ShadowLooper.shadowMainLooper().idle();
         mHandler.removeObserver(mObserver);
-        VoiceRecognitionHandler.setIsRecognitionIntentPresentForTesting(null);
         FeatureList.setTestValues(null);
-        VoiceRecognitionUtil.setIsVoiceSearchEnabledForTesting(null);
         mProfileSupplier.set(null);
-        TemplateUrlServiceFactory.setInstanceForTesting(null);
-        ProfileManager.onProfileAdded(null);
-        Profile.setLastUsedProfileForTesting(null);
+        ProfileManager.resetForTesting();
     }
 
     /**
@@ -193,7 +186,7 @@ public class VoiceRecognitionHandlerUnitTest {
         var intent = new Intent();
         var bundle = new Bundle();
         if (text != null) {
-            bundle = RecognitionTestHelper.createDummyBundle(
+            bundle = RecognitionTestHelper.createPlaceholderBundle(
                     new String[] {text}, new float[] {confidence});
         }
         intent.putExtras(bundle);
@@ -205,17 +198,6 @@ public class VoiceRecognitionHandlerUnitTest {
         })
                 .when(mWindowAndroid)
                 .showCancelableIntent(any(Intent.class), mIntentCallback.capture(), any());
-    }
-
-    /**
-     * Tests for {@link VoiceRecognitionHandler#isVoiceSearchEnabled}.
-     */
-    @Test
-    @SmallTest
-    @DisabledTest(message = "the logic being checked never tests for null tab")
-    public void testIsVoiceSearchEnabled_FalseOnNullTab() {
-        doReturn(null).when(mDataProvider).getTab();
-        Assert.assertFalse(mHandler.isVoiceSearchEnabled());
     }
 
     @Test
@@ -510,10 +492,10 @@ public class VoiceRecognitionHandlerUnitTest {
     @SmallTest
     public void testParseResults_MismatchedTextAndConfidenceScores() {
         Assert.assertNull(
-                mHandler.convertBundleToVoiceResults(RecognitionTestHelper.createDummyBundle(
+                mHandler.convertBundleToVoiceResults(RecognitionTestHelper.createPlaceholderBundle(
                         new String[] {"blah"}, new float[] {0f, 1f})));
         Assert.assertNull(
-                mHandler.convertBundleToVoiceResults(RecognitionTestHelper.createDummyBundle(
+                mHandler.convertBundleToVoiceResults(RecognitionTestHelper.createPlaceholderBundle(
                         new String[] {"blah", "foo"}, new float[] {7f})));
     }
 
@@ -524,7 +506,7 @@ public class VoiceRecognitionHandlerUnitTest {
         float[] confidences = new float[] {0.8f, 1.0f, 1.0f};
 
         List<VoiceResult> results = mHandler.convertBundleToVoiceResults(
-                RecognitionTestHelper.createDummyBundle(texts, confidences));
+                RecognitionTestHelper.createPlaceholderBundle(texts, confidences));
         Assert.assertEquals(3, results.size());
         RecognitionTestHelper.assertVoiceResultsAreEqual(results, texts, confidences);
     }
@@ -541,7 +523,7 @@ public class VoiceRecognitionHandlerUnitTest {
         String[] texts = new String[] {"a", "www. b .co .uk", "engadget .com", "www.google.com"};
         float[] confidences = new float[] {1.0f, 1.0f, 1.0f, 1.0f};
         List<VoiceResult> results = mHandler.convertBundleToVoiceResults(
-                RecognitionTestHelper.createDummyBundle(texts, confidences));
+                RecognitionTestHelper.createPlaceholderBundle(texts, confidences));
 
         RecognitionTestHelper.assertVoiceResultsAreEqual(results,
                 new String[] {"a", "www.b.co.uk", "engadget.com", "www.google.com"},

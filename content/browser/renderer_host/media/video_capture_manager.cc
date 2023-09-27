@@ -26,9 +26,9 @@
 #include "content/browser/media/media_internals.h"
 #include "content/browser/renderer_host/media/video_capture_controller.h"
 #include "content/browser/screenlock_monitor/screenlock_monitor.h"
+#include "content/common/features.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/desktop_media_id.h"
-#include "content/public/common/content_features.h"
 #include "media/base/media_switches.h"
 #include "media/base/video_facing.h"
 #include "media/capture/video/video_capture_device.h"
@@ -756,7 +756,7 @@ void VideoCaptureManager::OnDeviceInfosReceived(
     EmitLogMessage(
         base::StringPrintf("VideoCaptureManager::OnDeviceInfosReceived: Failed "
                            "to list device infos with error_code %d",
-                           error_code),
+                           static_cast<int>(error_code)),
         0);
     std::move(client_callback).Run(error_code, {});
     return;

@@ -11,6 +11,7 @@
 #include "ash/system/unified/power_button.h"
 #include "base/memory/raw_ptr.h"
 #include "components/prefs/pref_change_registrar.h"
+#include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/views/view.h"
 
 class PrefRegistrySimple;
@@ -25,8 +26,10 @@ class UnifiedSystemTrayController;
 // is a Jellyroll `PillButton` component that has a different icon label spacing
 // and right padding than `BatteryInfoViewBase`. It updates by observing
 // `PowerStatus`.
-class QsBatteryInfoViewBase : public PillButton, public PowerStatus::Observer {
+class ASH_EXPORT QsBatteryInfoViewBase : public PillButton,
+                                         public PowerStatus::Observer {
  public:
+  METADATA_HEADER(QsBatteryInfoViewBase);
   explicit QsBatteryInfoViewBase(UnifiedSystemTrayController* controller,
                                  const Type type = Type::kFloatingWithoutIcon,
                                  gfx::VectorIcon* icon = nullptr);
@@ -34,8 +37,14 @@ class QsBatteryInfoViewBase : public PillButton, public PowerStatus::Observer {
   QsBatteryInfoViewBase& operator=(const QsBatteryInfoViewBase&) = delete;
   ~QsBatteryInfoViewBase() override;
 
-  // Updates the subclass view's ui when `OnPowerStatusChanged`.
+  // Updates the subclass view's ui including button text/background color, text
+  // content, icons, etc.It can be applied to changes such as theme change,
+  // power status change,etc.
   virtual void Update() = 0;
+  // Updates battery icon and text with battery saver mode check.
+  void UpdateIconAndText(bool bsm_active = false);
+  // Builds the battery icon image.
+  void ConfigureIcon(bool bsm_active = false);
 
  private:
   // views::View:
@@ -45,42 +54,38 @@ class QsBatteryInfoViewBase : public PillButton, public PowerStatus::Observer {
 
   // PowerStatus::Observer:
   void OnPowerStatusChanged() override;
+
+  // PillButton:
+  void OnThemeChanged() override;
 };
 
 // A view that shows battery status.
-class QsBatteryLabelView : public QsBatteryInfoViewBase {
+class ASH_EXPORT QsBatteryLabelView : public QsBatteryInfoViewBase {
  public:
+  METADATA_HEADER(QsBatteryLabelView);
   explicit QsBatteryLabelView(UnifiedSystemTrayController* controller);
   QsBatteryLabelView(const QsBatteryLabelView&) = delete;
   QsBatteryLabelView& operator=(const QsBatteryLabelView&) = delete;
   ~QsBatteryLabelView() override;
 
  private:
-  // PillButton:
-  void OnThemeChanged() override;
-
   // QsBatteryInfoViewBase:
   void Update() override;
 };
 
 // A view that shows battery icon and charging state when smart charging is
 // enabled.
-class QsBatteryIconView : public QsBatteryInfoViewBase {
+class ASH_EXPORT QsBatteryIconView : public QsBatteryInfoViewBase {
  public:
+  METADATA_HEADER(QsBatteryIconView);
   explicit QsBatteryIconView(UnifiedSystemTrayController* controller);
   QsBatteryIconView(const QsBatteryIconView&) = delete;
   QsBatteryIconView& operator=(const QsBatteryIconView&) = delete;
   ~QsBatteryIconView() override;
 
  private:
-  // PillButton:
-  void OnThemeChanged() override;
-
   // QsBatteryInfoViewBase:
   void Update() override;
-
-  // Builds the battery icon image.
-  void ConfigureIcon();
 };
 
 // The footer view shown on the the bottom of the `QuickSettingsView`.
@@ -104,6 +109,10 @@ class ASH_EXPORT QuickSettingsFooter : public views::View {
   // Disables/Enables the `settings_button_` based on `kSettingsIconEnabled`
   // pref.
   void UpdateSettingsButtonState();
+
+  // Creates the container to carry the battery and settings button if there's
+  // any.
+  views::View* CreateEndContainer();
 
   // Owned.
   raw_ptr<IconButton, ExperimentalAsh> settings_button_ = nullptr;

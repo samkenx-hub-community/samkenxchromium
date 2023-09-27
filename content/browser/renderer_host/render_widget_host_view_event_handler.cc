@@ -19,9 +19,9 @@
 #include "content/browser/renderer_host/render_widget_host_view_base.h"
 #include "content/browser/renderer_host/text_input_manager.h"
 #include "content/common/content_switches_internal.h"
+#include "content/common/features.h"
 #include "content/public/browser/render_view_host.h"
 #include "content/public/browser/render_widget_host.h"
-#include "content/public/common/content_features.h"
 #include "ui/aura/client/cursor_client.h"
 #include "ui/aura/client/focus_client.h"
 #include "ui/aura/scoped_keyboard_hook.h"
@@ -264,7 +264,7 @@ void RenderWidgetHostViewEventHandler::OnKeyEvent(ui::KeyEvent* event) {
   // If the key has been reserved as part of the active KeyboardLock request,
   // then we want to mark it as such so it is not intercepted by the browser.
   if (IsKeyLocked(*event))
-    webkit_event.skip_in_browser = true;
+    webkit_event.skip_if_unhandled = true;
 
   bool mark_event_as_handled = true;
   delegate_->ForwardKeyboardEventWithLatencyInfo(

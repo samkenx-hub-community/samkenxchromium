@@ -7,7 +7,7 @@
 
 #include "third_party/blink/renderer/core/core_export.h"
 #include "third_party/blink/renderer/core/css/container_selector.h"
-#include "third_party/blink/renderer/core/css/container_stuck.h"
+#include "third_party/blink/renderer/core/css/container_state.h"
 #include "third_party/blink/renderer/core/css/media_query_evaluator.h"
 #include "third_party/blink/renderer/core/css/media_query_exp.h"
 #include "third_party/blink/renderer/core/css/style_recalc_change.h"
@@ -21,6 +21,7 @@ namespace blink {
 
 class ComputedStyle;
 class ContainerQuery;
+class ContainerQueryScrollSnapshot;
 class Element;
 class MatchResult;
 class StyleRecalcContext;
@@ -74,6 +75,10 @@ class CORE_EXPORT ContainerQueryEvaluator final
 
   // Re-evaluate the cached results and clear any results which are affected.
   Change StyleContainerChanged();
+
+  // Update the ContainerValues for the evaluator if necessary based on the
+  // latest snapshot.
+  Change ApplyScrollSnapshot();
 
   // Re-evaluate the cached results and clear any results which are affected by
   // the ContainerStuckPhysical changes.
@@ -144,13 +149,14 @@ class CORE_EXPORT ContainerQueryEvaluator final
   ContainerStuckPhysical stuck_horizontal_ = ContainerStuckPhysical::kNo;
   ContainerStuckPhysical stuck_vertical_ = ContainerStuckPhysical::kNo;
   HeapHashMap<Member<const ContainerQuery>, Result> results_;
+  Member<ContainerQueryScrollSnapshot> snapshot_;
   // The MediaQueryExpValue::UnitFlags of all queries evaluated against this
   // ContainerQueryEvaluator.
   unsigned unit_flags_ = 0;
   bool referenced_by_unit_ = false;
   bool font_dirty_ = false;
   bool depends_on_style_ = false;
-  bool depends_on_sticky_ = false;
+  bool depends_on_state_ = false;
 };
 
 }  // namespace blink

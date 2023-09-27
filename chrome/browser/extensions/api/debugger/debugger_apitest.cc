@@ -17,6 +17,7 @@
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/scoped_mock_time_message_loop_task_runner.h"
 #include "base/test/simple_test_tick_clock.h"
+#include "base/test/to_vector.h"
 #include "base/test/values_test_util.h"
 #include "base/values.h"
 #include "build/chromeos_buildflags.h"
@@ -402,7 +403,9 @@ IN_PROC_BROWSER_TEST_F(DebuggerApiTest, InfoBar) {
   EXPECT_EQ(1u, manager3->infobar_count());
 
   // Closing tab should not affect anything.
-  ASSERT_TRUE(another_browser->tab_strip_model()->CloseWebContentsAt(1, 0));
+  EXPECT_EQ(2, another_browser->tab_strip_model()->count());
+  another_browser->tab_strip_model()->CloseWebContentsAt(1, 0);
+  EXPECT_EQ(1, another_browser->tab_strip_model()->count());
   manager3 = nullptr;
   EXPECT_EQ(1u, manager1->infobar_count());
   EXPECT_EQ(1u, manager2->infobar_count());
@@ -531,9 +534,8 @@ IN_PROC_BROWSER_TEST_F(CrossProfileDebuggerApiTest, GetTargets) {
 
     ASSERT_TRUE(value.is_list());
     const base::Value::List targets = std::move(value).TakeList();
-    std::vector<std::string> urls;
-    base::ranges::transform(
-        targets, std::back_inserter(urls), [](const base::Value& value) {
+    std::vector<std::string> urls =
+        base::test::ToVector(targets, [](const base::Value& value) {
           GURL::Replacements remove_port;
           remove_port.ClearPort();
           const std::string* url = value.GetDict().FindString("url");

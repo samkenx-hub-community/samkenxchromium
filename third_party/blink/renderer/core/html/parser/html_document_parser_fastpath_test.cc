@@ -108,7 +108,7 @@ TEST(HTMLDocumentParserFastpathTest, MaximumHTMLParserDOMTreeDepth) {
 
   // Because kMaximumHTMLParserDOMTreeDepth was encountered, the deepest
   // node should have siblings.
-  Element* deepest = div->getElementById("deepest");
+  Element* deepest = div->getElementById(AtomicString("deepest"));
   ASSERT_TRUE(deepest);
   EXPECT_EQ(deepest->parentNode()->CountChildren(), 3u);
 }
@@ -303,6 +303,24 @@ TEST(HTMLDocumentParserFastpathTest, HandlesLi) {
   histogram_tester.ExpectTotalCount("Blink.HTMLFastPathParser.ParseResult", 1);
   histogram_tester.ExpectUniqueSample("Blink.HTMLFastPathParser.ParseResult",
                                       HtmlFastPathResult::kSucceeded, 1);
+}
+
+TEST(HTMLDocumentParserFastpathTest, NullMappedToReplacementChar) {
+  ScopedNullExecutionContext execution_context;
+  auto* document =
+      HTMLDocument::CreateForTest(execution_context.GetExecutionContext());
+  document->write("<body></body>");
+  auto* div = MakeGarbageCollected<HTMLDivElement>(*document);
+
+  base::HistogramTester histogram_tester;
+  // Constructor that takes size is needed because of \0 in string.
+  div->setInnerHTML(
+      String("<div id='x' name='x\0y'></div>", static_cast<size_t>(29)));
+  Element* new_div = div->getElementById(AtomicString("x"));
+  ASSERT_TRUE(new_div);
+  // Null chars are generally mapped to \uFFFD (at least this test should
+  // trigger the replacement).
+  EXPECT_EQ(AtomicString(String(u"x\uFFFDy")), new_div->GetNameAttribute());
 }
 
 }  // namespace

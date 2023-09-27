@@ -64,7 +64,7 @@ import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.util.ActivityTestUtils;
 import org.chromium.chrome.test.util.ChromeRenderTestRule;
 import org.chromium.chrome.test.util.ChromeTabUtils;
-import org.chromium.chrome.test.util.browser.Features;
+import org.chromium.chrome.test.util.browser.Features.DisableFeatures;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
 import org.chromium.ui.modaldialog.ModalDialogManager;
 import org.chromium.ui.modaldialog.ModalDialogProperties;
@@ -88,11 +88,9 @@ import java.io.IOException;
         "session_rate/<1"
 })
 @Restriction({UiRestriction.RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
-@Features.EnableFeatures({ChromeFeatureList.TAB_GROUPS_ANDROID,
-    ChromeFeatureList.TAB_GROUPS_CONTINUATION_ANDROID})
 // TODO(https://crbug.com/1362059): The message cards aren't shown the first time when entering GTS
 // with Start surface enabled.
-@Features.DisableFeatures({
+@DisableFeatures({
     ChromeFeatureList.CLOSE_TAB_SUGGESTIONS, ChromeFeatureList.START_SURFACE_ANDROID})
 public class TabGridIphTest {
     // clang-format on
@@ -125,6 +123,7 @@ public class TabGridIphTest {
 
     @Test
     @MediumTest
+    @DisabledTest(message = "https://crbug.com/1472857")
     public void testShowAndHideIphDialog() {
         final ChromeTabbedActivity cta = mActivityTestRule.getActivity();
 
@@ -243,7 +242,7 @@ public class TabGridIphTest {
         CriteriaHelper.pollUiThread(
                 TabSwitcherCoordinator::hasAppendedMessagesForTesting);
         onViewWaiting(allOf(withParent(withId(TabUiTestHelper.getTabSwitcherParentId(cta))),
-                              withId(R.id.tab_list_view)))
+                              withId(R.id.tab_list_recycler_view)))
                 .perform(RecyclerViewActions.scrollTo(withId(R.id.tab_grid_message_item)));
         onViewWaiting(withId(R.id.tab_grid_message_item)).check(matches(isDisplayed()));
 
@@ -255,6 +254,7 @@ public class TabGridIphTest {
     @Test
     @MediumTest
     @Feature({"RenderTest"})
+    @DisabledTest(message = "crbug.com/1466485")
     public void testRenderIphDialog_Portrait() throws IOException {
         ChromeTabbedActivity cta = mActivityTestRule.getActivity();
 
@@ -290,7 +290,7 @@ public class TabGridIphTest {
         // Scroll to the position of the IPH entrance so that it is completely showing for Espresso
         // click.
         onViewWaiting(allOf(withParent(withId(TabUiTestHelper.getTabSwitcherParentId(cta))),
-                              withId(R.id.tab_list_view)))
+                              withId(R.id.tab_list_recycler_view)))
                 .perform(RecyclerViewActions.scrollToPosition(1));
         onView(allOf(withId(R.id.action_button), withParent(withId(R.id.tab_grid_message_item))))
                 .perform(click());
@@ -350,12 +350,13 @@ public class TabGridIphTest {
         ChromeTabbedActivity cta = mActivityTestRule.getActivity();
         enterTabSwitcher(cta);
         onViewWaiting(withId(R.id.tab_grid_message_item)).check(matches(isDisplayed()));
-        RecyclerView.ViewHolder viewHolder = ((RecyclerView) cta.findViewById(R.id.tab_list_view))
-                                                     .findViewHolderForAdapterPosition(1);
+        RecyclerView.ViewHolder viewHolder =
+                ((RecyclerView) cta.findViewById(R.id.tab_list_recycler_view))
+                        .findViewHolderForAdapterPosition(1);
         assertEquals(TabProperties.UiType.MESSAGE, viewHolder.getItemViewType());
 
         onView(allOf(withParent(withId(TabUiTestHelper.getTabSwitcherParentId(cta))),
-                       withId(R.id.tab_list_view)))
+                       withId(R.id.tab_list_recycler_view)))
                 .perform(RecyclerViewActions.actionOnItemAtPosition(
                         1, getSwipeToDismissAction(true)));
 

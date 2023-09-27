@@ -4,6 +4,10 @@
 
 #include "content/browser/interest_group/ad_auction_url_loader_interceptor.h"
 
+#include <stddef.h>
+
+#include "base/base64url.h"
+#include "base/strings/string_split.h"
 #include "content/browser/interest_group/ad_auction_page_data.h"
 #include "content/browser/renderer_host/render_frame_host_impl.h"
 #include "content/public/browser/content_browser_client.h"
@@ -18,6 +22,11 @@ namespace content {
 namespace {
 
 constexpr char kAdAuctionRequestHeaderKey[] = "Sec-Ad-Auction-Fetch";
+
+constexpr char kAdAuctionSignalsResponseHeaderKey[] = "Ad-Auction-Signals";
+
+constexpr char kAdAuctionAdditionalBidResponseHeaderKey[] =
+    "Ad-Auction-Additional-Bid";
 
 }  // namespace
 
@@ -108,12 +117,54 @@ void AdAuctionURLLoaderInterceptor::WillFollowRedirect(
 
 void AdAuctionURLLoaderInterceptor::OnReceiveRedirect(
     const net::RedirectInfo& redirect_info,
-    const network::mojom::URLResponseHeadPtr& head) {
+    network::mojom::URLResponseHeadPtr& head) {
   has_redirect_ = true;
+
+  head->headers.get()->RemoveHeader(kAdAuctionSignalsResponseHeaderKey);
+  head->headers.get()->RemoveHeader(kAdAuctionAdditionalBidResponseHeaderKey);
 }
 
 void AdAuctionURLLoaderInterceptor::OnReceiveResponse(
-    const network::mojom::URLResponseHeadPtr& head) {
+    network::mojom::URLResponseHeadPtr& head) {
+  net::HttpResponseHeaders* headers = head->headers.get();
+
+  std::string ad_auction_signals;
+  bool found_ad_auction_signals_header = false;
+
+  if (base::FeatureList::IsEnabled(blink::features::kAdAuctionSignals)) {
+    found_ad_auction_signals_header = headers->GetNormalizedHeader(
+        kAdAuctionSignalsResponseHeaderKey, &ad_auction_signals);
+  }
+
+  if (found_ad_auction_signals_header) {
+    headers->RemoveHeader(kAdAuctionSignalsResponseHeaderKey);
+  }
+
+  std::map<std::string, std::vector<std::string>> nonce_additional_bids_map;
+  size_t iter = 0;
+  std::string header_line;
+  while (headers->EnumerateHeader(
+      &iter, kAdAuctionAdditionalBidResponseHeaderKey, &header_line)) {
+    // Skip if `header_line` doesn't match the format
+    // <36 characters auction nonce>:<base64-encoded signed additional bid>
+    std::vector<std::string> nonce_and_additional_bid = base::SplitString(
+        header_line, ":", base::KEEP_WHITESPACE, base::SPLIT_WANT_ALL);
+    if (nonce_and_additional_bid.size() != 2) {
+      continue;
+    }
+
+    const std::string& nonce = nonce_and_additional_bid[0];
+    const std::string& additional_bid = nonce_and_additional_bid[1];
+
+    if (nonce.size() != 36) {
+      continue;
+    }
+
+    nonce_additional_bids_map[nonce].push_back(additional_bid);
+  }
+
+  headers->RemoveHeader(kAdAuctionAdditionalBidResponseHeaderKey);
+
   if (has_redirect_ || !ad_auction_headers_eligible_) {
     return;
   }
@@ -123,21 +174,42 @@ void AdAuctionURLLoaderInterceptor::OnReceiveResponse(
     return;
   }
 
-  const net::HttpResponseHeaders* headers = head->headers.get();
-
-  std::string ad_auction_result;
-  if (!headers->GetNormalizedHeader("Ad-Auction-Result", &ad_auction_result) ||
-      ad_auction_result.size() != 64) {
-    return;
-  }
-
   Page& page = rfh->GetPage();
-
   AdAuctionPageData* ad_auction_page_data =
       PageUserData<AdAuctionPageData>::GetOrCreateForPage(page);
 
-  ad_auction_page_data->AddAuctionResponseWitnessForOrigin(request_origin_,
-                                                           ad_auction_result);
+  if (base::FeatureList::IsEnabled(
+          blink::features::kFledgeBiddingAndAuctionServer)) {
+    std::string ad_auction_results;
+    if (headers->GetNormalizedHeader("Ad-Auction-Result",
+                                     &ad_auction_results)) {
+      for (const auto& result :
+           base::SplitString(ad_auction_results, ",", base::TRIM_WHITESPACE,
+                             base::SPLIT_WANT_NONEMPTY)) {
+        std::string result_bytes;
+        if (base::Base64UrlDecode(result,
+                                  base::Base64UrlDecodePolicy::IGNORE_PADDING,
+                                  &result_bytes) &&
+            result_bytes.size() == 32) {
+          ad_auction_page_data->AddAuctionResultWitnessForOrigin(
+              request_origin_, result_bytes);
+        }
+      }
+    }
+  }
+
+  if (found_ad_auction_signals_header &&
+      ad_auction_signals.size() <=
+          static_cast<size_t>(
+              blink::features::kAdAuctionSignalsMaxSizeBytes.Get())) {
+    ad_auction_page_data->AddAuctionSignalsWitnessForOrigin(request_origin_,
+                                                            ad_auction_signals);
+  }
+
+  if (!nonce_additional_bids_map.empty()) {
+    ad_auction_page_data->AddAuctionAdditionalBidsWitnessForOrigin(
+        request_origin_, nonce_additional_bids_map);
+  }
 }
 
 }  // namespace content

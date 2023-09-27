@@ -4,9 +4,11 @@
 
 #include "components/metrics/structured/structured_metrics_service.h"
 
+#include "components/metrics/metrics_log.h"
 #include "components/metrics/metrics_service_client.h"
 #include "components/metrics/structured/reporting/structured_metrics_reporting_service.h"
 #include "components/metrics/structured/structured_metrics_features.h"
+#include "third_party/metrics_proto/system_profile.pb.h"
 
 namespace metrics::structured {
 
@@ -23,7 +25,7 @@ StructuredMetricsService::~StructuredMetricsService() = default;
 
 void StructuredMetricsService::EnableRecording() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  if (!base::FeatureList::IsEnabled(kEnabledStructuredMetricsService)) {
+  if (!structured_metrics_enabled_) {
     return;
   }
   if (!initialize_complete_) {
@@ -34,7 +36,7 @@ void StructuredMetricsService::EnableRecording() {
 
 void StructuredMetricsService::DisableRecording() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  if (!base::FeatureList::IsEnabled(kEnabledStructuredMetricsService)) {
+  if (!structured_metrics_enabled_) {
     return;
   }
   recorder_->DisableRecording();
@@ -42,7 +44,7 @@ void StructuredMetricsService::DisableRecording() {
 
 void StructuredMetricsService::EnableReporting() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  if (!base::FeatureList::IsEnabled(kEnabledStructuredMetricsService)) {
+  if (!structured_metrics_enabled_) {
     return;
   }
   if (!reporting_active()) {
@@ -53,7 +55,7 @@ void StructuredMetricsService::EnableReporting() {
 
 void StructuredMetricsService::DisableReporting() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  if (!base::FeatureList::IsEnabled(kEnabledStructuredMetricsService)) {
+  if (!structured_metrics_enabled_) {
     return;
   }
   reporting_service_->DisableReporting();
@@ -74,7 +76,7 @@ void StructuredMetricsService::Flush(
 
 void StructuredMetricsService::Purge() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  if (!base::FeatureList::IsEnabled(kEnabledStructuredMetricsService)) {
+  if (!structured_metrics_enabled_) {
     return;
   }
   recorder_->Purge();
@@ -85,14 +87,20 @@ StructuredMetricsService::StructuredMetricsService(
     MetricsServiceClient* client,
     PrefService* local_state,
     std::unique_ptr<StructuredMetricsRecorder> recorder)
-    : recorder_(std::move(recorder)), client_(client) {
+    : recorder_(std::move(recorder)),
+      // This service is only enabled if both structured metrics and the service
+      // flags are enabled.
+      structured_metrics_enabled_(
+          base::FeatureList::IsEnabled(metrics::features::kStructuredMetrics) &&
+          base::FeatureList::IsEnabled(kEnabledStructuredMetricsService)),
+      client_(client) {
   DCHECK(client);
   DCHECK(local_state);
 
   // If the StructuredMetricsService is not enabled then return early. The
   // recorder needs to be initialized, but not the reporting service or
   // scheduler.
-  if (!base::FeatureList::IsEnabled(kEnabledStructuredMetricsService)) {
+  if (!structured_metrics_enabled_) {
     return;
   }
 
@@ -124,7 +132,11 @@ base::TimeDelta StructuredMetricsService::GetUploadTimeInterval() {
 
 void StructuredMetricsService::RotateLogsAndSend() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  if (recorder_->events()->non_uma_events_size() == 0) {
+
+  // Verify that the recorder has been initialized and can be providing metrics.
+  // And if it is, then see if there are any events ready to be uploaded.
+  if (!recorder_->can_provide_metrics() ||
+      recorder_->events()->non_uma_events_size() == 0) {
     return;
   }
 
@@ -161,6 +173,9 @@ void StructuredMetricsService::InitializeUmaProto(
   if (product != uma_proto.product()) {
     uma_proto.set_product(product);
   }
+
+  SystemProfileProto* system_profile = uma_proto.mutable_system_profile();
+  metrics::MetricsLog::RecordCoreSystemProfile(client_, system_profile);
 }
 
 // static:
@@ -183,6 +198,16 @@ StructuredMetricsService::GetLogStoreLimits() {
       .min_queue_size_bytes = static_cast<size_t>(kMinLogQueueSizeBytes.Get()),
       .max_log_size_bytes = static_cast<size_t>(kMaxLogSizeBytes.Get()),
   };
+}
+
+void StructuredMetricsService::SetRecorderForTest(
+    std::unique_ptr<StructuredMetricsRecorder> recorder) {
+  recorder_ = std::move(recorder);
+}
+
+MetricsServiceClient* StructuredMetricsService::GetMetricsServiceClient()
+    const {
+  return client_;
 }
 
 }  // namespace metrics::structured

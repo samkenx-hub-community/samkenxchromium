@@ -34,6 +34,7 @@
 
 #include "RawPtrHelpers.h"
 #include "RawPtrManualPathsToIgnore.h"
+#include "SeparateRepositoryPaths.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
 #include "clang/ASTMatchers/ASTMatchers.h"
@@ -852,8 +853,9 @@ class RawRefRewriter {
         affected_expr_operator_rewriter(output_helper,
                                         affectedMemberExprOperatorFct_),
         affected_expr_rewriter(output_helper, affectedMemberExprFct_),
-        affected_expr_rewriter_withParentheses(output_helper,
-                                               affectedMemberExprWithParenFct_),
+        affected_expr_rewriter_with_parentheses(
+            output_helper,
+            affectedMemberExprWithParenFct_),
         affected_initializer_expr_rewriter(output_helper,
                                            affectedInitializerExprFct_),
         global_scope_rewriter(output_helper, "global-scope"),
@@ -889,7 +891,7 @@ class RawRefRewriter {
 
     // Matches expressions that used to have |SomeType&| as return type and
     // became |const raw_ref<SomeType>| after the rewrite.
-    auto affected_member_expr =
+    auto affected_member_expr = memberExpr(
         memberExpr(
             member(fieldDecl(hasExplicitFieldDecl(field_decl_matcher))),
             unless(anyOf(
@@ -901,10 +903,28 @@ class RawRefRewriter {
                           hasParent(declStmt(hasParent(cxxForRangeStmt()))))))),
                 hasAncestor(cxxConstructorDecl(isDefaulted())),
                 hasParent(cxxOperatorCallExpr()),
+                hasParent(unaryOperator(
+                    anyOf(hasOperatorName("--"), hasOperatorName("++")))),
                 hasParent(arraySubscriptExpr()),
                 hasParent(callExpr(callee(
                     fieldDecl(hasExplicitFieldDecl(field_decl_matcher))))))))
-            .bind("affectedMemberExpr");
+            .bind("affectedMemberExpr"),
+
+        unless(anyOf(
+            // Exclude memberExpressions appearing inside a constructor
+            // initializer of a reference field where we should NOT add
+            // operator*.
+            hasParent(cxxConstructorDecl(hasAnyConstructorInitializer(allOf(
+                withInitializer(
+                    memberExpr(equalsBoundNode("affectedMemberExpr"))),
+                forField(
+                    fieldDecl(hasExplicitFieldDecl(field_decl_matcher))))))),
+            // Exclude memberExpressions, in initializer lists, that are
+            // initializing a reference field that will be rewritten into
+            // raw_ref.
+            hasParent(initListExpr(forEachInitExprWithFieldDecl(
+                memberExpr(equalsBoundNode("affectedMemberExpr")),
+                hasExplicitFieldDecl(field_decl_matcher)))))));
 
     match_finder.addMatcher(affected_member_expr, &affected_expr_rewriter);
 
@@ -949,16 +969,18 @@ class RawRefRewriter {
     match_finder.addMatcher(auto_var_decl_matcher, &affected_expr_rewriter);
 
     // Matches affected member expressions that need parenthesization.
-    auto affected_member_expr_withParentheses =
+    auto affected_member_expr_with_parentheses =
         memberExpr(member(fieldDecl(hasExplicitFieldDecl(field_decl_matcher))),
                    anyOf(hasParent(cxxOperatorCallExpr()),
+                         hasParent(unaryOperator(anyOf(hasOperatorName("--"),
+                                                       hasOperatorName("++")))),
                          hasParent(arraySubscriptExpr()),
                          hasParent(callExpr(callee(fieldDecl(
                              hasExplicitFieldDecl(field_decl_matcher)))))))
             .bind("affectedMemberExprWithParentheses");
 
-    match_finder.addMatcher(affected_member_expr_withParentheses,
-                            &affected_expr_rewriter_withParentheses);
+    match_finder.addMatcher(affected_member_expr_with_parentheses,
+                            &affected_expr_rewriter_with_parentheses);
 
     // for structs/class that don't define a constructor and are initialized
     // using braced list initialization, we need to add raw_ref around the
@@ -969,7 +991,13 @@ class RawRefRewriter {
     // A a{num}; => A a{raw_ref(num)};
     auto init_list_expr_with_raw_ref = initListExpr(
         forEachInitExprWithFieldDecl(
-            expr(unless(materializeTemporaryExpr())).bind("initializer_expr"),
+            expr(unless(anyOf(
+                     materializeTemporaryExpr(),
+                     // Exclude member expressions where the member is a
+                     // reference field that will be rewritten into raw_ref.
+                     memberExpr(member(fieldDecl(
+                         hasExplicitFieldDecl(field_decl_matcher)))))))
+                .bind("initializer_expr"),
             hasExplicitFieldDecl(field_decl_matcher)),
         unless(hasParent(cxxConstructExpr())));
 
@@ -1146,7 +1174,7 @@ class RawRefRewriter {
   RawRefFieldDeclRewriter field_decl_rewriter;
   AffectedExprRewriter affected_expr_operator_rewriter;
   AffectedExprRewriter affected_expr_rewriter;
-  AffectedExprRewriter affected_expr_rewriter_withParentheses;
+  AffectedExprRewriter affected_expr_rewriter_with_parentheses;
   AffectedExprRewriter affected_initializer_expr_rewriter;
   FilteredExprWriter global_scope_rewriter;
   FilteredExprWriter overlapping_field_decl_writer;
@@ -1205,6 +1233,9 @@ int main(int argc, const char* argv[]) {
   if (override_exclude_paths_param == "") {
     std::vector<std::string> paths_to_exclude_lines;
     for (auto* const line : kRawPtrManualPathsToIgnore) {
+      paths_to_exclude_lines.push_back(line);
+    }
+    for (auto* const line : kSeparateRepositoryPaths) {
       paths_to_exclude_lines.push_back(line);
     }
     paths_to_exclude = std::make_unique<FilterFile>(paths_to_exclude_lines);

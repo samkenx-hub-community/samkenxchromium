@@ -12,6 +12,8 @@ import '../shared_style.css.js';
 import './credential_details_card.css.js';
 import '../dialogs/edit_password_dialog.js';
 import '../dialogs/multi_store_delete_password_dialog.js';
+import '../sharing/share_password_flow.js';
+import '../sharing/metrics_utils.js';
 
 import {CrToastElement} from '//resources/cr_elements/cr_toast/cr_toast.js';
 import {CrButtonElement} from 'chrome://resources/cr_elements/cr_button/cr_button.js';
@@ -22,6 +24,7 @@ import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
 import {PasswordManagerImpl, PasswordViewPageInteractions} from '../password_manager_proxy.js';
+import {PasswordSharingActions, recordPasswordSharingInteraction} from '../sharing/metrics_utils.js';
 import {ShowPasswordMixin} from '../show_password_mixin.js';
 import {UserUtilMixin} from '../user_utils_mixin.js';
 
@@ -68,6 +71,8 @@ export class PasswordDetailsCardElement extends PasswordDetailsCardElementBase {
   static get properties() {
     return {
       password: Object,
+      groupName: String,
+      iconUrl: String,
       toastMessage_: String,
       usernameCopyInteraction_: {
         type: PasswordViewPageInteractions,
@@ -79,6 +84,17 @@ export class PasswordDetailsCardElement extends PasswordDetailsCardElementBase {
       showEditPasswordDialog_: Boolean,
       showDeletePasswordDialog_: Boolean,
 
+      showShareButton_: {
+        type: Boolean,
+        computed: 'computeShowShareButton_(enableSendPasswords_, ' +
+            'isOptedInForAccountStorage, isSyncingPasswords)',
+      },
+
+      showShareFlow_: {
+        type: Boolean,
+        value: false,
+      },
+
       enableSendPasswords_: {
         type: Boolean,
         value() {
@@ -89,9 +105,12 @@ export class PasswordDetailsCardElement extends PasswordDetailsCardElementBase {
   }
 
   password: chrome.passwordsPrivate.PasswordUiEntry;
+  groupName: string;
+  iconUrl: string;
   private toastMessage_: string;
   private showEditPasswordDialog_: boolean;
   private showDeletePasswordDialog_: boolean;
+  private showShareFlow_: boolean;
   private enableSendPasswords_: boolean;
 
   private isFederated_(): boolean {
@@ -137,7 +156,7 @@ export class PasswordDetailsCardElement extends PasswordDetailsCardElementBase {
       this.showDeletePasswordDialog_ = true;
       return;
     }
-    PasswordManagerImpl.getInstance().removeSavedPassword(
+    PasswordManagerImpl.getInstance().removeCredential(
         this.password.id, this.password.storedIn);
     this.dispatchEvent(new CustomEvent('password-removed', {
       bubbles: true,
@@ -173,6 +192,16 @@ export class PasswordDetailsCardElement extends PasswordDetailsCardElementBase {
     this.extendAuthValidity_();
   }
 
+  private onShareButtonClick_() {
+    recordPasswordSharingInteraction(
+        PasswordSharingActions.PASSWORD_DETAILS_SHARE_BUTTON_CLICKED);
+    this.showShareFlow_ = true;
+  }
+
+  private onShareFlowDone_() {
+    this.showShareFlow_ = false;
+  }
+
   private extendAuthValidity_() {
     PasswordManagerImpl.getInstance().extendAuthValidity();
   }
@@ -188,8 +217,9 @@ export class PasswordDetailsCardElement extends PasswordDetailsCardElementBase {
     return hasApps ? this.i18n('appsLabel') : this.i18n('sitesLabel');
   }
 
-  private showShareButton_(): boolean {
-    return this.isSyncingPasswords && this.enableSendPasswords_;
+  private computeShowShareButton_(): boolean {
+    return this.enableSendPasswords_ && !this.isFederated_() &&
+        (this.isSyncingPasswords || this.isOptedInForAccountStorage);
   }
 }
 

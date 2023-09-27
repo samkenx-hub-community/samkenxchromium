@@ -9,6 +9,7 @@
 #include "ash/wm/snap_group/snap_group_controller.h"
 #include "ash/wm/splitview/split_view_constants.h"
 #include "ash/wm/window_positioning_utils.h"
+#include "ash/wm/window_util.h"
 #include "base/check.h"
 #include "base/check_op.h"
 #include "chromeos/ui/base/display_util.h"
@@ -35,11 +36,14 @@ SnapGroup::~SnapGroup() {
   StopObservingWindows();
 }
 
+aura::Window* SnapGroup::GetTopMostWindowInGroup() const {
+  return window_util::IsStackedBelow(window1_, window2_) ? window2_ : window1_;
+}
+
 void SnapGroup::MinimizeWindows() {
   auto* window1_state = WindowState::Get(window1_);
   auto* window2_state = WindowState::Get(window2_);
   CHECK(!window1_state->IsMinimized() && !window2_state->IsMinimized());
-
   window1_state->Minimize();
   window2_state->Minimize();
 }
@@ -50,7 +54,7 @@ void SnapGroup::OnWindowDestroying(aura::Window* window) {
   }
 
   // `this` will be destroyed after this line.
-  Shell::Get()->snap_group_controller()->RemoveSnapGroup(this);
+  SnapGroupController::Get()->RemoveSnapGroup(this);
 }
 
 void SnapGroup::StartObservingWindows() {

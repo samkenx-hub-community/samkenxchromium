@@ -9,14 +9,11 @@
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
 #import "ios/chrome/browser/ui/omnibox/keyboard_assist/omnibox_assistive_keyboard_delegate.h"
 #import "ios/chrome/browser/ui/omnibox/omnibox_ui_features.h"
+#import "ios/chrome/common/ui/colors/semantic_color_names.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ios/public/provider/chrome/browser/voice_search/voice_search_api.h"
 #import "ui/base/l10n/l10n_util.h"
 #import "ui/base/l10n/l10n_util_mac.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 NSString* const kVoiceSearchInputAccessoryViewID =
     @"kVoiceSearchInputAccessoryViewID";
@@ -44,17 +41,27 @@ void SetUpButtonWithIcon(UIButton* button, NSString* iconName) {
   button.layer.shadowRadius = kButtonShadowRadius;
 }
 
-void SetUpButtonWithSymbol(UIButton* button, NSString* symbolName) {
+}  // namespace
+
+void UpdateLensButtonAppearance(UIButton* button) {
   [button setTranslatesAutoresizingMaskIntoConstraints:NO];
   UIImageSymbolConfiguration* configuration = [UIImageSymbolConfiguration
       configurationWithPointSize:kSymbolPointSize
                           weight:UIImageSymbolWeightSemibold
                            scale:UIImageSymbolScaleMedium];
 
-  UIImage* icon = MakeSymbolMulticolor(
-      CustomSymbolWithConfiguration(symbolName, configuration));
+  UIImage* icon =
+      CustomSymbolWithConfiguration(kCameraLensSymbol, configuration);
+  if (UITraitCollection.currentTraitCollection.userInterfaceStyle ==
+      UIUserInterfaceStyleDark) {
+    icon = MakeSymbolMonochrome(icon);
+    button.tintColor = [UIColor whiteColor];
+  } else {
+    icon = MakeSymbolMulticolor(icon);
+  }
+
+  button.backgroundColor = [UIColor colorNamed:kOmniboxKeyboardButtonColor];
   [button setImage:icon forState:UIControlStateNormal];
-  button.backgroundColor = [UIColor whiteColor];
   button.layer.cornerRadius = kSymbolButtonSize / 2;
 
   button.layer.shadowColor = [UIColor blackColor].CGColor;
@@ -67,8 +74,6 @@ void SetUpButtonWithSymbol(UIButton* button, NSString* symbolName) {
     [button.heightAnchor constraintEqualToConstant:kSymbolButtonSize]
   ]];
 }
-
-}  // namespace
 
 NSArray<UIControl*>* OmniboxAssistiveKeyboardLeadingControls(
     id<OmniboxAssistiveKeyboardDelegate> delegate,
@@ -93,7 +98,8 @@ NSArray<UIControl*>* OmniboxAssistiveKeyboardLeadingControls(
       [ExtendedTouchTargetButton buttonWithType:UIButtonTypeCustom];
   if (useLens) {
     // Set up the camera button for Lens.
-    SetUpButtonWithSymbol(cameraButton, kCameraLensSymbol);
+    delegate.lensButton = cameraButton;
+    UpdateLensButtonAppearance(cameraButton);
     [cameraButton addTarget:delegate
                      action:@selector(keyboardAccessoryLensTapped)
            forControlEvents:UIControlEventTouchUpInside];

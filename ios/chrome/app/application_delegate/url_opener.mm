@@ -6,6 +6,7 @@
 
 #import <Foundation/Foundation.h>
 
+#import "base/debug/dump_without_crashing.h"
 #import "base/metrics/histogram_macros.h"
 #import "components/prefs/pref_service.h"
 #import "ios/chrome/app/application_delegate/app_state.h"
@@ -18,10 +19,6 @@
 #import "ios/chrome/browser/shared/model/url/url_util.h"
 #import "ios/chrome/browser/url_loading/url_loading_params.h"
 #import "url/gurl.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace {
 // Key of the UMA Startup.MobileSessionStartFromApps histogram.
@@ -77,7 +74,16 @@ const char* const kUMAShowDefaultPromoFromAppsHistogram =
       // As applicationDidBecomeActive: will not be called again,
       // _startupParameters will not include the command from openURL.
       // Pass the startup parameters from here.
-      DCHECK(!connectionInformation.startupParameters);
+      if (connectionInformation.startupParameters) {
+        // It should be really unlikely that a new startup request is triggered
+        // before the current one is completed, but it cannot be excluded as
+        // this path is controlled by system calls/
+        // It is still interesting to know if and when it happens, as this may
+        // be an indication that
+        // - an opening flow is not completed correctly
+        // - and/or the system calls changed and the current flow is incorrect.
+        base::debug::DumpWithoutCrashing();
+      }
       [connectionInformation setStartupParameters:params];
       ProceduralBlock tabOpenedCompletion = ^{
         [connectionInformation setStartupParameters:nil];

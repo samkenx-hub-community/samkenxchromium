@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/config/android/rules.gni")
+import("//third_party/jni_zero/jni_zero.gni")
 
 generate_jni("jni_headers") {
   sources = [
@@ -14,9 +15,13 @@ generate_jni("jni_headers") {
 }
 
 android_library("java") {
+  srcjar_deps = [ ":jni_headers" ]
   sources = [
     "java/src/org/chromium/components/webauthn/AuthenticatorFactory.java",
     "java/src/org/chromium/components/webauthn/AuthenticatorImpl.java",
+    "java/src/org/chromium/components/webauthn/AuthenticatorIncognitoConfirmationBottomsheet.java",
+    "java/src/org/chromium/components/webauthn/CredManHelper.java",
+    "java/src/org/chromium/components/webauthn/CredManMetricsHelper.java",
     "java/src/org/chromium/components/webauthn/Fido2Api.java",
     "java/src/org/chromium/components/webauthn/Fido2ApiCall.java",
     "java/src/org/chromium/components/webauthn/Fido2ApiCallHelper.java",
@@ -30,14 +35,16 @@ android_library("java") {
     "java/src/org/chromium/components/webauthn/WebAuthnBrowserBridge.java",
     "java/src/org/chromium/components/webauthn/WebAuthnCredentialDetails.java",
   ]
-  annotation_processor_deps = [ "//base/android/jni_generator:jni_processor" ]
+
   deps = [
+    ":java_resources",
     "$google_play_services_package:google_play_services_base_java",
     "$google_play_services_package:google_play_services_basement_java",
     "$google_play_services_package:google_play_services_tasks_java",
     "//base:base_java",
     "//base:jni_java",
     "//build/android:build_java",
+    "//components/browser_ui/bottomsheet/android:java",
     "//components/externalauth/android:java",
     "//components/password_manager/core/common:features",
     "//components/payments/content/android:feature_list_java",
@@ -56,9 +63,10 @@ android_library("java") {
     "//third_party/blink/public/mojom:android_mojo_bindings_java",
     "//ui/android:ui_no_recycler_view_java",
     "//url:gurl_java",
-    "//url:origin_java",
     "//url/mojom:url_mojom_gurl_java",
   ]
+
+  resources_package = "org.chromium.components.webauthn"
 }
 
 android_library("test_support_java") {
@@ -70,6 +78,7 @@ android_library("test_support_java") {
   deps = [
     ":java",
     "//base:base_java_test_support",
+    "//base:jni_java",
     "//components/payments/content/android:feature_list_java",
     "//components/payments/mojom:mojom_java",
     "//content/public/android:content_java",
@@ -78,7 +87,7 @@ android_library("test_support_java") {
     "//third_party/androidx:androidx_annotation_annotation_java",
     "//third_party/blink/public/mojom:android_mojo_bindings_java",
     "//third_party/junit:junit",
-    "//url:origin_java",
+    "//url:gurl_java",
     "//url/mojom:url_mojom_gurl_java",
     "//url/mojom:url_mojom_origin_java",
   ]
@@ -96,6 +105,8 @@ source_set("android") {
     "webauthn_client_android.h",
     "webauthn_cred_man_delegate.cc",
     "webauthn_cred_man_delegate.h",
+    "webauthn_cred_man_delegate_factory.cc",
+    "webauthn_cred_man_delegate_factory.h",
   ]
   deps = [
     ":jni_headers",
@@ -107,16 +118,60 @@ source_set("android") {
     "//device/fido",
     "//third_party/blink/public/mojom:android_mojo_bindings_blink",
     "//third_party/boringssl",
+    "//url:gurl_android",
   ]
 }
 
 source_set("unit_tests") {
   testonly = true
-  sources = [ "webauthn_cred_man_delegate_unittest.cc" ]
+  sources = [
+    "webauthn_cred_man_delegate_factory_unittest.cc",
+    "webauthn_cred_man_delegate_unittest.cc",
+  ]
   deps = [
     ":android",
     "//base/test:test_support",
+    "//content/public/browser",
+    "//content/test:test_support",
     "//testing/gmock",
     "//testing/gtest",
+  ]
+}
+
+android_resources("java_resources") {
+  sources = [
+    "java/res/drawable/webauthn_incognito_confirmation_icon.xml",
+    "java/res/layout/webauthn_incognito_confirmation.xml",
+  ]
+  deps = [
+    "//components/browser_ui/bottomsheet/android:java_resources",
+    "//components/strings:components_strings_grd",
+  ]
+}
+
+robolectric_library("junit") {
+  sources = [ "junit/src/org/chromium/components/webauthn/AuthenticatorIncognitoConfirmationBottomsheetTest.java" ]
+  deps = [
+    ":java",
+    "//base:base_java",
+    "//base:base_java_test_support",
+    "//base:base_junit_test_support",
+    "//base:jni_java",
+    "//components/browser_ui/bottomsheet/android:java",
+    "//components/payments/content/android:service_java",
+    "//components/payments/mojom:mojom_java",
+    "//components/url_formatter/android:url_formatter_java",
+    "//content/public/android:content_java",
+    "//mojo/public/java:system_java",
+    "//third_party/android_deps:material_design_java",
+    "//third_party/androidx:androidx_collection_collection_java",
+    "//third_party/blink/public/mojom:android_mojo_bindings_java",
+    "//third_party/junit",
+    "//third_party/mockito:mockito_java",
+    "//ui/android:ui_no_recycler_view_java",
+    "//url:gurl_java",
+    "//url:gurl_junit_test_support",
+    "//url/mojom:url_mojom_gurl_java",
+    "//url/mojom:url_mojom_origin_java",
   ]
 }

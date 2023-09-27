@@ -13,9 +13,7 @@
 #include "base/strings/string_number_conversions.h"
 #include "chrome/browser/download/bubble/download_bubble_prefs.h"
 #include "chrome/browser/download/bubble/download_bubble_update_service.h"
-#include "chrome/browser/download/bubble/download_display.h"
 #include "chrome/browser/download/bubble/download_display_controller.h"
-#include "chrome/browser/download/bubble/download_icon_state.h"
 #include "chrome/browser/download/chrome_download_manager_delegate.h"
 #include "chrome/browser/download/download_core_service.h"
 #include "chrome/browser/download/download_core_service_factory.h"
@@ -25,6 +23,7 @@
 #include "chrome/browser/offline_items_collection/offline_content_aggregator_factory.h"
 #include "chrome/browser/profiles/profile_key.h"
 #include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/download/download_display.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/test/base/test_browser_window.h"
 #include "chrome/test/base/testing_browser_process.h"
@@ -53,7 +52,6 @@ using ::testing::SetArgPointee;
 using ::testing::StrictMock;
 using StrictMockDownloadItem = testing::StrictMock<download::MockDownloadItem>;
 using DownloadDangerType = download::DownloadDangerType;
-using DownloadIconState = download::DownloadIconState;
 using DownloadState = download::DownloadItem::DownloadState;
 using DownloadUIModelPtr = DownloadUIModel::DownloadUIModelPtr;
 using OfflineItemList =
@@ -99,7 +97,7 @@ class MockDownloadBubbleUpdateService : public DownloadBubbleUpdateService {
 
   bool GetAllModelsToDisplay(
       std::vector<DownloadUIModelPtr>& models,
-      const web_app::AppId* web_app_id,
+      const webapps::AppId* web_app_id,
       bool force_backfill_download_items = true) override {
     models.clear();
     int download_item_index = 0, offline_item_index = 0;
@@ -127,9 +125,9 @@ class MockDownloadBubbleUpdateService : public DownloadBubbleUpdateService {
 
   bool IsInitialized() const override { return true; }
 
-  MOCK_METHOD(DownloadDisplayController::ProgressInfo,
+  MOCK_METHOD(DownloadDisplay::ProgressInfo,
               GetProgressInfo,
-              (const web_app::AppId*),
+              (const webapps::AppId*),
               (const override));
 
  private:
@@ -265,6 +263,7 @@ class DownloadBubbleUIControllerTest : public testing::Test {
         .WillRepeatedly(Return(creation_type));
     EXPECT_CALL(item(index), IsPaused()).WillRepeatedly(Return(false));
     EXPECT_CALL(item(index), IsDangerous()).WillRepeatedly(Return(false));
+    EXPECT_CALL(item(index), IsInsecure()).WillRepeatedly(Return(false));
     // Functions called when checking ShouldShowDownloadStartedAnimation().
     EXPECT_CALL(item(index), IsSavePackageDownload())
         .WillRepeatedly(Return(false));
@@ -434,8 +433,12 @@ TEST_F(DownloadBubbleUIControllerTest,
       /*mime_type=*/"",
       download::DownloadItem::DownloadCreationType::TYPE_HISTORY_IMPORT);
   std::vector<DownloadUIModelPtr> partial_view = controller().GetPartialView();
-  ASSERT_EQ(partial_view.size(), 1u);
-  EXPECT_EQ(partial_view[0]->GetContentId().id, ids[1]);
+  if (download::IsDownloadBubblePartialViewEnabled(profile())) {
+    ASSERT_EQ(partial_view.size(), 1u);
+    EXPECT_EQ(partial_view[0]->GetContentId().id, ids[1]);
+  } else {
+    EXPECT_EQ(partial_view.size(), 0u);
+  }
   std::vector<DownloadUIModelPtr> main_view = controller().GetMainView();
   EXPECT_EQ(main_view.size(), 2u);
 }
@@ -447,8 +450,13 @@ TEST_F(DownloadBubbleUIControllerTest,
                    download::DownloadItem::IN_PROGRESS, ids[0]);
   InitOfflineItem(OfflineItemState::IN_PROGRESS, ids[1]);
 
-  EXPECT_EQ(controller().GetPartialView().size(), 2ul);
-  EXPECT_EQ(second_controller().GetPartialView().size(), 2ul);
+  if (download::IsDownloadBubblePartialViewEnabled(profile())) {
+    EXPECT_EQ(controller().GetPartialView().size(), 2ul);
+    EXPECT_EQ(second_controller().GetPartialView().size(), 2ul);
+  } else {
+    EXPECT_EQ(controller().GetPartialView().size(), 0ul);
+    EXPECT_EQ(second_controller().GetPartialView().size(), 0ul);
+  }
 
   UpdateDownloadItem(/*item_index=*/0, DownloadState::COMPLETE);
   UpdateOfflineItem(/*item_index=*/0, OfflineItemState::COMPLETE);
@@ -465,12 +473,20 @@ TEST_F(DownloadBubbleUIControllerTest,
                    download::DownloadItem::IN_PROGRESS, ids[0]);
   InitOfflineItem(OfflineItemState::IN_PROGRESS, ids[1]);
 
-  EXPECT_EQ(controller().GetPartialView().size(), 2ul);
+  if (download::IsDownloadBubblePartialViewEnabled(profile())) {
+    EXPECT_EQ(controller().GetPartialView().size(), 2ul);
+  } else {
+    EXPECT_EQ(controller().GetPartialView().size(), 0ul);
+  }
 
   // This does not remove the entries from the partial view because the items
   // are in progress.
   EXPECT_EQ(controller().GetMainView().size(), 2ul);
-  EXPECT_EQ(controller().GetPartialView().size(), 2ul);
+  if (download::IsDownloadBubblePartialViewEnabled(profile())) {
+    EXPECT_EQ(controller().GetPartialView().size(), 2ul);
+  } else {
+    EXPECT_EQ(controller().GetPartialView().size(), 0ul);
+  }
 }
 
 // Tests that no items are returned (i.e. no partial view will be shown) if it
@@ -483,7 +499,11 @@ TEST_F(DownloadBubbleUIControllerTest, NoItemsReturnedForPartialViewTooSoon) {
   EXPECT_CALL(display_controller(), OnNewItem(true)).Times(1);
   InitDownloadItem(FILE_PATH_LITERAL("/foo/bar1.pdf"),
                    download::DownloadItem::COMPLETE, ids[0]);
-  EXPECT_EQ(controller().GetPartialView().size(), 1u);
+  if (download::IsDownloadBubblePartialViewEnabled(profile())) {
+    EXPECT_EQ(controller().GetPartialView().size(), 1u);
+  } else {
+    EXPECT_EQ(controller().GetPartialView().size(), 0u);
+  }
 
   // No items are returned for a partial view because it is too soon.
   task_environment_.FastForwardBy(base::Seconds(14));
@@ -497,7 +517,11 @@ TEST_F(DownloadBubbleUIControllerTest, NoItemsReturnedForPartialViewTooSoon) {
   EXPECT_CALL(display_controller(), OnNewItem(true)).Times(1);
   InitDownloadItem(FILE_PATH_LITERAL("/foo/bar3.pdf"),
                    download::DownloadItem::COMPLETE, ids[1]);
-  EXPECT_EQ(controller().GetPartialView().size(), 3u);
+  if (download::IsDownloadBubblePartialViewEnabled(profile())) {
+    EXPECT_EQ(controller().GetPartialView().size(), 3u);
+  } else {
+    EXPECT_EQ(controller().GetPartialView().size(), 0u);
+  }
 
   // Showing the main view even before time is up should still work.
   task_environment_.FastForwardBy(base::Seconds(14));
@@ -509,7 +533,11 @@ TEST_F(DownloadBubbleUIControllerTest, NoItemsReturnedForPartialViewTooSoon) {
   EXPECT_CALL(display_controller(), OnNewItem(true)).Times(1);
   InitDownloadItem(FILE_PATH_LITERAL("/foo/bar4.pdf"),
                    download::DownloadItem::IN_PROGRESS, ids[3]);
-  EXPECT_EQ(controller().GetPartialView().size(), 1u);
+  if (download::IsDownloadBubblePartialViewEnabled(profile())) {
+    EXPECT_EQ(controller().GetPartialView().size(), 1u);
+  } else {
+    EXPECT_EQ(controller().GetPartialView().size(), 0u);
+  }
 }
 
 // Tests that the partial view timer doesn't start if the partial view was
@@ -522,7 +550,11 @@ TEST_F(DownloadBubbleUIControllerTest, EmptyPartialViewDoesNotPreventOpening) {
                    download::DownloadItem::COMPLETE, "Download");
   // Partial view is returned despite previous call to GetPartialView less than
   // 15 seconds ago.
-  EXPECT_EQ(controller().GetPartialView().size(), 1u);
+  if (download::IsDownloadBubblePartialViewEnabled(profile())) {
+    EXPECT_EQ(controller().GetPartialView().size(), 1u);
+  } else {
+    EXPECT_EQ(controller().GetPartialView().size(), 0u);
+  }
 }
 
 // Test that the preference suppresses the partial view.
@@ -536,7 +568,11 @@ TEST_F(DownloadBubbleUIControllerTest, PrefSuppressesPartialView) {
   EXPECT_EQ(controller().GetPartialView().size(), 0u);
 
   download::SetDownloadBubblePartialViewEnabled(profile(), true);
-  EXPECT_EQ(controller().GetPartialView().size(), 1u);
+  if (download::IsDownloadBubblePartialViewEnabled(profile())) {
+    EXPECT_EQ(controller().GetPartialView().size(), 1u);
+  } else {
+    EXPECT_EQ(controller().GetPartialView().size(), 0u);
+  }
 }
 
 }  // namespace

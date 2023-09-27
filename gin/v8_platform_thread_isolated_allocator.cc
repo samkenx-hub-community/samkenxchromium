@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include "gin/v8_platform_thread_isolated_allocator.h"
+#include "base/allocator/partition_allocator/partition_alloc_constants.h"
 #include "base/allocator/partition_allocator/partition_root.h"
 
 #if BUILDFLAG(ENABLE_THREAD_ISOLATION)
@@ -26,20 +27,18 @@ ThreadIsolatedAllocator::~ThreadIsolatedAllocator() = default;
 void ThreadIsolatedAllocator::Initialize(int pkey) {
   pkey_ = pkey;
   allocator_.init(partition_alloc::PartitionOptions{
-      .aligned_alloc =
-          partition_alloc::PartitionOptions::AlignedAlloc::kAllowed,
-      .cookie = partition_alloc::PartitionOptions::Cookie::kAllowed,
+      .aligned_alloc = partition_alloc::PartitionOptions::kAllowed,
       .thread_isolation = partition_alloc::ThreadIsolationOption(pkey_),
   });
 }
 
 void* ThreadIsolatedAllocator::Allocate(size_t size) {
-  return allocator_.root()->AllocWithFlagsNoHooks(
-      0, size, partition_alloc::PartitionPageSize());
+  return allocator_.root()->AllocInline<partition_alloc::AllocFlags::kNoHooks>(
+      size);
 }
 
 void ThreadIsolatedAllocator::Free(void* object) {
-  allocator_.root()->FreeNoHooks(object);
+  allocator_.root()->FreeInline<partition_alloc::FreeFlags::kNoHooks>(object);
 }
 
 enum ThreadIsolatedAllocator::Type ThreadIsolatedAllocator::Type() const {

@@ -22,6 +22,28 @@
 
 namespace blink {
 
+const NGLayoutResult& NGBoxFragmentBuilder::LayoutResultForPropagation(
+    const NGLayoutResult& layout_result) const {
+  if (layout_result.Status() != NGLayoutResult::kSuccess) {
+    return layout_result;
+  }
+  const auto& fragment = layout_result.PhysicalFragment();
+  if (fragment.IsBox()) {
+    return layout_result;
+  }
+
+  const NGPhysicalLineBoxFragment* line =
+      DynamicTo<NGPhysicalLineBoxFragment>(&fragment);
+  if (!line || !line->IsBlockInInline() || !items_builder_) {
+    return layout_result;
+  }
+
+  const NGLogicalLineItems& line_items =
+      items_builder_->LogicalLineItems(*line);
+  DCHECK(line_items.BlockInInlineLayoutResult());
+  return *line_items.BlockInInlineLayoutResult();
+}
+
 void NGBoxFragmentBuilder::AddBreakBeforeChild(
     NGLayoutInputNode child,
     absl::optional<NGBreakAppeal> appeal,
@@ -83,6 +105,7 @@ void NGBoxFragmentBuilder::AddBreakBeforeChild(
 void NGBoxFragmentBuilder::AddResult(
     const NGLayoutResult& child_layout_result,
     const LogicalOffset offset,
+    absl::optional<const NGBoxStrut> margins,
     absl::optional<LogicalOffset> relative_offset,
     const NGInlineContainer<LogicalOffset>* inline_container) {
   const auto& fragment = child_layout_result.PhysicalFragment();
@@ -119,6 +142,18 @@ void NGBoxFragmentBuilder::AddResult(
   AddChild(fragment, offset, &end_margin_strut,
            child_layout_result.IsSelfCollapsing(), relative_offset,
            inline_container);
+  if (margins) {
+    if (RuntimeEnabledFeatures::LayoutNGNoCopyBackEnabled()) {
+      const auto& box_fragment = To<NGPhysicalBoxFragment>(fragment);
+      if (!margins->IsEmpty() || !box_fragment.Margins().IsZero()) {
+        box_fragment.GetMutableForContainerLayout().SetMargins(
+            margins->ConvertToPhysical(GetWritingDirection()));
+      }
+    } else {
+      To<LayoutBox>(fragment.GetMutableLayoutObject())
+          ->SetMargin((*margins).ConvertToPhysical(GetWritingDirection()));
+    }
+  }
 
   if (UNLIKELY(has_block_fragmentation_))
     PropagateBreakInfo(*result_for_propagation, offset);
@@ -126,6 +161,11 @@ void NGBoxFragmentBuilder::AddResult(
     PropagateChildBreakValues(*result_for_propagation);
 
   PropagateFromLayoutResult(*result_for_propagation);
+}
+
+void NGBoxFragmentBuilder::AddResult(const NGLayoutResult& child_layout_result,
+                                     const LogicalOffset offset) {
+  AddResult(child_layout_result, offset, absl::nullopt, absl::nullopt, nullptr);
 }
 
 void NGBoxFragmentBuilder::AddChild(
@@ -273,27 +313,6 @@ void NGBoxFragmentBuilder::AddBreakToken(const NGBreakToken* token,
   has_inflow_child_break_inside_ |= !is_in_parallel_flow;
 }
 
-void NGBoxFragmentBuilder::AddOutOfFlowLegacyCandidate(
-    NGBlockNode node,
-    const NGLogicalStaticPosition& static_position,
-    const LayoutInline* inline_container) {
-  oof_positioned_candidates_.emplace_back(
-      node, static_position,
-      NGInlineContainer<LogicalOffset>(inline_container,
-                                       /* relative_offset */ LogicalOffset()));
-}
-
-void NGBoxFragmentBuilder::PropagateSpaceShortage(
-    absl::optional<LayoutUnit> space_shortage) {
-  // Space shortage should only be reported when we already have a tentative
-  // fragmentainer block-size. It's meaningless to talk about space shortage
-  // in the initial column balancing pass, because then we have no
-  // fragmentainer block-size at all, so who's to tell what's too short or
-  // not?
-  DCHECK(!IsInitialColumnBalancingPass());
-  UpdateMinimalSpaceShortage(space_shortage, &minimal_space_shortage_);
-}
-
 EBreakBetween NGBoxFragmentBuilder::JoinedBreakBetweenValue(
     EBreakBetween break_before) const {
   return JoinFragmentainerBreakValues(previous_break_after_, break_before);
@@ -387,9 +406,6 @@ void NGBoxFragmentBuilder::PropagateBreakInfo(
     }
   }
 
-  if (!child_box_fragment)
-    return;
-
   if (IsBreakInside(token)) {
     if (child_is_in_same_flow) {
       has_inflow_child_break_inside_ = true;
@@ -411,6 +427,10 @@ void NGBoxFragmentBuilder::PropagateBreakInfo(
     SetHasForcedBreak();
   else if (!IsInitialColumnBalancingPass())
     PropagateSpaceShortage(child_layout_result.MinimalSpaceShortage());
+
+  if (!child_box_fragment) {
+    return;
+  }
 
   // If a spanner was found inside the child, we need to finish up and propagate
   // the spanner to the column layout algorithm, so that it can take care of it.

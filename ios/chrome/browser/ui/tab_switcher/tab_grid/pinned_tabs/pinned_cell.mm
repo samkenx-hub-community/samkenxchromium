@@ -21,10 +21,6 @@
 #import "ui/base/l10n/l10n_util_mac.h"
 #import "ui/gfx/ios/uikit_util.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 namespace {
 // TODO(crbug.com/1412115): Refactor this method.
 // Frame-based layout utilities for GridTransitionCell.
@@ -147,8 +143,6 @@ UIColor* GetInterfaceStyleDarkColor(UIColor* dynamicColor) {
 
 - (void)prepareForReuse {
   [super prepareForReuse];
-
-  self.itemIdentifier = nil;
   self.icon = nil;
   self.title = nil;
   self.snapshot = nil;

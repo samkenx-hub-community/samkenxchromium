@@ -20,7 +20,6 @@
 #include "base/time/time.h"
 #include "base/uuid.h"
 #include "base/values.h"
-#include "components/aggregation_service/aggregation_service.mojom.h"
 #include "components/aggregation_service/features.h"
 #include "components/cbor/reader.h"
 #include "components/cbor/values.h"
@@ -38,9 +37,6 @@
 namespace content {
 
 namespace {
-
-using AggregationCoordinator =
-    ::aggregation_service::mojom::AggregationCoordinator;
 
 testing::AssertionResult CborMapContainsKeyAndType(
     const cbor::Value::MapValue& map,
@@ -261,6 +257,46 @@ TEST(AggregatableReportTest,
                    /*expected_additional_fields=*/{}, {hpke_key}));
 }
 
+TEST(AggregatableReportTest, ValidNoContributionsRequest_ValidReportReturned) {
+  AggregatableReportRequest example_request =
+      aggregation_service::CreateExampleRequest(
+          blink::mojom::AggregationServiceMode::kTeeBased);
+
+  AggregationServicePayloadContents payload_contents =
+      example_request.payload_contents();
+  payload_contents.contributions.clear();
+
+  // A null contribution should be added automatically.
+  AggregationServicePayloadContents expected_payload_contents =
+      payload_contents;
+  expected_payload_contents.contributions = {
+      blink::mojom::AggregatableReportHistogramContribution(
+          /*bucket=*/0,
+          /*value=*/0)};
+
+  absl::optional<AggregatableReportRequest> request =
+      AggregatableReportRequest::Create(expected_payload_contents,
+                                        example_request.shared_info().Clone());
+  ASSERT_TRUE(request.has_value());
+
+  AggregatableReportSharedInfo expected_shared_info =
+      request->shared_info().Clone();
+  size_t expected_num_processing_urls = request->processing_urls().size();
+
+  aggregation_service::TestHpkeKey hpke_key =
+      aggregation_service::GenerateKey("id123");
+
+  absl::optional<AggregatableReport> report =
+      AggregatableReport::Provider().CreateFromRequestAndPublicKeys(
+          std::move(*request), {hpke_key.public_key});
+
+  ASSERT_NO_FATAL_FAILURE(
+      VerifyReport(report, expected_payload_contents, expected_shared_info,
+                   expected_num_processing_urls,
+                   /*expected_debug_key=*/absl::nullopt,
+                   /*expected_additional_fields=*/{}, {hpke_key}));
+}
+
 TEST(AggregatableReportTest, ValidDebugModeEnabledRequest_ValidReportReturned) {
   AggregatableReportRequest example_request =
       aggregation_service::CreateExampleRequest();
@@ -395,9 +431,10 @@ TEST(AggregatableReportTest, RequestCreatedWithInvalidReportId_Failed) {
   EXPECT_FALSE(request.has_value());
 }
 
-TEST(AggregatableReportTest, RequestCreatedWithZeroContributions) {
+TEST(AggregatableReportTest, TeeBasedRequestCreatedWithZeroContributions) {
   AggregatableReportRequest example_request =
-      aggregation_service::CreateExampleRequest();
+      aggregation_service::CreateExampleRequest(
+          blink::mojom::AggregationServiceMode::kTeeBased);
 
   AggregationServicePayloadContents payload_contents =
       example_request.payload_contents();
@@ -406,7 +443,23 @@ TEST(AggregatableReportTest, RequestCreatedWithZeroContributions) {
   absl::optional<AggregatableReportRequest> request =
       AggregatableReportRequest::Create(payload_contents,
                                         example_request.shared_info().Clone());
-  ASSERT_FALSE(request.has_value());
+  EXPECT_TRUE(request.has_value());
+}
+
+TEST(AggregatableReportTest,
+     ExperimentalPoplarRequestNotCreatedWithZeroContributions) {
+  AggregatableReportRequest example_request =
+      aggregation_service::CreateExampleRequest(
+          blink::mojom::AggregationServiceMode::kExperimentalPoplar);
+
+  AggregationServicePayloadContents payload_contents =
+      example_request.payload_contents();
+
+  payload_contents.contributions.clear();
+  absl::optional<AggregatableReportRequest> request =
+      AggregatableReportRequest::Create(payload_contents,
+                                        example_request.shared_info().Clone());
+  EXPECT_FALSE(request.has_value());
 }
 
 TEST(AggregatableReportTest, RequestCreatedWithTooManyContributions) {
@@ -453,7 +506,7 @@ TEST(AggregatableReportTest, GetAsJsonOnePayload_ValidJsonReturned) {
   AggregatableReport report(std::move(payloads), "example_shared_info",
                             /*debug_key=*/absl::nullopt,
                             /*additional_fields=*/{},
-                            AggregationCoordinator::kDefault);
+                            /*aggregation_coordinator_origin=*/absl::nullopt);
 
   std::string report_json_string;
   base::JSONWriter::Write(base::Value(report.GetAsJson()), &report_json_string);
@@ -480,7 +533,7 @@ TEST(AggregatableReportTest, GetAsJsonTwoPayloads_ValidJsonReturned) {
   AggregatableReport report(std::move(payloads), "example_shared_info",
                             /*debug_key=*/absl::nullopt,
                             /*additional_fields=*/{},
-                            AggregationCoordinator::kDefault);
+                            /*aggregation_coordinator_origin=*/absl::nullopt);
 
   std::string report_json_string;
   base::JSONWriter::Write(base::Value(report.GetAsJson()), &report_json_string);
@@ -505,7 +558,7 @@ TEST(AggregatableReportTest, GetAsJsonDebugCleartextPayload_ValidJsonReturned) {
   AggregatableReport report(std::move(payloads), "example_shared_info",
                             /*debug_key=*/absl::nullopt,
                             /*additional_fields=*/{},
-                            AggregationCoordinator::kDefault);
+                            /*aggregation_coordinator_origin=*/absl::nullopt);
 
   std::string report_json_string;
   base::JSONWriter::Write(base::Value(report.GetAsJson()), &report_json_string);
@@ -529,7 +582,7 @@ TEST(AggregatableReportTest, GetAsJsonDebugKey_ValidJsonReturned) {
 
   AggregatableReport report(std::move(payloads), "example_shared_info",
                             /*debug_key=*/1234, /*additional_fields=*/{},
-                            AggregationCoordinator::kDefault);
+                            /*aggregation_coordinator_origin=*/absl::nullopt);
 
   std::string report_json_string;
   base::JSONWriter::Write(base::Value(report.GetAsJson()), &report_json_string);
@@ -556,7 +609,7 @@ TEST(AggregatableReportTest, GetAsJsonAdditionalFields_ValidJsonReturned) {
       std::move(payloads), "example_shared_info",
       /*debug_key=*/absl::nullopt, /*additional_fields=*/
       {{"additional_key", "example_value"}, {"second", "field"}, {"", ""}},
-      AggregationCoordinator::kDefault);
+      /*aggregation_coordinator_origin=*/absl::nullopt);
 
   std::string report_json_string;
   base::JSONWriter::Write(base::Value(report.GetAsJson()), &report_json_string);
@@ -724,7 +777,7 @@ TEST(AggregatableReportTest, EmptyPayloads) {
   AggregatableReport report(/*payloads=*/{}, "example_shared_info",
                             /*debug_key=*/absl::nullopt,
                             /*additional_fields=*/{},
-                            AggregationCoordinator::kDefault);
+                            /*aggregation_coordinator_origin=*/absl::nullopt);
 
   std::string report_json_string;
   base::JSONWriter::Write(base::Value(report.GetAsJson()), &report_json_string);
@@ -759,7 +812,7 @@ TEST(AggregatableReportProtoMigrationTest,
               {blink::mojom::AggregatableReportHistogramContribution(
                   /*bucket=*/123, /*value=*/456)},
               blink::mojom::AggregationServiceMode::kDefault,
-              AggregationCoordinator::kDefault),
+              /*aggregation_coordinator_origin=*/absl::nullopt),
           AggregatableReportSharedInfo(
               base::Time::FromJavaTime(1652984901234),
               base::Uuid::ParseLowercase(
@@ -803,7 +856,7 @@ TEST(AggregatableReportProtoMigrationTest, NegativeDebugKey_ParsesCorrectly) {
               {blink::mojom::AggregatableReportHistogramContribution(
                   /*bucket=*/123, /*value=*/456)},
               blink::mojom::AggregationServiceMode::kDefault,
-              AggregationCoordinator::kDefault),
+              /*aggregation_coordinator_origin=*/absl::nullopt),
           AggregatableReportSharedInfo(
               base::Time::FromJavaTime(1652984901234),
               base::Uuid::ParseLowercase(
@@ -845,7 +898,7 @@ TEST(AggregatableReportProtoMigrationTest, NoAdditionalFields_ParsesCorrectly) {
               {blink::mojom::AggregatableReportHistogramContribution(
                   /*bucket=*/123, /*value=*/456)},
               blink::mojom::AggregationServiceMode::kDefault,
-              AggregationCoordinator::kDefault),
+              /*aggregation_coordinator_origin=*/absl::nullopt),
           AggregatableReportSharedInfo(
               base::Time::FromJavaTime(1652984901234),
               base::Uuid::ParseLowercase(
@@ -865,50 +918,83 @@ TEST(AggregatableReportProtoMigrationTest, NoAdditionalFields_ParsesCorrectly) {
       deserialized_request.value(), expected_request));
 }
 
+TEST(AggregatableReportTest, ProcessingUrlSet) {
+  AggregatableReportRequest request =
+      aggregation_service::CreateExampleRequest();
+  EXPECT_THAT(
+      request.processing_urls(),
+      ::testing::ElementsAre(GURL(
+          kPrivacySandboxAggregationServiceTrustedServerUrlAwsParam.Get())));
+}
+
 TEST(AggregatableReportTest, AggregationCoordinator_ProcessingUrlSet) {
+  base::test::ScopedFeatureList scoped_feature_list;
+  scoped_feature_list.InitAndEnableFeatureWithParameters(
+      ::aggregation_service::kAggregationServiceMultipleCloudProviders,
+      {{"aws_cloud", "https://aws.example.test"},
+       {"gcp_cloud", "https://gcp.example.test"}});
+
   const struct {
-    ::aggregation_service::mojom::AggregationCoordinator
-        aggregation_coordinator;
-    std::string expected_url;
+    absl::optional<url::Origin> aggregation_coordinator_origin;
+    std::vector<GURL> expected_urls;
   } kTestCases[] = {
       {
-          ::aggregation_service::mojom::AggregationCoordinator::kAwsCloud,
-          kPrivacySandboxAggregationServiceTrustedServerUrlAwsParam.Get(),
+          absl::nullopt,
+          {GURL("https://aws.example.test/.well-known/aggregation-service/"
+                "public-keys")},
+      },
+      {
+          url::Origin::Create(GURL("https://aws.example.test")),
+          {GURL("https://aws.example.test/.well-known/aggregation-service/"
+                "public-keys")},
+      },
+      {
+          url::Origin::Create(GURL("https://gcp.example.test")),
+          {GURL("https://gcp.example.test/.well-known/aggregation-service/"
+                "public-keys")},
+      },
+      {
+          url::Origin::Create(GURL("https://a.test")),
+          {},
       },
   };
 
   for (const auto& test_case : kTestCases) {
-    AggregatableReportRequest request =
-        aggregation_service::CreateExampleRequest(
-            blink::mojom::AggregationServiceMode::kDefault,
-            /*failed_send_attempts=*/0, test_case.aggregation_coordinator);
-    EXPECT_THAT(request.processing_urls(),
-                ::testing::ElementsAre(GURL(test_case.expected_url)));
-  }
-}
+    absl::optional<AggregatableReportRequest> request =
+        AggregatableReportRequest::Create(
+            AggregationServicePayloadContents(
+                AggregationServicePayloadContents::Operation::kHistogram,
+                {blink::mojom::AggregatableReportHistogramContribution(
+                    /*bucket=*/123,
+                    /*value=*/456)},
+                blink::mojom::AggregationServiceMode::kDefault,
+                test_case.aggregation_coordinator_origin),
+            AggregatableReportSharedInfo(
+                /*scheduled_report_time=*/base::Time::Now(),
+                /*report_id=*/
+                base::Uuid::GenerateRandomV4(),
+                url::Origin::Create(GURL("https://reporting.example")),
+                AggregatableReportSharedInfo::DebugMode::kDisabled,
+                /*additional_fields=*/base::Value::Dict(),
+                /*api_version=*/"",
+                /*api_identifier=*/"example-api"),
+            /*reporting_path=*/"example-path",
+            /*debug_key=*/absl::nullopt, /*additional_fields=*/{},
+            /*failed_send_attempts=*/0);
 
-TEST(AggregatableReportTest, AggregationCoordinator_ProtoSet) {
-  for (auto aggregation_coordinator :
-       {::aggregation_service::mojom::AggregationCoordinator::kAwsCloud}) {
-    AggregatableReportRequest request =
-        aggregation_service::CreateExampleRequest(
-            blink::mojom::AggregationServiceMode::kDefault,
-            /*failed_send_attempts=*/0, aggregation_coordinator);
-
-    // The aggregation coordinator identifier is correctly serialized and
-    // deserialized.
-    std::vector<uint8_t> proto = request.Serialize();
-    absl::optional<AggregatableReportRequest> parsed_request =
-        AggregatableReportRequest::Deserialize(proto);
-    ASSERT_TRUE(parsed_request.has_value());
-    EXPECT_EQ(parsed_request->payload_contents().aggregation_coordinator,
-              aggregation_coordinator);
+    if (test_case.expected_urls.empty()) {
+      EXPECT_FALSE(request.has_value());
+    } else {
+      EXPECT_EQ(request->processing_urls(), test_case.expected_urls);
+    }
   }
 }
 
 TEST(AggregatableReportTest, AggregationCoordinator_SetInReport) {
-  base::test::ScopedFeatureList scoped_feature_list(
-      ::aggregation_service::kAggregationServiceMultipleCloudProviders);
+  base::test::ScopedFeatureList scoped_feature_list;
+  scoped_feature_list.InitAndEnableFeatureWithParameters(
+      ::aggregation_service::kAggregationServiceMultipleCloudProviders,
+      {{"aws_cloud", "https://aws.example.test"}});
 
   std::vector<AggregatableReport::AggregationServicePayload> payloads;
   payloads.emplace_back(/*payload=*/kABCD1234AsBytes,
@@ -918,14 +1004,14 @@ TEST(AggregatableReportTest, AggregationCoordinator_SetInReport) {
   AggregatableReport report(std::move(payloads), "example_shared_info",
                             /*debug_key=*/absl::nullopt,
                             /*additional_fields=*/{},
-                            AggregationCoordinator::kDefault);
+                            /*aggregation_coordinator_origin=*/absl::nullopt);
 
   std::string report_json_string;
   base::JSONWriter::Write(base::Value(report.GetAsJson()), &report_json_string);
 
   const char kExpectedJsonString[] =
       R"({)"
-      R"("aggregation_coordinator_identifier":"aws-cloud",)"
+      R"("aggregation_coordinator_origin":"https://aws.example.test",)"
       R"("aggregation_service_payloads":[)"
       R"({"key_id":"key_1","payload":"ABCD1234"})"
       R"(],)"

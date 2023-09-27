@@ -16,12 +16,13 @@ import 'chrome://resources/polymer/v3_0/iron-icon/iron-icon.js';
 
 import {loadTimeData} from 'chrome://resources/ash/common/load_time_data.m.js';
 import {NavigationViewPanelElement} from 'chrome://resources/ash/common/navigation_view_panel.js';
-import {startColorChangeUpdater} from 'chrome://resources/cr_components/color_change_listener/colors_css_updater.js';
+import {ColorChangeUpdater} from 'chrome://resources/cr_components/color_change_listener/colors_css_updater.js';
 import {I18nMixin} from 'chrome://resources/cr_elements/i18n_mixin.js';
+import {assert} from 'chrome://resources/js/assert_ts.js';
 import {PolymerElementProperties} from 'chrome://resources/polymer/v3_0/polymer/interfaces.js';
 import {PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
-import {AcceleratorsUpdatedObserverInterface, AcceleratorsUpdatedObserverReceiver} from '../mojom-webui/ash/webui/shortcut_customization_ui/mojom/shortcut_customization.mojom-webui.js';
+import {AcceleratorsUpdatedObserverInterface, AcceleratorsUpdatedObserverReceiver, PolicyUpdatedObserverInterface, PolicyUpdatedObserverReceiver, UserAction} from '../mojom-webui/ash/webui/shortcut_customization_ui/mojom/shortcut_customization.mojom-webui.js';
 
 import {AcceleratorEditDialogElement} from './accelerator_edit_dialog.js';
 import {RequestUpdateAcceleratorEvent} from './accelerator_edit_view.js';
@@ -31,7 +32,7 @@ import {getShortcutProvider} from './mojo_interface_provider.js';
 import {RouteObserver, Router} from './router.js';
 import {getTemplate} from './shortcut_customization_app.html.js';
 import {AcceleratorConfigResult, AcceleratorInfo, AcceleratorSource, MojoAcceleratorConfig, MojoLayoutInfo, ShortcutProviderInterface} from './shortcut_types.js';
-import {getCategoryNameStringId, isCustomizationDisabled, isSearchEnabled} from './shortcut_utils.js';
+import {getAcceleratorId, getCategoryNameStringId, isCustomizationAllowed} from './shortcut_utils.js';
 
 const oldKeyboardSettingsLink = 'chrome://os-settings/keyboard-overlay';
 const newKeyboardSettingsLink = 'chrome://os-settings/per-device-keyboard';
@@ -60,7 +61,8 @@ const ShortcutCustomizationAppElementBase = I18nMixin(PolymerElement);
 
 export class ShortcutCustomizationAppElement extends
     ShortcutCustomizationAppElementBase implements
-        AcceleratorsUpdatedObserverInterface, RouteObserver {
+        AcceleratorsUpdatedObserverInterface, PolicyUpdatedObserverInterface,
+        RouteObserver {
   static get is(): string {
     return 'shortcut-customization-app';
   }
@@ -110,6 +112,7 @@ export class ShortcutCustomizationAppElement extends
   private acceleratorlookupManager: AcceleratorLookupManager =
       AcceleratorLookupManager.getInstance();
   private acceleratorsUpdatedReceiver: AcceleratorsUpdatedObserverReceiver;
+  private policyUpdatedReceiver: PolicyUpdatedObserverReceiver;
 
   override connectedCallback(): void {
     super.connectedCallback();
@@ -125,8 +128,12 @@ export class ShortcutCustomizationAppElement extends
       typographyLink.rel = 'stylesheet';
       document.head.appendChild(typographyLink);
       document.body.classList.add('jelly-enabled');
-      startColorChangeUpdater();
+      ColorChangeUpdater.forDocument().start();
     }
+
+    this.policyUpdatedReceiver = new PolicyUpdatedObserverReceiver(this);
+    this.shortcutProvider.addPolicyObserver(
+        this.policyUpdatedReceiver.$.bindNewPipeAndPassRemote());
 
     this.fetchAccelerators();
     this.addEventListener('show-edit-dialog', this.showDialog);
@@ -144,6 +151,7 @@ export class ShortcutCustomizationAppElement extends
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
+    this.policyUpdatedReceiver.$.close();
     this.acceleratorsUpdatedReceiver.$.close();
     this.removeEventListener('show-edit-dialog', this.showDialog);
     this.removeEventListener('edit-dialog-closed', this.onDialogClosed);
@@ -182,17 +190,33 @@ export class ShortcutCustomizationAppElement extends
         new AcceleratorsUpdatedObserverReceiver(this);
     this.shortcutProvider.addObserver(
         this.acceleratorsUpdatedReceiver.$.bindNewPipeAndPassRemote());
+    // Navigate to the selected shortcuts if one was set from the launcher
+    // search. If the url does not contain action or category info, the
+    // onRouteChanged does not do anything.
+    this.onRouteChanged(new URL(window.location.href));
   }
 
   // AcceleratorsUpdatedObserverInterface:
   onAcceleratorsUpdated(config: MojoAcceleratorConfig): void {
     this.acceleratorlookupManager.setAcceleratorLookup(config);
+    // Update subsections.
     this.$.navigationPanel.notifyEvent('updateSubsections');
+    // Update dialog accelerators.
+    if (this.acceleratorlookupManager.isStandardAcceleratorById(
+            getAcceleratorId(this.dialogSource, this.dialogAction))) {
+      this.updateDialogAccelerators(this.dialogSource, this.dialogAction);
+    }
 
     // Update the hasLauncherButton value every time accelerators are updated.
     this.shortcutProvider.hasLauncherButton().then(({hasLauncherButton}) => {
       this.acceleratorlookupManager.setHasLauncherButton(hasLauncherButton);
     });
+  }
+
+  // PolicyUpdatedObserverInterface:
+  onCustomizationPolicyUpdated(): void {
+    // Reload the page to apply the changes.
+    window.location.reload();
   }
 
   private addNavigationSelectors(layoutInfos: MojoLayoutInfo[]): void {
@@ -239,13 +263,13 @@ export class ShortcutCustomizationAppElement extends
   }
 
   private onRequestUpdateAccelerators(e: RequestUpdateAcceleratorEvent): void {
+    // Update subsections.
     this.$.navigationPanel.notifyEvent('updateSubsections');
-    const updatedAccels =
-        this.acceleratorlookupManager.getStandardAcceleratorInfos(
-            e.detail.source, e.detail.action);
-
-    this.shadowRoot!.querySelector<AcceleratorEditDialogElement>('#editDialog')!
-        .updateDialogAccelerators(updatedAccels as AcceleratorInfo[]);
+    // Update dialog accelerators.
+    if (this.acceleratorlookupManager.isStandardAcceleratorById(
+            getAcceleratorId(e.detail.source, e.detail.action))) {
+      this.updateDialogAccelerators(e.detail.source, e.detail.action);
+    }
   }
 
   protected onRestoreAllDefaultClicked(): void {
@@ -260,6 +284,7 @@ export class ShortcutCustomizationAppElement extends
     this.shortcutProvider.restoreAllDefaults().then(({result}) => {
       // TODO(jimmyxgong): Explore error state with restore all.
       if (result.result === AcceleratorConfigResult.kSuccess) {
+        this.shortcutProvider.recordUserAction(UserAction.kResetAll);
         this.closeRestoreAllDialog();
       }
     });
@@ -270,12 +295,18 @@ export class ShortcutCustomizationAppElement extends
   }
 
   protected shouldHideRestoreAllButton(): boolean {
-    return isCustomizationDisabled();
+    return !isCustomizationAllowed();
   }
 
-  protected shouldHideSearchBox(): boolean {
-    // Hide the search box when flag is disabled.
-    return !isSearchEnabled();
+  protected updateDialogAccelerators(
+      source: number|string, action: number|string): void {
+    assert(this.acceleratorlookupManager.isStandardAcceleratorById(
+        getAcceleratorId(source, action)));
+    const updatedAccels =
+        this.acceleratorlookupManager.getStandardAcceleratorInfos(
+            source, action);
+    this.shadowRoot!.querySelector<AcceleratorEditDialogElement>('#editDialog')!
+        .updateDialogAccelerators(updatedAccels as AcceleratorInfo[]);
   }
 
   static get template(): HTMLTemplateElement {

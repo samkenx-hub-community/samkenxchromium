@@ -100,6 +100,16 @@ bool IsCellularNetworkSimLocked(
   return network_properties->type_state->get_cellular()->sim_locked;
 }
 
+bool IsCellularNetworkCarrierLocked(
+    const NetworkStatePropertiesPtr& network_properties) {
+  CHECK(features::IsCellularCarrierLockEnabled());
+  CHECK(
+      NetworkTypeMatchesType(network_properties->type, NetworkType::kCellular));
+  return network_properties->type_state->get_cellular()->sim_locked &&
+         network_properties->type_state->get_cellular()->sim_lock_type ==
+             "network-pin";
+}
+
 bool IsNetworkConnectable(const NetworkStatePropertiesPtr& network_properties) {
   // The network must not already be connected to be able to be connected to.
   if (network_properties->connection_state !=
@@ -194,7 +204,8 @@ gfx::ImageSkia GetNetworkImageForNetwork(
       // disconnected.
       const SkColor icon_color =
           chromeos::features::IsJellyrollEnabled()
-              ? color_provider->GetColor(cros_tokens::kCrosSysPrimary)
+              ? network_icon::GetDefaultColorForIconType(
+                    color_provider, network_icon::ICON_TYPE_LIST)
               : AshColorProvider::Get()->GetContentLayerColor(
                     AshColorProvider::ContentLayerType::kIconColorPrimary);
       network_image = gfx::ImageSkiaOperations::CreateSuperimposedImage(
@@ -218,6 +229,12 @@ gfx::ImageSkia GetNetworkImageForNetwork(
 
 int GetCellularNetworkSubText(
     const NetworkStatePropertiesPtr& network_properties) {
+  if (features::IsCellularCarrierLockEnabled()) {
+    if (IsCellularNetworkCarrierLocked(network_properties)) {
+      return IDS_ASH_STATUS_TRAY_NETWORK_STATUS_CARRIER_LOCKED;
+    }
+  }
+
   if (IsCellularNetworkUnActivated(network_properties)) {
     if (Shell::Get()->session_controller()->login_status() ==
         LoginStatus::NOT_LOGGED_IN) {
@@ -248,11 +265,6 @@ NetworkListNetworkItemView::~NetworkListNetworkItemView() {
 
 void NetworkListNetworkItemView::UpdateViewForNetwork(
     const NetworkStatePropertiesPtr& network_properties) {
-  const bool was_connecting = network_properties_
-                                  ? network_properties_->connection_state ==
-                                        chromeos::network_config::mojom::
-                                            ConnectionStateType::kConnecting
-                                  : false;
   network_properties_ = mojo::Clone(network_properties);
 
   Reset();
@@ -300,9 +312,9 @@ void NetworkListNetworkItemView::UpdateViewForNetwork(
       network_properties_->connection_state ==
       chromeos::network_config::mojom::ConnectionStateType::kConnecting;
 
-  if (!was_connecting && is_connecting) {
+  if (is_connecting) {
     network_icon::NetworkIconAnimation::GetInstance()->AddObserver(this);
-  } else if (is_connecting) {
+  } else {
     network_icon::NetworkIconAnimation::GetInstance()->RemoveObserver(this);
   }
 
@@ -394,13 +406,14 @@ void NetworkListNetworkItemView::AddPowerStatusView() {
       AshColorProvider::ContentLayerType::kIconColorPrimary);
   image_icon->SetPreferredSize(gfx::Size(kMenuIconSize, kMenuIconSize));
   image_icon->SetFlipCanvasOnPaintForRTLUI(true);
-  PowerStatus::BatteryImageInfo icon_info;
 
   int battery_percentage =
       network_properties()->type_state->get_tether()->battery_percentage;
+  PowerStatus::BatteryImageInfo icon_info(icon_color);
   icon_info.charge_percent = battery_percentage;
-  image_icon->SetImage(PowerStatus::GetBatteryImage(
-      icon_info, kMobileNetworkBatteryIconSize, icon_color));
+  image_icon->SetImage(
+      PowerStatus::GetBatteryImage(icon_info, kMobileNetworkBatteryIconSize,
+                                   image_icon->GetColorProvider()));
 
   // Show the numeric battery percentage on hover.
   image_icon->SetTooltipText(base::FormatPercent(battery_percentage));
@@ -542,6 +555,12 @@ std::u16string
 NetworkListNetworkItemView::GenerateAccessibilityDescriptionForCellular(
     const std::u16string& connection_status,
     int signal_strength) {
+  if (features::IsCellularCarrierLockEnabled()) {
+    if (IsCellularNetworkCarrierLocked(network_properties())) {
+      return l10n_util::GetStringUTF16(
+          IDS_ASH_STATUS_TRAY_NETWORK_STATUS_CARRIER_LOCKED);
+    }
+  }
   if (IsCellularNetworkUnActivated(network_properties())) {
     if (Shell::Get()->session_controller()->login_status() ==
         LoginStatus::NOT_LOGGED_IN) {

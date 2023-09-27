@@ -7,6 +7,7 @@ package org.chromium.chrome.browser.bookmarks;
 import androidx.annotation.NonNull;
 
 import org.chromium.base.ObserverList;
+import org.chromium.base.ResettersForTesting;
 import org.chromium.base.ThreadUtils;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.components.bookmarks.BookmarkId;
@@ -29,6 +30,7 @@ public class BookmarkModel extends BookmarkBridge {
     /** Set an instance for testing. */
     public static void setInstanceForTesting(BookmarkModel bookmarkModel) {
         sInstanceForTesting = bookmarkModel;
+        ResettersForTesting.register(() -> sInstanceForTesting = null);
     }
 
     /**
@@ -133,22 +135,6 @@ public class BookmarkModel extends BookmarkBridge {
         BookmarkItem bookmarkItem = getBookmarkById(bookmarkId);
         if (bookmarkItem == null) return "";
         return bookmarkItem.getTitle();
-    }
-
-    /**
-     * @param bookmarkId The {@link BookmarkId} for the reading list folder.
-     * @return The total number of unread reading list articles.
-     */
-    public int getUnreadCount(@NonNull BookmarkId bookmarkId) {
-        assert bookmarkId.getType() == BookmarkType.READING_LIST;
-        List<BookmarkId> children = getChildIds(bookmarkId);
-        int unreadCount = 0;
-        for (BookmarkId child : children) {
-            BookmarkItem childItem = getBookmarkById(child);
-            if (!childItem.isRead()) unreadCount++;
-        }
-
-        return unreadCount;
     }
 
     /**

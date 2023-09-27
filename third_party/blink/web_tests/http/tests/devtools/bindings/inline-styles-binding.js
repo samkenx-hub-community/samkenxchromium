@@ -5,6 +5,9 @@
 import {TestRunner} from 'test_runner';
 import {BindingsTestRunner} from 'bindings_test_runner';
 
+import * as SDK from 'devtools/core/sdk/sdk.js';
+import * as BindingsModule from 'devtools/models/bindings/bindings.js';
+
 (async function() {
   TestRunner.addResult(`Editing inline styles should play nice with inline scripts.\n`);
 
@@ -17,7 +20,7 @@ import {BindingsTestRunner} from 'bindings_test_runner';
   headers.sort((a, b) => a.startLine - b.startLine);
   const styleSheets = headers.map(header => header.id);
   const scripts = TestRunner.debuggerModel.scriptsForSourceURL(uiSourceCode.url());
-  const locationPool = new Bindings.LiveLocationPool();
+  const locationPool = new BindingsModule.LiveLocation.LiveLocationPool();
   let i = 0;
   const locationUpdates = new Map();
   for (const script of scripts) {
@@ -30,7 +33,7 @@ import {BindingsTestRunner} from 'bindings_test_runner';
   i = 0;
   for (const styleSheetId of styleSheets) {
     const header = TestRunner.cssModel.styleSheetHeaderForId(styleSheetId);
-    const rawLocation = new SDK.CSSLocation(header, header.startLine, header.startColumn);
+    const rawLocation = new SDK.CSSModel.CSSLocation(header, header.startLine, header.startColumn);
     await Bindings.cssWorkspaceBinding.createLiveLocation(
       rawLocation, updateDelegate.bind(null, 'style' + i), locationPool);
     i++;

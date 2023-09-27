@@ -10,6 +10,8 @@
 
 #include "base/values.h"
 #include "chrome/browser/ash/login/oobe_screen.h"
+#include "chromeos/ash/components/osauth/public/common_types.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
 
 namespace ash {
 
@@ -32,6 +34,28 @@ class WizardContext {
   enum class EnrollmentPreference {
     kKiosk,
     kEnterprise,
+  };
+
+  enum class GaiaPath {
+    kDefault,
+    kChildSignup,
+    kChildSignin,
+    kReauth,
+  };
+
+  struct GaiaConfig {
+    // GAIA path to be loaded the next time GAIA Sign-in screen is shown.
+    // This is usually set just before showing the GAIA screen and reset
+    // to the default value when hiding the screen.
+    GaiaPath gaia_path = GaiaPath::kDefault;
+
+    // The GAIA path shown the last time the GAIA Sign-in screen was shown.
+    // This is set by the GAIA screen when hiding the screen.
+    GaiaPath last_gaia_path_shown = GaiaPath::kDefault;
+
+    // The account ID to be used in the next loading of GAIA webview.
+    // The value is reset to `EmptyAccountId()` when hiding the screen.
+    AccountId prefilled_account = EmptyAccountId();
   };
 
   struct RecoverySetup {
@@ -82,6 +106,12 @@ class WizardContext {
   // screens in tests. Is set by WizardController::SkipPostLoginScreensForTests.
   bool skip_post_login_screens_for_tests = false;
 
+  // Whether CHOOBE screen should be skipped. Setting this flag will force skip
+  // CHOOBE screen regardless of the number of eligible optional screens.
+  // To test an optional screen without selecting the screen from CHOOBE screen,
+  // set this flag to true before logging in as a new user.
+  bool skip_choobe_for_tests = false;
+
   // Whether user creation screen is enabled (could be disabled due to disabled
   // feature or on managed device). It determines the behavior of back button
   // for GaiaScreen and OfflineLoginScreen. Value is set to true in
@@ -118,6 +148,10 @@ class WizardContext {
   // another possible auth factor. Can be empty (if PIN is not supported).
   // In future will be replaced by AuthSession.
   std::unique_ptr<UserContext> extra_factors_auth_session;
+
+  // Same as above, but the actual context is stored in AuthSessionStorage,
+  // and the token can be used to retrieve it.
+  absl::optional<AuthProofToken> extra_factors_token;
 
   // If the onboarding flow wasn't completed by the user we will try to show
   // TermsOfServiceScreen to them first and then continue the flow with this
@@ -165,10 +199,10 @@ class WizardContext {
   // flow.
   std::unique_ptr<UserContext> user_context;
 
-  // Indicates whether there is error when fetching Gaia reauth request token.
-  // This flag helps us determine the reason when the reauth proof token is
-  // missing and if we should ask the user to login again.
-  bool gaia_reauth_token_fetch_error = false;
+  // Configuration for GAIA screen. If the configs needs to be updated, it
+  // should be updated before showing the GAIA screen. If the GAIA screen is
+  // already shown, a call to reload GAIA webview may be necessary.
+  GaiaConfig gaia_config;
 };
 
 // Returns |true| if this is an OOBE flow after enterprise enrollment.

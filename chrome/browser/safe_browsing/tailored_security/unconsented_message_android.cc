@@ -11,8 +11,8 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/safe_browsing/android/safe_browsing_settings_launcher_android.h"
 #include "chrome/browser/signin/identity_manager_factory.h"
+#include "chrome/grit/branded_strings.h"
 #include "chrome/grit/generated_resources.h"
-#include "chrome/grit/google_chrome_strings.h"
 #include "chrome/grit/theme_resources.h"
 #include "components/messages/android/message_dispatcher_bridge.h"
 #include "components/messages/android/message_enums.h"
@@ -189,7 +189,7 @@ void TailoredSecurityUnconsentedMessageAndroid::HandleMessageAccepted() {
     LogMessageOutcome(TailoredSecurityOutcome::kSettings, is_in_flow_);
   }
 
-  ShowSafeBrowsingSettings(web_contents_,
+  ShowSafeBrowsingSettings(web_contents_->GetTopLevelNativeWindow(),
                            SettingsAccessPoint::kTailoredSecurity);
 }
 

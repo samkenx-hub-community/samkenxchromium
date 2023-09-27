@@ -5,13 +5,14 @@
 #include "chrome/browser/ui/webui/settings/ash/os_settings_manager.h"
 
 #include "ash/public/cpp/input_device_settings_controller.h"
+#include "chrome/browser/nearby_sharing/common/nearby_share_features.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/ui/webui/ash/settings/pages/apps/app_notification_handler.h"
+#include "chrome/browser/ui/webui/ash/settings/search/search_handler.h"
+#include "chrome/browser/ui/webui/ash/settings/search/search_tag_registry.h"
 #include "chrome/browser/ui/webui/settings/ash/hierarchy.h"
 #include "chrome/browser/ui/webui/settings/ash/input_device_settings/input_device_settings_provider.h"
-#include "chrome/browser/ui/webui/settings/ash/os_apps_page/app_notification_handler.h"
 #include "chrome/browser/ui/webui/settings/ash/os_settings_sections.h"
-#include "chrome/browser/ui/webui/settings/ash/search/search_handler.h"
-#include "chrome/browser/ui/webui/settings/ash/search/search_tag_registry.h"
 #include "chrome/browser/ui/webui/settings/ash/settings_user_action_tracker.h"
 #include "chromeos/ash/components/phonehub/phone_hub_manager.h"
 #include "chromeos/constants/chromeos_features.h"
@@ -24,11 +25,9 @@ OsSettingsManager::OsSettingsManager(
     local_search_service::LocalSearchServiceProxy* local_search_service_proxy,
     multidevice_setup::MultiDeviceSetupClient* multidevice_setup_client,
     phonehub::PhoneHubManager* phone_hub_manager,
-    syncer::SyncService* sync_service,
     KerberosCredentialsManager* kerberos_credentials_manager,
     ArcAppListPrefs* arc_app_list_prefs,
     signin::IdentityManager* identity_manager,
-    android_sms::AndroidSmsService* android_sms_service,
     CupsPrintersManager* printers_manager,
     apps::AppServiceProxy* app_service_proxy,
     eche_app::EcheAppManager* eche_app_manager)
@@ -39,11 +38,9 @@ OsSettingsManager::OsSettingsManager(
                                                search_tag_registry_.get(),
                                                multidevice_setup_client,
                                                phone_hub_manager,
-                                               sync_service,
                                                kerberos_credentials_manager,
                                                arc_app_list_prefs,
                                                identity_manager,
-                                               android_sms_service,
                                                printers_manager,
                                                app_service_proxy,
                                                eche_app_manager)),
@@ -65,16 +62,21 @@ OsSettingsManager::OsSettingsManager(
 OsSettingsManager::~OsSettingsManager() = default;
 
 void OsSettingsManager::AddLoadTimeData(content::WebUIDataSource* html_source) {
-  for (const auto& section : sections_->sections())
+  for (const auto& section : sections_->sections()) {
     section->AddLoadTimeData(html_source);
+  }
   html_source->AddBoolean("isJellyEnabled",
                           chromeos::features::IsJellyEnabled());
+  html_source->AddBoolean("isCrosComponentsEnabled",
+                          chromeos::features::IsCrosComponentsEnabled());
+  html_source->AddBoolean("isSelfShareEnabled", features::IsSelfShareEnabled());
   html_source->UseStringsJs();
 }
 
 void OsSettingsManager::AddHandlers(content::WebUI* web_ui) {
-  for (const auto& section : sections_->sections())
+  for (const auto& section : sections_->sections()) {
     section->AddHandlers(web_ui);
+  }
 }
 
 void OsSettingsManager::Shutdown() {

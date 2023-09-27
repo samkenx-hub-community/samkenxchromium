@@ -54,17 +54,18 @@ SolidColorScrollbarLayerImpl::SolidColorScrollbarLayerImpl(
 
 void SolidColorScrollbarLayerImpl::PushPropertiesTo(LayerImpl* layer) {
   ScrollbarLayerImplBase::PushPropertiesTo(layer);
-  DCHECK(!layer->HitTestable());
+  CHECK(!layer->HitTestable());
 }
 
 int SolidColorScrollbarLayerImpl::ThumbThickness() const {
   if (thumb_thickness_ != -1)
     return thumb_thickness_;
 
-  if (orientation() == ScrollbarOrientation::HORIZONTAL)
+  if (orientation() == ScrollbarOrientation::kHorizontal) {
     return bounds().height();
-  else
+  } else {
     return bounds().width();
+  }
 }
 
 int SolidColorScrollbarLayerImpl::ThumbLength() const {
@@ -76,10 +77,11 @@ int SolidColorScrollbarLayerImpl::ThumbLength() const {
 }
 
 float SolidColorScrollbarLayerImpl::TrackLength() const {
-  if (orientation() == ScrollbarOrientation::HORIZONTAL)
+  if (orientation() == ScrollbarOrientation::kHorizontal) {
     return bounds().width() - TrackStart() * 2;
-  else
+  } else {
     return bounds().height() + vertical_adjust() - TrackStart() * 2;
+  }
 }
 
 int SolidColorScrollbarLayerImpl::TrackStart() const { return track_start_; }

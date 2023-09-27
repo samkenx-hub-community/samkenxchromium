@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "base/time/time.h"
 #include "base/values.h"
 #include "build/chromeos_buildflags.h"
 #include "chrome/browser/web_applications/mojom/user_display_mode.mojom.h"
@@ -15,6 +16,7 @@
 #include "chrome/browser/web_applications/web_app_id.h"
 #include "chrome/browser/web_applications/web_app_install_info.h"
 #include "chrome/browser/web_applications/web_app_install_params.h"
+#include "components/webapps/common/web_app_id.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "url/gurl.h"
 
@@ -166,10 +168,6 @@ struct ExternalInstallOptions {
   //  - |url| as the app name (unless fallback_app_name has been specified)
   bool install_placeholder = false;
 
-  // Whether we should try to reinstall the app if there is a placeholder for
-  // it.
-  bool reinstall_placeholder = false;
-
   // Optional query parameters to add to the start_url when launching the app.
   absl::optional<std::string> launch_query_params;
 
@@ -184,9 +182,14 @@ struct ExternalInstallOptions {
   // install_url if unset.
   absl::optional<GURL> service_worker_registration_url;
 
+  // The time to wait for the service worker registration before it times out.
+  // This is currently default at 40 seconds, override this value if more or
+  // less time is required.
+  base::TimeDelta service_worker_registration_timeout = base::Seconds(40);
+
   // A list of app_ids that the Web App System should attempt to uninstall and
   // replace with this app (e.g maintain shelf pins, app list positions).
-  std::vector<AppId> uninstall_and_replace;
+  std::vector<webapps::AppId> uninstall_and_replace;
 
   // Additional keywords that will be used by the OS when searching for the app.
   // Only affects Chrome OS.
@@ -221,7 +224,7 @@ struct ExternalInstallOptions {
   // Does not block installation if the actual app id doesn't match the
   // expectation.
   // Intended to be used for post-install activities like metrics and migration.
-  absl::optional<AppId> expected_app_id;
+  absl::optional<webapps::AppId> expected_app_id;
 };
 
 WebAppInstallParams ConvertExternalInstallOptionsToParams(

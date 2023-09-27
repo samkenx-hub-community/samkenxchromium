@@ -172,8 +172,6 @@ class ManagePasswordsUIController
   void ChooseCredential(
       const password_manager::PasswordForm& form,
       password_manager::CredentialType credential_type) override;
-  void NavigateToPasswordManagerAccountDashboard(
-      password_manager::ManagePasswordsReferrer referrer) override;
   void NavigateToPasswordManagerSettingsPage(
       password_manager::ManagePasswordsReferrer referrer) override;
   void EnableSync(const AccountInfo& account) override;
@@ -186,6 +184,7 @@ class ManagePasswordsUIController
   void AuthenticateUserForAccountStoreOptInAndMovePassword() override;
   void AuthenticateUserForAccountStoreOptInAfterSavingLocallyAndMovePassword()
       override;
+  void MaybeShowIOSPasswordPromo() override;
   // Skips user os level authentication during the life time of the returned
   // object. To be used in tests of flows that require user authentication.
   [[nodiscard]] std::unique_ptr<base::AutoReset<bool>>
@@ -345,7 +344,7 @@ class ManagePasswordsUIController
   std::list<std::unique_ptr<password_manager::MovePasswordToAccountStoreHelper>>
       move_to_account_store_helpers_;
 
-  scoped_refptr<device_reauth::DeviceAuthenticator> biometric_authenticator_;
+  std::unique_ptr<device_reauth::DeviceAuthenticator> biometric_authenticator_;
 
   // Used to bypass user authentication in integration tests.
   bool bypass_user_auth_for_testing_ = false;

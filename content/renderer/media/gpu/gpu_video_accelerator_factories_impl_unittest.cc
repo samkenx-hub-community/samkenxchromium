@@ -112,6 +112,7 @@ class TestGpuChannelHost : public gpu::GpuChannelHost {
       : GpuChannelHost(0 /* channel_id */,
                        gpu::GPUInfo(),
                        gpu::GpuFeatureInfo(),
+                       gpu::SharedImageCapabilities(),
                        mojo::ScopedMessagePipeHandle(
                            mojo::MessagePipeHandle(mojo::kInvalidHandleValue))),
         gpu_channel_(gpu_channel) {}
@@ -131,12 +132,10 @@ class MockOverlayInfoCbHandler {
 class MockContextProviderCommandBuffer
     : public viz::ContextProviderCommandBuffer {
  public:
-  MockContextProviderCommandBuffer(
-      scoped_refptr<gpu::GpuChannelHost> channel,
-      gpu::GpuMemoryBufferManager* gpu_memory_buffer_manager)
+  explicit MockContextProviderCommandBuffer(
+      scoped_refptr<gpu::GpuChannelHost> channel)
       : viz::ContextProviderCommandBuffer(
             std::move(channel),
-            gpu_memory_buffer_manager,
             content::kGpuStreamIdDefault,
             content::kGpuStreamPriorityDefault,
             gpu::kNullSurfaceHandle,
@@ -371,8 +370,7 @@ class GpuVideoAcceleratorFactoriesImplTest : public testing::Test {
             base::MakeRefCounted<TestGpuChannelHost>(mock_gpu_channel_)),
         mock_context_provider_(
             base::MakeRefCounted<NiceMock<MockContextProviderCommandBuffer>>(
-                gpu_channel_host_,
-                &gpu_memory_buffer_manager_)) {}
+                gpu_channel_host_)) {}
   ~GpuVideoAcceleratorFactoriesImplTest() override = default;
 
   void SetUp() override {
@@ -422,8 +420,7 @@ class GpuVideoAcceleratorFactoriesImplTest : public testing::Test {
         .WillByDefault(Return(&mock_context_gl_));
 
     gpu_command_buffer_proxy_ = new gpu::CommandBufferProxyImpl(
-        gpu_channel_host_, &gpu_memory_buffer_manager_,
-        content::kGpuStreamIdDefault,
+        gpu_channel_host_, content::kGpuStreamIdDefault,
         task_environment_.GetMainThreadTaskRunner());
     gpu_command_buffer_proxy_->Initialize(
         gpu::kNullSurfaceHandle, nullptr, content::kGpuStreamPriorityDefault,

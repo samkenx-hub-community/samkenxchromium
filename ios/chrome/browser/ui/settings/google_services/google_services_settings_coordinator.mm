@@ -4,11 +4,12 @@
 
 #import "ios/chrome/browser/ui/settings/google_services/google_services_settings_coordinator.h"
 
-#import "base/mac/foundation_util.h"
+#import "base/apple/foundation_util.h"
 #import "components/google/core/common/google_util.h"
 #import "components/signin/public/identity_manager/identity_manager.h"
 #import "components/strings/grit/components_strings.h"
-#import "components/sync/service/sync_service_utils.h"
+#import "components/sync/service/sync_service.h"
+#import "components/sync/service/sync_user_settings.h"
 #import "ios/chrome/browser/shared/coordinator/alert/action_sheet_coordinator.h"
 #import "ios/chrome/browser/shared/model/application_context/application_context.h"
 #import "ios/chrome/browser/shared/model/browser/browser.h"
@@ -25,8 +26,6 @@
 #import "ios/chrome/browser/signin/authentication_service_factory.h"
 #import "ios/chrome/browser/signin/identity_manager_factory.h"
 #import "ios/chrome/browser/sync/sync_service_factory.h"
-#import "ios/chrome/browser/sync/sync_setup_service.h"
-#import "ios/chrome/browser/sync/sync_setup_service_factory.h"
 #import "ios/chrome/browser/ui/authentication/authentication_flow.h"
 #import "ios/chrome/browser/ui/authentication/authentication_ui_util.h"
 #import "ios/chrome/browser/ui/authentication/signout_action_sheet_coordinator.h"
@@ -36,10 +35,6 @@
 #import "ios/chrome/browser/ui/settings/sync/sync_encryption_passphrase_table_view_controller.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ui/base/l10n/l10n_util.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 using signin_metrics::AccessPoint;
 using signin_metrics::PromoAction;
@@ -108,6 +103,11 @@ using signin_metrics::PromoAction;
                                            animated:YES];
 }
 
+- (void)stop {
+  [self.signOutCoordinator stop];
+  _signOutCoordinator = nil;
+}
+
 #pragma mark - Private
 
 - (void)authenticationFlowDidComplete {
@@ -124,7 +124,7 @@ using signin_metrics::PromoAction;
 }
 
 - (GoogleServicesSettingsViewController*)googleServicesSettingsViewController {
-  return base::mac::ObjCCast<GoogleServicesSettingsViewController>(
+  return base::apple::ObjCCast<GoogleServicesSettingsViewController>(
       self.viewController);
 }
 
@@ -138,11 +138,11 @@ using signin_metrics::PromoAction;
 - (void)showSignOutFromTargetRect:(CGRect)targetRect
                        completion:(signin_ui::CompletionCallback)completion {
   DCHECK(completion);
-  SyncSetupService* syncSetupService =
-      SyncSetupServiceFactory::GetForBrowserState(
-          self.browser->GetBrowserState());
+  syncer::SyncService* syncService =
+      SyncServiceFactory::GetForBrowserState(self.browser->GetBrowserState());
   BOOL isSyncConsentGiven =
-      syncSetupService && syncSetupService->IsInitialSyncFeatureSetupComplete();
+      syncService &&
+      syncService->GetUserSettings()->IsInitialSyncFeatureSetupComplete();
 
   self.signOutCoordinator = [[ActionSheetCoordinator alloc]
       initWithBaseViewController:self.viewController
@@ -175,6 +175,9 @@ using signin_metrics::PromoAction;
                   }
                   // Provide additional data retention options if the user is
                   // syncing their data.
+                  // TODO(crbug.com/1462552): Simplify once kSync becomes
+                  // unreachable or is deleted from the codebase. See
+                  // ConsentLevel::kSync documentation for details.
                   if (weakSelf.identityManager->HasPrimaryAccount(
                           signin::ConsentLevel::kSync)) {
                     [weakSelf

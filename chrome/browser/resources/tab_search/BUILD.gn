@@ -24,9 +24,10 @@ build_webui("build") {
   web_component_files = [
     "app.ts",
     "infinite_list.ts",
+    "tab_organization_page.ts",
     "tab_search_group_item.ts",
     "tab_search_item.ts",
-    "tab_search_search_field.ts",
+    "tab_search_page.ts",
   ]
 
   non_web_component_files = [
@@ -60,6 +61,7 @@ build_webui("build") {
   ]
   ts_deps = [
     "//third_party/polymer/v3_0:library",
+    "//ui/webui/resources/cr_components/color_change_listener:build_ts",
     "//ui/webui/resources/cr_elements:build_ts",
     "//ui/webui/resources/js:build_ts",
     "//ui/webui/resources/mojo:build_ts",

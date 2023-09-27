@@ -21,6 +21,7 @@
 
 using LoginState = content::IdentityRequestAccount::LoginState;
 using SignInMode = content::IdentityRequestAccount::SignInMode;
+using TokenError = content::IdentityCredentialTokenError;
 
 namespace {
 
@@ -35,7 +36,8 @@ class TestBubbleView : public AccountSelectionBubbleViewInterface {
     kAccountPicker,
     kConfirmAccount,
     kVerifying,
-    kFailure
+    kFailure,
+    kError
   };
 
   TestBubbleView() = default;
@@ -82,6 +84,15 @@ class TestBubbleView : public AccountSelectionBubbleViewInterface {
     account_ids_ = {};
   }
 
+  void ShowErrorDialog(const std::u16string& top_frame_for_display,
+                       const absl::optional<std::u16string>& iframe_for_display,
+                       const std::u16string& idp_for_display,
+                       const content::IdentityProviderMetadata& idp_metadata,
+                       const absl::optional<TokenError>& error) override {
+    sheet_type_ = SheetType::kError;
+    account_ids_ = {};
+  }
+
   std::string GetDialogTitle() const override { return std::string(); }
   absl::optional<std::string> GetDialogSubtitle() const override {
     return absl::nullopt;
@@ -95,8 +106,9 @@ class TestBubbleView : public AccountSelectionBubbleViewInterface {
 // Mock version of FedCmModalDialogView for injection during tests.
 class MockFedCmModalDialogView : public FedCmModalDialogView {
  public:
-  explicit MockFedCmModalDialogView(content::WebContents* web_contents)
-      : FedCmModalDialogView(web_contents, /*observer=*/nullptr) {}
+  explicit MockFedCmModalDialogView(content::WebContents* web_contents,
+                                    FedCmModalDialogView::Observer* observer)
+      : FedCmModalDialogView(web_contents, observer) {}
   ~MockFedCmModalDialogView() override = default;
 
   MockFedCmModalDialogView(const MockFedCmModalDialogView&) = delete;
@@ -106,7 +118,13 @@ class MockFedCmModalDialogView : public FedCmModalDialogView {
               ShowPopupWindow,
               (const GURL& url),
               (override));
-  MOCK_METHOD(void, ClosePopupWindow, (), (override));
+
+  void ClosePopupWindow() override {
+    FedCmModalDialogView::Observer* observer = GetObserverForTesting();
+    if (observer) {
+      observer->OnPopupWindowDestroyed();
+    }
+  }
 };
 
 // Test FedCmAccountSelectionView which uses TestBubbleView.
@@ -129,6 +147,7 @@ class TestFedCmAccountSelectionView : public FedCmAccountSelectionView {
   TestFedCmAccountSelectionView& operator=(
       const TestFedCmAccountSelectionView&) = delete;
 
+  const blink::mojom::RpContext& GetRpContext() { return rp_context_; }
   size_t num_bubbles_{0u};
 
  protected:
@@ -139,6 +158,7 @@ class TestFedCmAccountSelectionView : public FedCmAccountSelectionView {
       blink::mojom::RpContext rp_context,
       bool show_auto_reauthn_checkbox) override {
     ++num_bubbles_;
+    rp_context_ = rp_context;
     return widget_;
   }
 
@@ -149,6 +169,7 @@ class TestFedCmAccountSelectionView : public FedCmAccountSelectionView {
  private:
   raw_ptr<views::Widget> widget_;
   raw_ptr<TestBubbleView> bubble_view_;
+  blink::mojom::RpContext rp_context_;
 };
 
 // Stub AccountSelectionView::Delegate.
@@ -197,7 +218,9 @@ class FedCmAccountSelectionViewDesktopTest : public ChromeViewsTestBase {
     std::vector<content::IdentityRequestAccount> accounts;
     for (const auto& account_info : account_infos) {
       accounts.emplace_back(account_info.first, "", "", "", GURL::EmptyGURL(),
-                            std::vector<std::string>(), account_info.second);
+                            /*login_hints=*/std::vector<std::string>(),
+                            /*hosted_domains=*/std::vector<std::string>(),
+                            account_info.second);
     }
     return IdentityProviderDisplayData(u"", content::IdentityProviderMetadata(),
                                        content::ClientMetadata(GURL(), GURL()),
@@ -228,19 +251,31 @@ class FedCmAccountSelectionViewDesktopTest : public ChromeViewsTestBase {
         mode, show_auto_reauthn_checkbox);
   }
 
-  std::unique_ptr<TestFedCmAccountSelectionView> CreateAndShowFailureDialog() {
+  std::unique_ptr<TestFedCmAccountSelectionView> CreateAndShowMismatchDialog(
+      blink::mojom::RpContext rp_context = blink::mojom::RpContext::kSignIn) {
     auto controller = std::make_unique<TestFedCmAccountSelectionView>(
         delegate_.get(), widget_.get(), bubble_view_.get());
     controller->ShowFailureDialog(kTopFrameEtldPlusOne, kIframeEtldPlusOne,
-                                  kIdpEtldPlusOne,
+                                  kIdpEtldPlusOne, rp_context,
                                   content::IdentityProviderMetadata());
     EXPECT_EQ(TestBubbleView::SheetType::kFailure, bubble_view_->sheet_type_);
     return controller;
   }
 
+  std::unique_ptr<TestFedCmAccountSelectionView> CreateAndShowErrorDialog(
+      blink::mojom::RpContext rp_context = blink::mojom::RpContext::kSignIn) {
+    auto controller = std::make_unique<TestFedCmAccountSelectionView>(
+        delegate_.get(), widget_.get(), bubble_view_.get());
+    controller->ShowErrorDialog(
+        kTopFrameEtldPlusOne, kIframeEtldPlusOne, kIdpEtldPlusOne, rp_context,
+        content::IdentityProviderMetadata(), /*error=*/absl::nullopt);
+    EXPECT_EQ(TestBubbleView::SheetType::kError, bubble_view_->sheet_type_);
+    return controller;
+  }
+
   void CreateAndShowPopupWindow(TestFedCmAccountSelectionView& controller) {
-    auto idp_signin_popup_window =
-        std::make_unique<MockFedCmModalDialogView>(test_web_contents_.get());
+    auto idp_signin_popup_window = std::make_unique<MockFedCmModalDialogView>(
+        test_web_contents_.get(), &controller);
     EXPECT_CALL(*idp_signin_popup_window, ShowPopupWindow).Times(1);
     controller.SetIdpSigninPopupWindowForTesting(
         std::move(idp_signin_popup_window));
@@ -357,7 +392,7 @@ TEST_F(FedCmAccountSelectionViewDesktopTest, MultipleAccountFlowBack) {
 TEST_F(FedCmAccountSelectionViewDesktopTest,
        IdpSigninStatusMismatchDialogToSigninFlow) {
   std::unique_ptr<TestFedCmAccountSelectionView> controller =
-      CreateAndShowFailureDialog();
+      CreateAndShowMismatchDialog();
   AccountSelectionBubbleView::Observer* observer =
       static_cast<AccountSelectionBubbleView::Observer*>(controller.get());
 
@@ -385,7 +420,7 @@ TEST_F(FedCmAccountSelectionViewDesktopTest,
 TEST_F(FedCmAccountSelectionViewDesktopTest,
        IdpSigninStatusMismatchDialogToSigninFlowHidden) {
   std::unique_ptr<TestFedCmAccountSelectionView> controller =
-      CreateAndShowFailureDialog();
+      CreateAndShowMismatchDialog();
   AccountSelectionBubbleView::Observer* observer =
       static_cast<AccountSelectionBubbleView::Observer*>(controller.get());
 
@@ -538,86 +573,325 @@ TEST_F(FedCmAccountSelectionViewDesktopTest, CloseAutoReauthnSheetMetric) {
       static_cast<int>(FedCmAccountSelectionView::SheetType::AUTO_REAUTHN), 1);
 }
 
-// Test transitioning from IdP sign-in status mismatch failure dialog to regular
-// sign-in dialog. This emulates a user signing into the IdP in a pop-up window
-// and the pop-up window closes PRIOR to the failure dialog being updated to a
-// regular sign-in dialog.
+// Tests that when the mismatch dialog is closed through the close icon, the
+// relevant metric is recorded.
 TEST_F(FedCmAccountSelectionViewDesktopTest,
-       IdpSigninStatusPopupClosedBeforeAccountsPopulated) {
-  // Trigger IdP sign-in status mismatch failure dialog.
+       MismatchDialogDismissedByCloseIconMetric) {
   std::unique_ptr<TestFedCmAccountSelectionView> controller =
-      CreateAndShowFailureDialog();
+      CreateAndShowMismatchDialog();
+  histogram_tester_.ExpectTotalCount(
+      "Blink.FedCm.IdpSigninStatus.MismatchDialogResult", 0);
 
-  // Emulate user clicking on "Continue" button in the failure dialog.
-  CreateAndShowPopupWindow(*controller);
+  // Emulate user clicking the close icon.
+  widget_->CloseWithReason(views::Widget::ClosedReason::kCloseButtonClicked);
+  controller->OnWidgetDestroying(widget_.get());
 
-  // When pop-up window is shown, failure dialog should be hidden.
-  EXPECT_FALSE(widget_->IsVisible());
-
-  // Emulate user completing the sign-in flow and IdP prompts closing the pop-up
-  // window.
-  controller->CloseModalDialog();
-
-  // Failure dialog should remain hidden because it has not been updated to an
-  // accounts dialog yet.
-  EXPECT_FALSE(widget_->IsVisible());
-
-  // Emulate IdP sending the IdP sign-in status header which updates the failure
-  // dialog to an accounts dialog.
-  const char kAccountId[] = "account_id";
-  IdentityProviderDisplayData idp_data = CreateIdentityProviderDisplayData({
-      {kAccountId, LoginState::kSignUp},
-  });
-  Show(*controller, idp_data.accounts, SignInMode::kExplicit);
-
-  // Accounts dialog should now be visible.
-  EXPECT_TRUE(widget_->IsVisible());
+  histogram_tester_.ExpectUniqueSample(
+      "Blink.FedCm.IdpSigninStatus.MismatchDialogResult",
+      static_cast<int>(FedCmAccountSelectionView::MismatchDialogResult::
+                           kDismissedByCloseIcon),
+      1);
 }
 
-// Test transitioning from IdP sign-in status mismatch failure dialog to regular
-// sign-in dialog. This emulates a user signing into the IdP in a pop-up window
-// and the pop-up window closes AFTER the failure dialog has been updated to a
-// regular sign-in dialog.
+// Tests that when the mismatch dialog is closed through means other than the
+// close icon, the relevant metric is recorded.
 TEST_F(FedCmAccountSelectionViewDesktopTest,
-       IdpSigninStatusPopupClosedAfterAccountsPopulated) {
-  // Trigger IdP sign-in status mismatch failure dialog.
+       MismatchDialogDismissedForOtherReasonsMetric) {
   std::unique_ptr<TestFedCmAccountSelectionView> controller =
-      CreateAndShowFailureDialog();
+      CreateAndShowMismatchDialog();
+  histogram_tester_.ExpectTotalCount(
+      "Blink.FedCm.IdpSigninStatus.MismatchDialogResult", 0);
 
-  // Emulate user clicking on "Continue" button in the failure dialog.
+  // Emulate user closing the mismatch dialog for an unspecified reason.
+  widget_->CloseWithReason(views::Widget::ClosedReason::kUnspecified);
+  controller->OnWidgetDestroying(widget_.get());
+
+  histogram_tester_.ExpectUniqueSample(
+      "Blink.FedCm.IdpSigninStatus.MismatchDialogResult",
+      static_cast<int>(FedCmAccountSelectionView::MismatchDialogResult::
+                           kDismissedForOtherReasons),
+      1);
+}
+
+// Tests that when FedCmAccountSelectionView is destroyed while the mismatch
+// dialog is open, the relevant metric is recorded.
+TEST_F(FedCmAccountSelectionViewDesktopTest, MismatchDialogDestroyedMetric) {
+  {
+    std::unique_ptr<TestFedCmAccountSelectionView> controller =
+        CreateAndShowMismatchDialog();
+    histogram_tester_.ExpectTotalCount(
+        "Blink.FedCm.IdpSigninStatus.MismatchDialogResult", 0);
+  }
+
+  histogram_tester_.ExpectUniqueSample(
+      "Blink.FedCm.IdpSigninStatus.MismatchDialogResult",
+      static_cast<int>(FedCmAccountSelectionView::MismatchDialogResult::
+                           kDismissedForOtherReasons),
+      1);
+}
+
+// Tests that when the continue button on the mismatch dialog is clicked, the
+// relevant metric is recorded.
+TEST_F(FedCmAccountSelectionViewDesktopTest,
+       MismatchDialogContinueClickedMetric) {
+  std::unique_ptr<TestFedCmAccountSelectionView> controller =
+      CreateAndShowMismatchDialog();
+  AccountSelectionBubbleView::Observer* observer =
+      static_cast<AccountSelectionBubbleView::Observer*>(controller.get());
+  histogram_tester_.ExpectTotalCount(
+      "Blink.FedCm.IdpSigninStatus.MismatchDialogResult", 0);
+
+  // Emulate user clicking on "Continue" button in the mismatch dialog.
+  observer->OnSigninToIdP();
   CreateAndShowPopupWindow(*controller);
 
-  // When pop-up window is shown, failure dialog should be hidden.
-  EXPECT_FALSE(widget_->IsVisible());
+  histogram_tester_.ExpectUniqueSample(
+      "Blink.FedCm.IdpSigninStatus.MismatchDialogResult",
+      static_cast<int>(
+          FedCmAccountSelectionView::MismatchDialogResult::kContinued),
+      1);
+}
 
-  // Emulate IdP sending the IdP sign-in status header which updates the failure
-  // dialog to an accounts dialog.
-  const char kAccountId[] = "account_id";
-  IdentityProviderDisplayData idp_data = CreateIdentityProviderDisplayData({
-      {kAccountId, LoginState::kSignUp},
-  });
-  Show(*controller, idp_data.accounts, SignInMode::kExplicit);
+// Tests that when the continue button on the mismatch dialog is clicked and
+// then FedCmAccountSelectionView is destroyed, we record only the metric for
+// the continue button being clicked.
+TEST_F(FedCmAccountSelectionViewDesktopTest,
+       MismatchDialogContinueClickedThenDestroyedMetric) {
+  {
+    std::unique_ptr<TestFedCmAccountSelectionView> controller =
+        CreateAndShowMismatchDialog();
+    AccountSelectionBubbleView::Observer* observer =
+        static_cast<AccountSelectionBubbleView::Observer*>(controller.get());
+    histogram_tester_.ExpectTotalCount(
+        "Blink.FedCm.IdpSigninStatus.MismatchDialogResult", 0);
 
-  // Accounts dialog should remain hidden because the pop-up window has not been
-  // closed yet.
-  EXPECT_FALSE(widget_->IsVisible());
+    // Emulate user clicking on "Continue" button in the mismatch dialog.
+    observer->OnSigninToIdP();
+    CreateAndShowPopupWindow(*controller);
+  }
 
-  // Emulate IdP closing the pop-up window.
-  controller->CloseModalDialog();
+  histogram_tester_.ExpectUniqueSample(
+      "Blink.FedCm.IdpSigninStatus.MismatchDialogResult",
+      static_cast<int>(
+          FedCmAccountSelectionView::MismatchDialogResult::kContinued),
+      1);
+}
 
-  // Accounts dialog should now be visible.
-  EXPECT_TRUE(widget_->IsVisible());
+// Test transitioning from IdP sign-in status mismatch dialog to regular sign-in
+// dialog. This emulates a user signing into the IdP in a pop-up window and the
+// pop-up window closes PRIOR to the mismatch dialog being updated to a regular
+// sign-in dialog.
+TEST_F(FedCmAccountSelectionViewDesktopTest,
+       IdpSigninStatusPopupClosedBeforeAccountsPopulated) {
+  {
+    // Trigger IdP sign-in status mismatch dialog.
+    std::unique_ptr<TestFedCmAccountSelectionView> controller =
+        CreateAndShowMismatchDialog();
+    AccountSelectionBubbleView::Observer* observer =
+        static_cast<AccountSelectionBubbleView::Observer*>(controller.get());
+
+    // Emulate user clicking on "Continue" button in the mismatch dialog.
+    observer->OnSigninToIdP();
+    CreateAndShowPopupWindow(*controller);
+
+    // When pop-up window is shown, mismatch dialog should be hidden.
+    EXPECT_FALSE(widget_->IsVisible());
+
+    // Emulate user completing the sign-in flow and IdP prompts closing the
+    // pop-up window.
+    controller->CloseModalDialog();
+
+    // Mismatch dialog should remain hidden because it has not been updated to
+    // an accounts dialog yet.
+    EXPECT_FALSE(widget_->IsVisible());
+
+    histogram_tester_.ExpectTotalCount(
+        "Blink.FedCm.IdpSigninStatus."
+        "IdpClosePopupToBrowserShowAccountsDuration",
+        0);
+    histogram_tester_.ExpectTotalCount(
+        "Blink.FedCm.IdpSigninStatus.PopupWindowResult", 0);
+
+    // Emulate IdP sending the IdP sign-in status header which updates the
+    // mismatch dialog to an accounts dialog.
+    const char kAccountId[] = "account_id";
+    IdentityProviderDisplayData idp_data = CreateIdentityProviderDisplayData({
+        {kAccountId, LoginState::kSignUp},
+    });
+    Show(*controller, idp_data.accounts, SignInMode::kExplicit);
+
+    // Accounts dialog should now be visible.
+    EXPECT_TRUE(widget_->IsVisible());
+  }
+
+  histogram_tester_.ExpectTotalCount(
+      "Blink.FedCm.IdpSigninStatus.IdpClosePopupToBrowserShowAccountsDuration",
+      1);
+  histogram_tester_.ExpectUniqueSample(
+      "Blink.FedCm.IdpSigninStatus.PopupWindowResult",
+      static_cast<int>(FedCmAccountSelectionView::PopupWindowResult::
+                           kAccountsReceivedAndPopupClosedByIdp),
+      1);
+}
+
+// Test transitioning from IdP sign-in status mismatch dialog to regular sign-in
+// dialog. This emulates a user signing into the IdP in a pop-up window and the
+// pop-up window closes AFTER the mismatch dialog has been updated to a regular
+// sign-in dialog.
+TEST_F(FedCmAccountSelectionViewDesktopTest,
+       IdpSigninStatusPopupClosedAfterAccountsPopulated) {
+  {
+    // Trigger IdP sign-in status mismatch dialog.
+    std::unique_ptr<TestFedCmAccountSelectionView> controller =
+        CreateAndShowMismatchDialog();
+    AccountSelectionBubbleView::Observer* observer =
+        static_cast<AccountSelectionBubbleView::Observer*>(controller.get());
+
+    // Emulate user clicking on "Continue" button in the mismatch dialog.
+    observer->OnSigninToIdP();
+    CreateAndShowPopupWindow(*controller);
+
+    // When pop-up window is shown, mismatch dialog should be hidden.
+    EXPECT_FALSE(widget_->IsVisible());
+
+    // Emulate IdP sending the IdP sign-in status header which updates the
+    // mismatch dialog to an accounts dialog.
+    const char kAccountId[] = "account_id";
+    IdentityProviderDisplayData idp_data = CreateIdentityProviderDisplayData({
+        {kAccountId, LoginState::kSignUp},
+    });
+    Show(*controller, idp_data.accounts, SignInMode::kExplicit);
+
+    // Accounts dialog should remain hidden because the pop-up window has not
+    // been closed yet.
+    EXPECT_FALSE(widget_->IsVisible());
+
+    histogram_tester_.ExpectTotalCount(
+        "Blink.FedCm.IdpSigninStatus."
+        "IdpClosePopupToBrowserShowAccountsDuration",
+        0);
+    histogram_tester_.ExpectTotalCount(
+        "Blink.FedCm.IdpSigninStatus.PopupWindowResult", 0);
+
+    // Emulate IdP closing the pop-up window.
+    controller->CloseModalDialog();
+
+    // Accounts dialog should now be visible.
+    EXPECT_TRUE(widget_->IsVisible());
+  }
+
+  histogram_tester_.ExpectTotalCount(
+      "Blink.FedCm.IdpSigninStatus."
+      "IdpClosePopupToBrowserShowAccountsDuration",
+      1);
+  histogram_tester_.ExpectUniqueSample(
+      "Blink.FedCm.IdpSigninStatus.PopupWindowResult",
+      static_cast<int>(FedCmAccountSelectionView::PopupWindowResult::
+                           kAccountsReceivedAndPopupClosedByIdp),
+      1);
+}
+
+// Test that when user opens a pop-up window to complete the IDP sign-in flow,
+// we record the appropriate metric when accounts are received but
+// IdentityProvider.close() is not called.
+TEST_F(FedCmAccountSelectionViewDesktopTest,
+       IdpSigninStatusAccountsReceivedAndNoPopupClosedByIdpMetric) {
+  {
+    // Trigger IdP sign-in status mismatch dialog.
+    std::unique_ptr<TestFedCmAccountSelectionView> controller =
+        CreateAndShowMismatchDialog();
+    AccountSelectionBubbleView::Observer* observer =
+        static_cast<AccountSelectionBubbleView::Observer*>(controller.get());
+
+    // Emulate user clicking on "Continue" button in the mismatch dialog.
+    observer->OnSigninToIdP();
+    CreateAndShowPopupWindow(*controller);
+
+    // Emulate IdP sending the IdP sign-in status header which updates the
+    // failure dialog to an accounts dialog.
+    const char kAccountId[] = "account_id";
+    IdentityProviderDisplayData idp_data = CreateIdentityProviderDisplayData({
+        {kAccountId, LoginState::kSignUp},
+    });
+    Show(*controller, idp_data.accounts, SignInMode::kExplicit);
+
+    histogram_tester_.ExpectTotalCount(
+        "Blink.FedCm.IdpSigninStatus.PopupWindowResult", 0);
+  }
+
+  histogram_tester_.ExpectUniqueSample(
+      "Blink.FedCm.IdpSigninStatus.PopupWindowResult",
+      static_cast<int>(FedCmAccountSelectionView::PopupWindowResult::
+                           kAccountsReceivedAndPopupNotClosedByIdp),
+      1);
+}
+
+// Test that when user opens a pop-up window to complete the IDP sign-in flow,
+// we record the appropriate metric when accounts are not received but
+// IdentityProvider.close() is called.
+TEST_F(FedCmAccountSelectionViewDesktopTest,
+       IdpSigninStatusAccountsNotReceivedAndPopupClosedByIdpMetric) {
+  {
+    // Trigger IdP sign-in status mismatch dialog.
+    std::unique_ptr<TestFedCmAccountSelectionView> controller =
+        CreateAndShowMismatchDialog();
+    AccountSelectionBubbleView::Observer* observer =
+        static_cast<AccountSelectionBubbleView::Observer*>(controller.get());
+
+    // Emulate user clicking on "Continue" button in the mismatch dialog.
+    observer->OnSigninToIdP();
+    CreateAndShowPopupWindow(*controller);
+
+    // Emulate IdentityProvider.close() being called in the pop-up window.
+    controller->CloseModalDialog();
+
+    histogram_tester_.ExpectTotalCount(
+        "Blink.FedCm.IdpSigninStatus.PopupWindowResult", 0);
+  }
+
+  histogram_tester_.ExpectUniqueSample(
+      "Blink.FedCm.IdpSigninStatus.PopupWindowResult",
+      static_cast<int>(FedCmAccountSelectionView::PopupWindowResult::
+                           kAccountsNotReceivedAndPopupClosedByIdp),
+      1);
+}
+
+// Test that when user opens a pop-up window to complete the IDP sign-in flow,
+// we record the appropriate metric when accounts are not received and
+// IdentityProvider.close() is not called.
+TEST_F(FedCmAccountSelectionViewDesktopTest,
+       IdpSigninStatusAccountsNotReceivedAndNoPopupClosedByIdpMetric) {
+  {
+    // Trigger IdP sign-in status mismatch dialog.
+    std::unique_ptr<TestFedCmAccountSelectionView> controller =
+        CreateAndShowMismatchDialog();
+    AccountSelectionBubbleView::Observer* observer =
+        static_cast<AccountSelectionBubbleView::Observer*>(controller.get());
+
+    // Emulate user clicking on "Continue" button in the mismatch dialog.
+    observer->OnSigninToIdP();
+    CreateAndShowPopupWindow(*controller);
+
+    histogram_tester_.ExpectTotalCount(
+        "Blink.FedCm.IdpSigninStatus.PopupWindowResult", 0);
+  }
+
+  histogram_tester_.ExpectUniqueSample(
+      "Blink.FedCm.IdpSigninStatus.PopupWindowResult",
+      static_cast<int>(FedCmAccountSelectionView::PopupWindowResult::
+                           kAccountsNotReceivedAndPopupNotClosedByIdp),
+      1);
 }
 
 // Test closing the IdP sign-in pop-up window through IdentityProvider.close()
 // should not close the widget.
 TEST_F(FedCmAccountSelectionViewDesktopTest,
        IdpSigninStatusPopupClosedViaIdentityProviderClose) {
-  // Trigger IdP sign-in status mismatch failure dialog.
+  // Trigger IdP sign-in status mismatch dialog.
   std::unique_ptr<TestFedCmAccountSelectionView> controller =
-      CreateAndShowFailureDialog();
+      CreateAndShowMismatchDialog();
 
-  // Emulate user clicking on "Continue" button in the failure dialog.
+  // Emulate user clicking on "Continue" button in the mismatch dialog.
   CreateAndShowPopupWindow(*controller);
 
   // Emulate IdentityProvider.close() being called in the pop-up window.
@@ -631,15 +905,247 @@ TEST_F(FedCmAccountSelectionViewDesktopTest,
 // IdentityProvider.close() should also close the widget.
 TEST_F(FedCmAccountSelectionViewDesktopTest,
        IdpSigninStatusPopupClosedViaPopupDestroyed) {
-  // Trigger IdP sign-in status mismatch failure dialog.
+  // Trigger IdP sign-in status mismatch dialog.
   std::unique_ptr<TestFedCmAccountSelectionView> controller =
-      CreateAndShowFailureDialog();
+      CreateAndShowMismatchDialog();
 
-  // Emulate user clicking on "Continue" button in the failure dialog.
+  // Emulate user clicking on "Continue" button in the mismatch dialog.
   CreateAndShowPopupWindow(*controller);
 
   // Emulate user closing the pop-up window.
   controller->OnPopupWindowDestroyed();
+
+  // Widget should be closed.
+  EXPECT_TRUE(widget_->IsClosed());
+}
+
+// Test that the mismatch dialog can be shown again after the pop-up window is
+// closed.
+TEST_F(FedCmAccountSelectionViewDesktopTest,
+       IdpSigninStatusMismatchDialogReshown) {
+  // Trigger IdP sign-in status mismatch dialog.
+  std::unique_ptr<TestFedCmAccountSelectionView> controller =
+      CreateAndShowMismatchDialog();
+
+  // Emulate user clicking on "Continue" button in the mismatch dialog.
+  CreateAndShowPopupWindow(*controller);
+
+  // Mismatch dialog should be hidden because pop-up window is open.
+  EXPECT_FALSE(widget_->IsVisible());
+
+  // Emulate IdentityProvider.close() being called in the pop-up window.
+  controller->CloseModalDialog();
+
+  // Mismatch dialog should remain hidden because it has not been updated to an
+  // accounts dialog yet.
+  EXPECT_FALSE(widget_->IsVisible());
+
+  // Emulate another mismatch so we need to show the mismatch dialog again.
+  controller->ShowFailureDialog(
+      kTopFrameEtldPlusOne, kIframeEtldPlusOne, kIdpEtldPlusOne,
+      blink::mojom::RpContext::kSignIn, content::IdentityProviderMetadata());
+
+  // Mismatch dialog is visible again.
+  EXPECT_TRUE(widget_->IsVisible());
+}
+
+// Tests that RP context is properly set for the mismatch UI.
+TEST_F(FedCmAccountSelectionViewDesktopTest, MismatchDialogWithRpContext) {
+  {
+    std::unique_ptr<TestFedCmAccountSelectionView> controller =
+        CreateAndShowMismatchDialog();
+    EXPECT_EQ(controller->GetRpContext(), blink::mojom::RpContext::kSignIn);
+  }
+  {
+    std::unique_ptr<TestFedCmAccountSelectionView> controller =
+        CreateAndShowMismatchDialog(blink::mojom::RpContext::kSignUp);
+    EXPECT_EQ(controller->GetRpContext(), blink::mojom::RpContext::kSignUp);
+  }
+  {
+    std::unique_ptr<TestFedCmAccountSelectionView> controller =
+        CreateAndShowMismatchDialog(blink::mojom::RpContext::kContinue);
+    EXPECT_EQ(controller->GetRpContext(), blink::mojom::RpContext::kContinue);
+  }
+  {
+    std::unique_ptr<TestFedCmAccountSelectionView> controller =
+        CreateAndShowMismatchDialog(blink::mojom::RpContext::kUse);
+    EXPECT_EQ(controller->GetRpContext(), blink::mojom::RpContext::kUse);
+  }
+}
+
+// Tests the following
+// 1. pop-up window is closed
+// 2. visibility changes to hidden e.g. user navigates to different tab
+// 3. Show() is invoked
+// 4. widget should remain hidden
+// 5. visibility changes to visible e.g. user navigates back to same tab
+// 6. widget should now be visible
+TEST_F(FedCmAccountSelectionViewDesktopTest,
+       BubbleWidgetAfterPopupRemainsHiddenAfterAccountsFetched) {
+  // Trigger IdP sign-in status mismatch dialog.
+  std::unique_ptr<TestFedCmAccountSelectionView> controller =
+      CreateAndShowMismatchDialog();
+  // Emulate user clicking on "Continue" button in the mismatch dialog.
+  AccountSelectionBubbleView::Observer* observer =
+      static_cast<AccountSelectionBubbleView::Observer*>(controller.get());
+  observer->OnSigninToIdP();
+  CreateAndShowPopupWindow(*controller);
+
+  // Emulate IdP closing the pop-up window.
+  controller->CloseModalDialog();
+
+  controller->OnVisibilityChanged(content::Visibility::HIDDEN);
+
+  // Emulate IdP sending the IdP sign-in status header which updates the
+  // mismatch dialog to an accounts dialog.
+  const char kAccountId[] = "account_id";
+  IdentityProviderDisplayData idp_data = CreateIdentityProviderDisplayData({
+      {kAccountId, LoginState::kSignUp},
+  });
+  Show(*controller, idp_data.accounts, SignInMode::kExplicit);
+  EXPECT_FALSE(widget_->IsVisible());
+
+  controller->OnVisibilityChanged(content::Visibility::VISIBLE);
+  EXPECT_TRUE(widget_->IsVisible());
+  EXPECT_EQ(TestBubbleView::SheetType::kConfirmAccount,
+            bubble_view_->sheet_type_);
+}
+
+// Tests the following
+// 1. pop-up window is closed
+// 2. visibility changes to hidden e.g. user navigates to different tab
+// 3. visibility changes to visible e.g. user navigates back to same tab
+// 4. widget should remain hidden
+// 5. Show() is invoked
+// 6. widget should now be visible
+TEST_F(FedCmAccountSelectionViewDesktopTest,
+       BubbleWidgetAfterPopupRemainsHiddenBeforeAccountsFetched) {
+  // Trigger IdP sign-in status mismatch dialog.
+  std::unique_ptr<TestFedCmAccountSelectionView> controller =
+      CreateAndShowMismatchDialog();
+  // Emulate user clicking on "Continue" button in the mismatch dialog.
+  AccountSelectionBubbleView::Observer* observer =
+      static_cast<AccountSelectionBubbleView::Observer*>(controller.get());
+  observer->OnSigninToIdP();
+  CreateAndShowPopupWindow(*controller);
+
+  // Emulate IdP closing the pop-up window.
+  controller->CloseModalDialog();
+
+  // Switch to a different tab and then switch back to the same tab. The widget
+  // should remain hidden because the mismatch dialog has not been updated into
+  // an accounts dialog yet.
+  controller->OnVisibilityChanged(content::Visibility::HIDDEN);
+  EXPECT_FALSE(widget_->IsVisible());
+  controller->OnVisibilityChanged(content::Visibility::VISIBLE);
+  EXPECT_FALSE(widget_->IsVisible());
+
+  // Emulate IdP sending the IdP sign-in status header which updates the
+  // mismatch dialog to an accounts dialog.
+  const char kAccountId[] = "account_id";
+  IdentityProviderDisplayData idp_data = CreateIdentityProviderDisplayData({
+      {kAccountId, LoginState::kSignUp},
+  });
+  Show(*controller, idp_data.accounts, SignInMode::kExplicit);
+
+  // The widget should now be visible.
+  EXPECT_TRUE(widget_->IsVisible());
+  EXPECT_EQ(TestBubbleView::SheetType::kConfirmAccount,
+            bubble_view_->sheet_type_);
+}
+
+// Tests that the error dialog can be shown.
+TEST_F(FedCmAccountSelectionViewDesktopTest, ErrorDialogShown) {
+  std::unique_ptr<TestFedCmAccountSelectionView> controller =
+      CreateAndShowErrorDialog();
+  EXPECT_TRUE(widget_->IsVisible());
+}
+
+// Tests that RP context is properly set for the error dialog.
+TEST_F(FedCmAccountSelectionViewDesktopTest, ErrorDialogWithRpContext) {
+  {
+    std::unique_ptr<TestFedCmAccountSelectionView> controller =
+        CreateAndShowErrorDialog();
+    EXPECT_EQ(controller->GetRpContext(), blink::mojom::RpContext::kSignIn);
+  }
+  {
+    std::unique_ptr<TestFedCmAccountSelectionView> controller =
+        CreateAndShowErrorDialog(blink::mojom::RpContext::kSignUp);
+    EXPECT_EQ(controller->GetRpContext(), blink::mojom::RpContext::kSignUp);
+  }
+  {
+    std::unique_ptr<TestFedCmAccountSelectionView> controller =
+        CreateAndShowErrorDialog(blink::mojom::RpContext::kContinue);
+    EXPECT_EQ(controller->GetRpContext(), blink::mojom::RpContext::kContinue);
+  }
+  {
+    std::unique_ptr<TestFedCmAccountSelectionView> controller =
+        CreateAndShowErrorDialog(blink::mojom::RpContext::kUse);
+    EXPECT_EQ(controller->GetRpContext(), blink::mojom::RpContext::kUse);
+  }
+}
+
+// Tests the flow for when the "got it" button on the error dialog is clicked.
+TEST_F(FedCmAccountSelectionViewDesktopTest, ErrorDialogGotItClicked) {
+  // Trigger error dialog.
+  std::unique_ptr<TestFedCmAccountSelectionView> controller =
+      CreateAndShowErrorDialog();
+  EXPECT_TRUE(widget_->IsVisible());
+
+  // Emulate user clicking on "got it" button in the error dialog.
+  AccountSelectionBubbleView::Observer* observer =
+      static_cast<AccountSelectionBubbleView::Observer*>(controller.get());
+  observer->OnGotItButtonClicked(CreateMouseEvent());
+
+  // Widget should be closed.
+  EXPECT_TRUE(widget_->IsClosed());
+}
+
+// Tests the flow for when the "more details" button on the error dialog is
+// clicked.
+TEST_F(FedCmAccountSelectionViewDesktopTest, ErrorDialogMoreDetailsClicked) {
+  // Trigger error dialog.
+  std::unique_ptr<TestFedCmAccountSelectionView> controller =
+      CreateAndShowErrorDialog();
+  EXPECT_TRUE(widget_->IsVisible());
+
+  // Emulate user clicking on "more details" button in the error dialog.
+  AccountSelectionBubbleView::Observer* observer =
+      static_cast<AccountSelectionBubbleView::Observer*>(controller.get());
+  observer->OnMoreDetailsButtonClicked(GURL(), CreateMouseEvent());
+  CreateAndShowPopupWindow(*controller);
+
+  // Widget should be hidden but not closed.
+  EXPECT_FALSE(widget_->IsVisible());
+  EXPECT_FALSE(widget_->IsClosed());
+
+  // Emulate user closing the pop-up window.
+  controller->OnPopupWindowDestroyed();
+
+  // Widget should be closed.
+  EXPECT_TRUE(widget_->IsClosed());
+}
+
+// Tests that IdentityProvider.close() on a non sign-in to IDP pop-up closes the
+// widget.
+TEST_F(FedCmAccountSelectionViewDesktopTest, MoreDetailsPopupIdpClose) {
+  // Trigger error dialog.
+  std::unique_ptr<TestFedCmAccountSelectionView> controller =
+      CreateAndShowErrorDialog();
+  EXPECT_TRUE(widget_->IsVisible());
+
+  // Emulate user clicking on "more details" button in the error dialog.
+  AccountSelectionBubbleView::Observer* observer =
+      static_cast<AccountSelectionBubbleView::Observer*>(controller.get());
+  observer->OnMoreDetailsButtonClicked(GURL(), CreateMouseEvent());
+  CreateAndShowPopupWindow(*controller);
+
+  // Widget should be hidden but not closed.
+  EXPECT_FALSE(widget_->IsVisible());
+  EXPECT_FALSE(widget_->IsClosed());
+
+  // Emulate IdP closing the pop-up window.
+  controller->CloseModalDialog();
 
   // Widget should be closed.
   EXPECT_TRUE(widget_->IsClosed());

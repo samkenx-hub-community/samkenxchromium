@@ -6,10 +6,7 @@ package org.chromium.net.apihelpers;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
-import static org.chromium.net.CronetTestRule.getContext;
+import static org.chromium.net.truth.UrlResponseInfoSubject.assertThat;
 
 import android.os.ConditionVariable;
 import android.os.ParcelFileDescriptor;
@@ -25,8 +22,8 @@ import org.junit.runner.RunWith;
 
 import org.chromium.net.CallbackException;
 import org.chromium.net.CronetTestRule;
-import org.chromium.net.CronetTestRule.CronetTestFramework;
-import org.chromium.net.CronetTestRule.OnlyRunNativeCronet;
+import org.chromium.net.CronetTestRule.CronetImplementation;
+import org.chromium.net.CronetTestRule.IgnoreFor;
 import org.chromium.net.NativeTestServer;
 import org.chromium.net.TestUrlRequestCallback;
 import org.chromium.net.UploadDataProvider;
@@ -45,16 +42,17 @@ public class UploadDataProvidersTest {
             + "Proin elementum, libero laoreet fringilla faucibus, metus tortor vehicula ante, "
             + "lacinia lorem eros vel sapien.";
     @Rule
-    public final CronetTestRule mTestRule = new CronetTestRule();
-    private CronetTestFramework mTestFramework;
+    public final CronetTestRule mTestRule = CronetTestRule.withAutomaticEngineStartup();
     private File mFile;
 
     @Before
     public void setUp() throws Exception {
-        mTestFramework = mTestRule.startCronetTestFramework();
-        assertTrue(NativeTestServer.startNativeTestServer(getContext()));
+        assertThat(
+                NativeTestServer.startNativeTestServer(mTestRule.getTestFramework().getContext()))
+                .isTrue();
         // Add url interceptors after native application context is initialized.
-        mFile = new File(getContext().getCacheDir().getPath() + "/tmpfile");
+        mFile = new File(
+                mTestRule.getTestFramework().getContext().getCacheDir().getPath() + "/tmpfile");
         FileOutputStream fileOutputStream = new FileOutputStream(mFile);
         try {
             fileOutputStream.write(LOREM.getBytes("UTF-8"));
@@ -66,22 +64,21 @@ public class UploadDataProvidersTest {
     @After
     public void tearDown() throws Exception {
         NativeTestServer.shutdownNativeTestServer();
-        mTestFramework.mCronetEngine.shutdown();
-        assertTrue(mFile.delete());
+        assertThat(mFile.delete()).isTrue();
     }
 
     @Test
     @SmallTest
     public void testFileProvider() throws Exception {
         TestUrlRequestCallback callback = new TestUrlRequestCallback();
-        UrlRequest.Builder builder = mTestFramework.mCronetEngine.newUrlRequestBuilder(
+        UrlRequest.Builder builder = mTestRule.getTestFramework().getEngine().newUrlRequestBuilder(
                 NativeTestServer.getRedirectToEchoBody(), callback, callback.getExecutor());
         UploadDataProvider dataProvider = UploadDataProviders.create(mFile);
         builder.setUploadDataProvider(dataProvider, callback.getExecutor());
         builder.addHeader("Content-Type", "useless/string");
         builder.build().start();
         callback.blockForDone();
-        assertThat(callback.mResponseInfo.getHttpStatusCode()).isEqualTo(200);
+        assertThat(callback.getResponseInfoWithChecks()).hasHttpStatusCodeThat().isEqualTo(200);
         assertThat(callback.mResponseAsString).isEqualTo(LOREM);
     }
 
@@ -90,16 +87,16 @@ public class UploadDataProvidersTest {
     public void testFileDescriptorProvider() throws Exception {
         ParcelFileDescriptor descriptor =
                 ParcelFileDescriptor.open(mFile, ParcelFileDescriptor.MODE_READ_ONLY);
-        assertTrue(descriptor.getFileDescriptor().valid());
+        assertThat(descriptor.getFileDescriptor().valid()).isTrue();
         TestUrlRequestCallback callback = new TestUrlRequestCallback();
-        UrlRequest.Builder builder = mTestFramework.mCronetEngine.newUrlRequestBuilder(
+        UrlRequest.Builder builder = mTestRule.getTestFramework().getEngine().newUrlRequestBuilder(
                 NativeTestServer.getRedirectToEchoBody(), callback, callback.getExecutor());
         UploadDataProvider dataProvider = UploadDataProviders.create(descriptor);
         builder.setUploadDataProvider(dataProvider, callback.getExecutor());
         builder.addHeader("Content-Type", "useless/string");
         builder.build().start();
         callback.blockForDone();
-        assertThat(callback.mResponseInfo.getHttpStatusCode()).isEqualTo(200);
+        assertThat(callback.getResponseInfoWithChecks()).hasHttpStatusCodeThat().isEqualTo(200);
         assertThat(callback.mResponseAsString).isEqualTo(LOREM);
     }
 
@@ -107,7 +104,7 @@ public class UploadDataProvidersTest {
     @SmallTest
     public void testBadFileDescriptorProvider() throws Exception {
         TestUrlRequestCallback callback = new TestUrlRequestCallback();
-        UrlRequest.Builder builder = mTestFramework.mCronetEngine.newUrlRequestBuilder(
+        UrlRequest.Builder builder = mTestRule.getTestFramework().getEngine().newUrlRequestBuilder(
                 NativeTestServer.getRedirectToEchoBody(), callback, callback.getExecutor());
         ParcelFileDescriptor[] pipe = ParcelFileDescriptor.createPipe();
         try {
@@ -127,7 +124,7 @@ public class UploadDataProvidersTest {
     @SmallTest
     public void testBufferProvider() throws Exception {
         TestUrlRequestCallback callback = new TestUrlRequestCallback();
-        UrlRequest.Builder builder = mTestFramework.mCronetEngine.newUrlRequestBuilder(
+        UrlRequest.Builder builder = mTestRule.getTestFramework().getEngine().newUrlRequestBuilder(
                 NativeTestServer.getRedirectToEchoBody(), callback, callback.getExecutor());
         UploadDataProvider dataProvider = UploadDataProviders.create(LOREM.getBytes("UTF-8"));
         builder.setUploadDataProvider(dataProvider, callback.getExecutor());
@@ -135,17 +132,19 @@ public class UploadDataProvidersTest {
         builder.build().start();
         callback.blockForDone();
 
-        assertThat(callback.mResponseInfo.getHttpStatusCode()).isEqualTo(200);
+        assertThat(callback.getResponseInfoWithChecks()).hasHttpStatusCodeThat().isEqualTo(200);
         assertThat(callback.mResponseAsString).isEqualTo(LOREM);
     }
 
     @Test
     @SmallTest
-    @OnlyRunNativeCronet
+    @IgnoreFor(implementations = {CronetImplementation.FALLBACK},
+            reason = "This is not the case for the fallback implementation")
     // Tests that ByteBuffer's limit cannot be changed by the caller.
-    public void testUploadChangeBufferLimit() throws Exception {
+    public void
+    testUploadChangeBufferLimit() throws Exception {
         TestUrlRequestCallback callback = new TestUrlRequestCallback();
-        UrlRequest.Builder builder = mTestFramework.mCronetEngine.newUrlRequestBuilder(
+        UrlRequest.Builder builder = mTestRule.getTestFramework().getEngine().newUrlRequestBuilder(
                 NativeTestServer.getEchoBodyURL(), callback, callback.getExecutor());
         builder.addHeader("Content-Type", "useless/string");
         builder.setUploadDataProvider(new UploadDataProvider() {
@@ -175,7 +174,7 @@ public class UploadDataProvidersTest {
         UrlRequest urlRequest = builder.build();
         urlRequest.start();
         callback.blockForDone();
-        assertTrue(callback.mOnErrorCalled);
+        assertThat(callback.mOnErrorCalled).isTrue();
         assertThat(callback.mError)
                 .hasMessageThat()
                 .contains("Exception received from UploadDataProvider");
@@ -189,7 +188,7 @@ public class UploadDataProvidersTest {
     @SmallTest
     public void testNoErrorWhenCanceledDuringStart() throws Exception {
         TestUrlRequestCallback callback = new TestUrlRequestCallback();
-        UrlRequest.Builder builder = mTestFramework.mCronetEngine.newUrlRequestBuilder(
+        UrlRequest.Builder builder = mTestRule.getTestFramework().getEngine().newUrlRequestBuilder(
                 NativeTestServer.getEchoBodyURL(), callback, callback.getExecutor());
         final ConditionVariable first = new ConditionVariable();
         final ConditionVariable second = new ConditionVariable();
@@ -215,14 +214,14 @@ public class UploadDataProvidersTest {
         urlRequest.cancel();
         second.open();
         callback.blockForDone();
-        assertTrue(callback.mOnCanceledCalled);
+        assertThat(callback.mOnCanceledCalled).isTrue();
     }
 
     @Test
     @SmallTest
     public void testNoErrorWhenExceptionDuringStart() throws Exception {
         TestUrlRequestCallback callback = new TestUrlRequestCallback();
-        UrlRequest.Builder builder = mTestFramework.mCronetEngine.newUrlRequestBuilder(
+        UrlRequest.Builder builder = mTestRule.getTestFramework().getEngine().newUrlRequestBuilder(
                 NativeTestServer.getEchoBodyURL(), callback, callback.getExecutor());
         final ConditionVariable first = new ConditionVariable();
         final String exceptionMessage = "Bad Length";
@@ -245,7 +244,7 @@ public class UploadDataProvidersTest {
         urlRequest.start();
         first.block();
         callback.blockForDone();
-        assertFalse(callback.mOnCanceledCalled);
+        assertThat(callback.mOnCanceledCalled).isFalse();
         assertThat(callback.mError).isInstanceOf(CallbackException.class);
         assertThat(callback.mError)
                 .hasMessageThat()
@@ -260,7 +259,7 @@ public class UploadDataProvidersTest {
     public void testCreateByteBufferUploadWithArrayOffset() throws Exception {
         TestUrlRequestCallback callback = new TestUrlRequestCallback();
         // This URL will trigger a rewind().
-        UrlRequest.Builder builder = mTestFramework.mCronetEngine.newUrlRequestBuilder(
+        UrlRequest.Builder builder = mTestRule.getTestFramework().getEngine().newUrlRequestBuilder(
                 NativeTestServer.getRedirectToEchoBody(), callback, callback.getExecutor());
         builder.addHeader("Content-Type", "useless/string");
         byte[] uploadData = LOREM.getBytes("UTF-8");
@@ -274,7 +273,7 @@ public class UploadDataProvidersTest {
         UrlRequest urlRequest = builder.build();
         urlRequest.start();
         callback.blockForDone();
-        assertThat(callback.mResponseInfo.getHttpStatusCode()).isEqualTo(200);
+        assertThat(callback.getResponseInfoWithChecks()).hasHttpStatusCodeThat().isEqualTo(200);
         assertThat(callback.mResponseAsString).isEqualTo(LOREM);
     }
 }

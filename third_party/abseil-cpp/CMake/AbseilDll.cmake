@@ -25,8 +25,8 @@ set(ABSL_INTERNAL_DLL_FILES
   "base/internal/low_level_alloc.cc"
   "base/internal/low_level_alloc.h"
   "base/internal/low_level_scheduling.h"
+  "base/internal/nullability_impl.h"
   "base/internal/per_thread_tls.h"
-  "base/internal/prefetch.h"
   "base/prefetch.h"
   "base/internal/pretty_function.h"
   "base/internal/raw_logging.cc"
@@ -54,6 +54,7 @@ set(ABSL_INTERNAL_DLL_FILES
   "base/log_severity.cc"
   "base/log_severity.h"
   "base/macros.h"
+  "base/nullability.h"
   "base/optimization.h"
   "base/options.h"
   "base/policy_checks.h"
@@ -73,7 +74,6 @@ set(ABSL_INTERNAL_DLL_FILES
   "container/internal/common_policy_traits.h"
   "container/internal/compressed_tuple.h"
   "container/internal/container_memory.h"
-  "container/internal/counting_allocator.h"
   "container/internal/hash_function_defaults.h"
   "container/internal/hash_policy_traits.h"
   "container/internal/hashtable_debug.h"
@@ -105,7 +105,7 @@ set(ABSL_INTERNAL_DLL_FILES
   "crc/internal/crc_x86_arm_combined.cc"
   "crc/internal/crc_memcpy_fallback.cc"
   "crc/internal/crc_memcpy.h"
-  "crc/internal/crc_memcpy_x86_64.cc"
+  "crc/internal/crc_memcpy_x86_arm_combined.cc"
   "crc/internal/crc_non_temporal_memcpy.cc"
   "crc/internal/crc_x86_arm_combined.cc"
   "crc/internal/non_temporal_arm_intrinsics.h"
@@ -159,6 +159,8 @@ set(ABSL_INTERNAL_DLL_FILES
   "log/internal/conditions.cc"
   "log/internal/conditions.h"
   "log/internal/config.h"
+  "log/internal/fnmatch.h"
+  "log/internal/fnmatch.cc"
   "log/internal/globals.cc"
   "log/internal/globals.h"
   "log/internal/log_format.cc"
@@ -246,6 +248,7 @@ set(ABSL_INTERNAL_DLL_FILES
   "random/uniform_real_distribution.h"
   "random/zipf_distribution.h"
   "status/internal/status_internal.h"
+  "status/internal/status_internal.cc"
   "status/internal/statusor_internal.h"
   "status/status.h"
   "status/status.cc"
@@ -257,6 +260,7 @@ set(ABSL_INTERNAL_DLL_FILES
   "strings/ascii.h"
   "strings/charconv.cc"
   "strings/charconv.h"
+  "strings/charset.h"
   "strings/cord.cc"
   "strings/cord.h"
   "strings/cord_analysis.cc"
@@ -283,9 +287,6 @@ set(ABSL_INTERNAL_DLL_FILES
   "strings/internal/cord_rep_consume.h"
   "strings/internal/cord_rep_consume.cc"
   "strings/internal/cord_rep_flat.h"
-  "strings/internal/cord_rep_ring.cc"
-  "strings/internal/cord_rep_ring.h"
-  "strings/internal/cord_rep_ring_reader.h"
   "strings/internal/cordz_functions.cc"
   "strings/internal/cordz_functions.h"
   "strings/internal/cordz_handle.cc"
@@ -304,6 +305,7 @@ set(ABSL_INTERNAL_DLL_FILES
   "strings/internal/stringify_sink.h"
   "strings/internal/stringify_sink.cc"
   "strings/internal/has_absl_stringify.h"
+  "strings/has_absl_stringify.h"
   "strings/match.cc"
   "strings/match.h"
   "strings/numbers.cc"
@@ -321,7 +323,6 @@ set(ABSL_INTERNAL_DLL_FILES
   "strings/strip.h"
   "strings/substitute.cc"
   "strings/substitute.h"
-  "strings/internal/char_map.h"
   "strings/internal/escaping.h"
   "strings/internal/escaping.cc"
   "strings/internal/memutil.cc"
@@ -417,11 +418,6 @@ set(ABSL_INTERNAL_DLL_FILES
   "types/bad_variant_access.cc"
   "types/bad_variant_access.h"
   "types/compare.h"
-  "types/internal/conformance_aliases.h"
-  "types/internal/conformance_archetype.h"
-  "types/internal/conformance_profile.h"
-  "types/internal/parentheses.h"
-  "types/internal/transform_args.h"
   "types/internal/variant.h"
   "types/optional.h"
   "types/internal/optional.h"
@@ -784,7 +780,7 @@ Name: ${_dll}\n\
 Description: Abseil DLL library\n\
 URL: https://abseil.io/\n\
 Version: ${absl_VERSION}\n\
-Libs: -L\${libdir} ${PC_LINKOPTS} $<$<NOT:$<BOOL:${ABSL_CC_LIB_IS_INTERFACE}>>:-l${_dll}>\n\
+Libs: -L\${libdir} $<$<NOT:$<BOOL:${ABSL_CC_LIB_IS_INTERFACE}>>:-l${_dll}> ${PC_LINKOPTS}\n\
 Cflags: -I\${includedir}${PC_CFLAGS}\n")
   INSTALL(FILES "${CMAKE_BINARY_DIR}/lib/pkgconfig/${_dll}.pc"
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
@@ -813,4 +809,6 @@ Cflags: -I\${includedir}${PC_CFLAGS}\n")
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
   )
+
+  add_library(absl::${_dll} ALIAS ${_dll})
 endfunction()

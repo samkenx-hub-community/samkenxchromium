@@ -49,6 +49,7 @@
 #include "components/account_id/account_id.h"
 #include "components/prefs/testing_pref_service.h"
 #include "components/sync_preferences/testing_pref_service_syncable.h"
+#include "components/user_manager/scoped_user_manager.h"
 #include "content/public/test/browser_task_environment.h"
 #include "services/data_decoder/public/cpp/test_support/in_process_data_decoder.h"
 #include "storage/browser/file_system/external_mount_points.h"
@@ -276,7 +277,8 @@ class NearbyNotificationManagerTestBase : public testing::Test {
   std::unique_ptr<base::ScopedDisallowBlocking> disallow_blocking_;
   std::unique_ptr<NearbyNotificationManager> manager_;
   data_decoder::test::InProcessDataDecoder in_process_data_decoder_;
-  raw_ptr<MockSettingsOpener, ExperimentalAsh> settings_opener_;
+  raw_ptr<MockSettingsOpener, DanglingUntriaged | ExperimentalAsh>
+      settings_opener_;
   bool is_self_share_enabled_ = false;
 };
 
@@ -1686,7 +1688,8 @@ class NearbyFilesHoldingSpaceTest : public testing::Test {
   std::unique_ptr<NearbyNotificationManager> manager_;
   std::unique_ptr<TestSessionController> session_controller_;
   std::unique_ptr<ash::HoldingSpaceController> holding_space_controller_;
-  std::unique_ptr<ash::FakeChromeUserManager> user_manager_;
+  user_manager::TypedScopedUserManager<ash::FakeChromeUserManager>
+      user_manager_;
 };
 
 TEST_F(NearbyFilesHoldingSpaceTest, ShowSuccess_Files) {
@@ -1720,7 +1723,7 @@ TEST_F(NearbyFilesHoldingSpaceTest, ShowSuccess_Files) {
               holding_space_item->type());
 
     EXPECT_EQ(share_target.file_attachments[i].file_path(),
-              holding_space_item->file_path());
+              holding_space_item->file().file_path);
   }
 }
 
@@ -1920,6 +1923,29 @@ TEST_P(NearbyNotificationManagerTest, ConnectionRequest_SelfShare) {
   } else {
       ASSERT_EQ(1u, notifications.size());
   }
+}
+
+TEST_P(NearbyNotificationManagerTest,
+       ConnectionRequest_SelfShare_WiFiCantAutoAccept) {
+  ShareTarget share_target;
+  // Incoming Wi-Fi credential Self Share.
+  share_target.is_incoming = true;
+  share_target.for_self_share = true;
+  share_target.wifi_credentials_attachments.push_back(
+      CreateWifiCredentialsAttachment(
+          WifiCredentialsAttachment::SecurityType::kWpaPsk));
+  TransferMetadata transfer_metadata =
+      TransferMetadataBuilder()
+          .set_status(TransferMetadata::Status::kAwaitingLocalConfirmation)
+          .build();
+
+  // Simulate incoming connection request waiting for local confirmation.
+  manager()->OnTransferUpdate(share_target, transfer_metadata);
+  std::vector<message_center::Notification> notifications =
+      GetDisplayedNotifications();
+  // We can't auto-accept Wi-Fi credentials, so expect the confirmation
+  // notification whether or not self share is enabled.
+  ASSERT_EQ(1u, notifications.size());
 }
 
 INSTANTIATE_TEST_SUITE_P(NearbyNotificationManagerTest,

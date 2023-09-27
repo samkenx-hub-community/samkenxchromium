@@ -29,6 +29,7 @@
 #include "base/system/sys_info.h"
 #include "base/task/thread_pool/initialization_util.h"
 #include "base/task/thread_pool/thread_pool_instance.h"
+#include "content/common/features.h"
 #include "content/common/thread_pool_util.h"
 #include "content/public/common/bindings_policy.h"
 #include "content/public/common/content_client.h"
@@ -47,10 +48,6 @@
 #endif
 #if (BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)) && defined(ARCH_CPU_X86_64)
 #include "v8/include/v8-wasm-trap-handler-posix.h"
-#endif
-
-#if BUILDFLAG(IS_MAC)
-#include "base/system/sys_info.h"
 #endif
 
 namespace {
@@ -104,12 +101,6 @@ namespace content {
 
 RenderProcessImpl::RenderProcessImpl()
     : RenderProcess(GetThreadPoolInitParams()) {
-#if BUILDFLAG(IS_MAC)
-  // Specified when launching the process in
-  // RendererSandboxedProcessLauncherDelegate::EnableCpuSecurityMitigations
-  base::SysInfo::SetIsCpuSecurityMitigationsEnabled(true);
-#endif
-
 #if BUILDFLAG(DCHECK_IS_CONFIGURABLE)
   // Some official builds ship with DCHECKs compiled in. Failing DCHECKs then
   // are either fatal or simply log the error, based on a feature flag.

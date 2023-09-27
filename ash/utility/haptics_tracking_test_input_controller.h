@@ -83,6 +83,7 @@ class HapticsTrackingTestInputController : public ui::InputController {
   void GetTouchDeviceStatus(GetTouchDeviceStatusReply reply) override;
   void GetTouchEventLog(const base::FilePath& out_dir,
                         GetTouchEventLogReply reply) override;
+  void DescribeForLog(DescribeForLogReply reply) const override;
   void SetTouchEventLoggingEnabled(bool enabled) override;
   void SetTapToClickPaused(bool state) override;
   void SetInternalTouchpadEnabled(bool enabled) override;
@@ -105,6 +106,7 @@ class HapticsTrackingTestInputController : public ui::InputController {
   void GetGesturePropertiesService(
       mojo::PendingReceiver<ui::ozone::mojom::GesturePropertiesService>
           receiver) override;
+  bool AreAnyKeysPressed() override;
 
   // Returns haptic count for effect/strength combination for testing.
   int GetSentHapticCount(ui::HapticTouchpadEffect effect,

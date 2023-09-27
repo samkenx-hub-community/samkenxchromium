@@ -29,7 +29,7 @@
 #include "base/time/time.h"
 #include "base/uuid.h"
 #include "base/values.h"
-#include "components/aggregation_service/aggregation_service.mojom.h"
+#include "components/aggregation_service/aggregation_coordinator_utils.h"
 #include "components/aggregation_service/features.h"
 #include "components/aggregation_service/parsing_utils.h"
 #include "components/cbor/values.h"
@@ -59,16 +59,33 @@ using DpfParameters = distributed_point_functions::DpfParameters;
 constexpr char kHistogramValue[] = "histogram";
 constexpr char kOperationKey[] = "operation";
 
+GURL GetProcessingUrl(const url::Origin& origin) {
+  GURL::Replacements replacements;
+  static constexpr char kEndpointPath[] =
+      ".well-known/aggregation-service/public-keys";
+  replacements.SetPathStr(kEndpointPath);
+  return origin.GetURL().ReplaceComponents(replacements);
+}
+
 std::vector<GURL> GetDefaultProcessingUrls(
     blink::mojom::AggregationServiceMode aggregation_mode,
-    ::aggregation_service::mojom::AggregationCoordinator
-        aggregation_coordinator) {
+    const absl::optional<url::Origin>& aggregation_coordinator_origin) {
   switch (aggregation_mode) {
     case blink::mojom::AggregationServiceMode::kTeeBased:
-      switch (aggregation_coordinator) {
-        case ::aggregation_service::mojom::AggregationCoordinator::kAwsCloud:
-          return {GURL(
-              kPrivacySandboxAggregationServiceTrustedServerUrlAwsParam.Get())};
+      if (base::FeatureList::IsEnabled(
+              aggregation_service::kAggregationServiceMultipleCloudProviders)) {
+        if (!aggregation_coordinator_origin.has_value()) {
+          return {GetProcessingUrl(
+              ::aggregation_service::GetDefaultAggregationCoordinatorOrigin())};
+        }
+        if (!::aggregation_service::IsAggregationCoordinatorOriginAllowed(
+                *aggregation_coordinator_origin)) {
+          return {};
+        }
+        return {GetProcessingUrl(*aggregation_coordinator_origin)};
+      } else {
+        return {GURL(
+            kPrivacySandboxAggregationServiceTrustedServerUrlAwsParam.Get())};
       }
     case blink::mojom::AggregationServiceMode::kExperimentalPoplar:
       // TODO(crbug.com/1295705): Update default processing urls.
@@ -185,6 +202,16 @@ std::vector<uint8_t> EncodeIntegerForPayload(T integer) {
   return byte_string;
 }
 
+void AppendEncodedContributionToCborArray(
+    cbor::Value::ArrayValue& array,
+    const blink::mojom::AggregatableReportHistogramContribution& contribution) {
+  cbor::Value::MapValue map;
+  map.emplace("bucket",
+              EncodeIntegerForPayload<absl::uint128>(contribution.bucket));
+  map.emplace("value", EncodeIntegerForPayload<uint32_t>(contribution.value));
+  array.emplace_back(std::move(map));
+}
+
 // Returns a vector with a serialized CBOR map. See the AggregatableReport
 // documentation for more detail on the expected format. Returns an empty
 // vector in case of error.
@@ -195,15 +222,20 @@ std::vector<std::vector<uint8_t>> ConstructUnencryptedTeeBasedPayload(
   value.emplace(kOperationKey, kHistogramValue);
 
   cbor::Value::ArrayValue data;
-  for (const blink::mojom::AggregatableReportHistogramContribution&
-           contribution : payload_contents.contributions) {
-    cbor::Value::MapValue data_map;
-    data_map.emplace(
-        "bucket", EncodeIntegerForPayload<absl::uint128>(contribution.bucket));
-    data_map.emplace("value",
-                     EncodeIntegerForPayload<uint32_t>(contribution.value));
-    data.push_back(cbor::Value(std::move(data_map)));
+  base::ranges::for_each(
+      payload_contents.contributions,
+      [&data](const blink::mojom::AggregatableReportHistogramContribution&
+                  contribution) {
+        AppendEncodedContributionToCborArray(data, contribution);
+      });
+
+  // TODO(crbug.com/1478353): Replace this with more generic padding solution.
+  if (payload_contents.contributions.empty()) {
+    AppendEncodedContributionToCborArray(
+        data, blink::mojom::AggregatableReportHistogramContribution(
+                  /*bucket=*/0, /*value=*/0));
   }
+
   value.emplace("data", std::move(data));
 
   absl::optional<std::vector<uint8_t>> unencrypted_payload =
@@ -299,19 +331,10 @@ ConvertPayloadContentsFromProto(
       return absl::nullopt;
   }
 
-  ::aggregation_service::mojom::AggregationCoordinator aggregation_coordinator;
-  switch (proto.aggregation_coordinator()) {
-    case proto::AggregationCoordinator::AWS_CLOUD:
-      aggregation_coordinator =
-          ::aggregation_service::mojom::AggregationCoordinator::kAwsCloud;
-      break;
-    default:
-      return absl::nullopt;
-  }
-
-  return AggregationServicePayloadContents(operation, std::move(contributions),
-                                           aggregation_mode,
-                                           aggregation_coordinator);
+  // Report storage doesn't support multiple aggregation coordinators.
+  return AggregationServicePayloadContents(
+      operation, std::move(contributions), aggregation_mode,
+      /*aggregation_coordinator_origin=*/absl::nullopt);
 }
 
 absl::optional<AggregatableReportSharedInfo> ConvertSharedInfoFromProto(
@@ -406,12 +429,8 @@ void ConvertPayloadContentsToProto(
       break;
   }
 
-  switch (payload_contents.aggregation_coordinator) {
-    case ::aggregation_service::mojom::AggregationCoordinator::kAwsCloud:
-      out->set_aggregation_coordinator(
-          proto::AggregationCoordinator::AWS_CLOUD);
-      break;
-  }
+  // Report storage doesn't support multiple aggregation coordinators.
+  CHECK(!payload_contents.aggregation_coordinator_origin.has_value());
 }
 
 void ConvertSharedInfoToProto(const AggregatableReportSharedInfo& shared_info,
@@ -467,12 +486,12 @@ AggregationServicePayloadContents::AggregationServicePayloadContents(
     std::vector<blink::mojom::AggregatableReportHistogramContribution>
         contributions,
     blink::mojom::AggregationServiceMode aggregation_mode,
-    ::aggregation_service::mojom::AggregationCoordinator
-        aggregation_coordinator)
+    absl::optional<url::Origin> aggregation_coordinator_origin)
     : operation(operation),
       contributions(std::move(contributions)),
       aggregation_mode(aggregation_mode),
-      aggregation_coordinator(aggregation_coordinator) {}
+      aggregation_coordinator_origin(
+          std::move(aggregation_coordinator_origin)) {}
 
 AggregationServicePayloadContents::AggregationServicePayloadContents(
     const AggregationServicePayloadContents& other) = default;
@@ -562,7 +581,7 @@ absl::optional<AggregatableReportRequest> AggregatableReportRequest::Create(
     int failed_send_attempts) {
   std::vector<GURL> processing_urls =
       GetDefaultProcessingUrls(payload_contents.aggregation_mode,
-                               payload_contents.aggregation_coordinator);
+                               payload_contents.aggregation_coordinator_origin);
   return CreateInternal(std::move(processing_urls), std::move(payload_contents),
                         std::move(shared_info), std::move(reporting_path),
                         debug_key, std::move(additional_fields),
@@ -724,13 +743,13 @@ AggregatableReport::AggregatableReport(
     std::string shared_info,
     absl::optional<uint64_t> debug_key,
     base::flat_map<std::string, std::string> additional_fields,
-    ::aggregation_service::mojom::AggregationCoordinator
-        aggregation_coordinator)
+    absl::optional<url::Origin> aggregation_coordinator_origin)
     : payloads_(std::move(payloads)),
       shared_info_(std::move(shared_info)),
       debug_key_(debug_key),
       additional_fields_(std::move(additional_fields)),
-      aggregation_coordinator_(aggregation_coordinator) {}
+      aggregation_coordinator_origin_(
+          std::move(aggregation_coordinator_origin)) {}
 
 AggregatableReport::AggregatableReport(const AggregatableReport& other) =
     default;
@@ -825,7 +844,7 @@ AggregatableReport::Provider::CreateFromRequestAndPublicKeys(
   return AggregatableReport(
       std::move(encrypted_payloads), std::move(encoded_shared_info),
       report_request.debug_key(), report_request.additional_fields(),
-      report_request.payload_contents().aggregation_coordinator);
+      report_request.payload_contents().aggregation_coordinator_origin);
 }
 
 base::Value::Dict AggregatableReport::GetAsJson() const {
@@ -859,9 +878,12 @@ base::Value::Dict AggregatableReport::GetAsJson() const {
 
   if (base::FeatureList::IsEnabled(
           aggregation_service::kAggregationServiceMultipleCloudProviders)) {
-    value.Set("aggregation_coordinator_identifier",
-              ::aggregation_service::SerializeAggregationCoordinator(
-                  aggregation_coordinator_));
+    value.Set(
+        "aggregation_coordinator_origin",
+        aggregation_coordinator_origin_
+            .value_or(
+                ::aggregation_service::GetDefaultAggregationCoordinatorOrigin())
+            .Serialize());
   }
 
   for (const auto& item : additional_fields_) {
@@ -892,7 +914,7 @@ bool AggregatableReport::IsNumberOfHistogramContributionsValid(
   // Note: APIs using the aggregation service may impose their own limits.
   switch (aggregation_mode) {
     case blink::mojom::AggregationServiceMode::kTeeBased:
-      return number >= 1u;
+      return true;
     case blink::mojom::AggregationServiceMode::kExperimentalPoplar:
       return number == 1u;
   }

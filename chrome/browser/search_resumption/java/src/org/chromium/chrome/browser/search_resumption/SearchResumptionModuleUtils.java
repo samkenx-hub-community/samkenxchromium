@@ -19,9 +19,8 @@ import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.search_engines.TemplateUrlServiceFactory;
 import org.chromium.chrome.browser.search_resumption.SearchResumptionUserData.SuggestionResult;
 import org.chromium.chrome.browser.signin.services.IdentityServicesProvider;
-import org.chromium.chrome.browser.sync.SyncService;
+import org.chromium.chrome.browser.sync.SyncServiceFactory;
 import org.chromium.chrome.browser.tab.Tab;
-import org.chromium.chrome.browser.tab.state.CriticalPersistedTabData;
 import org.chromium.chrome.browser.tabmodel.TabModel;
 import org.chromium.chrome.browser.tabmodel.TabModelUtils;
 import org.chromium.components.signin.identitymanager.ConsentLevel;
@@ -142,7 +141,7 @@ public class SearchResumptionModuleUtils {
             return false;
         }
 
-        if (!SyncService.get().hasKeepEverythingSynced()) {
+        if (!SyncServiceFactory.getForProfile(profile).hasKeepEverythingSynced()) {
             recordModuleNotShownReason(ModuleNotShownReason.NOT_SYNC);
             return false;
         }
@@ -163,8 +162,8 @@ public class SearchResumptionModuleUtils {
         }
 
         // Only shows the module if the Tab to track was visited within an expiration time.
-        if (TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis()
-                    - CriticalPersistedTabData.from(tabToTrack).getTimestampMillis())
+        if (TimeUnit.MILLISECONDS.toSeconds(
+                    System.currentTimeMillis() - tabToTrack.getTimestampMillis())
                 < ChromeFeatureList.getFieldTrialParamByFeatureAsInt(
                         ChromeFeatureList.SEARCH_RESUMPTION_MODULE_ANDROID,
                         TAB_EXPIRATION_TIME_PARAM, LAST_TAB_EXPIRATION_TIME_SECONDS)) {

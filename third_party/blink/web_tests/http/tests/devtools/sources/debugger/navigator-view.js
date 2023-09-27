@@ -6,6 +6,9 @@ import {TestRunner} from 'test_runner';
 import {SourcesTestRunner} from 'sources_test_runner';
 import {SDKTestRunner} from 'sdk_test_runner';
 
+import * as SDK from 'devtools/core/sdk/sdk.js';
+import * as SourcesModule from 'devtools/panels/sources/sources.js';
+
 (async function() {
   TestRunner.addResult(`Tests scripts panel file selectors.\n`);
   await TestRunner.loadLegacyModule('sources');
@@ -18,9 +21,9 @@ import {SDKTestRunner} from 'sdk_test_runner';
 
   var subframe = TestRunner.mainFrame().childFrames[0];
 
-  var sourcesNavigatorView = new Sources.NetworkNavigatorView();
+  var sourcesNavigatorView = new SourcesModule.SourcesNavigator.NetworkNavigatorView();
   sourcesNavigatorView.show(UI.inspectorView.element);
-  var contentScriptsNavigatorView = new Sources.ContentScriptsNavigatorView();
+  var contentScriptsNavigatorView = new SourcesModule.SourcesNavigator.ContentScriptsNavigatorView();
   contentScriptsNavigatorView.show(UI.inspectorView.element);
 
   var uiSourceCodes = [];
@@ -151,7 +154,7 @@ import {SDKTestRunner} from 'sdk_test_runner';
 
   TestRunner.addResult('\n\n================================================');
   TestRunner.addResult('Removing all resources:');
-  for (const target of SDK.targetManager.targets()) {
+  for (const target of SDK.TargetManager.TargetManager.instance().targets()) {
     if (target !== TestRunner.mainTarget)
       Bindings.debuggerWorkspaceBinding.resetForTest(target);
   }

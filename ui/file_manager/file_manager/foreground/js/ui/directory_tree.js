@@ -4,12 +4,13 @@
 
 import {assert, assertNotReached} from 'chrome://resources/ash/common/assert.js';
 import {dispatchSimpleEvent, getPropertyDescriptor, PropertyKind} from 'chrome://resources/ash/common/cr_deprecated.js';
+import {sanitizeInnerHtml} from 'chrome://resources/js/parse_html_subset.js';
 
 import {maybeShowTooltip} from '../../../common/js/dom_utils.js';
 import {isEntryInsideDrive} from '../../../common/js/entry_utils.js';
 import {FileType} from '../../../common/js/file_type.js';
 import {vmTypeToIconName} from '../../../common/js/icon_util.js';
-import {metrics} from '../../../common/js/metrics.js';
+import {recordEnum, recordInterval, recordSmallCount, recordUserAction, startInterval} from '../../../common/js/metrics.js';
 import {str, strf, util} from '../../../common/js/util.js';
 import {VolumeManagerCommon} from '../../../common/js/volume_manager_types.js';
 import {FileOperationManager} from '../../../externs/background/file_operation_manager.js';
@@ -147,8 +148,7 @@ DirectoryItemTreeBaseMethods.recordUMASelectedEntry =
         metricName = 'Location.OnEntryExpandedOrCollapsed.NonTopLevel';
       }
 
-      metrics.recordEnum(
-          metricName, rootType, VolumeManagerCommon.RootTypesForUMA);
+      recordEnum(metricName, rootType, VolumeManagerCommon.RootTypesForUMA);
     };
 
 Object.freeze(DirectoryItemTreeBaseMethods);
@@ -223,7 +223,8 @@ class FilesTreeItem extends TreeItem {
     this.parentTree_ = tree;
 
     const innerHTML = directorytree.createRowElementContent(id);
-    this.rowElement.innerHTML = innerHTML;
+    this.rowElement.innerHTML =
+        sanitizeInnerHtml(innerHTML, {attrs: ['class', 'id']});
     this.label = label;
   }
 
@@ -310,6 +311,10 @@ export class DirectoryItem extends FilesTreeItem {
     // @type {function()=} onMetadataUpdated_ bound to |this| used to listen
     // metadata update events.
     this.onMetadataUpdateBound_ = undefined;
+  }
+
+  get typeName() {
+    return 'directory_item';
   }
 
   /**
@@ -546,7 +551,7 @@ export class DirectoryItem extends FilesTreeItem {
     const rootType = this.rootType;
     const metricName = rootType ? (`DirectoryTree.Expand.${rootType}`) :
                                   'DirectoryTree.Expand.unknown';
-    metrics.startInterval(metricName);
+    startInterval(metricName);
 
     if (this.supportDriveSpecificIcons && !this.onMetadataUpdateBound_) {
       this.onMetadataUpdateBound_ = this.onMetadataUpdated_.bind(this);
@@ -563,11 +568,11 @@ export class DirectoryItem extends FilesTreeItem {
                     .concat(constants.DLP_METADATA_PREFETCH_PROPERTY_NAMES));
           }
 
-          metrics.recordInterval(metricName);
+          recordInterval(metricName);
         },
         () => {
           this.expanded = false;
-          metrics.recordInterval(metricName);
+          recordInterval(metricName);
         });
 
     e.stopPropagation();
@@ -1168,10 +1173,16 @@ class VolumeItem extends DirectoryItem {
     if (modelItem.volumeInfo_.providerId !== '@smb' &&
         modelItem.volumeInfo_.volumeType !==
             VolumeManagerCommon.VolumeType.SMB) {
-      this.volumeInfo_.resolveDisplayRoot((displayRoot) => {
-        this.resolved_ = true;
-        this.updateSubDirectories(false /* recursive */);
-      });
+      this.volumeInfo_.resolveDisplayRoot(
+          (displayRoot) => {
+            this.resolved_ = true;
+            this.updateSubDirectories(false /* recursive */);
+          },
+          (error) => {
+            console.warn(
+                'Failed to resolve display root of',
+                modelItem.volumeInfo_.volumeType, 'due to', error);
+          });
     }
   }
 
@@ -1364,7 +1375,7 @@ export class DriveVolumeItem extends VolumeItem {
 
       const reader = sharedDriveGrandRoot.createReader();
       reader.readEntries((results) => {
-        metrics.recordSmallCount('TeamDrivesCount', results.length);
+        recordSmallCount('TeamDrivesCount', results.length);
         // Only create grand root if there is at least 1 child/result.
         if (results.length) {
           if (index !== undefined) {
@@ -1430,7 +1441,7 @@ export class DriveVolumeItem extends VolumeItem {
 
       const reader = computerGrandRoot.createReader();
       reader.readEntries((results) => {
-        metrics.recordSmallCount('ComputersCount', results.length);
+        recordSmallCount('ComputersCount', results.length);
         // Only create grand root if there is at least 1 child/result.
         if (results.length) {
           if (index !== undefined) {
@@ -1484,9 +1495,14 @@ export class DriveVolumeItem extends VolumeItem {
     if (!target.classList.contains('expand-icon')) {
       // If the Drive volume is clicked, select one of the children instead of
       // this item itself.
-      this.volumeInfo_.resolveDisplayRoot((displayRoot) => {
-        this.searchAndSelectByEntry(displayRoot);
-      });
+      this.volumeInfo_.resolveDisplayRoot(
+          (displayRoot) => {
+            this.searchAndSelectByEntry(displayRoot);
+          },
+          (error) => {
+            console.warn(
+                'Unable to select display root for', target, 'due to', error);
+          });
     }
   }
 
@@ -1739,7 +1755,7 @@ export class ShortcutItem extends FilesTreeItem {
     const onEntryResolved = (entry) => {
       // Changes directory to the model item's root directory if needed.
       if (!util.isSameEntry(directoryModel.getCurrentDirEntry(), entry)) {
-        metrics.recordUserAction('FolderShortcut.Navigate');
+        recordUserAction('FolderShortcut.Navigate');
         directoryModel.changeDirectoryEntry(entry);
       }
     };
@@ -2002,6 +2018,10 @@ export class DirectoryTree extends Tree {
     this.privateOnDirectoryChangedBound_ = null;
   }
 
+  get typeName() {
+    return 'directory_tree';
+  }
+
   /**
    * Decorates an element.
    * @param {!DirectoryModel} directoryModel Current DirectoryModel.
@@ -2057,33 +2077,64 @@ export class DirectoryTree extends Tree {
     // For Search V2 subscribe to the store so that we can listen to search
     // becoming active and inactive. We use this to hide or show the highlight
     // of the active item in the directory tree.
-    if (util.isSearchV2Enabled()) {
-      /** @type {!SearchData|undefined} */
-      this.cachedSearchState_ = {};
-      getStore().subscribe(this);
-    }
+    /** @type {!SearchData|undefined} */
+    this.cachedSearchState_ = {};
+
+    /**
+     * Subscribe to the store so that we can listen to ODFS getting enabled or
+     * disabled. When ODFS first gets added in the store,
+     * `isODFSVolumeDisabled_` gets initialized to the right value and the
+     * directory tree and its data model are updated through other mechanisms.
+     * @type {boolean}
+     */
+    this.isODFSVolumeDisabled_ = false;
+    getStore().subscribe(this);
   }
 
   /**
    * @param {!State} state
    */
   onStateChanged(state) {
+    // Search.
     const searchState = state.search;
-    if (searchState === this.cachedSearchState_) {
-      return;
-    }
-    this.cachedSearchState_ = searchState;
-    if (searchState === undefined) {
-      this.setActiveItemHighlighted_(true);
-    } else {
-      if (searchState.status === undefined) {
+    if (searchState !== this.cachedSearchState_) {
+      this.cachedSearchState_ = searchState;
+      if (searchState === undefined) {
         this.setActiveItemHighlighted_(true);
-      } else if (
-          searchState.status === PropStatus.STARTED && searchState.query) {
-        this.setActiveItemHighlighted_(
-            (searchState.options || {}).location ===
-            SearchLocation.THIS_FOLDER);
+      } else {
+        if (searchState.status === undefined) {
+          this.setActiveItemHighlighted_(true);
+        } else if (
+            searchState.status === PropStatus.STARTED && searchState.query) {
+          this.setActiveItemHighlighted_(
+              (searchState.options || {}).location ===
+              SearchLocation.THIS_FOLDER);
+        }
       }
+    }
+
+    // ODFS.
+    const odfsDisabledUpdated =
+        Object.values(state.volumes)
+            .some(
+                volume => volume && util.isOneDriveId(volume.providerId) &&
+                    !!volume.isDisabled !== this.isODFSVolumeDisabled_);
+    if (odfsDisabledUpdated) {
+      this.isODFSVolumeDisabled_ = !this.isODFSVolumeDisabled_;
+      // Refresh data model.
+      this.dataModel.refreshNavigationItems();
+      // Remove ODFS volumes from the directoryTree so that they get redrawn
+      // with the right attributes.
+      for (let i = 0; i < this.items.length; ++i) {
+        const treeItem = this.items[i];
+        if (util.isOneDrive(treeItem.modelItem.volumeInfo)) {
+          this.remove(treeItem);
+          // Decrement to account for the removed item.
+          --i;
+        }
+      }
+      // Force-redraw directory tree.
+      this.redraw(true);
     }
   }
 
@@ -2264,14 +2315,18 @@ export class DirectoryTree extends Tree {
     if (!volumeInfo) {
       return;
     }
-    volumeInfo.resolveDisplayRoot(async () => {
-      if (this.sequence_ !== currentSequence) {
-        return;
-      }
-      if (!(await this.searchAndSelectByEntry(entry))) {
-        this.selectedItem = null;
-      }
-    });
+    volumeInfo.resolveDisplayRoot(
+        async () => {
+          if (this.sequence_ !== currentSequence) {
+            return;
+          }
+          if (!(await this.searchAndSelectByEntry(entry))) {
+            this.selectedItem = null;
+          }
+        },
+        (error) => {
+          console.warn('Failed to select by entry due to', error);
+        });
   }
 
   /**

@@ -3,13 +3,14 @@
 // found in the LICENSE file.
 
 import 'chrome://resources/cr_elements/cr_action_menu/cr_action_menu.js';
-import type {CrActionMenuElement} from 'chrome://resources/cr_elements/cr_action_menu/cr_action_menu.js';
 import 'chrome://resources/polymer/v3_0/paper-ripple/paper-ripple.js';
+
+import type {CrActionMenuElement} from 'chrome://resources/cr_elements/cr_action_menu/cr_action_menu.js';
 
 import {addCSSPrefixSelector, getCrActionMenuTop, mouseEnterMaybeShowTooltip} from '../common/js/dom_utils.js';
 import {str} from '../common/js/util.js';
 
-import {css, customElement, html, property, PropertyValues, query, state, XfBase} from './xf_base.js';
+import {css, customElement, html, property, type PropertyValues, query, state, XfBase} from './xf_base.js';
 
 
 /**
@@ -19,6 +20,9 @@ import {css, customElement, html, property, PropertyValues, query, state, XfBase
 export class XfBreadcrumb extends XfBase {
   /** A path is a "/" separated string. */
   @property({type: String, reflect: true}) path = '';
+
+  /** The maximum number of path elements shown. */
+  @property({type: Number, reflect: true}) maxPathParts = 4;
 
   static get events() {
     return {
@@ -48,7 +52,7 @@ export class XfBreadcrumb extends XfBase {
       return html``;
     }
     const parts = this.path.split('/');
-    const showElider = parts.length > 4;
+    const showElider = parts.length > this.maxPathParts;
     const partBeforeElider = parts[0];
     const eliderParts = showElider ? parts.slice(1, parts.length - 2) : [];
     const afterEliderIndex = showElider ? parts.length - 2 : 1;

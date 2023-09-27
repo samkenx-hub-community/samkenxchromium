@@ -148,6 +148,7 @@ function frameToTreeItem(frame: FrameInfo, parentProcessId: number = -1):
   }
 
   itemLabel += ` SI:${frame.siteInstance.id}`;
+  itemLabel += `, SIG:${frame.siteInstance.siteInstanceGroupId}`;
   if (frame.siteInstance.locked) {
     itemLabel += ', locked';
   } else {
@@ -167,6 +168,9 @@ function frameToTreeItem(frame: FrameInfo, parentProcessId: number = -1):
   }
   if (frame.siteInstance.isGuest) {
     itemLabel += ', guest';
+  }
+  if (frame.siteInstance.isPdf) {
+    itemLabel += ', pdf';
   }
   if (frame.siteInstance.storagePartition) {
     itemLabel += `, partition:${frame.siteInstance.storagePartition}`;

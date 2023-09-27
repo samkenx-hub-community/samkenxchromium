@@ -12,13 +12,15 @@
 #include "base/memory/weak_ptr.h"
 #include "base/scoped_observation.h"
 #include "base/time/time.h"
+#include "chrome/browser/download/bubble/download_bubble_display_info.h"
 #include "chrome/browser/download/bubble/download_display_controller.h"
 #include "chrome/browser/download/download_ui_model.h"
-#include "chrome/browser/web_applications/web_app_id.h"
+#include "chrome/browser/ui/download/download_display.h"
 #include "components/download/content/public/all_download_item_notifier.h"
 #include "components/keyed_service/core/keyed_service.h"
 #include "components/offline_items_collection/core/offline_content_provider.h"
 #include "components/offline_items_collection/core/offline_item.h"
+#include "components/webapps/common/web_app_id.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 
 class Profile;
@@ -81,7 +83,7 @@ class DownloadBubbleUpdateService
   // testing.
   virtual bool GetAllModelsToDisplay(
       std::vector<DownloadUIModel::DownloadUIModelPtr>& models,
-      const web_app::AppId* web_app_id,
+      const webapps::AppId* web_app_id,
       bool force_backfill_download_items = false);
 
   // Returns information relevant to the display state of the download button.
@@ -90,8 +92,8 @@ class DownloadBubbleUpdateService
   // initiated by normal Chrome windows. Does not prune the cache or backfill
   // missing items. May be slightly inaccurate in edge cases. Virtual for
   // testing.
-  virtual const DownloadDisplayController::AllDownloadUIModelsInfo&
-  GetAllModelsInfo(const web_app::AppId* web_app_id);
+  virtual const DownloadBubbleDisplayInfo& GetDisplayInfo(
+      const webapps::AppId* web_app_id);
 
   // Computes progress info based on in-progress downloads. If |web_app_id| is
   // non-null, the results are limited to downloads initiated by the specified
@@ -100,8 +102,8 @@ class DownloadBubbleUpdateService
   // returned progress info may be slightly inaccurate in edge cases. This is
   // ok, as it is only for the purpose of showing a progress ring around the
   // icon, which is not precise anyway. Virtual for testing.
-  virtual DownloadDisplayController::ProgressInfo GetProgressInfo(
-      const web_app::AppId* web_app_id) const;
+  virtual DownloadDisplay::ProgressInfo GetProgressInfo(
+      const webapps::AppId* web_app_id) const;
 
   // Notifies the appropriate browser windows that a download item was added.
   void NotifyWindowsOfDownloadItemAdded(download::DownloadItem* item);
@@ -197,6 +199,10 @@ class DownloadBubbleUpdateService
     return *original_download_item_notifier_;
   }
 
+  base::WeakPtr<DownloadBubbleUpdateService> GetWeakPtr() {
+    return weak_factory_.GetWeakPtr();
+  }
+
  private:
   // Encapsulates the caching functionality of DownloadBubbleUpdateService.
   // Holds two caches, one for DownloadItems and one for OfflineItems, and their
@@ -232,9 +238,8 @@ class DownloadBubbleUpdateService
     bool GetAllModelsToDisplay(
         std::vector<DownloadUIModel::DownloadUIModelPtr>& models,
         bool force_backfill_download_items = false);
-    const DownloadDisplayController::AllDownloadUIModelsInfo& GetAllModelsInfo()
-        const;
-    DownloadDisplayController::ProgressInfo GetProgressInfo() const;
+    const DownloadBubbleDisplayInfo& GetDisplayInfo() const;
+    DownloadDisplay::ProgressInfo GetProgressInfo() const;
 
     // Adds an item to the cache if it is recent enough and meets other criteria
     // for showing in the bubble. If adding an item makes the map size exceed
@@ -267,6 +272,10 @@ class DownloadBubbleUpdateService
     bool RemoveOfflineItemFromCache(
         const offline_items_collection::ContentId& id);
 
+    // Updates |all_models_info_| based on the current contents of the cache.
+    // This is kept updated as items are added or removed from the cache.
+    void UpdateAllModelsInfo();
+
     // Clears the cache.
     void DropAllDownloadItems();
     void DropAllOfflineItems();
@@ -293,10 +302,6 @@ class DownloadBubbleUpdateService
         typename SortedItems<Item>::iterator iter,
         SortedItems<Item>& cache,
         IterMap<Id, Item>& iter_map);
-
-    // Updates |all_models_info_| based on the current contents of the cache.
-    // This is kept updated as items are added or removed from the cache.
-    void UpdateAllModelsInfo();
 
     // Wraps an item into a DownloadUIModel and possibly adds it to |models|, if
     // it is new enough (newer than |cutoff_time|) and meets other criteria.
@@ -348,7 +353,7 @@ class DownloadBubbleUpdateService
 
     // Holds the latest info about all models, relevant to the display state of
     // the download toolbar icon.
-    DownloadDisplayController::AllDownloadUIModelsInfo all_models_info_;
+    DownloadBubbleDisplayInfo display_info_;
   };
 
  public:
@@ -362,14 +367,23 @@ class DownloadBubbleUpdateService
   // offline items only go into the main cache.
   bool IsMainCache(const CacheManager& cache) const;
 
+  // Called when a download with an ephemeral warning should disappear from the
+  // download bubble. To enact the disappearance, the item is omitted when
+  // calculating `all_models_info_` and GetAllModelsToDisplay(). The item
+  // remains in the cache until pruned in GetAllModelsToDisplay(). This function
+  // handles the other part of that, which is updating `all_models_info_` and
+  // notifying the display controller (which then hides the toolbar button if no
+  // other downloads are displayed).
+  void OnEphemeralWarningExpired(const std::string& guid);
+
  private:
   // Finds the appropriate CacheManager for a web app, creating one if it
   // doesn't exist.
-  CacheManager& GetCacheForWebApp(const web_app::AppId& app_id);
+  CacheManager& GetCacheForWebApp(const webapps::AppId& app_id);
   // As above, but does not create one if it doesn't exist (in which case it
   // returns nullptr).
   const CacheManager* GetExistingCacheForWebApp(
-      const web_app::AppId& app_id) const;
+      const webapps::AppId& app_id) const;
 
   // Finds the appropriate CacheManager for a download item, creating one if it
   // doesn't exist.
@@ -432,7 +446,7 @@ class DownloadBubbleUpdateService
   CacheManager main_cache_;
 
   // A separate cache for each web app.
-  std::map<web_app::AppId, CacheManager> web_app_caches_;
+  std::map<webapps::AppId, CacheManager> web_app_caches_;
 
   // Observes the offline content provider.
   base::ScopedObservation<

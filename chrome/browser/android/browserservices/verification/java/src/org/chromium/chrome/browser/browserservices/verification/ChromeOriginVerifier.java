@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -248,7 +248,6 @@ public class ChromeOriginVerifier extends OriginVerifier {
     }
 
     /** Clears all known relations. */
-    @VisibleForTesting
     public static void clearCachedVerificationsForTesting() {
         ChromeVerificationResultStore.getInstance().clearStoredRelationships();
     }
@@ -261,7 +260,7 @@ public class ChromeOriginVerifier extends OriginVerifier {
         ChromeVerificationResultStore.getInstance().clearStoredRelationships();
     }
 
-    @VisibleForTesting
+    @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
     @NativeMethods
     public interface Natives {
         long init(ChromeOriginVerifier caller, BrowserContextHandle browserContextHandle);

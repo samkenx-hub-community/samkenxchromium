@@ -11,6 +11,7 @@
 #include "ash/constants/ash_features.h"
 #include "ash/webui/common/backend/accessibility_features.h"
 #include "ash/webui/common/mojom/accessibility_features.mojom.h"
+#include "ash/webui/common/trusted_types_util.h"
 #include "ash/webui/grit/ash_scanning_app_resources.h"
 #include "ash/webui/grit/ash_scanning_app_resources_map.h"
 #include "ash/webui/scanning/mojom/scanning.mojom.h"
@@ -168,20 +169,13 @@ ScanningUI::ScanningUI(
       network::mojom::CSPDirectiveName::ScriptSrc,
       "script-src chrome://resources chrome://test chrome://webui-test "
       "'self';");
-  html_source->DisableTrustedTypesCSP();
+  ash::EnableTrustedTypesCSP(html_source);
 
   accessibility_features_ = std::make_unique<AccessibilityFeatures>();
 
   const auto resources =
       base::make_span(kAshScanningAppResources, kAshScanningAppResourcesSize);
-  SetUpWebUIDataSource(html_source, resources, IDR_SCANNING_APP_INDEX_HTML);
-
-  html_source->AddResourcePath("scanning.mojom-lite.js",
-                               IDR_SCANNING_MOJO_LITE_JS);
-  html_source->AddResourcePath("file_path.mojom-lite.js",
-                               IDR_SCANNING_APP_FILE_PATH_MOJO_LITE_JS);
-  html_source->AddResourcePath("accessibility_features.mojom-lite.js",
-                               IDR_ACCESSIBILITY_FEATURES_MOJO_LITE_JS);
+  SetUpWebUIDataSource(html_source, resources, IDR_ASH_SCANNING_APP_INDEX_HTML);
 
   AddScanningAppStrings(html_source);
 

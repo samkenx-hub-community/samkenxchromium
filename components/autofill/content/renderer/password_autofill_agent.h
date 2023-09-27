@@ -30,6 +30,7 @@
 #include "mojo/public/cpp/bindings/associated_remote.h"
 #include "mojo/public/cpp/bindings/pending_associated_receiver.h"
 #include "third_party/blink/public/common/associated_interfaces/associated_interface_registry.h"
+#include "third_party/blink/public/web/web_form_control_element.h"
 #include "third_party/blink/public/web/web_input_element.h"
 
 #if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
@@ -108,7 +109,6 @@ class PasswordAutofillAgent : public content::RenderFrameObserver,
  public:
   using UseFallbackData = base::StrongAlias<class UseFallbackDataTag, bool>;
   using ShowAll = base::StrongAlias<class ShowAllTag, bool>;
-  using GenerationShowing = base::StrongAlias<class GenerationShowingTag, bool>;
 
   PasswordAutofillAgent(content::RenderFrame* render_frame,
                         blink::AssociatedInterfaceRegistry* registry);
@@ -131,6 +131,8 @@ class PasswordAutofillAgent : public content::RenderFrameObserver,
 
   // mojom::PasswordAutofillAgent:
   void SetPasswordFillData(const PasswordFormFillData& form_data) override;
+  void FillPasswordSuggestion(const std::u16string& username,
+                              const std::u16string& password) override;
   void InformNoSavedCredentials(
       bool should_show_popup_without_passwords) override;
   void FillIntoFocusedField(bool is_password,
@@ -165,12 +167,6 @@ class PasswordAutofillAgent : public content::RenderFrameObserver,
   // Instructs `autofill_agent_` to track the autofilled `element`.
   void TrackAutofilledElement(const blink::WebFormControlElement& element);
 
-  // Fills the username and password fields of this form with the given values.
-  // Returns true if the fields were filled, false otherwise.
-  bool FillSuggestion(const blink::WebFormControlElement& control_element,
-                      const std::u16string& username,
-                      const std::u16string& password);
-
   // Previews the username and password fields of this form with the given
   // values. Returns true if the fields were previewed, false otherwise.
   bool PreviewSuggestion(const blink::WebFormControlElement& node,
@@ -204,9 +200,7 @@ class PasswordAutofillAgent : public content::RenderFrameObserver,
   // as both UIs should not be shown at the same time. This function should
   // still be called in this situation so that UMA stats can be logged.
   // Returns true if any suggestions were shown, false otherwise.
-  bool ShowSuggestions(const blink::WebInputElement& element,
-                       ShowAll show_all,
-                       GenerationShowing generation_popup_showing);
+  bool ShowSuggestions(const blink::WebInputElement& element, ShowAll show_all);
 
   // Called when new form controls are inserted.
   void OnDynamicFormsSeen();
@@ -254,6 +248,11 @@ class PasswordAutofillAgent : public content::RenderFrameObserver,
 
   // Check if the given element is a username input field.
   bool IsUsernameInputField(const blink::WebInputElement& input_element) const;
+
+  const blink::WebFormControlElement& focused_element() const {
+    CHECK(autofill_agent_);
+    return autofill_agent_->focused_element();
+  }
 
  private:
   using OnPasswordField = base::StrongAlias<class OnPasswordFieldTag, bool>;

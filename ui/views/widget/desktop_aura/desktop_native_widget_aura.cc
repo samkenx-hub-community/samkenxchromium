@@ -237,7 +237,8 @@ class DesktopNativeWidgetAuraWindowParentingClient
 
   // Overridden from client::WindowParentingClient:
   aura::Window* GetDefaultParent(aura::Window* window,
-                                 const gfx::Rect& bounds) override {
+                                 const gfx::Rect& bounds,
+                                 const int64_t display_id) override {
     // TODO(crbug.com/1236997): Re-enable this logic once Fuchsia's windowing
     // APIs provide the required functionality.
 #if !BUILDFLAG(IS_FUCHSIA)
@@ -301,9 +302,7 @@ DesktopNativeWidgetAura::DesktopNativeWidgetAura(
     : desktop_window_tree_host_(nullptr),
 
       content_window_(new aura::Window(this)),
-      native_widget_delegate_(delegate->AsWidget()->GetWeakPtr()),
-
-      cursor_(gfx::kNullCursor) {
+      native_widget_delegate_(delegate->AsWidget()->GetWeakPtr()) {
   aura::client::SetFocusChangeObserver(content_window_, this);
   wm::SetActivationChangeObserver(content_window_, this);
 }

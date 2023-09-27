@@ -7,6 +7,7 @@ package org.chromium.chrome.browser.toolbar.top;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
+import android.animation.ObjectAnimator;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.res.ColorStateList;
@@ -14,6 +15,7 @@ import android.content.res.Resources;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.LevelListDrawable;
 import android.util.AttributeSet;
+import android.util.TypedValue;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.ViewGroup;
@@ -174,6 +176,26 @@ public class ToolbarTablet
         mShouldAnimateButtonVisibilityChange = false;
         mToolbarButtonsVisible = true;
         mToolbarButtons = new ImageButton[] {mBackButton, mForwardButton, mReloadButton};
+
+        setTooltipTextForToolbarButtons();
+    }
+
+    // Set hover tooltip texts for tablets buttons.
+    @Override
+    public void setTooltipTextForToolbarButtons() {
+        // Set hover tooltip texts for toolbar buttons shared between phones and tablets.
+        super.setTooltipTextForToolbarButtons();
+
+        // Set hover tooltip texts for toolbar buttons that only on tablets.
+        super.setTooltipText(
+                mBackButton, getContext().getString(R.string.accessibility_toolbar_btn_back));
+        super.setTooltipText(
+                mForwardButton, getContext().getString(R.string.accessibility_menu_forward));
+        super.setTooltipText(
+                mReloadButton, getContext().getString(R.string.accessibility_btn_refresh));
+        super.setTooltipText(
+                mBookmarkButton, getContext().getString(R.string.accessibility_menu_bookmark));
+        super.setTooltipText(mSaveOfflineButton, getContext().getString(R.string.download_page));
     }
 
     @Override
@@ -652,6 +674,26 @@ public class ToolbarTablet
         }
 
         ButtonSpec buttonSpec = buttonData.getButtonSpec();
+
+        // Set hover highlight for profile, voice search, share and new tab button on tablets. Set
+        // box hover highlight for the rest of button variants.
+        if (buttonData.getButtonSpec().getShouldShowHoverHighlight()) {
+            mOptionalButton.setBackgroundResource(R.drawable.toolbar_button_ripple);
+        } else {
+            TypedValue themeRes = new TypedValue();
+            getContext().getTheme().resolveAttribute(
+                    R.attr.selectableItemBackground, themeRes, true);
+            mOptionalButton.setBackgroundResource(themeRes.resourceId);
+        }
+
+        // Set hover tooltip text for voice search, share and new tab button on tablets.
+        if (buttonSpec.getHoverTooltipTextId() != ButtonSpec.INVALID_TOOLTIP_TEXT_ID) {
+            super.setTooltipText(
+                    mOptionalButton, getContext().getString(buttonSpec.getHoverTooltipTextId()));
+        } else {
+            super.setTooltipText(mOptionalButton, null);
+        }
+
         mOptionalButtonUsesTint = buttonSpec.getSupportsTinting();
         if (mOptionalButtonUsesTint) {
             ImageViewCompat.setImageTintList(mOptionalButton, getTint());
@@ -685,7 +727,6 @@ public class ToolbarTablet
     }
 
     @Override
-    @VisibleForTesting
     public View getOptionalButtonViewForTesting() {
         return mOptionalButton;
     }
@@ -693,6 +734,11 @@ public class ToolbarTablet
     @Override
     public HomeButton getHomeButton() {
         return mHomeButton;
+    }
+
+    @Override
+    public ToggleTabStackButton getTabSwitcherButton() {
+        return mSwitcherButton;
     }
 
     private void setToolbarButtonsVisible(boolean visible) {
@@ -783,7 +829,11 @@ public class ToolbarTablet
 
         // Create animators for all of the toolbar buttons.
         for (ImageButton button : mToolbarButtons) {
-            animators.add(mLocationBar.createHideButtonAnimatorForTablet(button));
+            ObjectAnimator hideButtonAnimator =
+                    mLocationBar.createHideButtonAnimatorForTablet(button);
+            if (hideButtonAnimator != null) {
+                animators.add(hideButtonAnimator);
+            }
         }
 
         // Add animators for location bar.
@@ -820,12 +870,10 @@ public class ToolbarTablet
         return mToolbarButtons;
     }
 
-    @VisibleForTesting
     void enableButtonVisibilityChangeAnimationForTesting() {
         mShouldAnimateButtonVisibilityChange = true;
     }
 
-    @VisibleForTesting
     void setToolbarButtonsVisibleForTesting(boolean value) {
         mToolbarButtonsVisible = value;
     }

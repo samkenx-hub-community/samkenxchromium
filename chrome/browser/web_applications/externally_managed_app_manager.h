@@ -16,6 +16,7 @@
 #include "base/memory/weak_ptr.h"
 #include "chrome/browser/web_applications/external_install_options.h"
 #include "chrome/browser/web_applications/web_app_id.h"
+#include "components/webapps/common/web_app_id.h"
 #include "url/gurl.h"
 
 class GURL;
@@ -38,12 +39,9 @@ namespace web_app {
 class AllAppsLock;
 class ExternallyManagedAppInstallTask;
 class ExternallyManagedAppRegistrationTaskBase;
-class WebAppCommandScheduler;
 class WebAppDataRetriever;
-class WebAppInstallFinalizer;
-class WebAppUiManager;
 class WebAppUrlLoader;
-class WebContentsManager;
+class WebAppProvider;
 
 enum class RegistrationResultCode { kSuccess, kAlreadyRegistered, kTimeout };
 
@@ -71,16 +69,17 @@ class ExternallyManagedAppManager {
  public:
   struct InstallResult {
     InstallResult();
-    explicit InstallResult(webapps::InstallResultCode code,
-                           absl::optional<AppId> app_id = absl::nullopt,
-                           bool did_uninstall_and_replace = false);
+    explicit InstallResult(
+        webapps::InstallResultCode code,
+        absl::optional<webapps::AppId> app_id = absl::nullopt,
+        bool did_uninstall_and_replace = false);
     InstallResult(const InstallResult&);
     ~InstallResult();
 
     bool operator==(const InstallResult& other) const;
 
     webapps::InstallResultCode code;
-    absl::optional<AppId> app_id;
+    absl::optional<webapps::AppId> app_id;
     bool did_uninstall_and_replace = false;
     // When adding fields, please update the `==` and `<<` operators to include
     // the new field.
@@ -106,10 +105,7 @@ class ExternallyManagedAppManager {
       delete;
   virtual ~ExternallyManagedAppManager();
 
-  void SetSubsystems(WebAppUiManager* ui_manager,
-                     WebAppInstallFinalizer* finalizer,
-                     WebAppCommandScheduler* command_scheduler,
-                     WebContentsManager* web_contents_manager);
+  void SetProvider(base::PassKey<WebAppProvider>, WebAppProvider& provider);
 
   // Queues an installation operation with the highest priority. Essentially
   // installing the app immediately if there are no ongoing operations or
@@ -181,22 +177,21 @@ class ExternallyManagedAppManager {
       base::RepeatingCallback<std::unique_ptr<WebAppDataRetriever>()> factory);
 
  protected:
-  WebAppUiManager* ui_manager() { return ui_manager_; }
-  WebAppInstallFinalizer* finalizer() { return finalizer_; }
-  WebAppCommandScheduler* command_scheduler() { return command_scheduler_; }
-
   virtual void ReleaseWebContents();
 
   virtual std::unique_ptr<ExternallyManagedAppInstallTask>
   CreateInstallationTask(ExternalInstallOptions install_options);
 
   virtual std::unique_ptr<ExternallyManagedAppRegistrationTaskBase>
-  CreateRegistration(GURL launch_url);
+  CreateRegistration(GURL install_url,
+                     const base::TimeDelta registration_timeout);
 
   virtual void OnRegistrationFinished(const GURL& launch_url,
                                       RegistrationResultCode result);
 
   Profile* profile() { return profile_; }
+
+  raw_ptr<WebAppProvider> provider_ = nullptr;
 
  private:
   struct TaskAndCallback;
@@ -233,14 +228,17 @@ class ExternallyManagedAppManager {
   void UninstallForSynchronizeCallback(ExternalInstallSource source,
                                        const GURL& install_url,
                                        bool succeeded);
-  void ContinueOrCompleteSynchronization(ExternalInstallSource source);
+  void ContinueSynchronization(ExternalInstallSource source);
+  void CompleteSynchronization(ExternalInstallSource source);
 
   void PostMaybeStartNext();
 
   void MaybeStartNext();
   void MaybeStartNextOnLockAcquired(AllAppsLock& lock);
 
-  void StartInstallationTask(std::unique_ptr<TaskAndCallback> task);
+  void StartInstallationTask(
+      std::unique_ptr<TaskAndCallback> task,
+      absl::optional<AppId> installed_placeholder_app_id);
 
   bool RunNextRegistration();
 
@@ -254,11 +252,6 @@ class ExternallyManagedAppManager {
   bool IsShuttingDown();
 
   base::OnceClosure registrations_complete_callback_;
-
-  raw_ptr<WebAppUiManager, DanglingUntriaged> ui_manager_ = nullptr;
-  raw_ptr<WebAppInstallFinalizer, DanglingUntriaged> finalizer_ = nullptr;
-  raw_ptr<WebAppCommandScheduler, DanglingUntriaged> command_scheduler_ =
-      nullptr;
 
   const raw_ptr<Profile> profile_;
 
@@ -282,7 +275,8 @@ class ExternallyManagedAppManager {
   std::unique_ptr<ExternallyManagedAppRegistrationTaskBase>
       current_registration_;
 
-  base::circular_deque<GURL> pending_registrations_;
+  using UrlAndTimeout = std::tuple<GURL, const base::TimeDelta>;
+  base::circular_deque<UrlAndTimeout> pending_registrations_;
 
   RegistrationCallback registration_callback_;
 

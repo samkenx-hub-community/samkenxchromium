@@ -74,6 +74,7 @@ class MODULES_EXPORT AXNodeObject : public AXObject {
   ax::mojom::blink::Role DetermineTableSectionRole() const;
   ax::mojom::blink::Role DetermineTableCellRole() const;
   ax::mojom::blink::Role DetermineTableRowRole() const;
+  bool IsDataTable() const override;
   ax::mojom::blink::Role DetermineAccessibilityRole() override;
   ax::mojom::blink::Role NativeRoleIgnoringAria() const override;
   void AlterSliderOrSpinButtonValue(bool increase);
@@ -116,8 +117,6 @@ class MODULES_EXPORT AXNodeObject : public AXObject {
   // Check object state.
   bool IsClickable() const final;
   bool IsFocused() const override;
-  // aria-grabbed is deprecated in WAI-ARIA 1.1.
-  AccessibilityGrabbedState IsGrabbed() const override;
   AccessibilityExpanded IsExpanded() const override;
   AccessibilitySelectedState IsSelected() const override;
   bool IsSelectedFromFocusSupported() const override;
@@ -188,7 +187,6 @@ class MODULES_EXPORT AXNodeObject : public AXObject {
   ax::mojom::blink::Role AriaRoleAttribute() const final;
   void AriaDescribedbyElements(AXObjectVector&) const override;
   void AriaOwnsElements(AXObjectVector&) const override;
-  bool SupportsARIADragging() const override;
   void Dropeffects(
       Vector<ax::mojom::blink::Dropeffect>& dropeffects) const override;
 
@@ -268,9 +266,16 @@ class MODULES_EXPORT AXNodeObject : public AXObject {
   void HandleAriaExpandedChanged() override;
   void HandleActiveDescendantChanged() override;
 
-  // The aria-errormessage object or native object from a validationMessage
-  // alert.
-  AXObject* ErrorMessage() const override;
+  // Gets a list of nodes that form an error message for this node, if it
+  // exists. Error messages from ARIA will always override native error
+  // messages.
+  AXObjectVector ErrorMessage() const override;
+  // Gets a list of nodes specified by `aria-errormessage` that form an error
+  // message for this node, if any exist.
+  AXObjectVector ErrorMessageFromAria() const override;
+  // Gets a list of nodes created from HTML validation that form an error
+  // message for this node, if any exist.
+  AXObjectVector ErrorMessageFromHTML() const override;
 
   // Position in set and Size of set
   int PosInSet() const override;
@@ -334,9 +339,7 @@ class MODULES_EXPORT AXNodeObject : public AXObject {
   void AddNodeChildren();
   void AddPseudoElementChildrenFromLayoutTree();
   bool CanAddLayoutChild(LayoutObject& child);
-  // Add inline textbox children, if either force == true or
-  // AXObjectCache().InlineTextBoxAccessibilityEnabled().
-  void AddInlineTextBoxChildren(bool force = false);
+  void AddInlineTextBoxChildren();
   void AddImageMapChildren();
   void AddPopupChildren();
   bool HasValidHTMLTableStructureAndLayout() const;
@@ -353,6 +356,10 @@ class MODULES_EXPORT AXNodeObject : public AXObject {
 
   static bool IsNameFromLabelElement(HTMLElement* control);
   static bool IsRedundantLabel(HTMLLabelElement* label);
+
+#if BUILDFLAG(IS_ANDROID)
+  bool always_load_inline_text_boxes_ = false;
+#endif
 
   Member<Node> node_;
 };

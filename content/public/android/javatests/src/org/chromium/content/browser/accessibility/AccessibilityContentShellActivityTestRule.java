@@ -96,8 +96,42 @@ public class AccessibilityContentShellActivityTestRule extends ContentShellActiv
      */
     /* @Before */
     public void setupTestFramework() {
-        AccessibilityState.setIsAnyAccessibilityServiceEnabledForTesting(true);
-        AccessibilityState.setEventTypeMaskForTesting(EVENT_TYPE_MASK_ALL);
+        TestThreadUtils.runOnUiThreadBlocking(() -> {
+            AccessibilityState.setIsAnyAccessibilityServiceEnabledForTesting(true);
+            AccessibilityState.setIsScreenReaderEnabledForTesting(true);
+            AccessibilityState.setEventTypeMaskForTesting(EVENT_TYPE_MASK_ALL);
+        });
+
+        mWcax = getWebContentsAccessibility();
+        mNodeProvider = getAccessibilityNodeProvider();
+
+        mTracker = new AccessibilityActionAndEventTracker();
+        mWcax.setAccessibilityTrackerForTesting(mTracker);
+
+        FeatureList.setTestCanUseDefaultsForTesting();
+    }
+
+    public void setupTestFrameworkForBasicMode() {
+        TestThreadUtils.runOnUiThreadBlocking(() -> {
+            AccessibilityState.setIsAnyAccessibilityServiceEnabledForTesting(true);
+            AccessibilityState.setEventTypeMaskForTesting(EVENT_TYPE_MASK_ALL);
+        });
+
+        mWcax = getWebContentsAccessibility();
+        mNodeProvider = getAccessibilityNodeProvider();
+
+        mTracker = new AccessibilityActionAndEventTracker();
+        mWcax.setAccessibilityTrackerForTesting(mTracker);
+
+        FeatureList.setTestCanUseDefaultsForTesting();
+    }
+
+    public void setupTestFrameworkForFormControlsMode() {
+        TestThreadUtils.runOnUiThreadBlocking(() -> {
+            AccessibilityState.setIsAnyAccessibilityServiceEnabledForTesting(true);
+            AccessibilityState.setIsOnlyPasswordManagersEnabledForTesting(true);
+            AccessibilityState.setEventTypeMaskForTesting(EVENT_TYPE_MASK_ALL);
+        });
 
         mWcax = getWebContentsAccessibility();
         mNodeProvider = getAccessibilityNodeProvider();

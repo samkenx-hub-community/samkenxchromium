@@ -7,13 +7,13 @@ package org.chromium.net.test;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.assertThrows;
 
-import static org.chromium.net.CronetTestRule.getContext;
+import static org.chromium.net.truth.UrlResponseInfoSubject.assertThat;
 
 import android.os.ConditionVariable;
 
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 
@@ -83,7 +83,7 @@ public class FakeUrlRequestTest {
         }
     }
 
-    private class EchoBodyResponseMatcher implements ResponseMatcher {
+    private static class EchoBodyResponseMatcher implements ResponseMatcher {
         private final String mUrl;
 
         EchoBodyResponseMatcher(String url) {
@@ -107,7 +107,10 @@ public class FakeUrlRequestTest {
     @Before
     public void setUp() {
         mFakeCronetController = new FakeCronetController();
-        mFakeCronetEngine = mFakeCronetController.newFakeCronetEngineBuilder(getContext()).build();
+        mFakeCronetEngine =
+                mFakeCronetController
+                        .newFakeCronetEngineBuilder(ApplicationProvider.getApplicationContext())
+                        .build();
     }
 
     @After
@@ -152,26 +155,21 @@ public class FakeUrlRequestTest {
 
     @Test
     @SmallTest
-    public void testBuilderChecks() throws Exception {
+    public void testBuilderChecks() {
         TestUrlRequestCallback callback = new TestUrlRequestCallback();
-        try {
-            mFakeCronetEngine.newUrlRequestBuilder(null, callback, callback.getExecutor());
-            fail("URL not null-checked");
-        } catch (NullPointerException e) {
-            assertThat(e).hasMessageThat().isEqualTo("URL is required.");
-        }
-        try {
-            mFakeCronetEngine.newUrlRequestBuilder("url", null, callback.getExecutor());
-            fail("Callback not null-checked");
-        } catch (NullPointerException e) {
-            assertThat(e).hasMessageThat().isEqualTo("Callback is required.");
-        }
-        try {
-            mFakeCronetEngine.newUrlRequestBuilder("url", callback, null);
-            fail("Executor not null-checked");
-        } catch (NullPointerException e) {
-            assertThat(e).hasMessageThat().isEqualTo("Executor is required.");
-        }
+        NullPointerException e = assertThrows(NullPointerException.class,
+                ()
+                        -> mFakeCronetEngine.newUrlRequestBuilder(
+                                null, callback, callback.getExecutor()));
+        assertThat(e).hasMessageThat().isEqualTo("URL is required.");
+
+        e = assertThrows(NullPointerException.class,
+                () -> mFakeCronetEngine.newUrlRequestBuilder("url", null, callback.getExecutor()));
+        assertThat(e).hasMessageThat().isEqualTo("Callback is required.");
+
+        e = assertThrows(NullPointerException.class,
+                () -> mFakeCronetEngine.newUrlRequestBuilder("url", callback, null));
+        assertThat(e).hasMessageThat().isEqualTo("Executor is required.");
         // Verify successful creation doesn't throw.
         mFakeCronetEngine.newUrlRequestBuilder("url", callback, callback.getExecutor());
     }
@@ -185,12 +183,9 @@ public class FakeUrlRequestTest {
                         .newUrlRequestBuilder("url", callback, callback.getExecutor())
                         .build();
         // Check exception thrown for null method.
-        try {
-            request.setHttpMethod(null);
-            fail("Method not null-checked");
-        } catch (NullPointerException e) {
-            assertThat(e).hasMessageThat().isEqualTo("Method is required.");
-        }
+        NullPointerException e =
+                assertThrows(NullPointerException.class, () -> request.setHttpMethod(null));
+        assertThat(e).hasMessageThat().isEqualTo("Method is required.");
     }
 
     @Test
@@ -204,12 +199,9 @@ public class FakeUrlRequestTest {
 
         // Check exception thrown for invalid method.
         String method = "BADMETHOD";
-        try {
-            request.setHttpMethod(method);
-            fail("Method not checked for validity");
-        } catch (IllegalArgumentException e) {
-            assertThat(e).hasMessageThat().isEqualTo("Invalid http method: " + method);
-        }
+        IllegalArgumentException e =
+                assertThrows(IllegalArgumentException.class, () -> request.setHttpMethod(method));
+        assertThat(e).hasMessageThat().isEqualTo("Invalid http method: " + method);
     }
 
     @Test
@@ -243,7 +235,7 @@ public class FakeUrlRequestTest {
         request.start();
         callback.blockForDone();
 
-        assertTrue(foundMethod.get());
+        assertThat(foundMethod.get()).isTrue();
     }
 
     @Test
@@ -274,7 +266,7 @@ public class FakeUrlRequestTest {
         request.start();
         callback.blockForDone();
 
-        assertTrue(foundEntry.get());
+        assertThat(foundEntry.get()).isTrue();
     }
 
     @Test
@@ -287,13 +279,9 @@ public class FakeUrlRequestTest {
                         .build();
 
         mFakeCronetEngine.shutdown();
-        try {
-            request.start();
-            fail("Request should check that the CronetEngine is not shutdown before starting.");
-        } catch (IllegalStateException e) {
-            assertThat(e).hasMessageThat().isEqualTo(
-                    "This request's CronetEngine is already shutdown.");
-        }
+        IllegalStateException e = assertThrows(IllegalStateException.class, request::start);
+        assertThat(e).hasMessageThat().isEqualTo(
+                "This request's CronetEngine is already shutdown.");
     }
 
     @Test
@@ -334,7 +322,9 @@ public class FakeUrlRequestTest {
         request.start();
         callback.blockForDone();
 
-        assertThat(callback.mResponseInfo.getReceivedByteCount()).isEqualTo(responseText.length());
+        assertThat(callback.getResponseInfoWithChecks())
+                .hasReceivedByteCountThat()
+                .isEqualTo(responseText.length());
     }
 
     @Test
@@ -429,7 +419,7 @@ public class FakeUrlRequestTest {
         callback.startNextRead(request);
         callback.waitForNextStep();
         assertThat(callback.mResponseStep).isEqualTo(ResponseStep.ON_SUCCEEDED);
-        assertTrue(Objects.equals(callback.mResponseAsString, longResponseString));
+        assertThat(Objects.equals(callback.mResponseAsString, longResponseString)).isTrue();
     }
 
     @Test
@@ -509,7 +499,7 @@ public class FakeUrlRequestTest {
         callback.blockForDone();
 
         assertThat(callback.mResponseStep).isEqualTo(ResponseStep.ON_SUCCEEDED);
-        assertTrue(request.isDone());
+        assertThat(request.isDone()).isTrue();
     }
 
     @Test
@@ -528,13 +518,12 @@ public class FakeUrlRequestTest {
         // error.
         callback.blockForDone();
 
-        try {
-            request.setUploadDataProvider(
-                    UploadDataProviders.create(body.getBytes()), callback.getExecutor());
-            fail("UploadDataProvider cannot be changed after request has started");
-        } catch (IllegalStateException e) {
-            assertThat(e).hasMessageThat().isEqualTo("Request is already started. State is: 7");
-        }
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                ()
+                        -> request.setUploadDataProvider(
+                                UploadDataProviders.create(body.getBytes()),
+                                callback.getExecutor()));
+        assertThat(e).hasMessageThat().isEqualTo("Request is already started. State is: 7");
     }
 
     @Test
@@ -551,7 +540,7 @@ public class FakeUrlRequestTest {
         request.start();
         callback.blockForDone();
 
-        assertThat(callback.mResponseInfo.getUrlChain()).isEqualTo(expectedUrlChain);
+        assertThat(callback.getResponseInfoWithChecks()).hasUrlChainThat().isEqualTo(expectedUrlChain);
     }
 
     @Test
@@ -571,7 +560,7 @@ public class FakeUrlRequestTest {
         request.start();
         callback.blockForDone();
 
-        assertThat(callback.mResponseInfo.getUrlChain()).isEqualTo(expectedUrlChain);
+        assertThat(callback.getResponseInfoWithChecks()).hasUrlChainThat().isEqualTo(expectedUrlChain);
     }
 
     @Test
@@ -590,7 +579,9 @@ public class FakeUrlRequestTest {
         request.start();
         callback.blockForDone();
 
-        assertThat(callback.mResponseInfo.getHttpStatusCode()).isEqualTo(expectedResponseCode);
+        assertThat(callback.getResponseInfoWithChecks())
+                .hasHttpStatusCodeThat()
+                .isEqualTo(expectedResponseCode);
     }
 
     @Test
@@ -610,7 +601,9 @@ public class FakeUrlRequestTest {
         request.start();
         callback.blockForDone();
 
-        assertThat(callback.mResponseInfo.getHttpStatusText()).isEqualTo(expectedResponseText);
+        assertThat(callback.getResponseInfoWithChecks())
+                .hasHttpStatusTextThat()
+                .isEqualTo(expectedResponseText);
     }
 
     @Test
@@ -618,9 +611,8 @@ public class FakeUrlRequestTest {
     public void testResponseWasCachedCorrect() {
         TestUrlRequestCallback callback = new TestUrlRequestCallback();
         String testUrl = "TEST_URL";
-        boolean expectedWasCached = true;
         mFakeCronetController.addResponseForUrl(
-                new FakeUrlResponse.Builder().setWasCached(expectedWasCached).build(), testUrl);
+                new FakeUrlResponse.Builder().setWasCached(true).build(), testUrl);
         FakeUrlRequest request =
                 (FakeUrlRequest) mFakeCronetEngine
                         .newUrlRequestBuilder(testUrl, callback, callback.getExecutor())
@@ -628,7 +620,7 @@ public class FakeUrlRequestTest {
         request.start();
         callback.blockForDone();
 
-        assertThat(callback.mResponseInfo.wasCached()).isEqualTo(expectedWasCached);
+        assertThat(callback.getResponseInfoWithChecks()).wasCached();
     }
 
     @Test
@@ -649,7 +641,8 @@ public class FakeUrlRequestTest {
         request.start();
         callback.blockForDone();
 
-        assertThat(callback.mResponseInfo.getNegotiatedProtocol())
+        assertThat(callback.getResponseInfoWithChecks())
+                .hasNegotiatedProtocolThat()
                 .isEqualTo(expectedNegotiatedProtocol);
     }
 
@@ -668,7 +661,7 @@ public class FakeUrlRequestTest {
         request.start();
         callback.blockForDone();
 
-        assertThat(callback.mResponseInfo.getProxyServer()).isEqualTo(expectedProxyServer);
+        assertThat(callback.getResponseInfoWithChecks()).hasProxyServerThat().isEqualTo(expectedProxyServer);
     }
 
     @Test
@@ -782,16 +775,13 @@ public class FakeUrlRequestTest {
                         .newUrlRequestBuilder("url", callback, Executors.newSingleThreadExecutor())
                         .build();
         ByteBuffer buffer = ByteBuffer.allocateDirect(32 * 1024);
-        request.start();
 
+        request.start();
         request.read(buffer);
-        try {
-            request.read(buffer);
-            fail("Double read() should be disallowed.");
-        } catch (IllegalStateException e) {
-            assertThat(e).hasMessageThat().isEqualTo(
-                    "Invalid state transition - expected 4 but was 7");
-        }
+
+        IllegalStateException e =
+                assertThrows(IllegalStateException.class, () -> request.read(buffer));
+        assertThat(e).hasMessageThat().isEqualTo("Invalid state transition - expected 4 but was 7");
     }
 
     @Test
@@ -806,13 +796,9 @@ public class FakeUrlRequestTest {
                         .build();
         mFakeCronetController.addRedirectResponse("location", url);
         request.start();
-        try {
-            callback.startNextRead(request);
-            fail("Read should be disallowed while waiting for redirect.");
-        } catch (IllegalStateException e) {
-            assertThat(e).hasMessageThat().isEqualTo(
-                    "Invalid state transition - expected 4 but was 3");
-        }
+        IllegalStateException e =
+                assertThrows(IllegalStateException.class, () -> callback.startNextRead(request));
+        assertThat(e).hasMessageThat().isEqualTo("Invalid state transition - expected 4 but was 3");
         callback.waitForNextStep();
         assertThat(callback.mResponseStep).isEqualTo(ResponseStep.ON_RECEIVED_REDIRECT);
         callback.setAutoAdvance(true);
@@ -831,12 +817,9 @@ public class FakeUrlRequestTest {
                         .newUrlRequestBuilder(url, callback, callback.getExecutor())
                         .build();
         request.start();
-        try {
-            mFakeCronetEngine.shutdown();
-            fail("Shutdown not checked for active requests.");
-        } catch (IllegalStateException e) {
-            assertThat(e).hasMessageThat().isEqualTo("Cannot shutdown with running requests.");
-        }
+        IllegalStateException e =
+                assertThrows(IllegalStateException.class, mFakeCronetEngine::shutdown);
+        assertThat(e).hasMessageThat().isEqualTo("Cannot shutdown with running requests.");
         callback.waitForNextStep();
         assertThat(callback.mResponseStep).isEqualTo(ResponseStep.ON_RESPONSE_STARTED);
         callback.setAutoAdvance(true);
@@ -858,7 +841,7 @@ public class FakeUrlRequestTest {
         request.start();
         callback.blockForDone();
 
-        assertThat(callback.mResponseInfo.getHttpStatusCode()).isEqualTo(404);
+        assertThat(callback.getResponseInfoWithChecks()).hasHttpStatusCodeThat().isEqualTo(404);
     }
 
     @Test
@@ -872,12 +855,9 @@ public class FakeUrlRequestTest {
 
         mFakeCronetController.addResponseMatcher(new EchoBodyResponseMatcher());
 
-        try {
-            builder.setUploadDataProvider(null, callback.getExecutor());
-            fail("Exception not thrown");
-        } catch (NullPointerException e) {
-            assertThat(e).hasMessageThat().isEqualTo("Invalid UploadDataProvider.");
-        }
+        NullPointerException e = assertThrows(NullPointerException.class,
+                () -> builder.setUploadDataProvider(null, callback.getExecutor()));
+        assertThat(e).hasMessageThat().isEqualTo("Invalid UploadDataProvider.");
     }
 
     @Test
@@ -894,13 +874,10 @@ public class FakeUrlRequestTest {
         TestUploadDataProvider dataProvider = new TestUploadDataProvider(
                 TestUploadDataProvider.SuccessCallbackMode.SYNC, callback.getExecutor());
         builder.setUploadDataProvider(dataProvider, callback.getExecutor());
-        try {
-            builder.build().start();
-            fail("Exception not thrown");
-        } catch (IllegalArgumentException e) {
-            assertThat(e).hasMessageThat().isEqualTo(
-                    "Requests with upload data must have a Content-Type.");
-        }
+        IllegalArgumentException e =
+                assertThrows(IllegalArgumentException.class, () -> builder.build().start());
+        assertThat(e).hasMessageThat().isEqualTo(
+                "Requests with upload data must have a Content-Type.");
     }
 
     @Test
@@ -919,8 +896,7 @@ public class FakeUrlRequestTest {
         builder.build().start();
         callback.blockForDone();
 
-        assertThat(callback.mResponseInfo).isNotNull();
-        assertThat(callback.mResponseInfo.getHttpStatusCode()).isEqualTo(200);
+        assertThat(callback.getResponseInfoWithChecks()).hasHttpStatusCodeThat().isEqualTo(200);
         assertThat(callback.mResponseAsString).isEmpty();
         dataProvider.assertClosed();
     }
@@ -949,7 +925,7 @@ public class FakeUrlRequestTest {
         assertThat(dataProvider.getNumReadCalls()).isEqualTo(1);
         assertThat(dataProvider.getNumRewindCalls()).isEqualTo(0);
 
-        assertThat(callback.mResponseInfo.getHttpStatusCode()).isEqualTo(200);
+        assertThat(callback.getResponseInfoWithChecks()).hasHttpStatusCodeThat().isEqualTo(200);
         assertThat(callback.mResponseAsString).isEqualTo("test");
     }
 
@@ -975,16 +951,17 @@ public class FakeUrlRequestTest {
         FakeUrlRequest request = (FakeUrlRequest) builder.build();
         request.start();
         callback.waitForNextStep();
-        try {
-            synchronized (request.mLock) {
-                request.mFakeDataSink.onReadSucceeded(false);
-            }
-            fail("Cannot read before upload has started");
-        } catch (IllegalStateException e) {
-            assertThat(e).hasMessageThat().isEqualTo(
-                    "onReadSucceeded() called when not awaiting a read result; in state: 2");
-        }
-        request.cancel();
+
+        // clang-format off
+        // crbug/866014: clang-format doesn't handle java lambda well
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> {
+            synchronized (request.mLock) { request.mFakeDataSink.onReadSucceeded(false); }
+        });
+
+        assertThat(e).hasMessageThat().isEqualTo(
+                "onReadSucceeded() called when not awaiting a read result; in state: 2");
+
+        request.cancel(); // clang-format on
     }
 
     @Test
@@ -1009,16 +986,16 @@ public class FakeUrlRequestTest {
         FakeUrlRequest request = (FakeUrlRequest) builder.build();
         request.start();
         callback.waitForNextStep();
-        try {
-            synchronized (request.mLock) {
-                request.mFakeDataSink.onRewindSucceeded();
-            }
-            fail("Cannot rewind before upload has started");
-        } catch (IllegalStateException e) {
-            assertThat(e).hasMessageThat().isEqualTo(
-                    "onRewindSucceeded() called when not awaiting a rewind; in state: 2");
-        }
-        request.cancel();
+
+        // clang-format off
+        // crbug/866014: clang-format doesn't handle java lambda well
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> {
+            synchronized (request.mLock) { request.mFakeDataSink.onRewindSucceeded(); }
+        });
+        assertThat(e).hasMessageThat().isEqualTo(
+                "onRewindSucceeded() called when not awaiting a rewind; in state: 2");
+
+        request.cancel(); // clang-format on
     }
 
     @Test
@@ -1047,7 +1024,7 @@ public class FakeUrlRequestTest {
         assertThat(dataProvider.getNumReadCalls()).isEqualTo(4);
         assertThat(dataProvider.getNumRewindCalls()).isEqualTo(0);
 
-        assertThat(callback.mResponseInfo.getHttpStatusCode()).isEqualTo(200);
+        assertThat(callback.getResponseInfoWithChecks()).hasHttpStatusCodeThat().isEqualTo(200);
         assertThat(callback.mResponseAsString).isEqualTo("Yet another test");
     }
 
@@ -1077,7 +1054,7 @@ public class FakeUrlRequestTest {
         assertThat(dataProvider.getNumReadCalls()).isEqualTo(4);
         assertThat(dataProvider.getNumRewindCalls()).isEqualTo(0);
 
-        assertThat(callback.mResponseInfo.getHttpStatusCode()).isEqualTo(200);
+        assertThat(callback.getResponseInfoWithChecks()).hasHttpStatusCodeThat().isEqualTo(200);
         assertThat(callback.mResponseAsString).isEqualTo("Yet another test");
     }
 
@@ -1105,7 +1082,7 @@ public class FakeUrlRequestTest {
         callback.blockForDone();
         dataProvider.assertClosed();
 
-        assertThat(callback.mResponseInfo.getHttpStatusCode()).isEqualTo(200);
+        assertThat(callback.getResponseInfoWithChecks()).hasHttpStatusCodeThat().isEqualTo(200);
         assertThat(callback.mResponseAsString).isEqualTo("POST");
     }
 
@@ -1136,7 +1113,7 @@ public class FakeUrlRequestTest {
         callback.blockForDone();
         dataProvider.assertClosed();
 
-        assertThat(callback.mResponseInfo.getHttpStatusCode()).isEqualTo(200);
+        assertThat(callback.getResponseInfoWithChecks()).hasHttpStatusCodeThat().isEqualTo(200);
         assertThat(callback.mResponseAsString).isEqualTo("PUT");
     }
 
@@ -1165,7 +1142,7 @@ public class FakeUrlRequestTest {
         assertThat(dataProvider.getNumReadCalls()).isEqualTo(2);
         assertThat(dataProvider.getNumRewindCalls()).isEqualTo(1);
 
-        assertThat(callback.mResponseInfo.getHttpStatusCode()).isEqualTo(200);
+        assertThat(callback.getResponseInfoWithChecks()).hasHttpStatusCodeThat().isEqualTo(200);
         assertThat(callback.mResponseAsString).isEqualTo("test");
     }
 
@@ -1194,7 +1171,7 @@ public class FakeUrlRequestTest {
         assertThat(dataProvider.getNumReadCalls()).isEqualTo(2);
         assertThat(dataProvider.getNumRewindCalls()).isEqualTo(1);
 
-        assertThat(callback.mResponseInfo.getHttpStatusCode()).isEqualTo(200);
+        assertThat(callback.getResponseInfoWithChecks()).hasHttpStatusCodeThat().isEqualTo(200);
         assertThat(callback.mResponseAsString).isEqualTo("test");
     }
 
@@ -1236,7 +1213,7 @@ public class FakeUrlRequestTest {
                 .hasCauseThat()
                 .hasMessageThat()
                 .contains("Read upload data length 2 exceeds expected length 1");
-        assertThat(callback.mResponseInfo).isNull();
+        assertThat(callback.getResponseInfo()).isNull();
     }
 
     @Test
@@ -1275,7 +1252,7 @@ public class FakeUrlRequestTest {
                 .hasCauseThat()
                 .hasMessageThat()
                 .contains("Read upload data length 8192 exceeds expected length 8191");
-        assertThat(callback.mResponseInfo).isNull();
+        assertThat(callback.getResponseInfo()).isNull();
     }
 
     @Test
@@ -1307,7 +1284,7 @@ public class FakeUrlRequestTest {
                 .hasMessageThat()
                 .contains("Exception received from UploadDataProvider");
         assertThat(callback.mError).hasCauseThat().hasMessageThat().contains("Sync length failure");
-        assertThat(callback.mResponseInfo).isNull();
+        assertThat(callback.getResponseInfo()).isNull();
     }
 
     @Test
@@ -1340,7 +1317,7 @@ public class FakeUrlRequestTest {
                 .hasMessageThat()
                 .contains("Exception received from UploadDataProvider");
         assertThat(callback.mError).hasCauseThat().hasMessageThat().contains("Sync read failure");
-        assertThat(callback.mResponseInfo).isNull();
+        assertThat(callback.getResponseInfo()).isNull();
     }
 
     @Test
@@ -1373,7 +1350,7 @@ public class FakeUrlRequestTest {
                 .hasMessageThat()
                 .contains("Exception received from UploadDataProvider");
         assertThat(callback.mError).hasCauseThat().hasMessageThat().contains("Async read failure");
-        assertThat(callback.mResponseInfo).isNull();
+        assertThat(callback.getResponseInfo()).isNull();
     }
 
     @Test
@@ -1405,7 +1382,7 @@ public class FakeUrlRequestTest {
                 .hasMessageThat()
                 .contains("Exception received from UploadDataProvider");
         assertThat(callback.mError).hasCauseThat().hasMessageThat().contains("Thrown read failure");
-        assertThat(callback.mResponseInfo).isNull();
+        assertThat(callback.getResponseInfo()).isNull();
     }
 
     /** This test uses a direct executor for upload, and non direct for callbacks */
@@ -1445,7 +1422,7 @@ public class FakeUrlRequestTest {
                 .hasCauseThat()
                 .hasMessageThat()
                 .contains("Inline execution is prohibited for this request");
-        assertThat(callback.mResponseInfo).isNull();
+        assertThat(callback.getResponseInfo()).isNull();
     }
 
     /** This test uses a direct executor for callbacks, and non direct for upload */
@@ -1483,7 +1460,7 @@ public class FakeUrlRequestTest {
                 .hasCauseThat()
                 .hasMessageThat()
                 .contains("Inline execution is prohibited for this request");
-        assertThat(callback.mResponseInfo).isNull();
+        assertThat(callback.getResponseInfo()).isNull();
         dataProvider.assertClosed();
     }
 
@@ -1514,7 +1491,7 @@ public class FakeUrlRequestTest {
             throw callback.mError;
         }
 
-        assertThat(callback.mResponseInfo.getHttpStatusCode()).isEqualTo(200);
+        assertThat(callback.getResponseInfoWithChecks()).hasHttpStatusCodeThat().isEqualTo(200);
         assertThat(callback.mResponseAsString).isEqualTo("test");
     }
 
@@ -1547,7 +1524,7 @@ public class FakeUrlRequestTest {
                 .hasMessageThat()
                 .contains("Exception received from UploadDataProvider");
         assertThat(callback.mError).hasCauseThat().hasMessageThat().contains("Sync rewind failure");
-        assertThat(callback.mResponseInfo).isNull();
+        assertThat(callback.getResponseInfo()).isNull();
     }
 
     @Test
@@ -1582,7 +1559,7 @@ public class FakeUrlRequestTest {
                 .hasCauseThat()
                 .hasMessageThat()
                 .contains("Async rewind failure");
-        assertThat(callback.mResponseInfo).isNull();
+        assertThat(callback.getResponseInfo()).isNull();
     }
 
     @Test
@@ -1617,7 +1594,7 @@ public class FakeUrlRequestTest {
                 .hasCauseThat()
                 .hasMessageThat()
                 .contains("Thrown rewind failure");
-        assertThat(callback.mResponseInfo).isNull();
+        assertThat(callback.getResponseInfo()).isNull();
     }
 
     @Test
@@ -1677,6 +1654,28 @@ public class FakeUrlRequestTest {
         // 2 read call for the first two data chunks, and 1 for final chunk.
         assertThat(dataProvider.getNumReadCalls()).isEqualTo(3);
         assertThat(callback.mResponseAsString).isEqualTo("hello there!");
+    }
+
+    @Test
+    @SmallTest
+    public void testCancelBeforeStart_doesNotCrash() {
+        // Setup the basic response.
+        String responseText = "response text";
+        String url = "TEST_URL";
+        FakeUrlResponse response =
+                new FakeUrlResponse.Builder().setResponseBody(responseText.getBytes()).build();
+        mFakeCronetController.addResponseForUrl(response, url);
+        TestUrlRequestCallback callback = new TestUrlRequestCallback();
+        FakeUrlRequest request =
+                (FakeUrlRequest) mFakeCronetEngine
+                        .newUrlRequestBuilder(url, callback, callback.getExecutor())
+                        .build();
+
+        request.cancel();
+        request.start();
+        callback.blockForDone();
+
+        assertThat(callback.mResponseStep).isEqualTo(ResponseStep.ON_SUCCEEDED);
     }
 
     /**

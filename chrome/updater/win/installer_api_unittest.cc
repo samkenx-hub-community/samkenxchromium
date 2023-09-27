@@ -9,6 +9,7 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/test_reg_util_win.h"
 #include "base/win/registry.h"
+#include "chrome/updater/constants.h"
 #include "chrome/updater/updater_scope.h"
 #include "chrome/updater/util/win_util.h"
 #include "chrome/updater/win/win_constants.h"
@@ -19,50 +20,6 @@ namespace updater {
 namespace {
 
 constexpr char kAppId[] = "{55d6c27c-8b97-4b76-a691-2df8810004ed}";
-
-absl::optional<InstallerOutcome> GetLastInstallerOutcomeForTesting(
-    UpdaterScope updater_scope,
-    const std::string& app_id) {
-  absl::optional<base::win::RegKey> key =
-      ClientStateAppKeyOpen(updater_scope, app_id, KEY_READ);
-  if (!key) {
-    return absl::nullopt;
-  }
-  InstallerOutcome installer_outcome;
-  {
-    DWORD val = 0;
-    if (key->ReadValueDW(kRegValueLastInstallerResult, &val) == ERROR_SUCCESS) {
-      installer_outcome.installer_result =
-          *CheckedCastToEnum<InstallerResult>(val);
-    }
-    if (key->ReadValueDW(kRegValueLastInstallerError, &val) == ERROR_SUCCESS) {
-      installer_outcome.installer_error = val;
-    }
-    if (key->ReadValueDW(kRegValueLastInstallerExtraCode1, &val) ==
-        ERROR_SUCCESS) {
-      installer_outcome.installer_extracode1 = val;
-    }
-  }
-  {
-    std::wstring val;
-    if (key->ReadValue(kRegValueLastInstallerResultUIString, &val) ==
-        ERROR_SUCCESS) {
-      std::string installer_text;
-      if (base::WideToUTF8(val.c_str(), val.size(), &installer_text)) {
-        installer_outcome.installer_text = installer_text;
-      }
-    }
-    if (key->ReadValue(kRegValueLastInstallerSuccessLaunchCmdLine, &val) ==
-        ERROR_SUCCESS) {
-      std::string installer_cmd_line;
-      if (base::WideToUTF8(val.c_str(), val.size(), &installer_cmd_line)) {
-        installer_outcome.installer_cmd_line = installer_cmd_line;
-      }
-    }
-  }
-
-  return installer_outcome;
-}
 
 }  // namespace
 
@@ -106,7 +63,8 @@ TEST_P(InstallerAPITest, GetInstallerOutcome) {
 
   // No installer outcome if the ClientState for the app it does not exist.
   EXPECT_FALSE(GetInstallerOutcome(updater_scope_, kAppId));
-  EXPECT_FALSE(GetLastInstallerOutcomeForTesting(updater_scope_, kAppId));
+  EXPECT_FALSE(GetClientStateKeyLastInstallerOutcome(updater_scope_, kAppId));
+  EXPECT_FALSE(GetUpdaterKeyLastInstallerOutcome(updater_scope_));
 
   {
     InstallerOutcome installer_outcome;
@@ -129,19 +87,21 @@ TEST_P(InstallerAPITest, GetInstallerOutcome) {
   EXPECT_STREQ(installer_outcome->installer_cmd_line->c_str(), "some cmd line");
 
   // Checks that LastInstallerXXX values match the installer outcome.
-  absl::optional<InstallerOutcome> last_installer_outcome =
-      GetLastInstallerOutcomeForTesting(updater_scope_, kAppId);
-  ASSERT_TRUE(last_installer_outcome);
-  EXPECT_EQ(last_installer_outcome->installer_result,
-            installer_outcome->installer_result);
-  EXPECT_EQ(last_installer_outcome->installer_error,
-            installer_outcome->installer_error);
-  EXPECT_EQ(last_installer_outcome->installer_extracode1,
-            installer_outcome->installer_extracode1);
-  EXPECT_STREQ(last_installer_outcome->installer_text->c_str(),
-               installer_outcome->installer_text->c_str());
-  EXPECT_STREQ(last_installer_outcome->installer_cmd_line->c_str(),
-               installer_outcome->installer_cmd_line->c_str());
+  for (absl::optional<InstallerOutcome> last_installer_outcome :
+       {GetClientStateKeyLastInstallerOutcome(updater_scope_, kAppId),
+        GetUpdaterKeyLastInstallerOutcome(updater_scope_)}) {
+    ASSERT_TRUE(last_installer_outcome);
+    EXPECT_EQ(last_installer_outcome->installer_result,
+              installer_outcome->installer_result);
+    EXPECT_EQ(last_installer_outcome->installer_error,
+              installer_outcome->installer_error);
+    EXPECT_EQ(last_installer_outcome->installer_extracode1,
+              installer_outcome->installer_extracode1);
+    EXPECT_EQ(*last_installer_outcome->installer_text,
+              *installer_outcome->installer_text);
+    EXPECT_EQ(*last_installer_outcome->installer_cmd_line,
+              *installer_outcome->installer_cmd_line);
+  }
 
   // Checks that the previous call to `GetInstallerOutcome` cleared the
   // installer outcome.
@@ -188,7 +148,7 @@ TEST_P(InstallerAPITest, MakeInstallerResult) {
     installer_outcome.installer_cmd_line = "some cmd line";
     const auto installer_result = MakeInstallerResult(installer_outcome, 10);
     EXPECT_EQ(installer_result.error, 0);
-    EXPECT_EQ(installer_result.extended_error, 0);
+    EXPECT_EQ(installer_result.extended_error, -2);
     EXPECT_TRUE(installer_result.installer_text.empty());
     EXPECT_STREQ(installer_result.installer_cmd_line.c_str(), "some cmd line");
   }
@@ -201,13 +161,15 @@ TEST_P(InstallerAPITest, MakeInstallerResult) {
     installer_outcome.installer_text = "some text";
     installer_outcome.installer_cmd_line = "some cmd line";
     auto installer_result = MakeInstallerResult(installer_outcome, 10);
-    EXPECT_EQ(installer_result.error, 1);
+    EXPECT_EQ(installer_result.error, kErrorApplicationInstallerFailed);
+    EXPECT_EQ(installer_result.original_error, 1);
     EXPECT_EQ(installer_result.extended_error, -2);
     EXPECT_STREQ(installer_result.installer_text.c_str(), "some text");
     EXPECT_TRUE(installer_result.installer_cmd_line.empty());
     installer_outcome.installer_error = absl::nullopt;
     installer_result = MakeInstallerResult(installer_outcome, 10);
-    EXPECT_EQ(installer_result.error, 10);
+    EXPECT_EQ(installer_result.error, kErrorApplicationInstallerFailed);
+    EXPECT_EQ(installer_result.original_error, 10);
     EXPECT_EQ(installer_result.extended_error, -2);
     EXPECT_STREQ(installer_result.installer_text.c_str(), "some text");
     EXPECT_TRUE(installer_result.installer_cmd_line.empty());
@@ -221,13 +183,15 @@ TEST_P(InstallerAPITest, MakeInstallerResult) {
     installer_outcome.installer_text = "some text";
     installer_outcome.installer_cmd_line = "some cmd line";
     auto installer_result = MakeInstallerResult(installer_outcome, 10);
-    EXPECT_EQ(installer_result.error, 1);
+    EXPECT_EQ(installer_result.error, kErrorApplicationInstallerFailed);
+    EXPECT_EQ(installer_result.original_error, 1);
     EXPECT_EQ(installer_result.extended_error, -2);
     EXPECT_FALSE(installer_result.installer_text.empty());
     EXPECT_TRUE(installer_result.installer_cmd_line.empty());
     installer_outcome.installer_error = absl::nullopt;
     installer_result = MakeInstallerResult(installer_outcome, 10);
-    EXPECT_EQ(installer_result.error, 10);
+    EXPECT_EQ(installer_result.error, kErrorApplicationInstallerFailed);
+    EXPECT_EQ(installer_result.original_error, 10);
     EXPECT_EQ(installer_result.extended_error, -2);
     EXPECT_FALSE(installer_result.installer_text.empty());
     EXPECT_TRUE(installer_result.installer_cmd_line.empty());
@@ -241,13 +205,15 @@ TEST_P(InstallerAPITest, MakeInstallerResult) {
     installer_outcome.installer_text = "some text";
     installer_outcome.installer_cmd_line = "some cmd line";
     auto installer_result = MakeInstallerResult(installer_outcome, 10);
-    EXPECT_EQ(installer_result.error, 1);
+    EXPECT_EQ(installer_result.error, kErrorApplicationInstallerFailed);
+    EXPECT_EQ(installer_result.original_error, 1);
     EXPECT_EQ(installer_result.extended_error, -2);
     EXPECT_FALSE(installer_result.installer_text.empty());
     EXPECT_TRUE(installer_result.installer_cmd_line.empty());
     installer_outcome.installer_error = absl::nullopt;
     installer_result = MakeInstallerResult(installer_outcome, 10);
-    EXPECT_EQ(installer_result.error, 10);
+    EXPECT_EQ(installer_result.error, kErrorApplicationInstallerFailed);
+    EXPECT_EQ(installer_result.original_error, 10);
     EXPECT_EQ(installer_result.extended_error, -2);
     EXPECT_FALSE(installer_result.installer_text.empty());
     EXPECT_TRUE(installer_result.installer_cmd_line.empty());
@@ -261,14 +227,21 @@ TEST_P(InstallerAPITest, MakeInstallerResult) {
     installer_outcome.installer_text = "some text";
     installer_outcome.installer_cmd_line = "some cmd line";
     auto installer_result = MakeInstallerResult(installer_outcome, 0);
-    EXPECT_EQ(installer_result.error, 0);
-    EXPECT_EQ(installer_result.extended_error, 0);
-    EXPECT_TRUE(installer_result.installer_text.empty());
-    EXPECT_STREQ(installer_result.installer_cmd_line.c_str(), "some cmd line");
+
+    // TODO(crbug.com/1483374): reconcile update_client::InstallError overlaps
+    // with InstallerResult::kExitCode
+    EXPECT_EQ(installer_result.error, kErrorApplicationInstallerFailed);
+    EXPECT_EQ(installer_result.original_error, 1);
+    EXPECT_EQ(installer_result.extended_error, -2);
+    EXPECT_EQ(installer_result.installer_text, "some text");
+    EXPECT_TRUE(installer_result.installer_cmd_line.empty());
+
+    // `installer_outcome` overrides the exit code.
     installer_result = MakeInstallerResult(installer_outcome, 10);
-    EXPECT_EQ(installer_result.error, 10);
-    EXPECT_EQ(installer_result.extended_error, 0);
-    EXPECT_TRUE(installer_result.installer_text.empty());
+    EXPECT_EQ(installer_result.error, kErrorApplicationInstallerFailed);
+    EXPECT_EQ(installer_result.original_error, 1);
+    EXPECT_EQ(installer_result.extended_error, -2);
+    EXPECT_EQ(installer_result.installer_text, "some text");
     EXPECT_TRUE(installer_result.installer_cmd_line.empty());
   }
 }

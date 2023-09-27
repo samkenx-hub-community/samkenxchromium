@@ -15,12 +15,28 @@ BASE_FEATURE(kEnforceNoExecutableFileHandles,
              "EnforceNoExecutableFileHandles",
              FEATURE_ENABLED_BY_DEFAULT);
 
+// TODO(crbug.com/851128): Roll out this to 100% before replacing existing
+// NOTREACHED()s with NOTREACHED_NORETURN() as part of NOTREACHED() migration.
+// Note that a prerequisite for rolling out this experiment is that existing
+// NOTREACHED reports are at a very low rate. Once this rolls out we should
+// monitor that crash rates for the experiment population is within a 1-5% or
+// lower than the control group.
+BASE_FEATURE(kNotReachedIsFatal,
+             "NotReachedIsFatal",
+             FEATURE_DISABLED_BY_DEFAULT);
+
 // Optimizes parsing and loading of data: URLs.
 BASE_FEATURE(kOptimizeDataUrls, "OptimizeDataUrls", FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kSupportsUserDataFlatHashMap,
              "SupportsUserDataFlatHashMap",
              FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kUseRustJsonParser,
+             "UseRustJsonParser",
+             FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kJsonNegativeZero, "JsonNegativeZero", FEATURE_ENABLED_BY_DEFAULT);
 
 #if BUILDFLAG(IS_ANDROID)
 // Force to enable LowEndDeviceMode partially on Android mid-range devices.
@@ -34,15 +50,12 @@ BASE_FEATURE(kSupportsUserDataFlatHashMap,
 // population to collect data.
 BASE_FEATURE(kPartialLowEndModeOnMidRangeDevices,
              "PartialLowEndModeOnMidRangeDevices",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
+// Whether to report frame metrics to the Android.FrameTimeline.* histograms.
+BASE_FEATURE(kCollectAndroidFrameTimelineMetrics,
+             "CollectAndroidFrameTimelineMetrics",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-// A parameter to exclude or not exclude LowEndBackgroundCleanup from
-// PartialLowModeOnMidRangeDevices. This is used to see how
-// LowEndBackGroundCleanup affects total count of memory.gpu.privatefootprints.
-const FeatureParam<bool> kPartialLowEndModeExcludeLowEndBackgroundCleanup{
-    &kPartialLowEndModeOnMidRangeDevices, "exculde-low-end-background-cleanup",
-    false};
-
 #endif  // BUILDFLAG(IS_ANDROID)
 
 }  // namespace base::features

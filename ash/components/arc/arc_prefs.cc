@@ -29,6 +29,9 @@ const char kAlwaysOnVpnPackage[] = "arc.vpn.always_on.vpn_package";
 // is still used.
 const char kArcActiveDirectoryPlayUserId[] =
     "arc.active_directory_play_user_id";
+// Stores whether ARC app is requested in the session. Used for UMA.
+// -1 indicates no data. 0 or greaters are the number of app launch requests.
+const char kArcAppRequestedInSession[] = "arc.app_requested_in_session";
 // A preference to keep list of Android apps and their state.
 const char kArcApps[] = "arc.apps";
 // A preference to store backup and restore state for Android apps.
@@ -167,6 +170,19 @@ const char kArcVmmSwapOutTime[] = "arc_vmm_swap_out_time";
 // current ARC session.
 const char kWebViewProcessStarted[] = "arc.webview.started";
 
+// Tells us whether the initial location setting sync is required or not. With
+// Privacy Hub for ChromeOS this setting is needed to migrate the location
+// settings from existing android settings to ChromeOS.
+// Default value is true, once done we set it to false as we want to honor the
+// ChromeOS settings at boot from now on. Also in case of first time login or
+// arc opt-in, we will set this value to false.
+const char kArcInitialLocationSettingSyncRequired[] =
+    "arc.initial.location.setting.sync.required";
+
+// An integer preference to indicate the strategy of ARCVM /data migration for
+// enterprise user.
+const char kArcVmDataMigrationStrategy[] = "arc.vm_data_migration_strategy";
+
 void RegisterLocalStatePrefs(PrefRegistrySimple* registry) {
   // Sorted in lexicographical order.
   RegisterDailyMetricsPrefs(registry);
@@ -211,6 +227,7 @@ void RegisterProfilePrefs(PrefRegistrySimple* registry) {
   registry->RegisterBooleanPref(kArcEnabled, false);
   registry->RegisterBooleanPref(kArcHasAccessToRemovableMedia, false);
   registry->RegisterBooleanPref(kArcInitialSettingsPending, false);
+  registry->RegisterBooleanPref(kArcInitialLocationSettingSyncRequired, true);
   registry->RegisterBooleanPref(kArcPaiStarted, false);
   registry->RegisterBooleanPref(kArcFastAppReinstallStarted, false);
   registry->RegisterListPref(kArcFastAppReinstallPackages);
@@ -226,6 +243,9 @@ void RegisterProfilePrefs(PrefRegistrySimple* registry) {
   registry->RegisterIntegerPref(
       kArcVmDataMigrationStatus,
       static_cast<int>(ArcVmDataMigrationStatus::kUnnotified));
+  registry->RegisterIntegerPref(
+      kArcVmDataMigrationStrategy,
+      static_cast<int>(ArcVmDataMigrationStrategy::kDoNotPrompt));
 }
 
 }  // namespace prefs

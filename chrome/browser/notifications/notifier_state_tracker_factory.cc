@@ -18,7 +18,8 @@ NotifierStateTrackerFactory::GetForProfile(Profile* profile) {
 // static
 NotifierStateTrackerFactory*
 NotifierStateTrackerFactory::GetInstance() {
-  return base::Singleton<NotifierStateTrackerFactory>::get();
+  static base::NoDestructor<NotifierStateTrackerFactory> instance;
+  return instance.get();
 }
 
 NotifierStateTrackerFactory::NotifierStateTrackerFactory()
@@ -33,9 +34,10 @@ NotifierStateTrackerFactory::NotifierStateTrackerFactory()
   DependsOn(PermissionManagerFactory::GetInstance());
 }
 
-NotifierStateTrackerFactory::~NotifierStateTrackerFactory() {}
+NotifierStateTrackerFactory::~NotifierStateTrackerFactory() = default;
 
-KeyedService* NotifierStateTrackerFactory::BuildServiceInstanceFor(
+std::unique_ptr<KeyedService>
+NotifierStateTrackerFactory::BuildServiceInstanceForBrowserContext(
     content::BrowserContext* profile) const {
-  return new NotifierStateTracker(static_cast<Profile*>(profile));
+  return std::make_unique<NotifierStateTracker>(static_cast<Profile*>(profile));
 }

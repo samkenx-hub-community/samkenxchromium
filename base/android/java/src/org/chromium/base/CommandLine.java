@@ -158,8 +158,7 @@ public abstract class CommandLine {
      * Resets both the java proxy and the native command lines. This allows the entire
      * command line initialization to be re-run including the call to onJniLoaded.
      */
-    @VisibleForTesting
-    public static void reset() {
+    static void resetForTesting() {
         setInstance(null);
     }
 
@@ -173,8 +172,8 @@ public abstract class CommandLine {
      */
     @VisibleForTesting
     static String[] tokenizeQuotedArguments(char[] buffer) {
-        // Just field trials can take up to 10K of command line.
-        if (buffer.length > 64 * 1024) {
+        // Just field trials can take over 60K of command line.
+        if (buffer.length > 96 * 1024) {
             // Check that our test runners are setting a reasonable number of flags.
             throw new RuntimeException("Flags file too big: " + buffer.length);
         }
@@ -243,15 +242,6 @@ public abstract class CommandLine {
     }
 
     /**
-     * Set {@link CommandLine} for testing.
-     * @param commandLine The {@link CommandLine} to use.
-     */
-    @VisibleForTesting
-    public static void setInstanceForTesting(CommandLine commandLine) {
-        setInstance(commandLine);
-    }
-
-    /**
      * @param fileName the file to read in.
      * @return Array of chars read from the file, or null if the file cannot be read.
      */
@@ -269,7 +259,8 @@ public abstract class CommandLine {
 
     private CommandLine() {}
 
-    private static class JavaCommandLine extends CommandLine {
+    @VisibleForTesting
+    static class JavaCommandLine extends CommandLine {
         private HashMap<String, String> mSwitches = new HashMap<String, String>();
         private ArrayList<String> mArgs = new ArrayList<String>();
 

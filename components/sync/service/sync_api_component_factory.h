@@ -11,10 +11,6 @@
 #include "components/sync/base/model_type.h"
 #include "components/sync/service/data_type_controller.h"
 
-namespace invalidation {
-class InvalidationService;
-}  // namespace invalidation
-
 namespace syncer {
 
 class DataTypeEncryptionHandler;
@@ -36,19 +32,20 @@ class SyncApiComponentFactory {
       ModelTypeConfigurer* configurer,
       DataTypeManagerObserver* observer) = 0;
 
-  // Creating this in the factory helps us mock it out in testing. |invalidator|
-  // and |sync_invalidation_service| are different invalidations. SyncEngine
-  // handles incoming invalidations from both of them (if provided).
-  // |sync_invalidation_service| is a new sync-specific invalidations service
-  // and must not be null. In future, there will be only one invalidation
-  // service.
+  // Creating this in the factory helps us mock it out in testing.
+  // `sync_invalidation_service` must not be null.
   virtual std::unique_ptr<SyncEngine> CreateSyncEngine(
       const std::string& name,
-      invalidation::InvalidationService* invalidator,
       SyncInvalidationsService* sync_invalidation_service) = 0;
 
+  // Returns whether the local transport data indicates that a sync engine
+  // previously initialized successfully and hence populated at least some
+  // transport data (e.g. birthday). It also implies that the client
+  // successfully communicated to the server at least once.
+  virtual bool HasTransportDataIncludingFirstSync() = 0;
+
   // Clears all local transport data. Upon calling this, the deletion is
-  // guaranteed to finish before a new engine returned by |CreateSyncEngine()|
+  // guaranteed to finish before a new engine returned by `CreateSyncEngine()`
   // can do any proper work.
   virtual void ClearAllTransportData() = 0;
 };

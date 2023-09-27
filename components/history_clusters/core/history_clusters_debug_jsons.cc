@@ -10,10 +10,10 @@
 #include <utility>
 #include <vector>
 
+#include "base/i18n/time_formatting.h"
 #include "base/json/json_writer.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
-#include "base/time/time_to_iso8601.h"
 #include "base/values.h"
 #include "components/history/core/browser/history_types.h"
 #include "components/history_clusters/core/history_clusters_util.h"
@@ -64,6 +64,10 @@ base::Value::Dict GetDebugJSONDictForAnnotatedVisit(
                       : visit.content_annotations.search_normalized_url.spec());
   debug_visit.Set("visitSource", base::NumberToString(visit.source));
   debug_visit.Set("isKnownToSync", visit.visit_row.is_known_to_sync);
+  debug_visit.Set("normalized_url",
+                  visit.content_annotations.search_normalized_url.is_empty()
+                      ? visit.url_row.url().spec()
+                      : visit.content_annotations.search_normalized_url.spec());
 
   // Content annotations.
   base::Value::List debug_categories;
@@ -99,7 +103,7 @@ base::Value::Dict GetDebugJSONDictForAnnotatedVisit(
 }  // namespace
 
 std::string GetDebugTime(const base::Time time) {
-  return time.is_null() ? "null" : base::TimeToISO8601(time);
+  return time.is_null() ? "null" : base::TimeFormatAsIso8601(time);
 }
 
 // Gets a loggable JSON representation of `visits`.
@@ -168,10 +172,11 @@ std::string GetDebugJSONForClusters(
     debug_clusters_list.Append(std::move(debug_cluster));
   }
 
+  base::Value::Dict debug_value;
+  debug_value.Set("clusters", std::move(debug_clusters_list));
   std::string debug_string;
   if (!base::JSONWriter::WriteWithOptions(
-          debug_clusters_list, base::JSONWriter::OPTIONS_PRETTY_PRINT,
-          &debug_string)) {
+          debug_value, base::JSONWriter::OPTIONS_PRETTY_PRINT, &debug_string)) {
     debug_string = "Error: Could not write clusters to JSON.";
   }
   return debug_string;

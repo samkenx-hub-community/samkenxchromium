@@ -4,11 +4,12 @@
 
 #import "ios/chrome/browser/ui/toolbar/buttons/toolbar_button_actions_handler.h"
 
-#import "base/mac/foundation_util.h"
+#import "base/apple/foundation_util.h"
 #import "base/metrics/user_metrics.h"
 #import "base/metrics/user_metrics_action.h"
 #import "components/feature_engagement/public/event_constants.h"
 #import "components/feature_engagement/public/tracker.h"
+#import "ios/chrome/browser/intents/intents_donation_helper.h"
 #import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/shared/public/commands/activity_service_commands.h"
 #import "ios/chrome/browser/shared/public/commands/application_commands.h"
@@ -17,10 +18,6 @@
 #import "ios/chrome/browser/shared/public/commands/popup_menu_commands.h"
 #import "ios/chrome/browser/web/web_navigation_browser_agent.h"
 #import "url/gurl.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 @implementation ToolbarButtonActionsHandler {
   feature_engagement::Tracker* _engagementTracker;
@@ -45,6 +42,7 @@
 }
 
 - (void)tabGridTouchDown {
+  [IntentDonationHelper donateIntent:DonatedIntentType::kOpenTabGrid];
   [self.applicationHandler prepareTabSwitcher];
 }
 
@@ -75,7 +73,7 @@
 }
 
 - (void)newTabAction:(id)sender {
-  UIView* senderView = base::mac::ObjCCastStrict<UIView>(sender);
+  UIView* senderView = base::apple::ObjCCastStrict<UIView>(sender);
   CGPoint center = [senderView.superview convertPoint:senderView.center
                                                toView:nil];
   OpenNewTabCommand* command =
@@ -85,6 +83,8 @@
 
   _engagementTracker->NotifyEvent(
       feature_engagement::events::kNewTabToolbarItemUsed);
+
+  [IntentDonationHelper donateIntent:DonatedIntentType::kOpenNewTab];
 }
 
 - (void)cancelOmniboxFocusAction {

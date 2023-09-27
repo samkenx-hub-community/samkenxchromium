@@ -15,9 +15,6 @@
 #include "base/task/common/task_annotator.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
-#include "components/power_scheduler/power_mode.h"
-#include "components/power_scheduler/power_mode_arbiter.h"
-#include "components/power_scheduler/power_mode_voter.h"
 #include "third_party/blink/public/common/features.h"
 #include "third_party/blink/public/common/scheduler/web_scheduler_tracked_feature.h"
 #include "third_party/blink/public/platform/web_string.h"
@@ -120,7 +117,6 @@ FrameSchedulerImpl::FrameSchedulerImpl(
       main_thread_scheduler_(main_thread_scheduler),
       parent_page_scheduler_(parent_page_scheduler),
       delegate_(delegate),
-      throttling_state_(SchedulingLifecycleState::kNotThrottled),
       frame_visible_(true,
                      "FrameScheduler.FrameVisible",
                      &tracing_controller_,
@@ -178,9 +174,10 @@ FrameSchedulerImpl::FrameSchedulerImpl(
                                     "FrameScheduler.WaitingForMeaningfulPaint",
                                     &tracing_controller_,
                                     YesNoStateToString),
-      loading_power_mode_voter_(
-          power_scheduler::PowerModeArbiter::GetInstance()->NewVoter(
-              "PowerModeVoter.Loading")) {
+      is_load_event_dispatched_(false,
+                                "FrameScheduler.IsLoadEventDispatched",
+                                &tracing_controller_,
+                                YesNoStateToString) {
   frame_task_queue_controller_ = base::WrapUnique(
       new FrameTaskQueueController(main_thread_scheduler_, this, this));
   back_forward_cache_disabling_feature_tracker_.SetDelegate(delegate_);
@@ -339,10 +336,10 @@ void FrameSchedulerImpl::AddTaskTime(base::TimeDelta time) {
       base::Milliseconds(100);
   if (!delegate_)
     return;
-  task_time_ += time;
-  if (task_time_ >= kTaskDurationSendThreshold) {
-    delegate_->UpdateTaskTime(task_time_);
-    task_time_ = base::TimeDelta();
+  unreported_task_time_ += time;
+  if (unreported_task_time_ >= kTaskDurationSendThreshold) {
+    delegate_->UpdateTaskTime(unreported_task_time_);
+    unreported_task_time_ = base::TimeDelta();
   }
 }
 
@@ -406,7 +403,6 @@ QueueTraits FrameSchedulerImpl::CreateQueueTraitsForTaskType(TaskType type) {
     case TaskType::kWebSocket:
     case TaskType::kMicrotask:
     case TaskType::kUnshippedPortMessage:
-    case TaskType::kFileReading:
     case TaskType::kPresentation:
     case TaskType::kSensor:
     case TaskType::kPerformanceTimeline:
@@ -423,6 +419,12 @@ QueueTraits FrameSchedulerImpl::CreateQueueTraitsForTaskType(TaskType type) {
     case TaskType::kStorage:
       // TODO(altimin): Move appropriate tasks to throttleable task queue.
       return DeferrableTaskQueueTraits();
+    case TaskType::kFileReading:
+      // This is used by Blob operations (BlobURLStore in particular, which is
+      // associated to BlobRegistry) and should run with VT paused to prevent
+      // deadlocks when reading network requests as Blobs. See crbug.com/1455267
+      // for more details.
+      return DeferrableTaskQueueTraits().SetCanRunWhenVirtualTimePaused(true);
     // PostedMessage can be used for navigation, so we shouldn't defer it
     // when expecting a user gesture.
     case TaskType::kPostedMessage:
@@ -496,6 +498,7 @@ QueueTraits FrameSchedulerImpl::CreateQueueTraitsForTaskType(TaskType type) {
               QueueTraits::PrioritisationType::kPostMessageForwarding);
     case TaskType::kDeprecatedNone:
     case TaskType::kMainThreadTaskQueueV8:
+    case TaskType::kMainThreadTaskQueueV8LowPriority:
     case TaskType::kMainThreadTaskQueueCompositor:
     case TaskType::kMainThreadTaskQueueDefault:
     case TaskType::kMainThreadTaskQueueInput:
@@ -562,22 +565,22 @@ void FrameSchedulerImpl::DidStartProvisionalLoad() {
 
 void FrameSchedulerImpl::DidCommitProvisionalLoad(
     bool is_web_history_inert_commit,
-    NavigationType navigation_type) {
+    NavigationType navigation_type,
+    DidCommitProvisionalLoadParams params) {
   bool is_outermost_main_frame =
       GetFrameType() == FrameType::kMainFrame && !is_in_embedded_frame_tree_;
   bool is_same_document = navigation_type == NavigationType::kSameDocument;
 
   if (!is_same_document) {
-    loading_power_mode_voter_->VoteFor(power_scheduler::PowerMode::kLoading);
-    loading_power_mode_voter_->ResetVoteAfterTimeout(
-        power_scheduler::PowerModeVoter::kStuckLoadingTimeout);
-
     waiting_for_contentful_paint_ = true;
     waiting_for_meaningful_paint_ = true;
+    is_load_event_dispatched_ = false;
   }
 
   if (is_outermost_main_frame && !is_same_document) {
-    task_time_ = base::TimeDelta();
+    unreported_task_time_ = base::TimeDelta();
+  } else {
+    unreported_task_time_ = params.previous_document_unreported_task_time;
   }
 
   main_thread_scheduler_->DidCommitProvisionalLoad(
@@ -615,8 +618,6 @@ void FrameSchedulerImpl::OnStartedUsingNonStickyFeature(
     back_forward_cache_disabling_feature_tracker_.AddNonStickyFeature(
         feature, std::move(source_location), handle);
   }
-  if (policy.disable_align_wake_ups)
-    DisableAlignWakeUpsForProcess();
 }
 
 void FrameSchedulerImpl::OnStartedUsingStickyFeature(
@@ -629,8 +630,6 @@ void FrameSchedulerImpl::OnStartedUsingStickyFeature(
     back_forward_cache_disabling_feature_tracker_.AddStickyFeature(
         feature, std::move(source_location));
   }
-  if (policy.disable_align_wake_ups)
-    DisableAlignWakeUpsForProcess();
 }
 
 void FrameSchedulerImpl::OnStoppedUsingNonStickyFeature(
@@ -838,8 +837,9 @@ void FrameSchedulerImpl::OnMainFrameInteractive() {
   }
 }
 
-void FrameSchedulerImpl::OnFirstMeaningfulPaint() {
+void FrameSchedulerImpl::OnFirstMeaningfulPaint(base::TimeTicks timestamp) {
   waiting_for_meaningful_paint_ = false;
+  first_meaningful_paint_timestamp_ = timestamp;
 
   if (GetFrameType() != FrameScheduler::FrameType::kMainFrame ||
       is_in_embedded_frame_tree_) {
@@ -849,9 +849,8 @@ void FrameSchedulerImpl::OnFirstMeaningfulPaint() {
   main_thread_scheduler_->OnMainFramePaint();
 }
 
-void FrameSchedulerImpl::OnLoad() {
-  loading_power_mode_voter_->ResetVoteAfterTimeout(
-      power_scheduler::PowerModeVoter::kLoadingTimeout);
+void FrameSchedulerImpl::OnDispatchLoadEvent() {
+  is_load_event_dispatched_ = true;
 }
 
 bool FrameSchedulerImpl::IsWaitingForContentfulPaint() const {
@@ -860,6 +859,19 @@ bool FrameSchedulerImpl::IsWaitingForContentfulPaint() const {
 
 bool FrameSchedulerImpl::IsWaitingForMeaningfulPaint() const {
   return waiting_for_meaningful_paint_;
+}
+
+bool FrameSchedulerImpl::IsLoading() const {
+  if (waiting_for_meaningful_paint_) {
+    return true;
+  }
+
+  if (is_load_event_dispatched_) {
+    return false;
+  }
+
+  return base::TimeTicks::Now() - first_meaningful_paint_timestamp_ <=
+         GetLoadingPhaseBufferTimeAfterFirstMeaningfulPaint();
 }
 
 bool FrameSchedulerImpl::IsOrdinary() const {
@@ -1117,13 +1129,6 @@ WTF::HashSet<SchedulingPolicy::Feature>
 FrameSchedulerImpl::GetActiveFeaturesTrackedForBackForwardCacheMetrics() {
   return back_forward_cache_disabling_feature_tracker_
       .GetActiveFeaturesTrackedForBackForwardCacheMetrics();
-}
-
-uint64_t
-FrameSchedulerImpl::GetActiveFeaturesTrackedForBackForwardCacheMetricsMask()
-    const {
-  return back_forward_cache_disabling_feature_tracker_
-      .GetActiveFeaturesTrackedForBackForwardCacheMetricsMask();
 }
 
 base::WeakPtr<FrameOrWorkerScheduler>

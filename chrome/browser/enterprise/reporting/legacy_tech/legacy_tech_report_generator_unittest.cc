@@ -11,15 +11,19 @@
 namespace enterprise_reporting {
 
 namespace {
-base::Time::Exploded kTestDate = {
-    2023, 5,  4,  4,  // May. 4, 2023, Thu
-    22,   10, 15, 0   // 22:10:15.000
-};
 
-base::Time::Exploded kTestDateInMidnight = {
-    2023, 5, 4, 4,  // May. 4, 2023, Thu
-    0,    0, 0, 0   // 00:00:00.000
-};
+constexpr base::Time::Exploded kTestDate = {.year = 2023,
+                                            .month = 5,
+                                            .day_of_week = 4,
+                                            .day_of_month = 4,
+                                            .hour = 22,
+                                            .minute = 10,
+                                            .second = 15};
+
+constexpr base::Time::Exploded kTestDateInMidnight = {.year = 2023,
+                                                      .month = 5,
+                                                      .day_of_week = 4,
+                                                      .day_of_month = 4};
 
 }  // namespace
 
@@ -41,18 +45,17 @@ TEST_F(LegacyTechGeneratorTest, Test) {
   ASSERT_TRUE(base::Time::FromUTCExploded(kTestDate, &data.timestamp));
 
   LegacyTechReportGenerator generator;
-  auto reports = generator.Generate(data);
-  ASSERT_EQ(1u, reports.size());
+  auto report = generator.Generate(data);
 
-  EXPECT_EQ(data.type, reports[0]->feature_id());
-  EXPECT_EQ(data.url.spec(), reports[0]->url());
-  EXPECT_EQ(data.matched_url, reports[0]->allowlisted_url_match());
-  EXPECT_EQ(data.filename, reports[0]->filename());
-  EXPECT_EQ(data.column, reports[0]->column());
-  EXPECT_EQ(data.line, reports[0]->line());
+  EXPECT_EQ(data.type, report->feature_id());
+  EXPECT_EQ(data.url.spec(), report->url());
+  EXPECT_EQ(data.matched_url, report->allowlisted_url_match());
+  EXPECT_EQ(data.filename, report->filename());
+  EXPECT_EQ(data.column, report->column());
+  EXPECT_EQ(data.line, report->line());
   base::Time midnight;
   ASSERT_TRUE(base::Time::FromUTCExploded(kTestDateInMidnight, &midnight));
-  EXPECT_EQ(midnight.ToJavaTime(), reports[0]->event_timestamp_millis());
+  EXPECT_EQ(midnight.ToJavaTime(), report->event_timestamp_millis());
 }
 
 }  // namespace enterprise_reporting

@@ -191,6 +191,10 @@ AccountTrackerService::AccountTrackerService() {
 
 AccountTrackerService::~AccountTrackerService() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+#if BUILDFLAG(IS_ANDROID)
+  JNIEnv* env = base::android::AttachCurrentThread();
+  signin::Java_AccountTrackerService_destroy(env, java_ref_);
+#endif
   pref_service_ = nullptr;
   accounts_.clear();
 }
@@ -366,22 +370,26 @@ void AccountTrackerService::SetAccountCapabilities(
   AccountInfo& account_info = accounts_[account_id];
 
   bool modified = account_info.capabilities.UpdateWith(account_capabilities);
-  if (!modified)
-    return;
 
 #if !(BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_CHROMEOS))
   // Set the child account status based on the account capabilities.
-  if (base::FeatureList::IsEnabled(
-          supervised_user::kEnableSupervisionOnDesktopAndIOS)) {
-    SetIsChildAccount(
-        account_id,
-        account_info.capabilities.is_subject_to_parental_controls() ==
-            signin::Tribool::kTrue);
+  if (supervised_user::IsChildAccountSupervisionEnabled()) {
+    modified =
+        UpdateAccountInfoChildStatus(
+            account_info,
+            account_info.capabilities.is_subject_to_parental_controls() ==
+                signin::Tribool::kTrue) ||
+        modified;
   }
 #endif
 
-  if (!account_info.gaia.empty())
+  if (!modified) {
+    return;
+  }
+
+  if (!account_info.gaia.empty()) {
     NotifyAccountUpdated(account_info);
+  }
   SaveToPrefs(account_info);
 }
 
@@ -389,11 +397,10 @@ void AccountTrackerService::SetIsChildAccount(const CoreAccountId& account_id,
                                               bool is_child_account) {
   DCHECK(base::Contains(accounts_, account_id)) << account_id.ToString();
   AccountInfo& account_info = accounts_[account_id];
-  signin::Tribool new_status =
-      is_child_account ? signin::Tribool::kTrue : signin::Tribool::kFalse;
-  if (account_info.is_child_account == new_status)
+  bool modified = UpdateAccountInfoChildStatus(account_info, is_child_account);
+  if (!modified) {
     return;
-  account_info.is_child_account = new_status;
+  }
   if (!account_info.gaia.empty())
     NotifyAccountUpdated(account_info);
   SaveToPrefs(account_info);
@@ -811,11 +818,14 @@ CoreAccountId AccountTrackerService::PickAccountIdForAccount(
 #endif
 }
 
-CoreAccountId AccountTrackerService::SeedAccountInfo(const std::string& gaia,
-                                                     const std::string& email) {
+CoreAccountId AccountTrackerService::SeedAccountInfo(
+    const std::string& gaia,
+    const std::string& email,
+    signin_metrics::AccessPoint access_point) {
   AccountInfo account_info;
   account_info.gaia = gaia;
   account_info.email = email;
+  account_info.access_point = access_point;
   CoreAccountId account_id = SeedAccountInfo(account_info);
 
   DVLOG(1) << "AccountTrackerService::SeedAccountInfo"
@@ -855,6 +865,18 @@ void AccountTrackerService::RemoveAccount(const CoreAccountId& account_id) {
   StopTrackingAccount(account_id);
 }
 
+bool AccountTrackerService::UpdateAccountInfoChildStatus(
+    AccountInfo& account_info,
+    bool is_child_account) {
+  signin::Tribool new_status =
+      is_child_account ? signin::Tribool::kTrue : signin::Tribool::kFalse;
+  if (account_info.is_child_account == new_status) {
+    return false;
+  }
+  account_info.is_child_account = new_status;
+  return true;
+}
+
 #if BUILDFLAG(IS_ANDROID)
 base::android::ScopedJavaLocalRef<jobject>
 AccountTrackerService::GetJavaObject() {
@@ -889,10 +911,5 @@ void AccountTrackerService::SeedAccountsInfo(
   for (const auto& core_account_info : curr_core_account_infos) {
     SeedAccountInfo(core_account_info.gaia, core_account_info.email);
   }
-}
-
-jboolean signin::JNI_AccountTrackerService_IsGaiaIdInAMFEnabled(JNIEnv* env) {
-  return base::FeatureList::IsEnabled(
-      switches::kGaiaIdCacheInAccountManagerFacade);
 }
 #endif

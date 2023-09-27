@@ -4,6 +4,9 @@
 
 import {TestRunner} from 'test_runner';
 
+import * as Common from 'devtools/core/common/common.js';
+import * as BindingsModule from 'devtools/models/bindings/bindings.js';
+
 (async function() {
   TestRunner.addResult(`Tests that the changes sidebar contains the changed uisourcecodes.\n`);
   await TestRunner.loadLegacyModule('workspace_diff');
@@ -12,7 +15,7 @@ import {TestRunner} from 'test_runner';
   var fulfill = function() {};
   var workspace = new Workspace.Workspace();
   var project =
-      new Bindings.ContentProviderBasedProject(workspace, 'mockProject', Workspace.projectTypes.Network, '', false);
+      new BindingsModule.ContentProviderBasedProject.ContentProviderBasedProject(workspace, 'mockProject', Workspace.projectTypes.Network, '', false);
   var workspaceDiff = new WorkspaceDiff.WorkspaceDiff(workspace);
   TestRunner.addSniffer(
       WorkspaceDiff.WorkspaceDiff.prototype, 'uiSourceCodeProcessedForTest', modifiedStatusChanged, true);
@@ -65,6 +68,6 @@ import {TestRunner} from 'test_runner';
 
   function addUISourceCode(url, content) {
     return project.addContentProvider(
-        url, TextUtils.StaticContentProvider.fromString(url, Common.resourceTypes.Stylesheet, content));
+        url, TextUtils.StaticContentProvider.fromString(url, Common.ResourceType.resourceTypes.Stylesheet, content));
   }
 })();

@@ -12,6 +12,7 @@
 #include "components/content_settings/core/browser/cookie_settings.h"
 #include "components/content_settings/core/common/content_settings.h"
 #include "components/content_settings/core/test/content_settings_mock_provider.h"
+#include "components/privacy_sandbox/privacy_sandbox_attestations/privacy_sandbox_attestations.h"
 #include "components/privacy_sandbox/privacy_sandbox_prefs.h"
 #include "components/privacy_sandbox/privacy_sandbox_settings.h"
 #include "content/public/test/browser_task_environment.h"
@@ -86,6 +87,18 @@ class MockPrivacySandboxSettingsDelegate
     });
   }
 
+  void SetUpIsCookieDeprecationExperimentEligibleResponse(bool eligible) {
+    ON_CALL(*this, IsCookieDeprecationExperimentEligible).WillByDefault([=]() {
+      return eligible;
+    });
+  }
+
+  void SetUpIsCookieDeprecationExperimentCurrentlyEligibleResponse(
+      bool eligible) {
+    ON_CALL(*this, IsCookieDeprecationExperimentCurrentlyEligible)
+        .WillByDefault([=]() { return eligible; });
+  }
+
   MOCK_METHOD(bool, IsPrivacySandboxRestricted, (), (const, override));
   MOCK_METHOD(bool,
               IsPrivacySandboxCurrentlyUnrestricted,
@@ -95,6 +108,14 @@ class MockPrivacySandboxSettingsDelegate
   MOCK_METHOD(bool, IsIncognitoProfile, (), (const, override));
   MOCK_METHOD(bool, HasAppropriateTopicsConsent, (), (const, override));
   MOCK_METHOD(bool, IsSubjectToM1NoticeRestricted, (), (const, override));
+  MOCK_METHOD(bool,
+              IsCookieDeprecationExperimentEligible,
+              (),
+              (const, override));
+  MOCK_METHOD(bool,
+              IsCookieDeprecationExperimentCurrentlyEligible,
+              (),
+              (const, override));
 };
 
 // A declarative test case is a collection of key value pairs, which each define
@@ -128,6 +149,7 @@ enum class StateKey {
   kHasAppropriateTopicsConsent = 24,
   kM1RestrictedNoticeAcknowledged = 25,
   kAttestationsMap = 26,
+  kBlockFledgeJoiningForEtldplus1 = 27,
 };
 
 // Defines the input to the functions under test.
@@ -142,6 +164,7 @@ enum class InputKey {
   kTopicsToggleNewValue = 8,
   kForceChromeBuild = 9,
   kPromptAction = 10,
+  kEventReportingDestinationOrigin = 11,
 };
 
 // Defines the expected output of the functions under test, when the profile is
@@ -149,7 +172,6 @@ enum class InputKey {
 enum class OutputKey {
   kIsTopicsAllowed = 1,
   kIsTopicsAllowedForContext = 2,
-  kIsFledgeAllowed = 3,
   kIsAttributionReportingAllowed = 4,
   kMaySendAttributionReport = 5,
   kIsSharedStorageAllowed = 6,
@@ -157,7 +179,6 @@ enum class OutputKey {
   kIsPrivateAggregationAllowed = 8,
   kIsTopicsAllowedMetric = 9,
   kIsTopicsAllowedForContextMetric = 10,
-  kIsFledgeAllowedMetric = 11,
   kIsAttributionReportingAllowedMetric = 12,
   kMaySendAttributionReportMetric = 13,
   kIsSharedStorageAllowedMetric = 14,
@@ -178,6 +199,22 @@ enum class OutputKey {
   kIsAttributionReportingEverAllowed = 29,
   kIsAttributionReportingEverAllowedMetric = 30,
   kM1RestrictedNoticeAcknowledged = 31,
+  kIsEventReportingDestinationAttestedForFledge = 32,
+  kIsEventReportingDestinationAttestedForSharedStorage = 33,
+  kIsEventReportingDestinationAttestedForFledgeMetric = 34,
+  kIsEventReportingDestinationAttestedForSharedStorageMetric = 35,
+  kIsFledgeJoinAllowed = 36,
+  kIsFledgeLeaveAllowed = 37,
+  kIsFledgeUpdateAllowed = 38,
+  kIsFledgeSellAllowed = 39,
+  kIsFledgeBuyAllowed = 40,
+  kIsFledgeJoinAllowedMetric = 41,
+  kIsFledgeLeaveAllowedMetric = 42,
+  kIsFledgeUpdateAllowedMetric = 43,
+  kIsFledgeSellAllowedMetric = 44,
+  kIsFledgeBuyAllowedMetric = 45,
+  kIsCookieDeprecationLabelAllowedForContext = 46,
+  kIsPrivateAggregationDebugModeAllowed = 47,
 };
 
 // To allow multiple input keys to map to the same value, without having to
@@ -201,20 +238,20 @@ using SiteDataExceptions = std::vector<SiteDataException>;
 // key types, the set of value types associated with those keys is shared, and
 // represented by this variant. When accessing keys, the test util will expect
 // a particular value type, and will error otherwise.
-using TestCaseItemValue =
-    absl::variant<bool,
-                  std::string,
-                  url::Origin,
-                  GURL,
-                  content_settings::CookieControlsMode,
-                  SiteDataExceptions,
-                  ContentSetting,
-                  int,
-                  base::Time,
-                  base::TimeDelta,
-                  privacy_sandbox::TopicsConsentUpdateSource,
-                  std::vector<int>,
-                  privacy_sandbox::PrivacySandboxAttestationsMap>;
+using TestCaseItemValue = absl::variant<
+    bool,
+    std::string,
+    url::Origin,
+    GURL,
+    content_settings::CookieControlsMode,
+    SiteDataExceptions,
+    ContentSetting,
+    int,
+    base::Time,
+    base::TimeDelta,
+    privacy_sandbox::TopicsConsentUpdateSource,
+    std::vector<int>,
+    absl::optional<privacy_sandbox::PrivacySandboxAttestationsMap>>;
 
 using TestState = std::map<TestKey<StateKey>, TestCaseItemValue>;
 using TestInput = std::map<TestKey<InputKey>, TestCaseItemValue>;

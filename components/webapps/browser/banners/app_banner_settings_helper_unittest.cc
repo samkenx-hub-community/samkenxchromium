@@ -25,19 +25,13 @@ const char kSameOriginTestURL2[] = "https://www.google.com/foo2.html";
 const char kTestPackageName[] = "test.package";
 
 base::Time GetReferenceTime() {
-  base::Time::Exploded exploded_reference_time;
-  exploded_reference_time.year = 2015;
-  exploded_reference_time.month = 1;
-  exploded_reference_time.day_of_month = 30;
-  exploded_reference_time.day_of_week = 5;
-  exploded_reference_time.hour = 11;
-  exploded_reference_time.minute = 0;
-  exploded_reference_time.second = 0;
-  exploded_reference_time.millisecond = 0;
-
+  static constexpr base::Time::Exploded kReferenceTime = {.year = 2015,
+                                                          .month = 1,
+                                                          .day_of_week = 5,
+                                                          .day_of_month = 30,
+                                                          .hour = 11};
   base::Time out_time;
-  EXPECT_TRUE(
-      base::Time::FromLocalExploded(exploded_reference_time, &out_time));
+  EXPECT_TRUE(base::Time::FromLocalExploded(kReferenceTime, &out_time));
   return out_time;
 }
 
@@ -174,7 +168,7 @@ TEST_F(AppBannerSettingsHelperTest, ReportsWhetherBannerWasRecentlyIgnored) {
   NavigateAndCommit(url);
 
   base::Time reference_time = GetReferenceTime();
-  base::Time one_week_ago = reference_time - base::Days(7);
+  base::Time one_week_ago = reference_time - base::Days(6);
   base::Time one_year_ago = reference_time - base::Days(366);
 
   EXPECT_FALSE(AppBannerSettingsHelper::WasBannerRecentlyIgnored(
@@ -195,7 +189,7 @@ TEST_F(AppBannerSettingsHelperTest, ReportsWhetherBannerWasRecentlyIgnored) {
       web_contents(), url, kTestPackageName, reference_time));
 
   // Change the number of days enforced.
-  AppBannerSettingsHelper::ScopedTriggerSettings trigger_settings(90, 6);
+  AppBannerSettingsHelper::ScopedTriggerSettings trigger_settings(90, 5);
 
   EXPECT_FALSE(AppBannerSettingsHelper::WasBannerRecentlyIgnored(
       web_contents(), url, kTestPackageName, reference_time));
@@ -222,7 +216,7 @@ TEST_F(AppBannerSettingsHelperTest, OperatesOnOrigins) {
       service->GetScore(otherURL)));
 
   base::Time reference_time = GetReferenceTime();
-  base::Time one_week_ago = reference_time - base::Days(7);
+  base::Time one_week_ago = reference_time - base::Days(5);
 
   // If url is blocked, otherURL will also be reported as blocked.
   EXPECT_FALSE(AppBannerSettingsHelper::WasBannerRecentlyBlocked(

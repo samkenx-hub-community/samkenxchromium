@@ -26,6 +26,7 @@
 #include "third_party/blink/renderer/core/css_value_keywords.h"
 #include "third_party/blink/renderer/core/dom/element_traversal.h"
 #include "third_party/blink/renderer/core/dom/events/event.h"
+#include "third_party/blink/renderer/core/dom/events/mutation_event_suppression_scope.h"
 #include "third_party/blink/renderer/core/dom/flat_tree_traversal.h"
 #include "third_party/blink/renderer/core/dom/shadow_root.h"
 #include "third_party/blink/renderer/core/dom/slot_assignment.h"
@@ -65,6 +66,10 @@ void HTMLDetailsElement::DispatchPendingEvent(
 
 LayoutObject* HTMLDetailsElement::CreateLayoutObject(
     const ComputedStyle& style) {
+  if (RuntimeEnabledFeatures::DetailsStylingEnabled()) {
+    return HTMLElement::CreateLayoutObject(style);
+  }
+
   return LayoutObject::CreateBlockFlowOrListItem(this, style);
 }
 
@@ -85,11 +90,17 @@ void HTMLDetailsElement::DidAddUserAgentShadowRoot(ShadowRoot& root) {
 
   summary_slot_ = MakeGarbageCollected<HTMLSlotElement>(GetDocument());
   summary_slot_->SetIdAttribute(shadow_element_names::kIdDetailsSummary);
+  if (RuntimeEnabledFeatures::DetailsStylingEnabled()) {
+    summary_slot_->SetShadowPseudoId(shadow_element_names::kIdDetailsSummary);
+  }
   summary_slot_->AppendChild(default_summary);
   root.AppendChild(summary_slot_);
 
   content_slot_ = MakeGarbageCollected<HTMLSlotElement>(GetDocument());
   content_slot_->SetIdAttribute(shadow_element_names::kIdDetailsContent);
+  if (RuntimeEnabledFeatures::DetailsStylingEnabled()) {
+    content_slot_->SetShadowPseudoId(shadow_element_names::kIdDetailsContent);
+  }
   content_slot_->SetInlineStyleProperty(CSSPropertyID::kContentVisibility,
                                         CSSValueID::kHidden);
   content_slot_->EnsureDisplayLockContext().SetIsDetailsSlotElement(true);
@@ -97,8 +108,8 @@ void HTMLDetailsElement::DidAddUserAgentShadowRoot(ShadowRoot& root) {
                                         CSSValueID::kBlock);
   root.AppendChild(content_slot_);
 
-  auto* default_summary_style = MakeGarbageCollected<HTMLStyleElement>(
-      GetDocument(), CreateElementFlags::ByCreateElement());
+  auto* default_summary_style =
+      MakeGarbageCollected<HTMLStyleElement>(GetDocument());
   // This style is required only if this <details> shows the UA-provided
   // <summary>, not a light child <summary>.
   default_summary_style->setTextContent(R"CSS(
@@ -155,6 +166,13 @@ void HTMLDetailsElement::Trace(Visitor* visitor) const {
 
 void HTMLDetailsElement::ParseAttribute(
     const AttributeModificationParams& params) {
+  CHECK(params.reason != AttributeModificationReason::kByParser ||
+        !parentNode())
+      << "This code depends on the parser setting attributes before inserting "
+         "into the document; if that were not the case we would need to "
+         "handle setting of either open or name by the parser, and "
+         "potentially change the open attribute during that handling.";
+
   if (params.name == html_names::kOpenAttr) {
     bool old_value = is_open_;
     is_open_ = !params.new_value.IsNull();
@@ -180,17 +198,18 @@ void HTMLDetailsElement::ParseAttribute(
       // other ones with the same name.
       CHECK_NE(params.reason,
                AttributeModificationReason::kBySynchronizationOfLazyAttribute);
-      if (!name_.IsNull() && IsInTreeScope() &&
+      // TODO(https://crbug.com/1444057): Should this be in
+      // AttributeChanged instead?
+      if (RuntimeEnabledFeatures::AccordionPatternEnabled() &&
+          !GetName().empty() &&
           params.reason == AttributeModificationReason::kDirectly) {
-        CHECK(RuntimeEnabledFeatures::AccordionPatternEnabled());
-        // Copy the set of details elements, because the setAttribute
-        // call can trigger mutation events that change the set.
+        // It's important that we have a copy of the set of details
+        // elements, because the setAttribute call can trigger mutation
+        // events that change the set.
         HeapVector<Member<HTMLDetailsElement>> details_with_name(
-            *GetTreeScope().NamedDetailsElements().at(name_));
+            OtherElementsInNameGroup());
         for (HTMLDetailsElement* other_details : details_with_name) {
-          if (other_details == this) {
-            continue;
-          }
+          CHECK_NE(other_details, this);
           other_details->setAttribute(html_names::kOpenAttr, g_null_atom);
         }
       }
@@ -201,50 +220,77 @@ void HTMLDetailsElement::ParseAttribute(
                                       CSSValueID::kHidden);
       content->EnsureDisplayLockContext().SetIsDetailsSlotElement(true);
     }
-  } else if (params.name == html_names::kNameAttr &&
-             RuntimeEnabledFeatures::AccordionPatternEnabled()) {
-    RemoveNameFromMap(GetTreeScope());
-    name_ = params.new_value;
-    AddNameToMap(GetTreeScope());
   } else {
     HTMLElement::ParseAttribute(params);
   }
 }
 
-void HTMLDetailsElement::DidMoveToNewTreeScope(TreeScope& old_scope) {
-  if (!name_.IsNull()) {
-    CHECK(RuntimeEnabledFeatures::AccordionPatternEnabled());
-
-    RemoveNameFromMap(old_scope);
-    AddNameToMap(GetTreeScope());
+void HTMLDetailsElement::AttributeChanged(
+    const AttributeModificationParams& params) {
+  const QualifiedName& name = params.name;
+  if (name == html_names::kNameAttr) {
+    MaybeCloseForExclusivity();
   }
+
+  HTMLElement::AttributeChanged(params);
 }
 
-void HTMLDetailsElement::AddNameToMap(TreeScope& tree_scope) {
-  if (!name_.IsNull()) {
-    CHECK(RuntimeEnabledFeatures::AccordionPatternEnabled());
+Node::InsertionNotificationRequest HTMLDetailsElement::InsertedInto(
+    ContainerNode& insertion_point) {
+  Node::InsertionNotificationRequest result =
+      HTMLElement::InsertedInto(insertion_point);
 
-    const auto add_result =
-        tree_scope.NamedDetailsElements().insert(name_, nullptr);
-    Member<Document::DetailsSet>& details_set = add_result.stored_value->value;
-    DCHECK_EQ(add_result.is_new_entry, !details_set);
-    if (!details_set) {
-      details_set = MakeGarbageCollected<Document::DetailsSet>();
+  {
+    // Don't fire mutation events for any changes to the open attribute
+    // that this causes.
+    MutationEventSuppressionScope scope(GetDocument());
+
+    MaybeCloseForExclusivity();
+  }
+
+  return result;
+}
+
+void HTMLDetailsElement::MaybeCloseForExclusivity() {
+  if (!RuntimeEnabledFeatures::AccordionPatternEnabled() || GetName().empty() ||
+      !is_open_) {
+    return;
+  }
+
+  DCHECK(RuntimeEnabledFeatures::OptimizedNodeCloneOrderEnabled())
+      << "OptimizedNodeCloneOrder should ship before AccordionPattern";
+  HeapVector<Member<HTMLDetailsElement>> details_with_name(
+      OtherElementsInNameGroup());
+  for (HTMLDetailsElement* other_details : details_with_name) {
+    CHECK_NE(other_details, this);
+    if (other_details->is_open_) {
+      // close this details element
+      ToggleOpen();
+      break;
     }
-    details_set->insert(this);
-  }
-}
-
-void HTMLDetailsElement::RemoveNameFromMap(TreeScope& tree_scope) {
-  if (!name_.IsNull()) {
-    CHECK(RuntimeEnabledFeatures::AccordionPatternEnabled());
-
-    tree_scope.NamedDetailsElements().at(name_)->erase(this);
   }
 }
 
 void HTMLDetailsElement::ToggleOpen() {
   setAttribute(html_names::kOpenAttr, is_open_ ? g_null_atom : g_empty_atom);
+}
+
+HeapVector<Member<HTMLDetailsElement>>
+HTMLDetailsElement::OtherElementsInNameGroup() {
+  CHECK(RuntimeEnabledFeatures::AccordionPatternEnabled());
+  HeapVector<Member<HTMLDetailsElement>> result;
+  const AtomicString& name = GetName();
+  if (name.empty()) {
+    return result;
+  }
+  HTMLDetailsElement* details = Traversal<HTMLDetailsElement>::Next(TreeRoot());
+  while (details) {
+    if (details != this && details->GetName() == name) {
+      result.push_back(details);
+    }
+    details = Traversal<HTMLDetailsElement>::Next(*details);
+  }
+  return result;
 }
 
 bool HTMLDetailsElement::IsInteractiveContent() const {

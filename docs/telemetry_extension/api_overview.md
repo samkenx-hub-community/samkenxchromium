@@ -8,6 +8,10 @@ and **events**.
 
 # Diagnostics
 
+The diagnostics namespace got a rework since the M119 release and added a new
+extension-event based interface in M119. The interface is described in
+[V2 Diagnostics API](#v2-diagnostics-api).
+
 ## Types
 
 ### Enum RoutineType
@@ -36,6 +40,13 @@ and **events**.
 | fingerprint_alive |
 | smartctl_check_with_percentage_used |
 | emmc_lifetime |
+| bluetooth_power |
+| ufs_lifetime |
+| power_button |
+| audio_driver |
+| bluetooth_discovery |
+| bluetooth_scanning |
+| bluetooth_pairing |
 
 ### Enum RoutineStatus
 | Property Name |
@@ -68,6 +79,7 @@ and **events**.
 | unknown |
 | unplug_ac_power |
 | plug_in_ac_power |
+| press_power_button |
 
 ### Enum DiskReadRoutineType
 | Property Name |
@@ -117,20 +129,10 @@ and **events**.
 | length_seconds | number | Length of time to run the routine for |
 | file_size_mb | number | test file size, in mega bytes, to test with DiskRead routine. Maximum file size is 10 GB |
 
-### GetRoutineUpdateRequest
+### RunPowerButtonRequest
 | Property Name | Type | Description |
 ------------ | ------- | ----------- |
-| id | number | Id of the routine you want to query |
-| command | RoutineCommandType | What kind of updated should be performed |
-
-### GetRoutineUpdateResponse
-| Property Name | Type | Description |
------------- | ------- | ----------- |
-| progress_percent | number | Current progress of the routine |
-| output | string | Optional debug output |
-| status | RoutineStatus | Current routine status |
-| status_message | string | Optional routine status message |
-| user_message | UserMessageType | Returned for routines that require user action (e.g. unplug power cable) |
+| timeout_seconds | number | A timeout for the routine |
 
 ### RunNvmeWearLevelRequest
 | Property Name | Type | Description |
@@ -147,34 +149,199 @@ and **events**.
 ------------ | ------- | ----------- |
 | percentage_used_threshold | number | an optional threshold number in percentage, range [0, 255] inclusive, that the routine examines `percentage_used` against. If not specified, the routine will default to the max allowed value (255). |
 
+### RunRoutineResponse
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| id | number | Id of the routine routine created |
+| status | RoutineStatus | Current routine status  |
+
+### GetRoutineUpdateRequest
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| id | number | Id of the routine you want to query |
+| command | RoutineCommandType | What kind of updated should be performed |
+
+### GetRoutineUpdateResponse
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| progress_percent | number | Current progress of the routine |
+| output | string | Optional debug output |
+| status | RoutineStatus | Current routine status |
+| status_message | string | Optional routine status message |
+| user_message | UserMessageType | Returned for routines that require user action (e.g. unplug power cable) |
+
+### GetAvailableRoutinesResponse
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| routines | Array<RoutineType\> | Available routine types |
+
+
 ## Functions
 
-| Function Name | Definition | Permission needed to access | Released in `dpsl` version |
+| Function Name | Definition | Permission needed to access | Released in Chrome version |
 ------------ | ------------- | ------------- | ------------- |
-| getAvailableRoutines | () => Promise<List<RoutineType\>\> | `os.diagnostics` | M96 |
-| getRoutineUpdate | (params: GetRoutineUpdateRequest) => Promise<GetRoutineUpdateResponse>\> | `os.diagnostics` | M96 |
-| runAcPowerRoutine | (params: RunAcPowerRoutineRequest) => Promise<Routine\> | `os.diagnostics` | M105 |
-| runBatteryCapacityRoutine | () => Promise<Routine\> | `os.diagnostics` | M96 |
-| runBatteryHealthRoutine | () => Promise<Routine\> | `os.diagnostics` | M96 |
-| runBatteryDischargeRoutine | (params: RunBatteryDischargeRoutineRequest) => Promise<Routine\> | `os.diagnostics` | M96 |
-| runBatteryChargeRoutine | (params: RunBatteryChargeRoutineRequest) => Promise<Routine\> | `os.diagnostics` | M96 |
-| runCpuCacheRoutine | (params: RunCpuRoutineRequest) => Promise<Routine\> | `os.diagnostics` | M96 |
-| runCpuFloatingPointAccuracyRoutine | (params: RunCpuRoutineRequest) => Promise<Routine\> | `os.diagnostics` | M99 |
-| runCpuPrimeSearchRoutine | (params: RunCpuRoutineRequest) => Promise<Routine\> | `os.diagnostics` | M99 |
-| runCpuStressRoutine | (params: RunCpuRoutineRequest) => Promise<Routine\> | `os.diagnostics` | M96 |
-| runDiskReadRoutine | (params: RunDiskReadRequest) => Promise<Routine\> | `os.diagnostics` | M102 |
-| runDnsResolutionRoutine | () => Promise<Routine\> | `os.diagnostics` | M108 |
-| runDnsResolverPresentRoutine | () => Promise<Routine\> | `os.diagnostics` | M108 |
-| runEmmcLifetimeRoutine | () => Promise<Routine\> | `os.diagnostics` | M110 |
-| runFingerprintAliveRoutine | () => Promise<Routine\> | `os.diagnostics` | M110 |
-| runGatewayCanBePingedRoutine | () => Promise<Routine\> | `os.diagnostics` | M108 |
-| runLanConnectivityRoutine | () => Promise<Routine\> | `os.diagnostics` | M102 |
-| runMemoryRoutine | () => Promise<Routine\> | `os.diagnostics` | M96 |
-| runNvmeSelfTestRoutine | (params: RunNvmeSelfTestRequest) => Promise<Routine\> | `os.diagnostics` | M110 |
-| runNvmeWearLevelRoutine | (params: RunNvmeWearLevelRequest) => Promise<Routine\> | `os.diagnostics` | M102 |
-| runSensitiveSensorRoutine | () => Promise<Routine\> | `os.diagnostics` | M110 |
-| runSignalStrengthRoutine | () => Promise<Routine\> | `os.diagnostics` | M108 |
-| runSmartctlCheckRoutine | (params: RunSmartctlCheckRequest?) => Promise<Routine\> | `os.diagnostics` | initial release: M102, new parameter added: M110. The parameter is only available if "smartctl_check_with_percentage_used" is returned from `GetAvailableRoutines` |
+| getAvailableRoutines | () => Promise<GetAvailableRoutinesResponse\> | `os.diagnostics` | M96 |
+| getRoutineUpdate | (params: GetRoutineUpdateRequest) => Promise<GetRoutineUpdateResponse\> | `os.diagnostics` | M96 |
+| runAcPowerRoutine | (params: RunAcPowerRoutineRequest) => Promise<RunRoutineResponse\> | `os.diagnostics` | M105 |
+| runAudioDriverRoutine | () => Promise<RunRoutineResponse\> | `os.diagnostics` | M117 |
+| runBatteryCapacityRoutine | () => Promise<RunRoutineResponse\> | `os.diagnostics` | M96 |
+| runBatteryHealthRoutine | () => Promise<RunRoutineResponse\> | `os.diagnostics` | M96 |
+| runBatteryDischargeRoutine | (params: RunBatteryDischargeRoutineRequest) => Promise<RunRoutineResponse\> | `os.diagnostics` | M96 |
+| runBatteryChargeRoutine | (params: RunBatteryChargeRoutineRequest) => Promise<RunRoutineResponse\> | `os.diagnostics` | M96 |
+| runBluetoothDiscoveryRoutine | () => Promise<RunRoutineResponse\> | `os.diagnostics` | M118 |
+| runBluetoothPairingRoutine | () => Promise<RunRoutineResponse\> | `os.diagnostics` | M118 |
+| runBluetoothPowerRoutine | () => Promise<RunRoutineResponse\> | `os.diagnostics` | M117 |
+| runBluetoothScanningRoutine | () => Promise<RunRoutineResponse\> | `os.diagnostics` | M118 |
+| runCpuCacheRoutine | (params: RunCpuRoutineRequest) => Promise<RunRoutineResponse\> | `os.diagnostics` | M96 |
+| runCpuFloatingPointAccuracyRoutine | (params: RunCpuRoutineRequest) => Promise<RunRoutineResponse\> | `os.diagnostics` | M99 |
+| runCpuPrimeSearchRoutine | (params: RunCpuRoutineRequest) => Promise<RunRoutineResponse\> | `os.diagnostics` | M99 |
+| runCpuStressRoutine | (params: RunCpuRoutineRequest) => Promise<RunRoutineResponse\> | `os.diagnostics` | M96 |
+| runDiskReadRoutine | (params: RunDiskReadRequest) => Promise<RunRoutineResponse\> | `os.diagnostics` | M102 |
+| runDnsResolutionRoutine | () => Promise<RunRoutineResponse\> | `os.diagnostics` | M108 |
+| runDnsResolverPresentRoutine | () => Promise<RunRoutineResponse\> | `os.diagnostics` | M108 |
+| runEmmcLifetimeRoutine | () => Promise<RunRoutineResponse\> | `os.diagnostics` | M110 |
+| runFingerprintAliveRoutine | () => Promise<RunRoutineResponse\> | `os.diagnostics` | M110 |
+| runGatewayCanBePingedRoutine | () => Promise<RunRoutineResponse\> | `os.diagnostics` | M108 |
+| runLanConnectivityRoutine | () => Promise<RunRoutineResponse\> | `os.diagnostics` | M102 |
+| runMemoryRoutine | () => Promise<RunRoutineResponse\> | `os.diagnostics` | M96 |
+| runNvmeSelfTestRoutine | (params: RunNvmeSelfTestRequest) => Promise<RunRoutineResponse\> | `os.diagnostics` | M110 |
+| runNvmeWearLevelRoutine | (params: RunNvmeWearLevelRequest) => Promise<RunRoutineResponse\> | `os.diagnostics` | M102 |
+| runPowerButtonRoutine | (params: RunPowerButtonRequest) => Promise<RunRoutineResponse\> | `os.diagnostics` | M117 |
+| runSensitiveSensorRoutine | () => Promise<RunRoutineResponse\> | `os.diagnostics` | M110 |
+| runSignalStrengthRoutine | () => Promise<RunRoutineResponse\> | `os.diagnostics` | M108 |
+| runSmartctlCheckRoutine | (params: RunSmartctlCheckRequest?) => Promise<RunRoutineResponse\> | `os.diagnostics` | initial release: M102, new parameter added: M110. The parameter is only available if "smartctl_check_with_percentage_used" is returned from `GetAvailableRoutines` |
+| runUfsLifetimeRoutine | () => Promise<RunRoutineResponse\> | `os.diagnostics` | M117 |
+
+# V2 Diagnostics API
+
+## Types
+
+### Enum RoutineWaitingReason
+| Property Name |
+------------ |
+| waiting_to_be_scheduled |
+| waiting_user_input |
+
+### Enum ExceptionReason
+| Property Name |
+------------ |
+| unknown |
+| unexpected |
+| unsupported |
+| app_ui_closed |
+
+### Enum MemtesterTestItemEnum
+| Property Name |
+------------ |
+| unknown |
+| stuck_address |
+| compare_and |
+| compare_div |
+| compare_mul |
+| compare_or |
+| compare_sub |
+| compare_xor |
+| sequential_increment |
+| bit_flip |
+| bit_spread |
+| block_sequential |
+| checkerboard |
+| random_value |
+| solid_bits |
+| walking_ones |
+| walking_zeroes |
+| eight_bit_writes |
+| sixteen_bit_writes |
+
+### Enum RoutineSupportStatus
+| Property Name |
+------------ |
+| supported |
+| unsupported |
+
+### RoutineInitializedInfo
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| uuid | string | UUID of the routine that entered this state  |
+
+### RoutineRunningInfo
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| uuid | string | UUID of the routine that entered this state  |
+| percentage | number | Current percentage of the routine status (0-100) |
+
+### RoutineWaitingInfo
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| uuid | string | UUID of the routine that entered this state  |
+| percentage | number | Current percentage of the routine status (0-100) |
+| reason | RoutineWaitingReason | Reason why the routine waits |
+| message | string | Additional information, may be used to pass instruction or explanation |
+
+### ExceptionInfo
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| uuid | string | UUID of the routine that entered this state  |
+| reason | ExceptionReason | Reason why the routine threw an exception |
+| debugMessage | string | A human readable message for debugging. Don't rely on the content because it could change anytime |
+
+### MemtesterResult
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| passed_items | Array<MemtesterTestItemEnum\> | Passed test items |
+| failed_items | Array<MemtesterTestItemEnum\> | Failed test items |
+
+### MemoryRoutineFinishedInfo
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| uuid | string | UUID of the routine that entered this state  |
+| has_passed | boolean | Whether the routine finished successfully |
+| bytesTested | number | Number of bytes tested in the memory routine |
+| result | MemtesterResult | Contains the memtester test results |
+
+### RunMemoryRoutineArguments
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| maxTestingMemKib | number | An optional field to indicate how much memory should be tested. If the value is null, memory test will run with as much memory as possible |
+
+### CreateMemoryRoutineResponse
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| uuid | string | UUID of the memory routine that was just created  |
+
+### RoutineSupportStatusInfo
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| status | RoutineSupportStatus | Whether a routine with the provided arguments is supported or unsupported |
+
+### StartRoutineRequest
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| uuid | string | UUID of the routine that shall be created |
+
+### CancelRoutineRequest
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| uuid | string | UUID of the routine that shall be cancelled |
+
+## Functions
+
+| Function Name | Definition | Permission needed to access | Released in Chrome version |
+------------ | ------------- | ------------- | ------------- |
+| startRoutine | (params: StartRoutineRequest) => Promise<void\> | `os.diagnostics` | M119 |
+| cancelRoutine | (params: CancelRoutineRequest) => Promise<void\> | `os.diagnostics` | M119 |
+| createMemoryRoutine | (args: RunMemoryRoutineArguments) => Promise<CreateMemoryRoutineResponse\> | `os.diagnostics` | M119 |
+| isMemoryRoutineArgumentSupported | (args: RunMemoryRoutineArguments) => Promise<RoutineSupportStatusInfo\> | `os.diagnostics` | M119 |
+
+## Events
+
+| Function Name | Definition | Permission needed to access | Released in Chrome version | Emitted on |
+------------ | ------------- | ------------- | ------------- | ------------- |
+| onRoutineInitialized | function(RoutineInitializedInfo) | `os.diagnostics` | M119 | Informs the extension that a routine was initialized |
+| onRoutineRunning | function(RoutineRunningInfo) | `os.diagnostics` | M119 | Informs the extension that a routine started running. This can happen in two situations: 1. `startRoutine` was called and the routine successfully started execution. 2. The routine exited the "waiting" state and returned to running |
+| onRoutineWaiting | function(RoutineWaitingInfo) | `os.diagnostics` | M119 | Informs the extension that a routine stopped execution and waits for an event, e.g. user interaction. `RoutineWaitingInfo` contains information about what the routine is waiting for |
+| onRoutineException | function(ExceptionInfo) | `os.diagnostics` | M119 | Informs the extension that an exception occurred. The error passed in `ExceptionInfo` is non-recoverable |
+| onMemoryRoutineFinished | function(MemoryRoutineFinishedInfo) | `os.diagnostics` | M119 | Informs the extension that a memory routine finished |
 
 # Events
 
@@ -185,6 +352,19 @@ and **events**.
 ------------ |
 | audio_jack |
 | lid |
+| usb |
+| sd_card |
+| power |
+| keyboard_diagnostic |
+| stylus_garage |
+| touchpad_button |
+| touchpad_touch |
+| touchpad_connected |
+| touchscreen_touch |
+| touchscreen_connected |
+| external_display |
+| stylus_touch |
+| stylus_connected |
 
 ### Enum EventSupportStatus
 | Property Name |
@@ -226,9 +406,230 @@ and **events**.
 ------------ | ------- | ----------- |
 | event | LidEvent | The event that occurred |
 
+### Enum KeyboardConnectionType
+| Property Name |
+------------ |
+| internal |
+| usb |
+| bluetooth |
+| unknown |
+
+### Enum PhysicalKeyboardLayout
+| Property Name |
+------------ |
+| unknown |
+| chrome_os |
+
+### Enum MechanicalKeyboardLayout
+| Property Name |
+------------ |
+| unknown |
+| ansi |
+| iso |
+| jis |
+
+### Enum KeyboardNumberPadPresence
+| Property Name |
+------------ |
+| unknown |
+| present |
+| not_present |
+
+### Enum KeyboardTopRowKey
+| Property Name |
+------------ |
+| no_key |
+| unknown |
+| back |
+| forward |
+| refresh |
+| fullscreen |
+| overview |
+| screenshot |
+| screen_brightness_down |
+| screen_brightness_up |
+| privacy_screen_toggle |
+| microphone_mute |
+| volume_mute |
+| volume_down |
+| volume_up |
+| keyboard_backlight_toggle |
+| keyboard_backlight_down |
+| keyboard_backlight_up |
+| next_track |
+| previous_track |
+| play_pause |
+| screen_mirror |
+| delete |
+
+### Enum KeyboardTopRightKey
+| Property Name |
+------------ |
+| unknown |
+| power |
+| lock |
+| control_panel |
+
+### KeyboardInfo
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| id | number | The number of the keyboard's /dev/input/event* node |
+| connectionType | KeyboardConnectionType | The keyboard's connection type |
+| name | string | The keyboard's name |
+| physicalLayout | PhysicalKeyboardLayout | The keyboard's physical layout |
+| mechanicalLayout | MechanicalKeyboardLayout | The keyboard's mechanical layout |
+| regionCode | string | For internal keyboards, the region code of the device (from which the visual layout can be determined) |
+| numberPadPresent | KeyboardNumberPadPresence | Whether the keyboard has a number pad or not |
+| topRowKeys | Array<KeyboardTopRowKey\> | List of ChromeOS specific action keys in the top row. This list excludes the left-most Escape key, and right-most key (usually Power/Lock). If a keyboard has F11-F15 keys beyond the rightmost action key, they may not be included in this list (even as "none") |
+| topRightKey | KeyboardTopRightKey | For CrOS keyboards, the glyph shown on the key at the far right end of the top row |
+| hasAssistantKey | boolean | Only applicable on ChromeOS keyboards |
+
+### KeyboardDiagnosticEventInfo
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| keyboardInfo | KeyboardInfo | The keyboard which has been tested |
+| testedKeys | Array<number\> | Keys which have been tested. It is an array of the evdev key code |
+| testedTopRowKeys | Array<number\> | Top row keys which have been tested. They are positions of the key on the top row after escape (0 is leftmost, 1 is next to the right, etc.).  Generally, 0 is F1, in some fashion. NOTE: This position may exceed the length of keyboard_info->top_row_keys, for external keyboards with keys in the F11-F15 range |
+
+### Enum UsbEvent
+| Property Name |
+------------ |
+| connected |
+| disconnected |
+
+### UsbEventInfo
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| vendor | string | Vendor name |
+| name | string | The device's name |
+| vid | number | Vendor ID of the device |
+| pid | number | Product ID of the device |
+| categories | Array<string\> | USB device categories: https://www.usb.org/defined-class-codes |
+| event | UsbEvent | The event that occurred |
+
+### Enum ExternalDisplayEvent
+| Property Name |
+------------ |
+| connected |
+| disconnected |
+
+### ExternalDisplayEventInfo
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| event | ExternalDisplayEvent | The event that occurred |
+| display_info | ExternalDisplayInfo | The information related to the plugged in external display |
+
+### Enum SdCardEvent
+| Property Name |
+------------ |
+| connected |
+| disconnected |
+
+### SdCardEventInfo
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| event | SdCardEvent | The event that occurred |
+
+### Enum PowerEvent
+| Property Name |
+------------ |
+| ac_inserted |
+| ac_removed |
+| os_suspend |
+| os_resume |
+
+### PowerEventInfo
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| event | PowerEvent | The event that occurred |
+
+### Enum StylusGarageEvent
+| Property Name |
+------------ |
+| inserted |
+| removed |
+
+### StylusGarageEventInfo
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| event | StylusGarageEvent | The event that occurred |
+
+### Enum InputTouchButton
+| Property Name |
+------------ |
+| left |
+| middle |
+| right |
+
+### Enum InputTouchButtonState
+| Property Name |
+------------ |
+| pressed |
+| released |
+
+### TouchpadButtonEventInfo
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| button | InputTouchButton | The input button that was interacted with |
+| button | InputTouchButtonState | The new state of the button |
+
+### TouchPointInfo
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| trackingId | number | An id to track an initiated contact throughout its life cycle |
+| x | number | The x position |
+| y | number | The y position |
+| pressure | number | The pressure applied to the touch contact. The value ranges from 0 to `max_pressure` as defined in `TouchpadConnectedEventInfo` and `TouchscreenConnectedEventInfo` |
+| touchMajor | number | The length of the longer dimension of the touch contact |
+| touchMinor | number | The length of the shorter dimension of the touch contact |
+
+### TouchpadTouchEventInfo
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| touchPoints | Array<TouchPointInfo\> | The touch points reported by the touchpad |
+
+### TouchpadConnectedEventInfo
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| maxX | number | The maximum possible x position of touch points |
+| maxY | number | The maximum possible y position of touch points |
+| maxPressure | number | The maximum possible pressure of touch points, or 0 if pressure is not supported |
+| buttons | Array<InputTouchButton\> | The supported buttons |
+
+### TouchscreenTouchEventInfo
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| touchPoints | Array<TouchPointInfo\> | The touch points reported by the touchscreen |
+
+### TouchscreenConnectedEventInfo
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| maxX | number | The maximum possible x position of touch points |
+| maxY | number | The maximum possible y position of touch points |
+| maxPressure | number | The maximum possible pressure of touch points, or 0 if pressure is not supported |
+
+### StylusTouchPointInfo
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| x | number | The x position in the cartesian XY plane. The value ranges from 0 to `max_x` as defined in `StylusConnectedEventInfo` |
+| y | number | The y position in the cartesian XY plane. The value ranges from 0 to `max_y` as defined in `StylusConnectedEventInfo` |
+| pressure | number | The pressure applied to the touch contact. The value ranges from 0 to `max_pressure` as defined in `StylusConnectedEventInfo` |
+
+### StylusTouchEventInfo
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| touchPoint | StylusTouchPointInfo | The info of the stylus touch point. A null touch point means the stylus leaves the contact |
+
+### StylusConnectedEventInfo
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| maxX | number | The maximum possible x position of touch points |
+| maxY | number | The maximum possible y position of touch points |
+| maxPressure | number | The maximum possible pressure of touch points, or 0 if pressure is not supported |
+
 ## Functions
 
-| Function Name | Definition | Permission needed to access | Released in `dpsl` version | Description |
+| Function Name | Definition | Permission needed to access | Released in Chrome version | Description |
 ------------ | ------------- | ------------- | ------------- | ------------- |
 | isEventSupported | (category: EventCategory) => Promise<EventSupportStatusInfo\> | `os.events` | M115 | Checks whether an event is supported. The information returned by this method is valid across reboots of the device |
 | startCapturingEvents | (category: EventCategory) => () | `os.events` | M115 | Starts capturing events for `EventCategory`. After calling this method, an extension can expect to be updated about events through invocations of `on<EventCategory>Event`, until either the PWA is closed or `stopCapturingEvents` is called. Note that an extension is only able to subscribe to events if the PWA is currently open |
@@ -236,10 +637,23 @@ and **events**.
 
 ## Events
 
-| Function Name | Definition | Permission needed to access | Released in `dpsl` version | Emitted on |
+| Function Name | Definition | Permission needed to access | Released in Chrome version | Emitted on |
 ------------ | ------------- | ------------- | ------------- | ------------- |
 | onAudioJackEvent | function(AudioJackEventInfo) | `os.events` | M115 | An audio device was plugged in or out |
+| onKeyboardDiagnosticEvent | function(KeyboardDiagnosticEventInfo) | `os.events` | M117 | Informs the extension that a Keyboard diagnostic has been completed in the first party diagnostic tool |
 | onLidEvent | function(LidEventInfo) | `os.events` | M115 | The device lid was opened or closed |
+| onUsbEvent | function(UsbEventInfo) | `os.events` | M115 | Informs the extension that a `Usb` event occurred |
+| onExternalDisplayEvent | function(ExternalDisplayEventInfo) | `os.events` | M117 | Informs the extension that a `ExternalDisplay` event occurred |
+| onSdCardEvent | function(SdCardEventInfo) | `os.events` | M117 | Informs the extension that a `SD Card` event occurred |
+| onPowerEvent | function(PowerEventInfo) | `os.events` | M117 | Informs the extension that a `Power` event occurred |
+| onStylusGarageEvent | function(StylusGarageEventInfo) | `os.events` | M117 | Informs the extension that a `Stylus Garage` event occurred |
+| onTouchpadButtonEvent | function(TouchpadButtonEventInfo) | `os.events` | M117 | Informs the extension that a `Touchpad Button` event occurred |
+| onTouchpadTouchEvent | function(TouchpadTouchEventInfo) | `os.events` | M117 | Informs the extension that a `Touchpad Touch` event occurred |
+| onTouchpadConnectedEvent | function(TouchpadConnectedEventInfo) | `os.events` | M117 | Informs the extension that a `Touchpad Connected` event occurred |
+| onTouchscreenTouchEvent | function(TouchscreenTouchEventInfo) | `os.events` | M118 | Informs the extension that a `Touchscreen Touch` event occurred |
+| onTouchscreenConnectedEvent | function(TouchscreenConnectedEventInfo) | `os.events` | M118 | Informs the extension that a `Touchscreen Connected` event occurred |
+| onStylusTouchEvent | function(StylusTouchEventInfo) | `os.events` | M117 | Informs the extension that a `Stylus Touch` event occurred |
+| onStylusConnectedEvent | function(StylusConnectedEventInfo) | `os.events` | M117 | Informs the extension that a `Stylus Connected` event occurred |
 
 # Telemetry
 
@@ -270,8 +684,8 @@ and **events**.
 | inputMute | boolean | Is the active input device mute or not |
 | underruns | number | Number of underruns |
 | severeUnderruns | number | Number of severe underruns |
-| outputNodes | Array<AudioOutputNodeInfo> | Output nodes |
-| inputNodes | Array<AudioInputNodeInfo> | Input nodes |
+| outputNodes | Array<AudioOutputNodeInfo\> | Output nodes |
+| inputNodes | Array<AudioInputNodeInfo\> | Input nodes |
 
 ### BatteryInfo
 | Property Name | Type | Description |
@@ -291,12 +705,17 @@ and **events**.
 | voltageMinDesign | number | Desired minimum output voltage |
 | voltageNow | number | Battery's voltage (V) |
 
-### BlockDeviceInfo
+### NonRemovableBlockDeviceInfo
 | Property Name | Type | Description |
 ------------ | ------- | ----------- |
 | name | string | The name of the block device. |
 | type | string | The type of the block device, (e.g. "MMC", "NVMe" or "ATA"). |
 | size | number | The device size in bytes. |
+
+### NonRemovableBlockDeviceInfoResponse
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| deviceInfos | Array<NonRemovableBlockDeviceInfo\> | The list of block devices. |
 
 ### Enum CpuArchitectureEnum
 | Property Name |
@@ -309,13 +728,13 @@ and **events**.
 ### PhysicalCpuInfo
 | Property Name | Type | Description |
 ------------ | ------- | ----------- |
-| logicalCpus | Array<LogicalCpuInfo> | Logical CPUs corresponding to this physical CPU |
+| logicalCpus | Array<LogicalCpuInfo\> | Logical CPUs corresponding to this physical CPU |
 | modelName | string | The CPU model name |
 
 ### LogicalCpuInfo
 | Property Name | Type | Description |
 ------------ | ------- | ----------- |
-| cStates | Array<CpuCStateInfo> | Information about the logical CPU's time in various C-states |
+| cStates | Array<CpuCStateInfo\> | Information about the logical CPU's time in various C-states |
 | idleTimeMs | number | Idle time since last boot, in milliseconds |
 | maxClockSpeedKhz | number | The max CPU clock speed in kilohertz |
 | scalingCurrentFrequencyKhz | number | Current frequency the CPU is running at |
@@ -334,6 +753,56 @@ and **events**.
 | architecture | CpuArchitectureEnum | The CPU architecture - it's assumed all of a device's CPUs share the same architecture |
 | numTotalThreads | number | Number of total threads available |
 | physicalCpus | Array<PhysicalCpuInfo\> | Information about the device's physical CPUs |
+
+### Enum DisplayInputType
+| Property Name |
+------------ |
+| unknown |
+| digital |
+| analog |
+
+### EmbeddedDisplayInfo
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| privacyScreenSupported | boolean | Whether a privacy screen is supported or not |
+| privacyScreenEnabled | boolean | Whether a privacy screen is enabled or not |
+| displayWidth | number | Display width in millimeters |
+| displayHeight | number | Display height in millimeters |
+| resolutionHorizontal | number | Horizontal resolution |
+| resolutionVertical | number | Vertical resolution |
+| refreshRate | number | Refresh rate |
+| manufacturer | string | Three letter manufacturer ID |
+| modelId | number | Manufacturer product code |
+| serialNumber | number | 32 bits serial number |
+| manufactureWeek | number | Week of manufacture |
+| manufactureYear | number | Year of manufacture |
+| edidVersion | string | EDID version |
+| inputType | DisplayInputType | Digital or analog input |
+| displayName | string | Name of display product |
+
+### ExternalDisplayInfo
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| displayWidth | number | Display width in millimeters |
+| displayHeight | number | Display height in millimeters |
+| resolutionHorizontal | number | Horizontal resolution |
+| resolutionVertical | number | Vertical resolution |
+| refreshRate | number | Refresh rate |
+| manufacturer | string | Three letter manufacturer ID |
+| modelId | number | Manufacturer product code |
+| serialNumber | number | 32 bits serial number |
+| manufacture_week | number | Week of manufacture |
+| manufacture_year | number | Year of manufacture |
+| edidVersion | string | EDID version |
+| inputType | DisplayInputType | Digital or analog input |
+| displayName | string | Name of display product |
+
+### DisplayInfo
+### ExternalDisplayInfo
+| Property Name | Type | Description |
+------------ | ------- | ----------- |
+| embeddedDisplay | EmbeddedDisplayInfo | Embedded display info |
+| externalDisplays | Array<ExternalDisplayInfo\> | External display info |
 
 ### Enum NetworkType
 | Property Name |
@@ -533,11 +1002,12 @@ Source:
 | getVpdInfo | () => Promise<VpdInfo\> | `os.telemetry`, `os.telemetry.serial_number` for serial number field | M96 |
 | getOemData | () => Promise<OemDataInfo\> | `os.telemetry`, `os.telemetry.serial_number` for the whole result | M96 |
 | getCpuInfo | () => Promise<CpuInfo\> | `os.telemetry` | M99 |
+| getDisplayInfo | () => Promise<DisplayInfo\> | `os.telemetry` | M117 |
 | getMemoryInfo | () => Promise<MemoryInfo\> | `os.telemetry` | M99 |
 | getBatteryInfo | () => Promise<BatteryInfo\> | `os.telemetry`, `os.telemetry.serial_number` for serial number field | M102 |
 | getStatefulPartitionInfo | () => Promise<StatefulPartitionInfo\> | `os.telemetry` | M105 |
 | getOsVersionInfo | () => Promise<OsVersionInfo\> | `os.telemetry` | M105 |
-| getNonRemovableBlockDevicesInfo | () => Promise<BlockDeviceInfo\> | `os.telemetry` | M108 |
+| getNonRemovableBlockDevicesInfo | () => Promise<NonRemovableBlockDeviceInfoResponse\> | `os.telemetry` | M108 |
 | getInternetConnectivityInfo | () => Promise<InternetConnectivityInfo\> | `os.telemetry`, `os.telemetry.network_info` for MAC address field | M108 - Mac address in M111 |
 | getTpmInfo | () => Promise<TpmInfo\> | `os.telemetry` | M108 |
 | getAudioInfo | () => Promise<AudioInfo\> | `os.telemetry` | M111 |

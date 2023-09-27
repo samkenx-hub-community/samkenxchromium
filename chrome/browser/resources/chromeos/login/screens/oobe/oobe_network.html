@@ -28,8 +28,18 @@
     <oobe-back-button id="backButton"
         on-click="onBackClicked_"></oobe-back-button>
   </div>
-  <div slot="bottom-buttons">
-    <oobe-next-button id="nextButton" disabled="[[!isConnected_]]"
-        on-click="onNextClicked_"></oobe-next-button>
+  <div slot="bottom-buttons" class="flex layout horizontal">
+    <quick-start-entry-point
+      id="quick-start-network-button"
+      on-click="onQuickStartClicked_"
+      hidden="[[!isQuickStartEnabled_]]"
+      quick-start-text-key="networkScreenQuickStart">
+    </quick-start-entry-point>
+    <oobe-next-button
+      id="nextButton"
+      disabled="[[!isConnected_]]"
+      on-click="onNextClicked_"
+    >
+    </oobe-next-button>
   </div>
 </oobe-adaptive-dialog>

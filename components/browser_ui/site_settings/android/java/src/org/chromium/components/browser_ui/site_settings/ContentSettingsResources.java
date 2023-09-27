@@ -264,7 +264,7 @@ public class ContentSettingsResources {
                         R.string.website_settings_category_motion_sensors_blocked;
                 try {
                     if (FeatureList.isNativeInitialized()
-                            && DeviceFeatureMap.getInstance().isEnabled(
+                            && DeviceFeatureMap.isEnabled(
                                     DeviceFeatureList.GENERIC_SENSOR_EXTRA_CLASSES)) {
                         sensorsPermissionTitle = R.string.sensors_permission_title;
                         sensorsAllowedDescription =
@@ -287,6 +287,11 @@ public class ContentSettingsResources {
                         ContentSettingValues.BLOCK,
                         R.string.website_settings_category_sound_allowed,
                         R.string.website_settings_category_sound_blocked);
+
+            case ContentSettingsType.STORAGE_ACCESS:
+                return new ResourceItem(R.drawable.ic_storage_access_24,
+                        R.string.storage_access_permission_title, ContentSettingValues.ASK,
+                        ContentSettingValues.BLOCK, 0, 0);
 
             case ContentSettingsType.USB_CHOOSER_DATA:
                 return new ResourceItem(R.drawable.gm_filled_usb_24, 0, ContentSettingValues.ASK,

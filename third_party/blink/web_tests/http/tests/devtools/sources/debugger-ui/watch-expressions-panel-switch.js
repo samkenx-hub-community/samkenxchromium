@@ -5,6 +5,9 @@
 import {TestRunner} from 'test_runner';
 import {SourcesTestRunner} from 'sources_test_runner';
 
+import * as Common from 'devtools/core/common/common.js';
+import * as SourcesModule from 'devtools/panels/sources/sources.js';
+
 (async function() {
   TestRunner.addResult(
       `Tests debugger does not fail when stopped while a panel other than scripts was opened. Both valid and invalid expressions are added to watch expressions.\n`);
@@ -20,7 +23,7 @@ import {SourcesTestRunner} from 'sources_test_runner';
   `);
 
   SourcesTestRunner.setQuiet(true);
-  Common.settings.createLocalSetting('watchExpressions', []).set([
+  Common.Settings.Settings.instance().createLocalSetting('watchExpressions', []).set([
     'x', 'y.foo'
   ]);
   await SourcesTestRunner.startDebuggerTestPromise();
@@ -36,7 +39,7 @@ import {SourcesTestRunner} from 'sources_test_runner';
   function waitForUpdate() {
     return new Promise(resolve => {
       TestRunner.addSniffer(
-          Sources.WatchExpression.prototype, 'createWatchExpression',
+          SourcesModule.WatchExpressionsSidebarPane.WatchExpression.prototype, 'createWatchExpression',
           watchExpressionsUpdated);
       let updateCount = 2;
       function watchExpressionsUpdated(result, wasThrown) {
@@ -48,7 +51,7 @@ import {SourcesTestRunner} from 'sources_test_runner';
           }
         }
         TestRunner.addSniffer(
-            Sources.WatchExpression.prototype, 'createWatchExpression',
+            SourcesModule.WatchExpressionsSidebarPane.WatchExpression.prototype, 'createWatchExpression',
             watchExpressionsUpdated);
       }
     });

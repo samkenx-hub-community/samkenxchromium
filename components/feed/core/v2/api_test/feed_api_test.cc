@@ -169,26 +169,49 @@ void TestUnreadContentObserver::HasUnreadContentChanged(
 TestSurfaceBase::TestSurfaceBase(const StreamType& stream_type,
                                  FeedStream* stream,
                                  SingleWebFeedEntryPoint entry_point)
-    : FeedStreamSurface(stream_type, entry_point) {
-  if (stream)
+    : stream_type_(stream_type), entry_point_(entry_point) {
+  if (stream) {
     Attach(stream);
+  }
 }
 
 TestSurfaceBase::~TestSurfaceBase() {
-  if (stream_)
+  if (bound_stream_) {
     Detach();
+  }
+
+  if (stream_) {
+    CHECK(!surface_id_.is_null());
+    stream_->DestroySurface(surface_id_);
+  }
+}
+
+SurfaceId TestSurfaceBase::GetSurfaceId() const {
+  CHECK(!surface_id_.is_null())
+      << "The surface wasn't yet created, so doesn't have an ID.";
+  return surface_id_;
+}
+
+void TestSurfaceBase::CreateWithoutAttach(FeedStream* stream) {
+  CHECK(surface_id_.is_null());
+
+  stream_ = stream->GetWeakPtr();
+  surface_id_ = stream->CreateSurface(stream_type_, entry_point_);
 }
 
 void TestSurfaceBase::Attach(FeedStream* stream) {
-  EXPECT_FALSE(stream_);
-  stream_ = stream->GetWeakPtr();
-  stream_->AttachSurface(this);
+  EXPECT_FALSE(bound_stream_);
+  if (surface_id_.is_null()) {
+    CreateWithoutAttach(stream);
+  }
+  bound_stream_ = stream->GetWeakPtr();
+  bound_stream_->AttachSurface(surface_id_, this);
 }
 
 void TestSurfaceBase::Detach() {
-  EXPECT_TRUE(stream_);
-  stream_->DetachSurface(this);
-  stream_ = nullptr;
+  EXPECT_TRUE(bound_stream_);
+  bound_stream_->DetachSurface(surface_id_);
+  bound_stream_ = nullptr;
 }
 
 void TestSurfaceBase::StreamUpdate(const feedui::StreamUpdate& stream_update) {
@@ -345,6 +368,8 @@ TestSingleWebFeedSurface::TestSingleWebFeedSurface(
           StreamType(StreamKind::kSingleWebFeed, web_feed_id, entry_point),
           stream,
           entry_point) {}
+TestSupervisedFeedSurface::TestSupervisedFeedSurface(FeedStream* stream)
+    : TestSurfaceBase(StreamType(StreamKind::kSupervisedUser), stream) {}
 
 TestReliabilityLoggingBridge::TestReliabilityLoggingBridge() = default;
 TestReliabilityLoggingBridge::~TestReliabilityLoggingBridge() = default;
@@ -666,6 +691,21 @@ void TestFeedNetwork::SendDiscoverApiRequest(
                      << api_path;
 }
 
+void TestFeedNetwork::SendAsyncDataRequest(
+    const GURL& url,
+    base::StringPiece request_method,
+    net::HttpRequestHeaders request_headers,
+    std::string request_body,
+    const AccountInfo& account_info,
+    base::OnceCallback<void(RawResponse)> callback) {
+  if (injected_raw_response_) {
+    Reply(base::BindOnce(std::move(callback),
+                         std::move(injected_raw_response_.value())));
+    return;
+  }
+  ASSERT_TRUE(false) << "No raw response injected";
+}
+
 void TestFeedNetwork::CancelRequests() {
   NOTIMPLEMENTED();
 }
@@ -721,6 +761,7 @@ void TestFeedNetwork::ClearTestData() {
   api_requests_sent_.clear();
   api_request_count_.clear();
   injected_response_.reset();
+  injected_raw_response_.reset();
 }
 
 void TestFeedNetwork::SendResponse() {
@@ -913,6 +954,10 @@ void FeedApiTest::SetUp() {
   image_fetcher_ =
       std::make_unique<TestImageFetcher>(shared_url_loader_factory_);
 
+  // Test initialization of TemplateURLService that defaults to Google as
+  // the default search engine.
+  template_url_service_ = std::make_unique<TemplateURLService>(nullptr, 0);
+
   CreateStream();
 }
 
@@ -944,9 +989,6 @@ AccountInfo FeedApiTest::GetAccountInfo() {
 bool FeedApiTest::IsSigninAllowed() {
   return is_signin_allowed_;
 }
-bool FeedApiTest::IsSyncOn() {
-  return is_sync_on_;
-}
 void FeedApiTest::RegisterFollowingFeedFollowCountFieldTrial(
     size_t follow_count) {
   register_following_feed_follow_count_field_trial_calls_.push_back(
@@ -966,9 +1008,6 @@ DisplayMetrics FeedApiTest::GetDisplayMetrics() {
 std::string FeedApiTest::GetLanguageTag() {
   return "en-US";
 }
-bool FeedApiTest::IsAutoplayEnabled() {
-  return false;
-}
 TabGroupEnabledState FeedApiTest::GetTabGroupEnabledState() {
   return TabGroupEnabledState::kNone;
 }
@@ -981,16 +1020,21 @@ void FeedApiTest::PrefetchImage(const GURL& url) {
   prefetch_image_call_count_++;
 }
 
-void FeedApiTest::CreateStream(bool wait_for_initialization,
-                               bool start_surface) {
+void FeedApiTest::CreateStream(
+    bool wait_for_initialization,
+    bool start_surface,
+    bool is_new_tab_search_engine_url_android_enabled) {
   ChromeInfo chrome_info;
   chrome_info.channel = version_info::Channel::STABLE;
   chrome_info.version = base::Version({99, 1, 9911, 2});
   chrome_info.start_surface = start_surface;
+  chrome_info.is_new_tab_search_engine_url_android_enabled =
+      is_new_tab_search_engine_url_android_enabled;
   stream_ = std::make_unique<FeedStream>(
       &refresh_scheduler_, metrics_reporter_.get(), this, &profile_prefs_,
       &network_, image_fetcher_.get(), store_.get(),
-      persistent_key_value_store_.get(), chrome_info);
+      persistent_key_value_store_.get(), template_url_service_.get(),
+      chrome_info);
   stream_->SetWireResponseTranslatorForTesting(&response_translator_);
 
   if (wait_for_initialization)

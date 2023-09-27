@@ -12,6 +12,8 @@ import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.equalTo;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doReturn;
@@ -58,6 +60,7 @@ import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.layouts.LayoutTestUtils;
 import org.chromium.chrome.browser.layouts.LayoutType;
 import org.chromium.chrome.browser.omnibox.LocationBarCoordinator;
+import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
 import org.chromium.chrome.browser.tasks.tab_management.TabUiFeatureUtilities;
 import org.chromium.chrome.browser.tasks.tab_management.TabUiTestHelper;
@@ -68,14 +71,17 @@ import org.chromium.chrome.browser.toolbar.adaptive.AdaptiveToolbarButtonVariant
 import org.chromium.chrome.browser.toolbar.menu_button.MenuButton;
 import org.chromium.chrome.browser.toolbar.menu_button.MenuButtonCoordinator;
 import org.chromium.chrome.browser.toolbar.optional_button.OptionalButtonCoordinator;
+import org.chromium.chrome.browser.toolbar.top.ToolbarPhone.NtpSearchBoxDrawable;
 import org.chromium.chrome.browser.ui.appmenu.AppMenuCoordinator;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
 import org.chromium.chrome.test.R;
+import org.chromium.chrome.test.util.NewTabPageTestUtils;
 import org.chromium.chrome.test.util.OmniboxTestUtils;
 import org.chromium.chrome.test.util.browser.Features.DisableFeatures;
 import org.chromium.chrome.test.util.browser.Features.EnableFeatures;
 import org.chromium.components.browser_ui.styles.ChromeColors;
+import org.chromium.components.embedder_support.util.UrlConstants;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
 import org.chromium.ui.test.util.DisableAnimationsTestRule;
 import org.chromium.ui.test.util.UiRestriction;
@@ -107,6 +113,8 @@ public class ToolbarPhoneTest {
     GradientDrawable mLocationbarBackgroundDrawable;
     @Mock
     OptionalButtonCoordinator mOptionalButtonCoordinator;
+    @Mock
+    NtpSearchBoxDrawable mNtpSearchBoxDrawable;
 
     private Canvas mCanvas = new Canvas();
     private ToolbarPhone mToolbar;
@@ -178,7 +186,7 @@ public class ToolbarPhoneTest {
             mToolbar.setMenuButtonCoordinatorForTesting(realMenuButtonCoordinator);
             mToolbar.updateOptionalButton(new ButtonDataImpl(false, drawable, null,
                     mActivityTestRule.getActivity().getString(R.string.share), false, null, false,
-                    AdaptiveToolbarButtonVariant.UNKNOWN));
+                    AdaptiveToolbarButtonVariant.UNKNOWN, 0, false));
             // Make sure the button is visible in the beginning of the test.
             assertEquals(realMenuButtonCoordinator.isVisible(), true);
 
@@ -199,18 +207,18 @@ public class ToolbarPhoneTest {
                             + "if it is visible",
                     offsetWhenParentInvisible, offsetWhenParentVisible, 0);
 
-            // Sanity check that the offset is different when menu button is invisible
+            // Confidence check that the offset is different when menu button is invisible.
             realMenuButtonCoordinator.getMenuButton().setVisibility(View.INVISIBLE);
             assertEquals(realMenuButtonCoordinator.isVisible(), false);
             float offsetWhenButtonInvisible = mToolbar.getLocationBarWidthOffsetForOptionalButton();
-            Assert.assertNotEquals("Offset should be different when menu button is invisible",
+            assertNotEquals("Offset should be different when menu button is invisible",
                     offsetWhenButtonInvisible, offsetWhenParentVisible);
         });
     }
 
     @Test
     @MediumTest
-    @EnableFeatures({ChromeFeatureList.OMNIBOX_MODERNIZE_VISUAL_UPDATE})
+    @EnableFeatures(ChromeFeatureList.OMNIBOX_MODERNIZE_VISUAL_UPDATE)
     @CommandLineFlags.
     Add({"enable-features=" + ChromeFeatureList.OMNIBOX_MODERNIZE_VISUAL_UPDATE + "<Study",
             "force-fieldtrials=Study/Group",
@@ -253,7 +261,7 @@ public class ToolbarPhoneTest {
 
     @Test
     @MediumTest
-    @EnableFeatures({ChromeFeatureList.OMNIBOX_MODERNIZE_VISUAL_UPDATE})
+    @EnableFeatures(ChromeFeatureList.OMNIBOX_MODERNIZE_VISUAL_UPDATE)
     @CommandLineFlags.
     Add({"enable-features=" + ChromeFeatureList.OMNIBOX_MODERNIZE_VISUAL_UPDATE + "<Study",
             "force-fieldtrials=Study/Group",
@@ -291,7 +299,7 @@ public class ToolbarPhoneTest {
 
     @Test
     @MediumTest
-    @EnableFeatures({ChromeFeatureList.OMNIBOX_MODERNIZE_VISUAL_UPDATE})
+    @EnableFeatures(ChromeFeatureList.OMNIBOX_MODERNIZE_VISUAL_UPDATE)
     @CommandLineFlags.
     Add({"enable-features=" + ChromeFeatureList.OMNIBOX_MODERNIZE_VISUAL_UPDATE + "<Study",
             "force-fieldtrials=Study/Group",
@@ -345,7 +353,7 @@ public class ToolbarPhoneTest {
 
     @Test
     @MediumTest
-    @DisableFeatures({ChromeFeatureList.OMNIBOX_MODERNIZE_VISUAL_UPDATE})
+    @DisableFeatures(ChromeFeatureList.OMNIBOX_MODERNIZE_VISUAL_UPDATE)
     public void testLocationBarCornerShouldNeverUpdatedWithoutExperiment() {
         LocationBarCoordinator locationBarCoordinator =
                 (LocationBarCoordinator) mToolbar.getLocationBar();
@@ -364,8 +372,8 @@ public class ToolbarPhoneTest {
 
     @Test
     @MediumTest
-    @EnableFeatures({ChromeFeatureList.START_SURFACE_ANDROID,
-            ChromeFeatureList.TAB_TO_GTS_ANIMATION, ChromeFeatureList.TAB_GRID_LAYOUT_ANDROID})
+    @EnableFeatures(
+            {ChromeFeatureList.START_SURFACE_ANDROID, ChromeFeatureList.TAB_TO_GTS_ANIMATION})
     public void
     testEnterTabSwitcher_toolbarVisibleUntilTransitionEnds_startSurfaceEnabled() {
         ChromeTabbedActivity cta = mActivityTestRule.getActivity();
@@ -385,7 +393,7 @@ public class ToolbarPhoneTest {
         }
         LayoutTestUtils.waitForLayout(cta.getLayoutManager(), LayoutType.TAB_SWITCHER);
         CriteriaHelper.pollUiThread(() -> {
-            RecyclerView tabList = cta.findViewById(R.id.tab_list_view);
+            RecyclerView tabList = cta.findViewById(R.id.tab_list_recycler_view);
             RecyclerView.ViewHolder viewHolder =
                     tabList == null ? null : tabList.findViewHolderForAdapterPosition(0);
             if (viewHolder != null) {
@@ -399,8 +407,8 @@ public class ToolbarPhoneTest {
 
     @Test
     @MediumTest
-    @EnableFeatures({ChromeFeatureList.START_SURFACE_ANDROID,
-            ChromeFeatureList.TAB_TO_GTS_ANIMATION, ChromeFeatureList.TAB_GRID_LAYOUT_ANDROID})
+    @EnableFeatures(
+            {ChromeFeatureList.START_SURFACE_ANDROID, ChromeFeatureList.TAB_TO_GTS_ANIMATION})
     @DisableAnimationsTestRule.EnsureAnimationsOn
     public void
     testEnterTabSwitcher_toolbarVisibleUntilTransitionEnds_startSurfaceEnabled_animationsEnabled() {
@@ -427,7 +435,7 @@ public class ToolbarPhoneTest {
         }
         LayoutTestUtils.waitForLayout(cta.getLayoutManager(), LayoutType.TAB_SWITCHER);
         CriteriaHelper.pollUiThread(() -> {
-            RecyclerView tabList = cta.findViewById(R.id.tab_list_view);
+            RecyclerView tabList = cta.findViewById(R.id.tab_list_recycler_view);
             RecyclerView.ViewHolder viewHolder =
                     tabList == null ? null : tabList.findViewHolderForAdapterPosition(0);
             if (viewHolder != null) {
@@ -441,8 +449,7 @@ public class ToolbarPhoneTest {
 
     @Test
     @MediumTest
-    @EnableFeatures({ChromeFeatureList.TAB_GRID_LAYOUT_ANDROID})
-    @DisableFeatures({ChromeFeatureList.START_SURFACE_ANDROID})
+    @DisableFeatures(ChromeFeatureList.START_SURFACE_ANDROID)
     @DisableAnimationsTestRule.EnsureAnimationsOn
     public void testEnterTabSwitcher_toolbarVisibleUntilTransitionEnds_startSurfaceDisabled() {
         ChromeTabbedActivity cta = mActivityTestRule.getActivity();
@@ -464,7 +471,7 @@ public class ToolbarPhoneTest {
         CriteriaHelper.pollUiThread(() -> mToolbar.getVisibility() != View.VISIBLE);
         LayoutTestUtils.waitForLayout(cta.getLayoutManager(), LayoutType.TAB_SWITCHER);
         CriteriaHelper.pollUiThread(() -> {
-            RecyclerView tabList = cta.findViewById(R.id.tab_list_view);
+            RecyclerView tabList = cta.findViewById(R.id.tab_list_recycler_view);
             RecyclerView.ViewHolder viewHolder =
                     tabList == null ? null : tabList.findViewHolderForAdapterPosition(0);
             if (viewHolder != null) {
@@ -478,8 +485,8 @@ public class ToolbarPhoneTest {
 
     @Test
     @MediumTest
-    @EnableFeatures({ChromeFeatureList.START_SURFACE_ANDROID,
-            ChromeFeatureList.TAB_TO_GTS_ANIMATION, ChromeFeatureList.TAB_GRID_LAYOUT_ANDROID})
+    @EnableFeatures(
+            {ChromeFeatureList.START_SURFACE_ANDROID, ChromeFeatureList.TAB_TO_GTS_ANIMATION})
     @DisableAnimationsTestRule.EnsureAnimationsOn
     public void
     testToolbarTabSwitcherButtonNotClickableDuringTransition_startSurfaceEnabled() {
@@ -504,7 +511,7 @@ public class ToolbarPhoneTest {
         CriteriaHelper.pollUiThread(() -> mToolbar.getVisibility() != View.VISIBLE);
         LayoutTestUtils.waitForLayout(cta.getLayoutManager(), LayoutType.TAB_SWITCHER);
         CriteriaHelper.pollUiThread(() -> {
-            RecyclerView tabList = cta.findViewById(R.id.tab_list_view);
+            RecyclerView tabList = cta.findViewById(R.id.tab_list_recycler_view);
             RecyclerView.ViewHolder viewHolder =
                     tabList == null ? null : tabList.findViewHolderForAdapterPosition(0);
             if (viewHolder != null) {
@@ -532,9 +539,8 @@ public class ToolbarPhoneTest {
 
     @Test
     @MediumTest
-    @DisableFeatures({ChromeFeatureList.TAB_TO_GTS_ANIMATION})
-    @EnableFeatures(
-            {ChromeFeatureList.START_SURFACE_ANDROID, ChromeFeatureList.TAB_GRID_LAYOUT_ANDROID})
+    @DisableFeatures(ChromeFeatureList.TAB_TO_GTS_ANIMATION)
+    @EnableFeatures(ChromeFeatureList.START_SURFACE_ANDROID)
     @DisableAnimationsTestRule.EnsureAnimationsOn
     public void
     testToolbarTabSwitcherButtonNotClickableDuringTransition_startSurfaceEnabled_noAnimation() {
@@ -559,7 +565,7 @@ public class ToolbarPhoneTest {
         CriteriaHelper.pollUiThread(() -> mToolbar.getVisibility() != View.VISIBLE);
         LayoutTestUtils.waitForLayout(cta.getLayoutManager(), LayoutType.TAB_SWITCHER);
         CriteriaHelper.pollUiThread(() -> {
-            RecyclerView tabList = cta.findViewById(R.id.tab_list_view);
+            RecyclerView tabList = cta.findViewById(R.id.tab_list_recycler_view);
             RecyclerView.ViewHolder viewHolder =
                     tabList == null ? null : tabList.findViewHolderForAdapterPosition(0);
             if (viewHolder != null) {
@@ -587,12 +593,10 @@ public class ToolbarPhoneTest {
 
     @Test
     @MediumTest
-    @EnableFeatures(
-            {ChromeFeatureList.TAB_GRID_LAYOUT_ANDROID, ChromeFeatureList.TAB_TO_GTS_ANIMATION})
-    @DisableFeatures({ChromeFeatureList.START_SURFACE_ANDROID})
+    @EnableFeatures(ChromeFeatureList.TAB_TO_GTS_ANIMATION)
+    @DisableFeatures(ChromeFeatureList.START_SURFACE_ANDROID)
     @DisableAnimationsTestRule.EnsureAnimationsOn
-    public void
-    testToolbarTabSwitcherButtonNotClickableDuringTransition_startSurfaceDisabled() {
+    public void testToolbarTabSwitcherButtonNotClickableDuringTransition_startSurfaceDisabled() {
         ChromeTabbedActivity cta = mActivityTestRule.getActivity();
         TabModelSelector tabModelSelector = cta.getTabModelSelectorSupplier().get();
         ImageButton tabSwitcherButton = TestThreadUtils.runOnUiThreadBlockingNoException(
@@ -614,7 +618,7 @@ public class ToolbarPhoneTest {
         CriteriaHelper.pollUiThread(() -> mToolbar.getVisibility() != View.VISIBLE);
         LayoutTestUtils.waitForLayout(cta.getLayoutManager(), LayoutType.TAB_SWITCHER);
         CriteriaHelper.pollUiThread(() -> {
-            RecyclerView tabList = cta.findViewById(R.id.tab_list_view);
+            RecyclerView tabList = cta.findViewById(R.id.tab_list_recycler_view);
             RecyclerView.ViewHolder viewHolder =
                     tabList == null ? null : tabList.findViewHolderForAdapterPosition(0);
             if (viewHolder != null) {
@@ -648,7 +652,7 @@ public class ToolbarPhoneTest {
                 mActivityTestRule.getActivity(), R.drawable.ic_toolbar_share_offset_24dp);
         ButtonData buttonData = new ButtonDataImpl(true, drawable, null,
                 mActivityTestRule.getActivity().getString(R.string.share), false, null, true,
-                AdaptiveToolbarButtonVariant.UNKNOWN);
+                AdaptiveToolbarButtonVariant.UNKNOWN, 0, false);
 
         // Show a button, this will inflate the optional button view and create its coordinator.
         TestThreadUtils.runOnUiThreadBlocking(() -> { mToolbar.updateOptionalButton(buttonData); });
@@ -681,7 +685,7 @@ public class ToolbarPhoneTest {
                 mActivityTestRule.getActivity(), R.drawable.ic_toolbar_share_offset_24dp);
         ButtonData buttonData = new ButtonDataImpl(true, drawable, null,
                 mActivityTestRule.getActivity().getString(R.string.share), false, null, true,
-                AdaptiveToolbarButtonVariant.UNKNOWN);
+                AdaptiveToolbarButtonVariant.UNKNOWN, 0, false);
 
         // Show a button, this will inflate the optional button view and create its coordinator.
         TestThreadUtils.runOnUiThreadBlocking(() -> { mToolbar.updateOptionalButton(buttonData); });
@@ -709,13 +713,13 @@ public class ToolbarPhoneTest {
 
     @Test
     @MediumTest
-    @DisabledTest(message = "crbug.com/1440715")
+    @DisabledTest(message = "crbug.com/1473282")
     public void testOptionalButton_DrawnWhenVisible() {
         Drawable drawable = AppCompatResources.getDrawable(
                 mActivityTestRule.getActivity(), R.drawable.ic_toolbar_share_offset_24dp);
         ButtonData buttonData = new ButtonDataImpl(true, drawable, null,
                 mActivityTestRule.getActivity().getString(R.string.share), false, null, true,
-                AdaptiveToolbarButtonVariant.UNKNOWN);
+                AdaptiveToolbarButtonVariant.UNKNOWN, 0, false);
 
         // Show a button, this will inflate the optional button view and create its coordinator.
         TestThreadUtils.runOnUiThreadBlocking(() -> { mToolbar.updateOptionalButton(buttonData); });
@@ -738,6 +742,69 @@ public class ToolbarPhoneTest {
             // Optional button should be drawn.
             verify(mOptionalButtonCoordinator, atLeastOnce()).getViewForDrawing();
         });
+    }
+
+    @Test
+    @MediumTest
+    @EnableFeatures({ChromeFeatureList.SURFACE_POLISH})
+    public void testLocationBarBackgroundChangedWithStartSurfaceState() {
+        // Test updating the location bar background when entering the search page from the Start
+        // Surface.
+        assertEquals(false, mToolbar.isLocationBarShownInNTP());
+        mToolbar.setLocationBarBackgroundDrawableForTesting(mLocationbarBackgroundDrawable);
+        mToolbar.setIsShowingStartSurfaceHomepageForTesting(true);
+        TestThreadUtils.runOnUiThreadBlocking(
+                () -> { mToolbar.onStartSurfaceStateChanged(false, false, false, true); });
+        assertEquals(mLocationbarBackgroundDrawable,
+                mToolbar.getActiveLocationBarBackgroundForTesting());
+
+        // Test updating the location bar background when entering the New Tab Page from the Start
+        // Surface.
+        mActivityTestRule.loadUrl(UrlConstants.NTP_URL);
+        Tab tab = mActivityTestRule.getActivity().getActivityTab();
+        NewTabPageTestUtils.waitForNtpLoaded(tab);
+        assertEquals(true, mToolbar.isLocationBarShownInNTP());
+        mToolbar.setNtpSearchBoxBackgroundForTesting(mNtpSearchBoxDrawable);
+        mToolbar.setIsShowingStartSurfaceHomepageForTesting(true);
+        TestThreadUtils.runOnUiThreadBlocking(
+                () -> { mToolbar.onStartSurfaceStateChanged(false, false, false, false); });
+        assertEquals(mNtpSearchBoxDrawable, mToolbar.getActiveLocationBarBackgroundForTesting());
+
+        // Test updating the location bar background when entering the New Tab Page from the Start
+        // Surface when NtpSearchBoxDrawable hasn't been constructed.
+        assertEquals(true, mToolbar.isLocationBarShownInNTP());
+        mToolbar.setNtpSearchBoxBackgroundForTesting(null);
+        mToolbar.setIsShowingStartSurfaceHomepageForTesting(true);
+        TestThreadUtils.runOnUiThreadBlocking(
+                () -> { mToolbar.onStartSurfaceStateChanged(false, false, false, false); });
+        assertTrue(mToolbar.getActiveLocationBarBackgroundForTesting() != null);
+        assertTrue(mToolbar.getActiveLocationBarBackgroundForTesting()
+                           instanceof NtpSearchBoxDrawable);
+    }
+
+    @Test
+    @MediumTest
+    @EnableFeatures({ChromeFeatureList.SURFACE_POLISH})
+    public void testToolbarBackgroundChanged() {
+        ColorDrawable toolbarBackgroundDrawable = mToolbar.getBackgroundDrawable();
+        int expectColor = androidx.core.graphics.ColorUtils.setAlphaComponent(
+                ChromeColors.getSurfaceColor(
+                        mToolbar.getContext(), R.dimen.home_surface_background_color_elevation),
+                0);
+
+        assertEquals(false, mToolbar.isLocationBarShownInNTP());
+        assertNotEquals(expectColor, toolbarBackgroundDrawable.getColor());
+
+        // Load the new tab page.
+        mActivityTestRule.loadUrl(UrlConstants.NTP_URL);
+        Tab tab = mActivityTestRule.getActivity().getActivityTab();
+        NewTabPageTestUtils.waitForNtpLoaded(tab);
+        assertEquals(true, mToolbar.isLocationBarShownInNTP());
+        assertEquals(expectColor, toolbarBackgroundDrawable.getColor());
+
+        // Focus on the Omnibox.
+        mOmnibox.requestFocus();
+        assertNotEquals(expectColor, toolbarBackgroundDrawable.getColor());
     }
 
     private static class TestControlsVisibilityDelegate

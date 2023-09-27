@@ -84,11 +84,14 @@ source_set("common") {
     "platform_video_frame_pool.h",
     "platform_video_frame_utils.cc",
     "platform_video_frame_utils.h",
+    "shaders/shaders.h",
     "vd_video_decode_accelerator.cc",
     "vd_video_decode_accelerator.h",
     "vda_video_frame_pool.cc",
     "vda_video_frame_pool.h",
     "video_decoder_pipeline.h",
+    "vulkan_image_processor_backend.cc",
+    "vulkan_image_processor_backend.h",
   ]
 
   # TODO(crbug.com/1012587): Merge :fourcc to :common.
@@ -105,6 +108,7 @@ source_set("common") {
     "//build:chromeos_buildflags",
     "//build/config/linux/libdrm",
     "//gpu/ipc/common:common",
+    "//gpu/vulkan/init:init",
     "//media",
     "//media/gpu:buffer_validation",
     "//media/gpu:buildflags",
@@ -176,12 +180,28 @@ if (is_chromeos) {
   }
 }
 
+source_set(
+    "chromeos_compressed_gpu_memory_buffer_video_frame_utils_test_support") {
+  testonly = true
+  sources = [
+    "fake_chromeos_intel_compressed_gpu_memory_buffer.cc",
+    "fake_chromeos_intel_compressed_gpu_memory_buffer.h",
+  ]
+  deps = [
+    "//base",
+    "//build/config/linux/libdrm",
+    "//ui/gfx",
+  ]
+}
+
 source_set("unit_tests") {
   testonly = true
   deps = [
+    ":chromeos_compressed_gpu_memory_buffer_video_frame_utils_test_support",
     ":common",
     "//base",
     "//base/test:test_support",
+    "//build/config/linux/libdrm",
     "//gpu/ipc/service:service",
     "//media",
     "//media:test_support",
@@ -194,6 +214,7 @@ source_set("unit_tests") {
     "//ui/gfx/geometry",
   ]
   sources = [
+    "chromeos_compressed_gpu_memory_buffer_video_frame_utils_unittest.cc",
     "fourcc_unittests.cc",
     "mailbox_video_frame_converter_unittest.cc",
     "platform_video_frame_pool_unittest.cc",
@@ -229,8 +250,8 @@ test("image_processor_test") {
 }
 
 if (use_v4l2_codec) {
-  test("image_processor_perftest") {
-    sources = [ "image_processor_perftest.cc" ]
+  test("image_processor_perf_test") {
+    sources = [ "image_processor_perf_test.cc" ]
     deps = [
       ":chromeos",
       "//base/test:test_support",

@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -19,6 +19,8 @@ namespace desks_storage {
 class AdminTemplateService;
 class DeskModel;
 }
+
+class TestingPrefServiceSimple;
 
 namespace ash {
 
@@ -44,6 +46,10 @@ class SavedDeskTestHelper {
 
   desks_storage::DeskModel* desk_model() { return saved_desk_model_.get(); }
 
+  TestingPrefServiceSimple* test_pref_service() {
+    return test_pref_service_.get();
+  }
+
  private:
   AccountId account_id_;
 
@@ -54,6 +60,8 @@ class SavedDeskTestHelper {
   std::unique_ptr<desks_storage::DeskModel> saved_desk_model_;
 
   std::unique_ptr<apps::AppRegistryCache> cache_;
+
+  std::unique_ptr<TestingPrefServiceSimple> test_pref_service_;
 };
 
 }  // namespace ash

@@ -11,7 +11,7 @@
 #include "base/functional/callback_helpers.h"
 #include "chrome/browser/password_manager/android/jni_headers/PasswordStoreBridge_jni.h"
 #include "chrome/browser/password_manager/android/jni_headers/PasswordStoreCredential_jni.h"
-#include "components/password_manager/core/browser/form_parsing/form_parser.h"
+#include "components/password_manager/core/browser/form_parsing/form_data_parser.h"
 #include "url/android/gurl_android.h"
 
 namespace {
@@ -30,6 +30,15 @@ PasswordForm ConvertJavaObjectToPasswordForm(
   form.password_value = ConvertJavaStringToUTF16(
       env, Java_PasswordStoreCredential_getPassword(env, credential));
 
+  return form;
+}
+
+// IN-TEST
+PasswordForm Blocklist(JNIEnv* env, std::string url) {
+  PasswordForm form;
+  form.url = GURL(url);
+  form.signon_realm = password_manager::GetSignonRealm(form.url);
+  form.blocked_by_user = true;
   return form;
 }
 
@@ -55,6 +64,13 @@ void PasswordStoreBridge::InsertPasswordCredentialForTesting(
     JNIEnv* env,
     const base::android::JavaParamRef<jobject>& credential) {
   profile_store_->AddLogin(ConvertJavaObjectToPasswordForm(env, credential));
+}
+
+void PasswordStoreBridge::BlocklistForTesting(
+    JNIEnv* env,
+    const base::android::JavaParamRef<jstring>& jurl) {
+  profile_store_->AddLogin(
+      Blocklist(env, base::android::ConvertJavaStringToUTF8(env, jurl)));
 }
 
 bool PasswordStoreBridge::EditPassword(

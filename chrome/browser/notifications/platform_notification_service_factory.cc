@@ -24,7 +24,8 @@ PlatformNotificationServiceFactory::GetForProfile(Profile* profile) {
 // static
 PlatformNotificationServiceFactory*
 PlatformNotificationServiceFactory::GetInstance() {
-  return base::Singleton<PlatformNotificationServiceFactory>::get();
+  static base::NoDestructor<PlatformNotificationServiceFactory> instance;
+  return instance.get();
 }
 
 PlatformNotificationServiceFactory::PlatformNotificationServiceFactory()
@@ -42,8 +43,9 @@ PlatformNotificationServiceFactory::PlatformNotificationServiceFactory()
   DependsOn(ukm::UkmBackgroundRecorderFactory::GetInstance());
 }
 
-KeyedService* PlatformNotificationServiceFactory::BuildServiceInstanceFor(
+std::unique_ptr<KeyedService>
+PlatformNotificationServiceFactory::BuildServiceInstanceForBrowserContext(
     content::BrowserContext* context) const {
-  return new PlatformNotificationServiceImpl(
+  return std::make_unique<PlatformNotificationServiceImpl>(
       Profile::FromBrowserContext(context));
 }

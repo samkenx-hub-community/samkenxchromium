@@ -66,6 +66,8 @@ std::string SourceToString(SourceForRefreshTokenOperation source) {
       return "TokenService::ExtractCredentials";
     case SourceForRefreshTokenOperation::kLogoutTabHelper_PrimaryPageChanged:
       return "LogoutTabHelper::PrimaryPageChanged";
+    case SourceForRefreshTokenOperation::kForceSigninReauthWithDifferentAccount:
+      return "ForceSigninReauthWithDifferentAccount";
   }
 }
 }  // namespace
@@ -270,10 +272,20 @@ void ProfileOAuth2TokenService::LoadCredentials(
 void ProfileOAuth2TokenService::UpdateCredentials(
     const CoreAccountId& account_id,
     const std::string& refresh_token,
-    SourceForRefreshTokenOperation source) {
+    SourceForRefreshTokenOperation source
+#if BUILDFLAG(ENABLE_BOUND_SESSION_CREDENTIALS)
+    ,
+    const std::vector<uint8_t>& wrapped_binding_key
+#endif  // BUILDFLAG(ENABLE_BOUND_SESSION_CREDENTIALS)
+) {
   base::AutoReset<SourceForRefreshTokenOperation> auto_reset(
       &update_refresh_token_source_, source);
-  GetDelegate()->UpdateCredentials(account_id, refresh_token);
+  GetDelegate()->UpdateCredentials(account_id, refresh_token
+#if BUILDFLAG(ENABLE_BOUND_SESSION_CREDENTIALS)
+                                   ,
+                                   wrapped_binding_key
+#endif  // BUILDFLAG(ENABLE_BOUND_SESSION_CREDENTIALS)
+  );
 }
 
 void ProfileOAuth2TokenService::RevokeCredentials(

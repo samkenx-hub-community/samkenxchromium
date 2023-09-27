@@ -4,21 +4,32 @@
 
 #include "third_party/blink/renderer/core/css/style_containment_scope.h"
 
+#include "third_party/blink/renderer/core/css/counters_scope_tree.h"
+#include "third_party/blink/renderer/core/css/style_containment_scope_tree.h"
 #include "third_party/blink/renderer/core/dom/layout_tree_builder_traversal.h"
-#include "third_party/blink/renderer/core/dom/pseudo_element.h"
 #include "third_party/blink/renderer/core/layout/layout_quote.h"
 
 namespace blink {
+
+StyleContainmentScope::StyleContainmentScope(
+    const Element* element,
+    StyleContainmentScopeTree* style_containment_tree)
+    : element_(element),
+      parent_(nullptr),
+      counters_tree_(MakeGarbageCollected<CountersScopeTree>(this)),
+      style_containment_tree_(style_containment_tree) {}
 
 void StyleContainmentScope::Trace(Visitor* visitor) const {
   visitor->Trace(quotes_);
   visitor->Trace(children_);
   visitor->Trace(parent_);
   visitor->Trace(element_);
+  visitor->Trace(counters_tree_);
+  visitor->Trace(style_containment_tree_);
 }
 
 // If the scope is about to be removed, detach self from the parent,
-// reattach the quotes and the children scopes to the parent scope.
+// reattach the quotes, counters and the children scopes to the parent scope.
 void StyleContainmentScope::ReattachToParent() {
   if (parent_) {
     auto quotes = std::move(quotes_);
@@ -26,6 +37,7 @@ void StyleContainmentScope::ReattachToParent() {
       quote->SetScope(nullptr);
       parent_->AttachQuote(*quote);
     }
+    ReparentCountersToStyleScope(*parent_);
     auto children = std::move(children_);
     for (StyleContainmentScope* child : children) {
       child->SetParent(nullptr);
@@ -80,18 +92,7 @@ void StyleContainmentScope::AttachQuote(LayoutQuote& quote) {
   DCHECK(!quote.IsInScope());
   quote.SetScope(this);
   // Find previous in preorder quote from the current scope.
-  // Don't search outside the scope subtree.
-  LayoutObject* stay_within =
-      GetElement() ? GetElement()->GetLayoutObject() : nullptr;
-  LayoutObject* it = quote.PreviousInPreOrder(stay_within);
-  for (; it; it = it->PreviousInPreOrder(stay_within)) {
-    if (auto* pre_quote = DynamicTo<LayoutQuote>(it)) {
-      if (pre_quote->IsInScope() && pre_quote->GetScope() == this) {
-        break;
-      }
-    }
-  }
-  auto* pre_quote = DynamicTo<LayoutQuote>(it);
+  auto* pre_quote = FindQuotePrecedingElement(*quote.GetOwningPseudo());
   // Insert at 0 if we are the new head.
   wtf_size_t pos = pre_quote ? quotes_.Find(pre_quote) + 1u : 0u;
   quotes_.insert(pos, &quote);
@@ -108,7 +109,6 @@ void StyleContainmentScope::DetachQuote(LayoutQuote& quote) {
 }
 
 int StyleContainmentScope::ComputeInitialQuoteDepth() const {
-  int depth = 0;
   // Compute the depth of the previous quote from one of the parents.
   // Depth will be 0, if we are the first quote.
   for (StyleContainmentScope* parent = parent_; parent;
@@ -116,10 +116,10 @@ int StyleContainmentScope::ComputeInitialQuoteDepth() const {
     const LayoutQuote* parent_quote =
         parent->FindQuotePrecedingElement(*quotes_.front()->GetOwningPseudo());
     if (parent_quote) {
-      depth = parent_quote->GetNextDepth();
+      return parent_quote->GetNextDepth();
     }
   }
-  return depth;
+  return 0;
 }
 
 void StyleContainmentScope::UpdateQuotes() const {
@@ -135,12 +135,62 @@ void StyleContainmentScope::UpdateQuotes() const {
       depth = quote->GetNextDepth();
     }
   }
-  // If nothing has changed on this level, don't update children.
-  if (needs_children_update) {
+  // If nothing has changed on this level don't update children.
+  if (needs_children_update || !quotes_.size()) {
     for (StyleContainmentScope* child : Children()) {
       child->UpdateQuotes();
     }
   }
 }
+
+void StyleContainmentScope::ReparentCountersToStyleScope(
+    StyleContainmentScope& new_parent) {
+  counters_tree_->ReparentCountersToStyleScope(new_parent);
+}
+
+CountersScope* StyleContainmentScope::FindCountersScopeForElement(
+    const Element& element,
+    const AtomicString& identifier) const {
+  return counters_tree_->FindScopeForElement(element, identifier);
+}
+
+void StyleContainmentScope::CreateCounterNodesForLayoutObject(
+    LayoutObject& object) {
+  counters_tree_->CreateCountersForLayoutObject(object);
+}
+
+void StyleContainmentScope::CreateCounterNodeForLayoutObject(
+    LayoutObject& object,
+    const AtomicString& identifier) {
+  counters_tree_->CreateCounterForLayoutObject(object, identifier);
+}
+
+void StyleContainmentScope::CreateListItemCounterNodeForLayoutObject(
+    LayoutObject& object) {
+  counters_tree_->CreateListItemCounterForLayoutObject(object);
+}
+
+void StyleContainmentScope::CreateCounterNodeForLayoutCounter(
+    LayoutCounter& counter) {
+  counters_tree_->CreateCounterForLayoutCounter(counter);
+}
+
+void StyleContainmentScope::RemoveCounterNodeForLayoutCounter(
+    LayoutCounter& counter) {
+  counters_tree_->RemoveCounterForLayoutCounter(counter);
+}
+
+void StyleContainmentScope::UpdateCounters() const {
+  counters_tree_->UpdateCounters();
+  for (StyleContainmentScope* child : children_) {
+    child->UpdateCounters();
+  }
+}
+
+#if DCHECK_IS_ON()
+String StyleContainmentScope::ScopesTreeToString(wtf_size_t depth) const {
+  return counters_tree_->ToString(depth);
+}
+#endif  // DCHECK_IS_ON()
 
 }  // namespace blink

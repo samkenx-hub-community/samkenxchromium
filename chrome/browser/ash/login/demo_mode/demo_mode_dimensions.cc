@@ -4,10 +4,10 @@
 
 #include "chrome/browser/ash/login/demo_mode/demo_mode_dimensions.h"
 #include "ash/constants/ash_features.h"
+#include "ash/constants/ash_pref_names.h"
 #include "chrome/browser/ash/login/demo_mode/demo_session.h"
 #include "chrome/browser/ash/login/demo_mode/demo_setup_controller.h"
 #include "chrome/browser/browser_process.h"
-#include "chrome/common/pref_names.h"
 #include "chromeos/constants/chromeos_features.h"
 #include "components/prefs/pref_service.h"
 
@@ -43,6 +43,22 @@ bool IsCloudGamingDevice() {
 bool IsFeatureAwareDevice() {
   DCHECK(AreDemoDimensionsAccessible());
   return ash::features::IsFeatureAwareDeviceDemoModeEnabled();
+}
+
+enterprise_management::DemoModeDimensions GetDemoModeDimensions() {
+  enterprise_management::DemoModeDimensions dimensions;
+  dimensions.set_country(Country());
+  dimensions.set_retailer_name(RetailerName());
+  dimensions.set_store_number(StoreNumber());
+  if (IsCloudGamingDevice()) {
+    dimensions.add_customization_facets(
+        enterprise_management::DemoModeDimensions::CLOUD_GAMING_DEVICE);
+  }
+  if (IsFeatureAwareDevice()) {
+    dimensions.add_customization_facets(
+        enterprise_management::DemoModeDimensions::FEATURE_AWARE_DEVICE);
+  }
+  return dimensions;
 }
 
 }  // namespace demo_mode

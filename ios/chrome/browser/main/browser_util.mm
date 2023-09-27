@@ -14,36 +14,25 @@
 #import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/shared/model/web_state_list/web_state_opener.h"
 #import "ios/chrome/browser/snapshots/snapshot_browser_agent.h"
-#import "ios/chrome/browser/snapshots/snapshot_cache.h"
+#import "ios/chrome/browser/snapshots/snapshot_storage.h"
 #import "ios/chrome/browser/snapshots/snapshot_tab_helper.h"
 #import "ios/web/public/web_state.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace {
 
 // Moves snapshot associated with `snapshot_id` from `source_browser` to
-// `destination_browser`'s snapshot cache.
-void MoveSnapshot(NSString* snapshot_id,
+// `destination_browser`'s snapshot storage.
+void MoveSnapshot(SnapshotID snapshot_id,
                   Browser* source_browser,
                   Browser* destination_browser) {
-  DCHECK(snapshot_id.length);
-  SnapshotCache* source_cache =
-      SnapshotBrowserAgent::FromBrowser(source_browser)->snapshot_cache();
-  SnapshotCache* destination_cache =
-      SnapshotBrowserAgent::FromBrowser(destination_browser)->snapshot_cache();
-  [source_cache
-      retrieveImageForSnapshotID:snapshot_id
-                        callback:^(UIImage* snapshot) {
-                          if (snapshot) {
-                            [destination_cache setImage:snapshot
-                                         withSnapshotID:snapshot_id];
-                            [source_cache
-                                removeImageWithSnapshotID:snapshot_id];
-                          }
-                        }];
+  DCHECK(snapshot_id.valid());
+  SnapshotStorage* source_storage =
+      SnapshotBrowserAgent::FromBrowser(source_browser)->snapshot_storage();
+  SnapshotStorage* destination_storage =
+      SnapshotBrowserAgent::FromBrowser(destination_browser)
+          ->snapshot_storage();
+  [source_storage migrateImageWithSnapshotID:snapshot_id
+                           toSnapshotStorage:destination_storage];
 }
 
 }  // namespace
@@ -63,7 +52,7 @@ void MoveTabFromBrowserToBrowser(Browser* source_browser,
       source_browser->GetWebStateList()->DetachWebStateAt(source_tab_index);
   SnapshotTabHelper* snapshot_tab_helper =
       SnapshotTabHelper::FromWebState(web_state.get());
-  MoveSnapshot(snapshot_tab_helper->GetSnapshotIdentifier(), source_browser,
+  MoveSnapshot(snapshot_tab_helper->GetSnapshotID(), source_browser,
                destination_browser);
 
   int insertion_flags = flags;
@@ -90,11 +79,11 @@ void MoveTabFromBrowserToBrowser(Browser* source_browser,
                               WebStateList::InsertionFlags::INSERT_NO_FLAGS);
 }
 
-void MoveTabToBrowser(NSString* tab_id,
+void MoveTabToBrowser(web::WebStateID tab_id,
                       Browser* destination_browser,
                       int destination_tab_index,
                       WebStateList::InsertionFlags flags) {
-  DCHECK(tab_id.length);
+  DCHECK(tab_id.valid());
   ChromeBrowserState* browser_state = destination_browser->GetBrowserState();
   BrowserList* browser_list =
       BrowserListFactory::GetForBrowserState(browser_state);
@@ -114,21 +103,21 @@ void MoveTabToBrowser(NSString* tab_id,
                               flags);
 }
 
-void MoveTabToBrowser(NSString* tab_id,
+void MoveTabToBrowser(web::WebStateID tab_id,
                       Browser* destination_browser,
                       int destination_tab_index) {
   MoveTabToBrowser(tab_id, destination_browser, destination_tab_index,
                    WebStateList::InsertionFlags::INSERT_NO_FLAGS);
 }
 
-BrowserAndIndex FindBrowserAndIndex(NSString* tab_id,
+BrowserAndIndex FindBrowserAndIndex(web::WebStateID tab_id,
                                     const std::set<Browser*>& browsers) {
   for (Browser* browser : browsers) {
     WebStateList* web_state_list = browser->GetWebStateList();
     for (int i = 0; i < web_state_list->count(); ++i) {
       web::WebState* web_state = web_state_list->GetWebStateAt(i);
-      NSString* current_tab_id = web_state->GetStableIdentifier();
-      if ([current_tab_id isEqualToString:tab_id]) {
+      web::WebStateID current_tab_id = web_state->GetUniqueIdentifier();
+      if (current_tab_id == tab_id) {
         return BrowserAndIndex{
             .browser = browser,
             .tab_index = i,

@@ -355,3 +355,21 @@ export async function getBulkPinProgress() {
 export async function calculateBulkPinRequiredSpace() {
   return promisify(chrome.fileManagerPrivate.calculateBulkPinRequiredSpace);
 }
+
+/**
+ * Wrap the chrome.fileManagerPrivate.getDriveConnectionStatus function in an
+ * async/await compatible style.
+ * @returns {!Promise<(
+ * !chrome.fileManagerPrivate.DriveConnectionState)>}
+ */
+export async function getDriveConnectionState() {
+  return promisify(chrome.fileManagerPrivate.getDriveConnectionState);
+}
+
+/**
+ * @param {!Array<string>} entries
+ * @return {!Promise<void>}
+ */
+export async function grantAccess(entries) {
+  return promisify(chrome.fileManagerPrivate.grantAccess, entries);
+}

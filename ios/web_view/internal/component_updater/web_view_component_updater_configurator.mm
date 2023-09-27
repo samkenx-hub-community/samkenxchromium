@@ -32,17 +32,13 @@
 #import "services/network/public/cpp/shared_url_loader_factory.h"
 #import "third_party/abseil-cpp/absl/types/optional.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 namespace ios_web_view {
 
 namespace {
 
 // A //ios/web_view specific configurator.
 // See similar implementation at
-// //ios/chrome/browser/component_updater/ios_component_updater_configurator.mm
+// //ios/chrome/browser/component_updater/model/ios_component_updater_configurator.mm
 class WebViewConfigurator : public update_client::Configurator {
  public:
   explicit WebViewConfigurator(const base::CommandLine* cmdline);

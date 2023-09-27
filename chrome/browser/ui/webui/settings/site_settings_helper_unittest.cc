@@ -10,18 +10,23 @@
 #include "base/strings/string_piece.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/scoped_feature_list.h"
+#include "base/test/to_vector.h"
 #include "build/build_config.h"
 #include "build/chromeos_buildflags.h"
 #include "chrome/browser/content_settings/host_content_settings_map_factory.h"
+#include "chrome/browser/engagement/site_engagement_service_factory.h"
 #include "chrome/browser/file_system_access/chrome_file_system_access_permission_context.h"
 #include "chrome/browser/file_system_access/file_system_access_permission_context_factory.h"
+#include "chrome/browser/permissions/notifications_engagement_service_factory.h"
 #include "chrome/browser/permissions/permission_decision_auto_blocker_factory.h"
 #include "chrome/browser/ui/web_applications/test/isolated_web_app_test_utils.h"
 #include "chrome/browser/usb/usb_chooser_context.h"
 #include "chrome/browser/usb/usb_chooser_context_factory.h"
 #include "chrome/browser/web_applications/test/web_app_install_test_utils.h"
 #include "chrome/browser/web_applications/test/web_app_test_utils.h"
+#include "chrome/common/chrome_features.h"
 #include "chrome/common/pref_names.h"
+#include "chrome/grit/generated_resources.h"
 #include "chrome/test/base/testing_profile.h"
 #include "components/content_settings/core/browser/content_settings_utils.h"
 #include "components/content_settings/core/browser/host_content_settings_map.h"
@@ -35,11 +40,13 @@
 #include "components/permissions/test/permission_test_util.h"
 #include "components/prefs/pref_service.h"
 #include "components/privacy_sandbox/privacy_sandbox_features.h"
+#include "components/site_engagement/content/site_engagement_score.h"
 #include "content/public/test/browser_task_environment.h"
 #include "extensions/browser/extension_registry.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
 #include "services/device/public/cpp/test/fake_usb_device_manager.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "ui/base/l10n/l10n_util.h"
 #include "url/gurl.h"
 
 #if BUILDFLAG(ENABLE_EXTENSIONS)
@@ -54,6 +61,9 @@
 namespace site_settings {
 
 namespace {
+
+using PermissionStatus = blink::mojom::PermissionStatus;
+
 constexpr ContentSettingsType kContentType = ContentSettingsType::GEOLOCATION;
 constexpr ContentSettingsType kContentTypeCookies =
     ContentSettingsType::COOKIES;
@@ -61,7 +71,7 @@ constexpr ContentSettingsType kContentTypeFileSystem =
     ContentSettingsType::FILE_SYSTEM_WRITE_GUARD;
 constexpr ContentSettingsType kContentTypeNotifications =
     ContentSettingsType::NOTIFICATIONS;
-}
+}  // namespace
 
 class SiteSettingsHelperTest : public testing::Test {
  public:
@@ -91,6 +101,12 @@ class SiteSettingsHelperTest : public testing::Test {
     map->SetContentSettingCustomScope(
         ContentSettingsPattern::FromString(pattern),
         ContentSettingsPattern::Wildcard(), kContentType, setting);
+  }
+
+  static base::Time GetReferenceTime() {
+    base::Time time;
+    EXPECT_TRUE(base::Time::FromString("Sat, 1 Sep 2018 11:00:00", &time));
+    return time;
   }
 
  private:
@@ -153,11 +169,11 @@ TEST_F(SiteSettingsHelperTest, ExceptionListShowsIncognitoEmbargoed) {
     }
 
     // Check that origin is under embargo.
-    ASSERT_EQ(CONTENT_SETTING_BLOCK,
+    ASSERT_EQ(PermissionStatus::DENIED,
               auto_blocker
                   ->GetEmbargoResult(GURL(kOriginToEmbargo),
                                      kContentTypeNotifications)
-                  ->content_setting);
+                  ->status);
   }
 
   // Check there is 1 embargoed origin for a non-incognito profile.
@@ -211,11 +227,11 @@ TEST_F(SiteSettingsHelperTest, ExceptionListShowsIncognitoEmbargoed) {
       incognito_auto_blocker->RecordDismissAndEmbargo(
           GURL(kOriginToEmbargoIncognito), kContentTypeNotifications, false);
     }
-    EXPECT_EQ(CONTENT_SETTING_BLOCK,
+    EXPECT_EQ(PermissionStatus::DENIED,
               incognito_auto_blocker
                   ->GetEmbargoResult(GURL(kOriginToEmbargoIncognito),
                                      kContentTypeNotifications)
-                  ->content_setting);
+                  ->status);
   }
 
   // Check there are 2 blocked or embargoed origins for an incognito profile.
@@ -268,10 +284,10 @@ TEST_F(SiteSettingsHelperTest, ExceptionListShowsEmbargoed) {
   }
 
   // Check that origin is under embargo.
-  EXPECT_EQ(CONTENT_SETTING_BLOCK,
+  EXPECT_EQ(PermissionStatus::DENIED,
             auto_blocker
                 ->GetEmbargoResult(origin_to_embargo, kContentTypeNotifications)
-                ->content_setting);
+                ->status);
 
   // Check there are 2 blocked origins.
   {
@@ -554,10 +570,8 @@ TEST_F(SiteSettingsHelperTest, CookieExceptions) {
 
     // Convert the test cases, and the returned dictionary, into tuples for
     // unordered comparison, as the order of exception is not relevant.
-    std::vector<std::tuple<std::string, std::string, std::string>> expected;
-    std::vector<std::tuple<std::string, std::string, std::string>> actual;
-    base::ranges::transform(
-        test_cases, std::back_inserter(expected), [&](const auto& test_case) {
+    std::vector<std::tuple<std::string, std::string, std::string>> expected =
+        base::test::ToVector(test_cases, [&](const auto& test_case) {
           // make_tuple as we've some temporary rvalues.
           return std::make_tuple(
               test_case.primary_pattern,
@@ -569,18 +583,79 @@ TEST_F(SiteSettingsHelperTest, CookieExceptions) {
                   feature_state ? test_case.updated_setting
                                 : test_case.initial_setting));
         });
-    base::ranges::transform(
-        exceptions, std::back_inserter(actual), [](const auto& exception) {
+
+    std::vector<std::tuple<std::string, std::string, std::string>> actual =
+        base::test::ToVector(exceptions, [](const auto& exception) {
           const base::Value::Dict& dict = exception.GetDict();
-          return std::forward_as_tuple(*dict.FindString(kOrigin),
-                                       *dict.FindString(kEmbeddingOrigin),
-                                       *dict.FindString(kSetting));
+          return std::make_tuple(*dict.FindString(kOrigin),
+                                 *dict.FindString(kEmbeddingOrigin),
+                                 *dict.FindString(kSetting));
         });
 
     EXPECT_THAT(actual, testing::UnorderedElementsAreArray(expected))
         << "Privacy Sandbox Settings 4 "
         << (feature_state ? "enabled" : "disabled");
   }
+}
+
+TEST_F(SiteSettingsHelperTest, GetExpirationDescription) {
+  base::subtle::ScopedTimeClockOverrides time_override(
+      &SiteSettingsHelperTest::GetReferenceTime,
+      /*time_ticks_override=*/nullptr, /*thread_ticks_override=*/nullptr);
+
+  auto description =
+      GetExpirationDescription(GetReferenceTime() + base::Days(0));
+
+  EXPECT_EQ(description, l10n_util::GetPluralStringFUTF16(
+                             IDS_SETTINGS_EXPIRES_AFTER_TIME_LABEL, 0));
+}
+
+TEST_F(SiteSettingsHelperTest, GetExpirationDescription_Tomorrow) {
+  base::subtle::ScopedTimeClockOverrides time_override(
+      &SiteSettingsHelperTest::GetReferenceTime,
+      /*time_ticks_override=*/nullptr, /*thread_ticks_override=*/nullptr);
+
+  auto description =
+      GetExpirationDescription(GetReferenceTime() + base::Days(1));
+
+  EXPECT_EQ(description, l10n_util::GetPluralStringFUTF16(
+                             IDS_SETTINGS_EXPIRES_AFTER_TIME_LABEL, 1));
+}
+
+TEST_F(SiteSettingsHelperTest,
+       GetExpirationDescription_Tomorrow_LessThan24_AfterMidnight) {
+  base::subtle::ScopedTimeClockOverrides time_override(
+      &SiteSettingsHelperTest::GetReferenceTime,
+      /*time_ticks_override=*/nullptr, /*thread_ticks_override=*/nullptr);
+
+  auto description =
+      GetExpirationDescription(GetReferenceTime() + base::Hours(14));
+
+  EXPECT_EQ(description, l10n_util::GetPluralStringFUTF16(
+                             IDS_SETTINGS_EXPIRES_AFTER_TIME_LABEL, 1));
+}
+
+TEST_F(SiteSettingsHelperTest,
+       GetExpirationDescription_Tomorrow_LessThan24_BeforeMidnight) {
+  base::subtle::ScopedTimeClockOverrides time_override(
+      &SiteSettingsHelperTest::GetReferenceTime,
+      /*time_ticks_override=*/nullptr, /*thread_ticks_override=*/nullptr);
+
+  auto description =
+      GetExpirationDescription(GetReferenceTime() + base::Hours(12));
+  EXPECT_EQ(description, l10n_util::GetPluralStringFUTF16(
+                             IDS_SETTINGS_EXPIRES_AFTER_TIME_LABEL, 0));
+}
+
+TEST_F(SiteSettingsHelperTest, GetExpirationDescription_Expired) {
+  base::subtle::ScopedTimeClockOverrides time_override(
+      &SiteSettingsHelperTest::GetReferenceTime,
+      /*time_ticks_override=*/nullptr, /*thread_ticks_override=*/nullptr);
+
+  auto description =
+      GetExpirationDescription(GetReferenceTime() - base::Days(4));
+  EXPECT_EQ(description, l10n_util::GetPluralStringFUTF16(
+                             IDS_SETTINGS_EXPIRES_AFTER_TIME_LABEL, 0));
 }
 
 namespace {
@@ -980,8 +1055,11 @@ TEST_F(PersistentPermissionsSiteSettingsHelperTest,
   // Initialize and populate the `grants` object with permissions.
   ChromeFileSystemAccessPermissionContext* context =
       FileSystemAccessPermissionContextFactory::GetForProfile(&profile);
-  auto empty_grants = context->GetPermissionGrants(kTestOrigin);
+  auto empty_grants =
+      context->ConvertObjectsToGrants(context->GetGrantedObjects(kTestOrigin));
   EXPECT_TRUE(empty_grants.file_write_grants.empty());
+
+  context->SetOriginHasExtendedPermissionForTesting(kTestOrigin);
 
   auto file_write_grant = context->GetWritePermissionGrant(
       kTestOrigin, kTestPath,
@@ -991,7 +1069,9 @@ TEST_F(PersistentPermissionsSiteSettingsHelperTest,
       kTestOrigin, kTestPath2,
       ChromeFileSystemAccessPermissionContext::HandleType::kFile,
       ChromeFileSystemAccessPermissionContext::UserAction::kSave);
-  auto populated_grants = context->GetPermissionGrants(kTestOrigin);
+
+  auto populated_grants =
+      context->ConvertObjectsToGrants(context->GetGrantedObjects(kTestOrigin));
   EXPECT_FALSE(populated_grants.file_write_grants.empty());
 
   base::Value::List exceptions;

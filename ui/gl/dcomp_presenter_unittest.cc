@@ -4,6 +4,9 @@
 
 #include "ui/gl/dcomp_presenter.h"
 
+#include <limits>
+#include <memory>
+
 #include <wrl/client.h>
 #include <wrl/implements.h>
 
@@ -13,21 +16,25 @@
 #include "base/memory/ref_counted_memory.h"
 #include "base/memory/weak_ptr.h"
 #include "base/run_loop.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/strings/stringprintf.h"
 #include "base/synchronization/waitable_event.h"
 #include "base/test/power_monitor_test.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/win/windows_version.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "ui/base/test/skia_gold_matching_algorithm.h"
 #include "ui/base/test/skia_gold_pixel_diff.h"
 #include "ui/base/win/hidden_window.h"
 #include "ui/gfx/buffer_format_util.h"
 #include "ui/gfx/frame_data.h"
 #include "ui/gfx/geometry/rect_conversions.h"
+#include "ui/gfx/geometry/size.h"
 #include "ui/gfx/geometry/transform.h"
 #include "ui/gfx/geometry/vector2d_f.h"
 #include "ui/gfx/test/sk_color_eq.h"
 #include "ui/gl/dc_layer_overlay_params.h"
+#include "ui/gl/dc_layer_tree.h"
 #include "ui/gl/direct_composition_child_surface_win.h"
 #include "ui/gl/direct_composition_support.h"
 #include "ui/gl/direct_composition_surface_win.h"
@@ -119,6 +126,34 @@ Microsoft::WRL::ComPtr<ID3D11Texture2D> CreateNV12Texture(
 // margin for error.
 const int kMaxColorChannelDeviation = 10;
 
+void ClearRect(IDCompositionSurface* surface,
+               const gfx::Rect& update_rect,
+               SkColor4f update_color) {
+  Microsoft::WRL::ComPtr<ID3D11Device> d3d11_device =
+      GetDirectCompositionD3D11Device();
+  Microsoft::WRL::ComPtr<ID3D11DeviceContext> immediate_context;
+  d3d11_device->GetImmediateContext(&immediate_context);
+
+  HRESULT hr = S_OK;
+
+  Microsoft::WRL::ComPtr<ID3D11Texture2D> update_texture;
+  RECT rect = update_rect.ToRECT();
+  POINT update_offset;
+  hr = surface->BeginDraw(&rect, IID_PPV_ARGS(&update_texture), &update_offset);
+  CHECK_EQ(S_OK, hr);
+
+  Microsoft::WRL::ComPtr<ID3D11RenderTargetView> rtv;
+  hr =
+      d3d11_device->CreateRenderTargetView(update_texture.Get(), nullptr, &rtv);
+  CHECK_EQ(S_OK, hr);
+
+  immediate_context->ClearRenderTargetView(rtv.Get(),
+                                           update_color.premul().vec());
+
+  hr = surface->EndDraw();
+  CHECK_EQ(S_OK, hr);
+}
+
 // Create an overlay image with an initial color and rectangles, drawn using the
 // painter's algorithm.
 DCLayerOverlayImage CreateDCompSurface(
@@ -132,42 +167,35 @@ DCLayerOverlayImage CreateDCompSurface(
       gl::GetDirectCompositionDevice();
 
   Microsoft::WRL::ComPtr<IDCompositionSurface> surface;
-  hr = dcomp_device->CreateSurface(surface_size.width(), surface_size.height(),
-                                   DXGI_FORMAT_B8G8R8A8_UNORM,
-                                   DXGI_ALPHA_MODE_IGNORE, &surface);
+  hr = dcomp_device->CreateSurface(
+      surface_size.width(), surface_size.height(), DXGI_FORMAT_B8G8R8A8_UNORM,
+      initial_color.isOpaque() ? DXGI_ALPHA_MODE_IGNORE
+                               : DXGI_ALPHA_MODE_PREMULTIPLIED,
+      &surface);
   CHECK_EQ(S_OK, hr);
 
   // Add a rect that initializes the whole surface to |initial_color|.
   rectangles_back_to_front.insert(rectangles_back_to_front.begin(),
                                   {gfx::Rect(surface_size), initial_color});
 
-  Microsoft::WRL::ComPtr<ID3D11Device> d3d11_device =
-      gl::QueryD3D11DeviceObjectFromANGLE();
-  Microsoft::WRL::ComPtr<ID3D11DeviceContext> immediate_context;
-  d3d11_device->GetImmediateContext(&immediate_context);
-
   for (const auto& [draw_rect, color] : rectangles_back_to_front) {
     CHECK(gfx::Rect(surface_size).Contains(draw_rect));
-
-    Microsoft::WRL::ComPtr<ID3D11Texture2D> update_texture;
-    RECT rect = draw_rect.ToRECT();
-    POINT update_offset;
-    hr = surface->BeginDraw(&rect, IID_PPV_ARGS(&update_texture),
-                            &update_offset);
-    CHECK_EQ(S_OK, hr);
-
-    Microsoft::WRL::ComPtr<ID3D11RenderTargetView> rtv;
-    hr = d3d11_device->CreateRenderTargetView(update_texture.Get(), nullptr,
-                                              &rtv);
-    CHECK_EQ(S_OK, hr);
-
-    immediate_context->ClearRenderTargetView(rtv.Get(), color.vec());
-
-    hr = surface->EndDraw();
-    CHECK_EQ(S_OK, hr);
+    ClearRect(surface.Get(), draw_rect, color);
   }
 
   return DCLayerOverlayImage(surface_size, surface);
+}
+
+// Create a |DCLayerOverlayParams| from an |image| and set the |content_rect| to
+// the bounds of |image|, or |content_rect_override|, if set.
+std::unique_ptr<DCLayerOverlayParams> CreateParamsFromImage(
+    DCLayerOverlayImage image,
+    absl::optional<gfx::RectF> content_rect_override = {}) {
+  auto params = std::make_unique<DCLayerOverlayParams>();
+  params->content_rect =
+      content_rect_override.value_or(gfx::RectF(image.size()));
+  params->overlay_image = std::move(image);
+  return params;
 }
 
 }  // namespace
@@ -178,30 +206,39 @@ class DCompPresenterTest : public testing::Test {
 
  protected:
   void SetUp() override {
-    // These tests are assumed to run on battery.
-    fake_power_monitor_source_.SetOnBatteryPower(true);
-
     // Without this, the following check always fails.
     display_ = gl::init::InitializeGLNoExtensionsOneOff(
         /*init_bindings=*/true, /*gpu_preference=*/gl::GpuPreference::kDefault);
+
+    gl_surface_ = init::CreateOffscreenGLSurface(
+        gl::GLSurfaceEGL::GetGLDisplayEGL(), gfx::Size());
+
+    scoped_refptr<GLContext> context = gl::init::CreateGLContext(
+        nullptr, gl_surface_.get(), GLContextAttribs());
+    EXPECT_TRUE(context->MakeCurrent(gl_surface_.get()));
+    context_ = std::move(context);
+
+    // These tests are assumed to run on battery.
+    fake_power_monitor_source_.SetOnBatteryPower(true);
+
     presenter_ = CreateDCompPresenter();
 
     // All bots run on non-blocklisted hardware that supports DComp (>Win7)
     ASSERT_TRUE(DirectCompositionSupported());
 
-    gl_surface_ = init::CreateOffscreenGLSurface(
-        gl::GLSurfaceEGL::GetGLDisplayEGL(), gfx::Size());
-    context_ = CreateGLContext(gl_surface_);
     SetDirectCompositionScaledOverlaysSupportedForTesting(false);
     SetDirectCompositionOverlayFormatUsedForTesting(DXGI_FORMAT_NV12);
   }
 
   void TearDown() override {
-    context_ = nullptr;
     if (presenter_) {
       DestroyPresenter(std::move(presenter_));
     }
+
+    context_.reset();
+    gl_surface_.reset();
     gl::init::ShutdownGL(display_, false);
+    display_ = nullptr;
   }
 
   scoped_refptr<DCompPresenter> CreateDCompPresenter() {
@@ -222,11 +259,19 @@ class DCompPresenterTest : public testing::Test {
     return presenter;
   }
 
-  scoped_refptr<GLContext> CreateGLContext(scoped_refptr<GLSurface> surface) {
-    scoped_refptr<GLContext> context =
-        gl::init::CreateGLContext(nullptr, surface.get(), GLContextAttribs());
-    EXPECT_TRUE(context->MakeCurrent(surface.get()));
-    return context;
+  // DCompPresenter is surfaceless--it's root surface is achieved via an
+  // overlay the size of the window.
+  // We can also present a manual initialized root surface with specific size
+  // and color.
+  void InitializeRootAndScheduleRootSurface(const gfx::Size& window_size,
+                                            SkColor4f initial_color) {
+    // Schedule the root surface as a normal overlay
+    auto params =
+        CreateParamsFromImage(CreateDCompSurface(window_size, initial_color));
+    params->z_order = 0;
+    params->quad_rect = gfx::Rect(window_size);
+    params->overlay_image = CreateDCompSurface(window_size, initial_color);
+    EXPECT_TRUE(presenter_->ScheduleDCLayer(std::move(params)));
   }
 
   // Wait for |presenter_| to present asynchronously check the swap result.
@@ -245,18 +290,19 @@ class DCompPresenterTest : public testing::Test {
     wait_for_present.Run();
   }
 
-  HWND parent_window_;
-  scoped_refptr<DCompPresenter> presenter_;
+  raw_ptr<GLDisplay> display_ = nullptr;
   scoped_refptr<GLSurface> gl_surface_;
   scoped_refptr<GLContext> context_;
+
   base::test::ScopedPowerMonitorTestSource fake_power_monitor_source_;
-  raw_ptr<GLDisplay> display_ = nullptr;
+  HWND parent_window_;
+  scoped_refptr<DCompPresenter> presenter_;
 };
 
 // Ensure that the overlay image isn't presented again unless it changes.
 TEST_F(DCompPresenterTest, NoPresentTwice) {
   Microsoft::WRL::ComPtr<ID3D11Device> d3d11_device =
-      QueryD3D11DeviceObjectFromANGLE();
+      GetDirectCompositionD3D11Device();
 
   gfx::Size texture_size(50, 50);
   Microsoft::WRL::ComPtr<ID3D11Texture2D> texture =
@@ -264,9 +310,8 @@ TEST_F(DCompPresenterTest, NoPresentTwice) {
   ASSERT_NE(texture, nullptr);
 
   {
-    auto params = std::make_unique<DCLayerOverlayParams>();
-    params->overlay_image.emplace(texture_size, texture);
-    params->content_rect = gfx::Rect(texture_size);
+    auto params =
+        CreateParamsFromImage(DCLayerOverlayImage(texture_size, texture));
     params->quad_rect = gfx::Rect(100, 100);
     params->color_space = gfx::ColorSpace::CreateREC709();
     presenter_->ScheduleDCLayer(std::move(params));
@@ -290,9 +335,8 @@ TEST_F(DCompPresenterTest, NoPresentTwice) {
   EXPECT_EQ(2u, last_present_count);
 
   {
-    auto params = std::make_unique<DCLayerOverlayParams>();
-    params->overlay_image.emplace(texture_size, texture);
-    params->content_rect = gfx::Rect(texture_size);
+    auto params =
+        CreateParamsFromImage(DCLayerOverlayImage(texture_size, texture));
     params->quad_rect = gfx::Rect(100, 100);
     params->color_space = gfx::ColorSpace::CreateREC709();
     presenter_->ScheduleDCLayer(std::move(params));
@@ -314,9 +358,8 @@ TEST_F(DCompPresenterTest, NoPresentTwice) {
   ASSERT_NE(texture, nullptr);
 
   {
-    auto params = std::make_unique<DCLayerOverlayParams>();
-    params->overlay_image.emplace(texture_size, texture);
-    params->content_rect = gfx::Rect(texture_size);
+    auto params =
+        CreateParamsFromImage(DCLayerOverlayImage(texture_size, texture));
     params->quad_rect = gfx::Rect(100, 100);
     params->color_space = gfx::ColorSpace::CreateREC709();
     presenter_->ScheduleDCLayer(std::move(params));
@@ -328,7 +371,7 @@ TEST_F(DCompPresenterTest, NoPresentTwice) {
       presenter_->GetLayerSwapChainForTesting(0);
   EXPECT_HRESULT_SUCCEEDED(
       swap_chain3->GetLastPresentCount(&last_present_count));
-  // the present count should increase with the new present
+  // The present count should increase with the new present
   EXPECT_EQ(3u, last_present_count);
 }
 
@@ -336,7 +379,7 @@ TEST_F(DCompPresenterTest, NoPresentTwice) {
 // is support - swapchain should be set to the onscreen video size.
 TEST_F(DCompPresenterTest, SwapchainSizeWithScaledOverlays) {
   Microsoft::WRL::ComPtr<ID3D11Device> d3d11_device =
-      QueryD3D11DeviceObjectFromANGLE();
+      GetDirectCompositionD3D11Device();
 
   gfx::Size texture_size(64, 64);
   Microsoft::WRL::ComPtr<ID3D11Texture2D> texture =
@@ -351,9 +394,8 @@ TEST_F(DCompPresenterTest, SwapchainSizeWithScaledOverlays) {
   gfx::Rect quad_rect = gfx::Rect(100, 100);
 
   {
-    auto params = std::make_unique<DCLayerOverlayParams>();
-    params->overlay_image.emplace(texture_size, texture);
-    params->content_rect = gfx::Rect(texture_size);
+    auto params =
+        CreateParamsFromImage(DCLayerOverlayImage(texture_size, texture));
     params->quad_rect = quad_rect;
     params->color_space = gfx::ColorSpace::CreateREC709();
     presenter_->ScheduleDCLayer(std::move(params));
@@ -379,9 +421,8 @@ TEST_F(DCompPresenterTest, SwapchainSizeWithScaledOverlays) {
   quad_rect = gfx::Rect(32, 48);
 
   {
-    auto params = std::make_unique<DCLayerOverlayParams>();
-    params->overlay_image.emplace(texture_size, texture);
-    params->content_rect = gfx::Rect(texture_size);
+    auto params =
+        CreateParamsFromImage(DCLayerOverlayImage(texture_size, texture));
     params->quad_rect = quad_rect;
     params->color_space = gfx::ColorSpace::CreateREC709();
     presenter_->ScheduleDCLayer(std::move(params));
@@ -403,7 +444,7 @@ TEST_F(DCompPresenterTest, SwapchainSizeWithScaledOverlays) {
 // is not support - swapchain should be the onscreen video size.
 TEST_F(DCompPresenterTest, SwapchainSizeWithoutScaledOverlays) {
   Microsoft::WRL::ComPtr<ID3D11Device> d3d11_device =
-      QueryD3D11DeviceObjectFromANGLE();
+      GetDirectCompositionD3D11Device();
 
   gfx::Size texture_size(80, 80);
   Microsoft::WRL::ComPtr<ID3D11Texture2D> texture =
@@ -413,9 +454,8 @@ TEST_F(DCompPresenterTest, SwapchainSizeWithoutScaledOverlays) {
   gfx::Rect quad_rect = gfx::Rect(42, 42);
 
   {
-    auto params = std::make_unique<DCLayerOverlayParams>();
-    params->overlay_image.emplace(texture_size, texture);
-    params->content_rect = gfx::Rect(texture_size);
+    auto params =
+        CreateParamsFromImage(DCLayerOverlayImage(texture_size, texture));
     params->quad_rect = quad_rect;
     params->color_space = gfx::ColorSpace::CreateREC709();
     presenter_->ScheduleDCLayer(std::move(params));
@@ -436,9 +476,8 @@ TEST_F(DCompPresenterTest, SwapchainSizeWithoutScaledOverlays) {
   quad_rect = gfx::Rect(124, 136);
 
   {
-    auto params = std::make_unique<DCLayerOverlayParams>();
-    params->overlay_image.emplace(texture_size, texture);
-    params->content_rect = gfx::Rect(texture_size);
+    auto params =
+        CreateParamsFromImage(DCLayerOverlayImage(texture_size, texture));
     params->quad_rect = quad_rect;
     params->color_space = gfx::ColorSpace::CreateREC709();
     presenter_->ScheduleDCLayer(std::move(params));
@@ -459,7 +498,7 @@ TEST_F(DCompPresenterTest, SwapchainSizeWithoutScaledOverlays) {
 // Test protected video flags
 TEST_F(DCompPresenterTest, ProtectedVideos) {
   Microsoft::WRL::ComPtr<ID3D11Device> d3d11_device =
-      QueryD3D11DeviceObjectFromANGLE();
+      GetDirectCompositionD3D11Device();
 
   gfx::Size texture_size(1280, 720);
   Microsoft::WRL::ComPtr<ID3D11Texture2D> texture =
@@ -470,10 +509,9 @@ TEST_F(DCompPresenterTest, ProtectedVideos) {
 
   // Clear video
   {
-    auto params = std::make_unique<DCLayerOverlayParams>();
-    params->overlay_image.emplace(texture_size, texture);
+    auto params =
+        CreateParamsFromImage(DCLayerOverlayImage(texture_size, texture));
     params->quad_rect = gfx::Rect(window_size);
-    params->content_rect = gfx::Rect(texture_size);
     params->color_space = gfx::ColorSpace::CreateREC709();
     params->protected_video_type = gfx::ProtectedVideoType::kClear;
 
@@ -493,10 +531,9 @@ TEST_F(DCompPresenterTest, ProtectedVideos) {
 
   // Software protected video
   {
-    auto params = std::make_unique<DCLayerOverlayParams>();
-    params->overlay_image.emplace(texture_size, texture);
+    auto params =
+        CreateParamsFromImage(DCLayerOverlayImage(texture_size, texture));
     params->quad_rect = gfx::Rect(window_size);
-    params->content_rect = gfx::Rect(texture_size);
     params->color_space = gfx::ColorSpace::CreateREC709();
     params->protected_video_type = gfx::ProtectedVideoType::kSoftwareProtected;
 
@@ -516,6 +553,123 @@ TEST_F(DCompPresenterTest, ProtectedVideos) {
 
   // TODO(magchen): Add a hardware protected video test when hardware protected
   // video support is enabled by default in the Intel driver and Chrome
+}
+
+TEST_F(DCompPresenterTest, NoBackgroundColorSurfaceForNonColorOverlays) {
+  const gfx::Size window_size(100, 100);
+  EXPECT_TRUE(presenter_->Resize(window_size, 1.0, gfx::ColorSpace(), true));
+  EXPECT_TRUE(presenter_->SetDrawRectangle(gfx::Rect(window_size)));
+
+  auto root_surface =
+      CreateParamsFromImage(CreateDCompSurface(window_size, SkColors::kBlack));
+  root_surface->quad_rect = gfx::Rect(window_size);
+  root_surface->z_order = 1;
+  presenter_->ScheduleDCLayer(std::move(root_surface));
+
+  PresentAndCheckSwapResult(gfx::SwapResult::SWAP_ACK);
+
+  const DCLayerTree* layer_tree = presenter_->GetLayerTreeForTesting();
+  EXPECT_EQ(1u, layer_tree->GetDcompLayerCountForTesting());
+  EXPECT_EQ(0u, layer_tree->GetNumSurfacesInPoolForTesting());
+}
+
+TEST_F(DCompPresenterTest, BackgroundColorSurfaceTrim) {
+  const gfx::Size window_size(100, 100);
+  EXPECT_TRUE(presenter_->Resize(window_size, 1.0, gfx::ColorSpace(), true));
+  EXPECT_TRUE(presenter_->SetDrawRectangle(gfx::Rect(window_size)));
+
+  const DCLayerTree* layer_tree = presenter_->GetLayerTreeForTesting();
+
+  // See |TrimAfterCommit|.
+  static constexpr size_t kMaxSolidColorBuffers = 12;
+
+  // From an empty state, the surface pool will allocate surfaces on demand and
+  // retain as many that are in use (and unused surfaces, up to
+  // |kMaxSolidColorBuffers| total). We iterate to |kMaxSolidColorBuffers + 1|
+  // to exceed this threshold.
+  for (size_t num_buffers = 1; num_buffers <= kMaxSolidColorBuffers + 1;
+       num_buffers++) {
+    // We expect as many retained surfaces as there are unique solid color
+    // overlays in the frame.
+    {
+      for (size_t i = 0; i < num_buffers; i++) {
+        auto params = std::make_unique<DCLayerOverlayParams>();
+        params->quad_rect = gfx::Rect(window_size);
+        params->background_color = SkColor4f::FromColor(SkColorSetRGB(i, 0, 0));
+        params->z_order = i + 1;
+        presenter_->ScheduleDCLayer(std::move(params));
+      }
+      PresentAndCheckSwapResult(gfx::SwapResult::SWAP_ACK);
+      EXPECT_EQ(num_buffers, layer_tree->GetNumSurfacesInPoolForTesting());
+    }
+
+    // We expect retained surfaces even after we present a frame with no solid
+    // color overlays.
+    {
+      PresentAndCheckSwapResult(gfx::SwapResult::SWAP_ACK);
+      EXPECT_EQ(std::min(num_buffers, kMaxSolidColorBuffers),
+                layer_tree->GetNumSurfacesInPoolForTesting());
+    }
+  }
+}
+
+// Check that when there's multiple background color surfaces, the correct one
+// is reused even if the order they're requested in changes.
+TEST_F(DCompPresenterTest, BackgroundColorSurfaceMultipleReused) {
+  const gfx::Size window_size(100, 100);
+  EXPECT_TRUE(presenter_->Resize(window_size, 1.0, gfx::ColorSpace(), true));
+  EXPECT_TRUE(presenter_->SetDrawRectangle(gfx::Rect(window_size)));
+
+  std::vector<SkColor4f> colors = {SkColors::kRed, SkColors::kGreen};
+  std::vector<IDCompositionSurface*> surfaces_frame1(2, nullptr);
+  std::vector<IDCompositionSurface*> surfaces_frame2(2, nullptr);
+
+  const DCLayerTree* layer_tree = presenter_->GetLayerTreeForTesting();
+
+  {
+    for (size_t i = 0; i < colors.size(); i++) {
+      auto params = std::make_unique<DCLayerOverlayParams>();
+      params->quad_rect = gfx::Rect(window_size);
+      params->background_color = colors[i];
+      params->z_order = i + 1;
+      presenter_->ScheduleDCLayer(std::move(params));
+    }
+
+    PresentAndCheckSwapResult(gfx::SwapResult::SWAP_ACK);
+    EXPECT_EQ(2u, layer_tree->GetNumSurfacesInPoolForTesting());
+
+    surfaces_frame1[0] = layer_tree->GetBackgroundColorSurfaceForTesting(0);
+    surfaces_frame1[1] = layer_tree->GetBackgroundColorSurfaceForTesting(1);
+    // The overlays should have different background color surfaces since they
+    // have different background colors.
+    EXPECT_NE(surfaces_frame1[0], surfaces_frame1[1]);
+  }
+
+  {
+    // Swap the colors so they appear as overlays in a different order for the
+    // next frame.
+    std::swap(colors[0], colors[1]);
+
+    for (size_t i = 0; i < colors.size(); i++) {
+      auto params = std::make_unique<DCLayerOverlayParams>();
+      params->quad_rect = gfx::Rect(window_size);
+      params->background_color = colors[i];
+      params->z_order = i + 1;
+      presenter_->ScheduleDCLayer(std::move(params));
+    }
+
+    PresentAndCheckSwapResult(gfx::SwapResult::SWAP_ACK);
+    EXPECT_EQ(2u, layer_tree->GetNumSurfacesInPoolForTesting());
+
+    surfaces_frame2[0] = layer_tree->GetBackgroundColorSurfaceForTesting(0);
+    surfaces_frame2[1] = layer_tree->GetBackgroundColorSurfaceForTesting(1);
+    EXPECT_NE(surfaces_frame2[0], surfaces_frame2[1]);
+
+    // We reversed the order of the color overlays. We expect the background
+    // color surfaces to be reused, but reversed.
+    EXPECT_EQ(surfaces_frame1[0], surfaces_frame2[1]);
+    EXPECT_EQ(surfaces_frame1[1], surfaces_frame2[0]);
+  }
 }
 
 class DCompPresenterPixelTest : public DCompPresenterTest {
@@ -538,20 +692,6 @@ class DCompPresenterPixelTest : public DCompPresenterTest {
     DCompPresenterTest::TearDown();
   }
 
-  // DCompPresenter is surfaceless--it's root surface is achieved
-  // via an overlay the size of the window.
-  void InitializeRootAndScheduleRootSurface(const gfx::Size& window_size,
-                                            SkColor4f initial_color) {
-    // Schedule the root surface as a normal overlay
-    std::unique_ptr<DCLayerOverlayParams> params =
-        std::make_unique<DCLayerOverlayParams>();
-    params->z_order = 0;
-    params->quad_rect = gfx::Rect(window_size);
-    params->content_rect = params->quad_rect;
-    params->overlay_image = CreateDCompSurface(window_size, initial_color);
-    EXPECT_TRUE(presenter_->ScheduleDCLayer(std::move(params)));
-  }
-
   void InitializeForPixelTest(const gfx::Size& window_size,
                               const gfx::Size& texture_size,
                               const gfx::Rect& content_rect,
@@ -561,15 +701,15 @@ class DCompPresenterPixelTest : public DCompPresenterTest {
     InitializeRootAndScheduleRootSurface(window_size, SkColors::kBlack);
 
     Microsoft::WRL::ComPtr<ID3D11Device> d3d11_device =
-        QueryD3D11DeviceObjectFromANGLE();
+        GetDirectCompositionD3D11Device();
 
     Microsoft::WRL::ComPtr<ID3D11Texture2D> texture =
         CreateNV12Texture(d3d11_device, texture_size);
     ASSERT_NE(texture, nullptr);
 
-    auto params = std::make_unique<DCLayerOverlayParams>();
-    params->overlay_image.emplace(texture_size, texture);
-    params->content_rect = content_rect;
+    auto params = CreateParamsFromImage(
+        DCLayerOverlayImage(texture_size, texture),
+        /*content_rect_override=*/gfx::RectF(content_rect));
     params->quad_rect = quad_rect;
     params->color_space = gfx::ColorSpace::CreateREC709();
     presenter_->ScheduleDCLayer(std::move(params));
@@ -589,15 +729,12 @@ class DCompPresenterPixelTest : public DCompPresenterTest {
 
     InitializeRootAndScheduleRootSurface(window_size, SkColors::kBlack);
 
-    auto dc_layer_params = std::make_unique<DCLayerOverlayParams>();
-    dc_layer_params->content_rect = gfx::Rect(2, 2);
-    dc_layer_params->overlay_image = CreateDCompSurface(
-        dc_layer_params->content_rect.size(), SkColors::kBlack,
-        {{gfx::Rect(0, 0, 1, 1), SkColors::kRed},
-         {gfx::Rect(1, 0, 1, 1), SkColors::kGreen},
-         {gfx::Rect(0, 1, 1, 1), SkColors::kBlue},
-         {gfx::Rect(1, 1, 1, 1), SkColors::kBlack}});
-    dc_layer_params->color_space = gfx::ColorSpace::CreateSRGB();
+    auto dc_layer_params = CreateParamsFromImage(
+        CreateDCompSurface(gfx::Size(2, 2), SkColors::kBlack,
+                           {{gfx::Rect(0, 0, 1, 1), SkColors::kRed},
+                            {gfx::Rect(1, 0, 1, 1), SkColors::kGreen},
+                            {gfx::Rect(0, 1, 1, 1), SkColors::kBlue},
+                            {gfx::Rect(1, 1, 1, 1), SkColors::kBlack}}));
     dc_layer_params->z_order = 1;
     dc_layer_params->nearest_neighbor_filter = true;
 
@@ -607,7 +744,8 @@ class DCompPresenterPixelTest : public DCompPresenterTest {
     } else {
       // Pick a small quad rect and assign a transform so the quad rect is
       // scaled up
-      dc_layer_params->quad_rect = dc_layer_params->content_rect;
+      dc_layer_params->quad_rect =
+          gfx::ToNearestRect(dc_layer_params->content_rect);
       dc_layer_params->transform = gfx::Transform::MakeScale(
           window_size.width() / dc_layer_params->quad_rect.width(),
           window_size.height() / dc_layer_params->quad_rect.height());
@@ -665,13 +803,10 @@ class DCompPresenterPixelTest : public DCompPresenterTest {
     EXPECT_TRUE(presenter_->Resize(window_size, 1.0, gfx::ColorSpace(), true));
     EXPECT_TRUE(presenter_->SetDrawRectangle(gfx::Rect(window_size)));
 
-    auto root_surface = std::make_unique<DCLayerOverlayParams>();
-    root_surface->quad_rect = gfx::Rect(window_size);
-    root_surface->content_rect = gfx::Rect(window_size);
-    root_surface->overlay_image =
+    auto root_surface = CreateParamsFromImage(
         CreateDCompSurface(window_size, kRootSurfaceInitialColor,
-                           {{root_surface_hole, kRootSurfaceHiddenColor}});
-    root_surface->color_space = gfx::ColorSpace::CreateSRGB();
+                           {{root_surface_hole, kRootSurfaceHiddenColor}}));
+    root_surface->quad_rect = gfx::Rect(window_size);
     root_surface->z_order = 0;
     presenter_->ScheduleDCLayer(std::move(root_surface));
 
@@ -725,7 +860,7 @@ class DCompPresenterVideoPixelTest : public DCompPresenterPixelTest {
     EXPECT_TRUE(presenter_->Resize(window_size, 1.0, gfx::ColorSpace(), true));
 
     Microsoft::WRL::ComPtr<ID3D11Device> d3d11_device =
-        QueryD3D11DeviceObjectFromANGLE();
+        GetDirectCompositionD3D11Device();
 
     gfx::Size texture_size(50, 50);
     Microsoft::WRL::ComPtr<ID3D11Texture2D> texture =
@@ -733,9 +868,8 @@ class DCompPresenterVideoPixelTest : public DCompPresenterPixelTest {
     ASSERT_NE(texture, nullptr);
 
     {
-      auto params = std::make_unique<DCLayerOverlayParams>();
-      params->overlay_image.emplace(texture_size, texture);
-      params->content_rect = gfx::Rect(texture_size);
+      auto params =
+          CreateParamsFromImage(DCLayerOverlayImage(texture_size, texture));
       params->quad_rect = gfx::Rect(texture_size);
       params->color_space = color_space;
       presenter_->ScheduleDCLayer(std::move(params));
@@ -746,9 +880,8 @@ class DCompPresenterVideoPixelTest : public DCompPresenterPixelTest {
     // Scaling up the swapchain with the same image should cause it to be
     // transformed again, but not presented again.
     {
-      auto params = std::make_unique<DCLayerOverlayParams>();
-      params->overlay_image.emplace(texture_size, texture);
-      params->content_rect = gfx::Rect(texture_size);
+      auto params =
+          CreateParamsFromImage(DCLayerOverlayImage(texture_size, texture));
       params->quad_rect = gfx::Rect(window_size);
       params->color_space = color_space;
       presenter_->ScheduleDCLayer(std::move(params));
@@ -796,17 +929,15 @@ TEST_F(DCompPresenterPixelTest, SoftwareVideoSwapchain) {
   EXPECT_TRUE(presenter_->Resize(window_size, 1.0, gfx::ColorSpace(), true));
 
   Microsoft::WRL::ComPtr<ID3D11Device> d3d11_device =
-      QueryD3D11DeviceObjectFromANGLE();
+      GetDirectCompositionD3D11Device();
 
   gfx::Size y_size(50, 50);
   size_t stride = y_size.width();
 
   std::vector<uint8_t> nv12_pixmap(stride * 3 * y_size.height() / 2, 0xff);
 
-  auto params = std::make_unique<DCLayerOverlayParams>();
-  params->overlay_image =
-      DCLayerOverlayImage(y_size, nv12_pixmap.data(), stride);
-  params->content_rect = gfx::Rect(y_size);
+  auto params = CreateParamsFromImage(
+      DCLayerOverlayImage(y_size, nv12_pixmap.data(), stride));
   params->quad_rect = gfx::Rect(window_size);
   params->color_space = gfx::ColorSpace::CreateREC709();
   presenter_->ScheduleDCLayer(std::move(params));
@@ -863,7 +994,7 @@ TEST_F(DCompPresenterPixelTest, SkipVideoLayerEmptyContentsRect) {
   InitializeRootAndScheduleRootSurface(window_size, SkColors::kBlack);
 
   Microsoft::WRL::ComPtr<ID3D11Device> d3d11_device =
-      QueryD3D11DeviceObjectFromANGLE();
+      GetDirectCompositionD3D11Device();
 
   gfx::Size texture_size(50, 50);
   Microsoft::WRL::ComPtr<ID3D11Texture2D> texture =
@@ -871,8 +1002,9 @@ TEST_F(DCompPresenterPixelTest, SkipVideoLayerEmptyContentsRect) {
   ASSERT_NE(texture, nullptr);
 
   // Layer with empty content rect.
-  auto params = std::make_unique<DCLayerOverlayParams>();
-  params->overlay_image.emplace(texture_size, texture);
+  auto params =
+      CreateParamsFromImage(DCLayerOverlayImage(texture_size, texture),
+                            /*content_rect_override=*/gfx::RectF());
   params->quad_rect = gfx::Rect(window_size);
   params->color_space = gfx::ColorSpace::CreateREC709();
   presenter_->ScheduleDCLayer(std::move(params));
@@ -1010,7 +1142,7 @@ TEST_F(DCompPresenterPixelTest, ResizeVideoLayer) {
   InitializeRootAndScheduleRootSurface(window_size, SkColors::kBlack);
 
   Microsoft::WRL::ComPtr<ID3D11Device> d3d11_device =
-      QueryD3D11DeviceObjectFromANGLE();
+      GetDirectCompositionD3D11Device();
 
   gfx::Size texture_size(50, 50);
   Microsoft::WRL::ComPtr<ID3D11Texture2D> texture =
@@ -1019,9 +1151,8 @@ TEST_F(DCompPresenterPixelTest, ResizeVideoLayer) {
 
   // (1) Test if swap chain is overridden to window size (100, 100).
   {
-    auto params = std::make_unique<DCLayerOverlayParams>();
-    params->overlay_image.emplace(texture_size, texture);
-    params->content_rect = gfx::Rect(texture_size);
+    auto params =
+        CreateParamsFromImage(DCLayerOverlayImage(texture_size, texture));
     params->quad_rect = gfx::Rect(window_size);
     params->color_space = gfx::ColorSpace::CreateREC709();
     presenter_->ScheduleDCLayer(std::move(params));
@@ -1041,9 +1172,9 @@ TEST_F(DCompPresenterPixelTest, ResizeVideoLayer) {
 
   // (2) Test if swap chain is overridden to window size (100, 100).
   {
-    auto params = std::make_unique<DCLayerOverlayParams>();
-    params->overlay_image.emplace(texture_size, texture);
-    params->content_rect = gfx::Rect(30, 30);
+    auto params =
+        CreateParamsFromImage(DCLayerOverlayImage(texture_size, texture),
+                              /*content_rect_override=*/gfx::RectF(30, 30));
     params->quad_rect = gfx::Rect(window_size);
     params->color_space = gfx::ColorSpace::CreateREC709();
     presenter_->ScheduleDCLayer(std::move(params));
@@ -1065,9 +1196,8 @@ TEST_F(DCompPresenterPixelTest, ResizeVideoLayer) {
   gfx::Rect on_screen_rect =
       gfx::Rect(0, 0, monitor_size.width() - 2, monitor_size.height() - 2);
   {
-    auto params = std::make_unique<DCLayerOverlayParams>();
-    params->overlay_image.emplace(texture_size, texture);
-    params->content_rect = gfx::Rect(50, 50);
+    auto params =
+        CreateParamsFromImage(DCLayerOverlayImage(texture_size, texture));
     params->quad_rect = on_screen_rect;
     params->clip_rect = on_screen_rect;
     params->color_space = gfx::ColorSpace::CreateREC709();
@@ -1097,9 +1227,8 @@ TEST_F(DCompPresenterPixelTest, ResizeVideoLayer) {
   on_screen_rect =
       gfx::Rect(0, 0, monitor_size.width() + 2, monitor_size.height() + 2);
   {
-    auto params = std::make_unique<DCLayerOverlayParams>();
-    params->overlay_image.emplace(texture_size, texture);
-    params->content_rect = gfx::Rect(50, 50);
+    auto params =
+        CreateParamsFromImage(DCLayerOverlayImage(texture_size, texture));
     params->quad_rect = on_screen_rect;
     params->color_space = gfx::ColorSpace::CreateREC709();
     presenter_->ScheduleDCLayer(std::move(params));
@@ -1128,7 +1257,7 @@ TEST_F(DCompPresenterPixelTest, SwapChainImage) {
   }
 
   Microsoft::WRL::ComPtr<ID3D11Device> d3d11_device =
-      QueryD3D11DeviceObjectFromANGLE();
+      GetDirectCompositionD3D11Device();
   ASSERT_TRUE(d3d11_device);
   Microsoft::WRL::ComPtr<IDXGIDevice> dxgi_device;
   d3d11_device.As(&dxgi_device);
@@ -1195,10 +1324,8 @@ TEST_F(DCompPresenterPixelTest, SwapChainImage) {
 
     ASSERT_HRESULT_SUCCEEDED(swap_chain->Present1(0, 0, &present_params));
 
-    auto dc_layer_params = std::make_unique<DCLayerOverlayParams>();
-    dc_layer_params->overlay_image =
-        DCLayerOverlayImage(swap_chain_size, swap_chain);
-    dc_layer_params->content_rect = gfx::Rect(swap_chain_size);
+    auto dc_layer_params =
+        CreateParamsFromImage(DCLayerOverlayImage(swap_chain_size, swap_chain));
     dc_layer_params->quad_rect = gfx::Rect(window_size);
     dc_layer_params->color_space = gfx::ColorSpace::CreateSRGB();
     dc_layer_params->z_order = 1;
@@ -1220,10 +1347,8 @@ TEST_F(DCompPresenterPixelTest, SwapChainImage) {
 
     ASSERT_HRESULT_SUCCEEDED(swap_chain->Present1(0, 0, &present_params));
 
-    auto dc_layer_params = std::make_unique<DCLayerOverlayParams>();
-    dc_layer_params->overlay_image =
-        DCLayerOverlayImage(swap_chain_size, swap_chain);
-    dc_layer_params->content_rect = gfx::Rect(swap_chain_size);
+    auto dc_layer_params =
+        CreateParamsFromImage(DCLayerOverlayImage(swap_chain_size, swap_chain));
     dc_layer_params->quad_rect = gfx::Rect(window_size);
     dc_layer_params->color_space = gfx::ColorSpace::CreateSRGB();
 
@@ -1242,10 +1367,8 @@ TEST_F(DCompPresenterPixelTest, SwapChainImage) {
   {
     ASSERT_HRESULT_SUCCEEDED(swap_chain->Present1(0, 0, &present_params));
 
-    auto dc_layer_params = std::make_unique<DCLayerOverlayParams>();
-    dc_layer_params->overlay_image =
-        DCLayerOverlayImage(swap_chain_size, swap_chain);
-    dc_layer_params->content_rect = gfx::Rect(swap_chain_size);
+    auto dc_layer_params =
+        CreateParamsFromImage(DCLayerOverlayImage(swap_chain_size, swap_chain));
     dc_layer_params->quad_rect = gfx::Rect(window_size);
     dc_layer_params->color_space = gfx::ColorSpace::CreateSRGB();
 
@@ -1264,10 +1387,8 @@ TEST_F(DCompPresenterPixelTest, SwapChainImage) {
     float clear_color[] = {0.0, 0.0, 1.0, 1.0};
     context->ClearRenderTargetView(rtv.Get(), clear_color);
 
-    auto dc_layer_params = std::make_unique<DCLayerOverlayParams>();
-    dc_layer_params->overlay_image =
-        DCLayerOverlayImage(swap_chain_size, swap_chain);
-    dc_layer_params->content_rect = gfx::Rect(swap_chain_size);
+    auto dc_layer_params =
+        CreateParamsFromImage(DCLayerOverlayImage(swap_chain_size, swap_chain));
     dc_layer_params->quad_rect = gfx::Rect(window_size);
     dc_layer_params->color_space = gfx::ColorSpace::CreateSRGB();
 
@@ -1297,13 +1418,10 @@ TEST_F(DCompPresenterPixelTest, QuadOffsetAppliedAfterTransform) {
 
   InitializeRootAndScheduleRootSurface(window_size, SkColors::kBlack);
 
-  auto dc_layer_params = std::make_unique<DCLayerOverlayParams>();
-  dc_layer_params->overlay_image =
-      CreateDCompSurface(quad_rect.size(), SkColors::kRed);
-  dc_layer_params->content_rect = gfx::Rect(quad_rect.size());
+  auto dc_layer_params = CreateParamsFromImage(
+      CreateDCompSurface(quad_rect.size(), SkColors::kRed));
   dc_layer_params->quad_rect = quad_rect;
   dc_layer_params->transform = quad_to_root_transform;
-  dc_layer_params->color_space = gfx::ColorSpace::CreateSRGB();
   dc_layer_params->z_order = 1;
 
   presenter_->ScheduleDCLayer(std::move(dc_layer_params));
@@ -1358,12 +1476,9 @@ TEST_F(DCompPresenterPixelTest, ContentRectScalesUpBuffer) {
   const gfx::Rect root_surface_hole = gfx::Rect(5, 10, 50, 75);
 
   // Provide an overlay that's smaller than the hole it needs to fill
-  auto overlay = std::make_unique<DCLayerOverlayParams>();
-  overlay->content_rect = gfx::Rect(1, 1);
+  auto overlay = CreateParamsFromImage(
+      CreateDCompSurface(gfx::Size(1, 1), kOverlayExpectedColor));
   overlay->quad_rect = root_surface_hole;
-  overlay->overlay_image =
-      CreateDCompSurface(overlay->content_rect.size(), kOverlayExpectedColor);
-  overlay->color_space = gfx::ColorSpace::CreateSRGB();
   overlay->z_order = 1;
   CheckOverlayExactlyFillsHole(window_size, root_surface_hole,
                                std::move(overlay));
@@ -1376,12 +1491,9 @@ TEST_F(DCompPresenterPixelTest, ContentRectScalesDownBuffer) {
   const gfx::Rect root_surface_hole = gfx::Rect(5, 10, 50, 75);
 
   // Provide an overlay that's larger than the hole it needs to fill
-  auto overlay = std::make_unique<DCLayerOverlayParams>();
-  overlay->content_rect = gfx::Rect(75, 100);
+  auto overlay = CreateParamsFromImage(
+      CreateDCompSurface(gfx::Size(75, 100), kOverlayExpectedColor));
   overlay->quad_rect = root_surface_hole;
-  overlay->overlay_image =
-      CreateDCompSurface(overlay->content_rect.size(), kOverlayExpectedColor);
-  overlay->color_space = gfx::ColorSpace::CreateSRGB();
   overlay->z_order = 1;
   CheckOverlayExactlyFillsHole(window_size, root_surface_hole,
                                std::move(overlay));
@@ -1400,13 +1512,11 @@ TEST_F(DCompPresenterPixelTest, ContentRectClipsBuffer) {
 
   // Provide an overlay that is the right size, but has extra data that is
   // clipped via content rect
-  auto overlay = std::make_unique<DCLayerOverlayParams>();
-  overlay->content_rect = tex_coord;
-  overlay->quad_rect = root_surface_hole;
-  overlay->overlay_image =
+  auto overlay = CreateParamsFromImage(
       CreateDCompSurface(window_size, kOverlayImageHiddenColor,
-                         {{tex_coord, kOverlayExpectedColor}});
-  overlay->color_space = gfx::ColorSpace::CreateSRGB();
+                         {{tex_coord, kOverlayExpectedColor}}),
+      /*content_rect_override=*/gfx::RectF(tex_coord));
+  overlay->quad_rect = root_surface_hole;
   overlay->z_order = 1;
   CheckOverlayExactlyFillsHole(window_size, root_surface_hole,
                                std::move(overlay));
@@ -1426,13 +1536,11 @@ TEST_F(DCompPresenterPixelTest, ContentRectClipsAndScalesBuffer) {
 
   // Provide an overlay that needs to be scaled and has extra data that is
   // clipped via content rect
-  auto overlay = std::make_unique<DCLayerOverlayParams>();
-  overlay->content_rect = tex_coord;
-  overlay->quad_rect = root_surface_hole;
-  overlay->overlay_image =
+  auto overlay = CreateParamsFromImage(
       CreateDCompSurface(window_size, kOverlayImageHiddenColor,
-                         {{tex_coord, kOverlayExpectedColor}});
-  overlay->color_space = gfx::ColorSpace::CreateSRGB();
+                         {{tex_coord, kOverlayExpectedColor}}),
+      /*content_rect_override=*/gfx::RectF(tex_coord));
+  overlay->quad_rect = root_surface_hole;
   overlay->z_order = 1;
 
   // Use nearest neighbor to avoid interpolation at the edges of the content
@@ -1443,34 +1551,67 @@ TEST_F(DCompPresenterPixelTest, ContentRectClipsAndScalesBuffer) {
                                std::move(overlay));
 }
 
+// Check that the surface backing solid color overlays is reused across frames.
+// This can happen e.g. with a solid color draw quad animating its color.
+TEST_F(DCompPresenterPixelTest, BackgroundColorSurfaceReuse) {
+  const gfx::Size window_size(100, 100);
+  EXPECT_TRUE(presenter_->Resize(window_size, 1.0, gfx::ColorSpace(), true));
+  EXPECT_TRUE(presenter_->SetDrawRectangle(gfx::Rect(window_size)));
+
+  SkColor4f colors[] = {
+      SkColors::kRed,    SkColors::kGreen, SkColors::kBlue,
+      SkColors::kYellow, SkColors::kCyan,  SkColors::kMagenta,
+  };
+
+  IDCompositionSurface* background_color_surface = nullptr;
+
+  for (const SkColor4f& color : colors) {
+    auto params = std::make_unique<DCLayerOverlayParams>();
+    params->quad_rect = gfx::Rect(window_size);
+    params->background_color = color;
+    params->z_order = 1;
+    presenter_->ScheduleDCLayer(std::move(params));
+
+    PresentAndCheckSwapResult(gfx::SwapResult::SWAP_ACK);
+
+    EXPECT_SKCOLOR_EQ(color.toSkColor(), GLTestHelper::ReadBackWindowPixel(
+                                             window_.hwnd(), gfx::Point(0, 0)));
+
+    const DCLayerTree* layer_tree = presenter_->GetLayerTreeForTesting();
+
+    EXPECT_EQ(1u, layer_tree->GetDcompLayerCountForTesting());
+    EXPECT_EQ(1u, layer_tree->GetNumSurfacesInPoolForTesting());
+
+    if (background_color_surface == nullptr) {
+      background_color_surface =
+          layer_tree->GetBackgroundColorSurfaceForTesting(0);
+    }
+    EXPECT_NE(background_color_surface, nullptr);
+    EXPECT_EQ(background_color_surface,
+              layer_tree->GetBackgroundColorSurfaceForTesting(0))
+        << "DComp content for solid color overlay expected to be reused across "
+           "frames";
+  }
+}
+
 class DCompPresenterSkiaGoldTest : public DCompPresenterPixelTest {
  protected:
   void SetUp() override {
     DCompPresenterPixelTest::SetUp();
+    ASSERT_TRUE(context_);
+    const ui::test::TestEnvironmentMap test_environment = {
+        {ui::test::TestEnvironmentKey::kSystemVersion,
+         base::win::OSInfo::GetInstance()->release_id()},
+        {ui::test::TestEnvironmentKey::kGpuDriverVendor,
+         context_->GetVersionInfo()->driver_vendor},
+        {ui::test::TestEnvironmentKey::kGpuDriverVersion,
+         context_->GetVersionInfo()->driver_version},
+        {ui::test::TestEnvironmentKey::kGlRenderer, context_->GetGLRenderer()},
 
-    // |pixel_diff_| only needs to be initialized once per suite, but depends on
-    // | DCompPresenterTest::SetUp()| so is initialized here.
-    if (!pixel_diff_.has_value()) {
-      pixel_diff_.emplace();
+    };
 
-      ASSERT_TRUE(context_);
-      const ui::test::TestEnvironmentMap test_environment = {
-          {ui::test::TestEnvironmentKey::kSystemVersion,
-           base::win::OSInfo::GetInstance()->release_id()},
-          {ui::test::TestEnvironmentKey::kGpuDriverVendor,
-           context_->GetVersionInfo()->driver_vendor},
-          {ui::test::TestEnvironmentKey::kGpuDriverVersion,
-           context_->GetVersionInfo()->driver_version},
-          {ui::test::TestEnvironmentKey::kGlRenderer,
-           context_->GetGLRenderer()},
-
-      };
-
-      pixel_diff_->Init(::testing::UnitTest::GetInstance()
-                            ->current_test_info()
-                            ->test_suite_name(),
-                        kSkiaGoldPixelDiffCorpus, test_environment);
-    }
+    pixel_diff_ = ui::test::SkiaGoldPixelDiff::GetSession(
+        kSkiaGoldPixelDiffCorpus, test_environment);
   }
 
   void TearDown() override {
@@ -1487,6 +1628,10 @@ class DCompPresenterSkiaGoldTest : public DCompPresenterPixelTest {
 
     capture_names_in_test_.clear();
   }
+
+  // An offset to move the test output off the top-left edges so that we don't
+  // need to dilate the edges of |SobelSkiaGoldMatchingAlgorithm|.
+  static const int kPaddingFromEdgeForAntiAliasedOutput = 5;
 
   void ResizeWindow(const gfx::Size& window_size) {
     EXPECT_TRUE(presenter_->Resize(window_size, 1.0, gfx::ColorSpace(), true));
@@ -1515,17 +1660,15 @@ class DCompPresenterSkiaGoldTest : public DCompPresenterPixelTest {
 
     PresentAndCheckSwapResult(gfx::SwapResult::SWAP_ACK);
 
-    std::string screenshot_name =
-        ::testing::UnitTest::GetInstance()->current_test_info()->name();
-    if (!capture_name.empty()) {
-      screenshot_name = base::StringPrintf("%s/%s", screenshot_name.c_str(),
-                                           capture_name.c_str());
-    }
-
     SkBitmap window_readback =
         GLTestHelper::ReadBackWindow(window_.hwnd(), window_size_);
-    ASSERT_TRUE(pixel_diff_);
-    if (!pixel_diff_->CompareScreenshot(screenshot_name, window_readback)) {
+    CHECK(pixel_diff_);
+    if (!pixel_diff_->CompareScreenshot(
+            ui::test::SkiaGoldPixelDiff::GetGoldenImageName(
+                ::testing::UnitTest::GetInstance()->current_test_info(),
+                capture_name.empty() ? absl::nullopt
+                                     : absl::make_optional(capture_name)),
+            window_readback, matching_algorithm_.get())) {
       ADD_FAILURE_AT(caller_location.file_name(), caller_location.line_number())
           << "Screenshot mismatch for "
           << (capture_name.empty() ? "(unnamed capture)" : capture_name);
@@ -1534,8 +1677,30 @@ class DCompPresenterSkiaGoldTest : public DCompPresenterPixelTest {
 
   const gfx::Size& current_window_size() const { return window_size_; }
 
+  void AddOverlaysForOpacityTest(
+      base::RepeatingCallback<
+          std::unique_ptr<DCLayerOverlayParams>(const gfx::Rect&, float)>
+          get_overlay_for_opacity) {
+    const int kOverlayCount = 10;
+    for (int i = 0; i < kOverlayCount; i++) {
+      const int width = current_window_size().width() / kOverlayCount;
+      const gfx::Rect quad_rect =
+          gfx::Rect(i * width, 0, width, current_window_size().height());
+      const float opacity =
+          static_cast<float>(i) / static_cast<float>(kOverlayCount);
+
+      auto overlay = get_overlay_for_opacity.Run(quad_rect, opacity);
+      overlay->z_order = i + 1;
+
+      presenter_->ScheduleDCLayer(std::move(overlay));
+    }
+  }
+
  private:
-  absl::optional<ui::test::SkiaGoldPixelDiff> pixel_diff_;
+  raw_ptr<ui::test::SkiaGoldPixelDiff> pixel_diff_ = nullptr;
+
+  // The matching algorithm for goldctl to use.
+  std::unique_ptr<ui::test::SkiaGoldMatchingAlgorithm> matching_algorithm_;
 
   // |true|, if |InitializeTest| has been called.
   bool test_initialized_ = false;
@@ -1548,16 +1713,53 @@ class DCompPresenterSkiaGoldTest : public DCompPresenterPixelTest {
   base::flat_set<std::string> capture_names_in_test_;
 };
 
-TEST_F(DCompPresenterSkiaGoldTest, NonAxisPerservingTransform) {
+// Check that a translation transform works.
+TEST_F(DCompPresenterSkiaGoldTest, TransformTranslate) {
   InitializeTest(gfx::Size(100, 100));
 
   InitializeRootAndScheduleRootSurface(current_window_size(), SkColors::kBlack);
 
-  auto overlay = std::make_unique<DCLayerOverlayParams>();
-  overlay->content_rect = gfx::Rect(50, 50);
+  auto overlay = CreateParamsFromImage(
+      CreateDCompSurface(gfx::Size(50, 50), SkColors::kWhite));
   overlay->quad_rect = gfx::Rect(50, 50);
-  overlay->overlay_image =
-      CreateDCompSurface(gfx::Size(50, 50), SkColors::kRed);
+  overlay->z_order = 1;
+
+  overlay->transform.Translate(25, 25);
+
+  EXPECT_TRUE(presenter_->ScheduleDCLayer(std::move(overlay)));
+
+  PresentAndCheckScreenshot();
+}
+
+// Check that a scaling transform works.
+TEST_F(DCompPresenterSkiaGoldTest, TransformScale) {
+  InitializeTest(gfx::Size(100, 100));
+
+  InitializeRootAndScheduleRootSurface(current_window_size(), SkColors::kBlack);
+
+  auto overlay = CreateParamsFromImage(
+      CreateDCompSurface(gfx::Size(50, 50), SkColors::kWhite));
+  overlay->quad_rect = gfx::Rect(50, 50);
+  overlay->z_order = 1;
+
+  overlay->transform.Translate(50, 50);
+  overlay->transform.Scale(1.2);
+  overlay->transform.Translate(-25, -25);
+
+  EXPECT_TRUE(presenter_->ScheduleDCLayer(std::move(overlay)));
+
+  PresentAndCheckScreenshot();
+}
+
+// Check that a rotation transform works.
+TEST_F(DCompPresenterSkiaGoldTest, TransformRotation) {
+  InitializeTest(gfx::Size(100, 100));
+
+  InitializeRootAndScheduleRootSurface(current_window_size(), SkColors::kBlack);
+
+  auto overlay = CreateParamsFromImage(
+      CreateDCompSurface(gfx::Size(50, 50), SkColors::kWhite));
+  overlay->quad_rect = gfx::Rect(50, 50);
   overlay->z_order = 1;
 
   // Center and partially rotate the overlay
@@ -1566,6 +1768,413 @@ TEST_F(DCompPresenterSkiaGoldTest, NonAxisPerservingTransform) {
   overlay->transform.Translate(-25, -25);
 
   EXPECT_TRUE(presenter_->ScheduleDCLayer(std::move(overlay)));
+
+  PresentAndCheckScreenshot();
+}
+
+// Check that a complex transform (i.e. non-flat) works.
+TEST_F(DCompPresenterSkiaGoldTest, Transform3D) {
+  InitializeTest(gfx::Size(100, 100));
+
+  InitializeRootAndScheduleRootSurface(current_window_size(), SkColors::kBlack);
+
+  auto overlay = std::make_unique<DCLayerOverlayParams>();
+
+  overlay->quad_rect = gfx::Rect(120, 75);
+
+  overlay->background_color = SkColors::kGreen;
+
+  overlay->z_order = 1;
+
+  overlay->transform.Translate(50, 50);
+  overlay->transform.ApplyPerspectiveDepth(100);
+  overlay->transform.RotateAboutYAxis(45);
+  overlay->transform.RotateAboutXAxis(30);
+  overlay->transform.Translate(-25, -25);
+
+  EXPECT_TRUE(presenter_->ScheduleDCLayer(std::move(overlay)));
+
+  PresentAndCheckScreenshot();
+}
+
+// This kind of transform is uncommon, but should be supported when rotations
+// are supported.
+TEST_F(DCompPresenterSkiaGoldTest, TransformShear) {
+  InitializeTest(gfx::Size(100, 100));
+
+  InitializeRootAndScheduleRootSurface(current_window_size(), SkColors::kBlack);
+
+  auto overlay = CreateParamsFromImage(
+      CreateDCompSurface(gfx::Size(50, 50), SkColors::kWhite));
+  overlay->quad_rect = gfx::Rect(50, 50);
+  overlay->z_order = 1;
+  overlay->transform.Translate(50, 50);
+  overlay->transform.Skew(15, 30);
+  overlay->transform.Translate(-25, -25);
+  EXPECT_TRUE(presenter_->ScheduleDCLayer(std::move(overlay)));
+
+  PresentAndCheckScreenshot();
+}
+
+// Test that solid color overlays completely fill their display rect.
+TEST_F(DCompPresenterSkiaGoldTest, SolidColorSimpleOpaque) {
+  InitializeTest(gfx::Size(100, 100));
+
+  const SkColor4f root_surface_color = SkColors::kBlack;
+
+  InitializeRootAndScheduleRootSurface(current_window_size(),
+                                       root_surface_color);
+
+  const std::vector<std::pair<SkColor4f, gfx::Rect>> colors = {
+      {SkColors::kRed, gfx::Rect(5, 10, 15, 20)},
+      {SkColors::kGreen, gfx::Rect(15, 12, 15, 20)},
+      {SkColors::kBlue, gfx::Rect(25, 14, 15, 20)},
+      {SkColors::kWhite, gfx::Rect(35, 16, 15, 20)},
+  };
+
+  for (size_t i = 0; i < colors.size(); i++) {
+    auto& [color, bounds] = colors[i];
+    auto overlay = std::make_unique<DCLayerOverlayParams>();
+    overlay->quad_rect = bounds;
+    overlay->background_color = absl::optional<SkColor4f>(color);
+    overlay->z_order = i + 1;
+    presenter_->ScheduleDCLayer(std::move(overlay));
+  }
+
+  PresentAndCheckScreenshot();
+}
+
+// Test that opacity works when originating from DComp tree parameter.
+TEST_F(DCompPresenterSkiaGoldTest, OpacityFromOverlay) {
+  InitializeTest(gfx::Size(100, 100));
+
+  InitializeRootAndScheduleRootSurface(current_window_size(), SkColors::kBlack);
+
+  AddOverlaysForOpacityTest(
+      base::BindRepeating([](const gfx::Rect& quad_rect, float opacity) {
+        auto overlay = CreateParamsFromImage(
+            CreateDCompSurface(quad_rect.size(), SkColors::kWhite));
+        overlay->quad_rect = quad_rect;
+        overlay->opacity = opacity;
+        return overlay;
+      }));
+
+  PresentAndCheckScreenshot();
+}
+
+// Test that opacity works when originating from the overlay image itself.
+TEST_F(DCompPresenterSkiaGoldTest, OpacityFromImage) {
+  InitializeTest(gfx::Size(100, 100));
+
+  InitializeRootAndScheduleRootSurface(current_window_size(), SkColors::kBlack);
+
+  AddOverlaysForOpacityTest(
+      base::BindRepeating([](const gfx::Rect& quad_rect, float opacity) {
+        SkColor4f overlay_color = SkColors::kWhite;
+        overlay_color.fA = opacity;
+
+        auto overlay = CreateParamsFromImage(
+            CreateDCompSurface(quad_rect.size(), overlay_color));
+        overlay->quad_rect = quad_rect;
+        return overlay;
+      }));
+
+  PresentAndCheckScreenshot();
+}
+
+// Test that opacity works when originating from a solid color overlay.
+TEST_F(DCompPresenterSkiaGoldTest, OpacityFromSolidColor) {
+  InitializeTest(gfx::Size(100, 100));
+
+  InitializeRootAndScheduleRootSurface(current_window_size(), SkColors::kBlack);
+
+  AddOverlaysForOpacityTest(
+      base::BindRepeating([](const gfx::Rect& quad_rect, float opacity) {
+        SkColor4f overlay_color = SkColors::kWhite;
+        overlay_color.fA = opacity;
+
+        auto overlay = std::make_unique<DCLayerOverlayParams>();
+        overlay->quad_rect = quad_rect;
+        overlay->background_color = absl::optional<SkColor4f>(overlay_color);
+        return overlay;
+      }));
+
+  PresentAndCheckScreenshot();
+}
+
+// Check that an overlay with a DComp surface will visually reflect draws to the
+// surface if its dcomp_surface_serial changes. This requires DCLayerTree to
+// call Commit, even if no other tree properties change.
+TEST_F(DCompPresenterSkiaGoldTest, SurfaceSerialForcesCommit) {
+  InitializeTest(gfx::Size(100, 100));
+
+  const std::vector<SkColor4f> colors = {SkColors::kRed, SkColors::kGreen,
+                                         SkColors::kBlue, SkColors::kWhite};
+
+  Microsoft::WRL::ComPtr<IDCompositionDevice2> dcomp_device =
+      gl::GetDirectCompositionDevice();
+
+  Microsoft::WRL::ComPtr<IDCompositionSurface> surface;
+  ASSERT_HRESULT_SUCCEEDED(dcomp_device->CreateSurface(
+      current_window_size().width(), current_window_size().height(),
+      DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_ALPHA_MODE_IGNORE, &surface));
+  uint64_t surface_serial = 0;
+
+  ClearRect(surface.Get(), gfx::Rect(current_window_size()), SkColors::kBlack);
+
+  for (size_t i = 0; i < colors.size(); i++) {
+    const auto color = colors[i];
+
+    ClearRect(surface.Get(), gfx::Rect(i * 10, i * 5, 15, 15), color);
+    surface_serial++;
+
+    auto overlay = CreateParamsFromImage(
+        DCLayerOverlayImage(current_window_size(), surface, surface_serial));
+    overlay->quad_rect = gfx::Rect(current_window_size());
+    overlay->z_order = 0;
+    presenter_->ScheduleDCLayer(std::move(overlay));
+
+    PresentAndCheckScreenshot(base::NumberToString(i));
+  }
+}
+
+// Check that we support simple rounded corners.
+TEST_F(DCompPresenterSkiaGoldTest, RoundedCornerSimple) {
+  InitializeTest(gfx::Size(100, 100));
+
+  InitializeRootAndScheduleRootSurface(current_window_size(), SkColors::kBlack);
+
+  auto overlay = CreateParamsFromImage(
+      CreateDCompSurface(current_window_size(), SkColors::kWhite));
+  overlay->quad_rect = gfx::Rect(current_window_size());
+  overlay->quad_rect.Inset(kPaddingFromEdgeForAntiAliasedOutput);
+  overlay->z_order = 1;
+  overlay->rounded_corner_bounds =
+      gfx::RRectF(gfx::RectF(overlay->quad_rect), 25.f);
+  presenter_->ScheduleDCLayer(std::move(overlay));
+
+  PresentAndCheckScreenshot();
+}
+
+// Check that we support rounded corners with complex radii.
+TEST_F(DCompPresenterSkiaGoldTest, RoundedCornerNonUniformRadii) {
+  InitializeTest(gfx::Size(100, 100));
+
+  InitializeRootAndScheduleRootSurface(current_window_size(), SkColors::kBlack);
+
+  auto overlay = CreateParamsFromImage(
+      CreateDCompSurface(current_window_size(), SkColors::kWhite));
+  overlay->quad_rect = gfx::Rect(current_window_size());
+  overlay->quad_rect.Inset(kPaddingFromEdgeForAntiAliasedOutput);
+  overlay->z_order = 1;
+
+  gfx::RRectF bounds = gfx::RRectF(gfx::RectF(overlay->quad_rect));
+  bounds.SetCornerRadii(gfx::RRectF::Corner::kUpperLeft, gfx::Vector2dF(5, 40));
+  bounds.SetCornerRadii(gfx::RRectF::Corner::kUpperRight,
+                        gfx::Vector2dF(15, 30));
+  bounds.SetCornerRadii(gfx::RRectF::Corner::kLowerRight,
+                        gfx::Vector2dF(25, 20));
+  bounds.SetCornerRadii(gfx::RRectF::Corner::kLowerLeft,
+                        gfx::Vector2dF(35, 10));
+  overlay->rounded_corner_bounds = bounds;
+  presenter_->ScheduleDCLayer(std::move(overlay));
+
+  PresentAndCheckScreenshot();
+}
+
+// Check that there are no seams between solid color quads when there is a
+// rounded corner clip present. Seams can appear since the solid color visual
+// uses a shared image that is scaled to fit the overlay. The combination of
+// scaling and soft borders implied by rounded corners can cause seams.
+// This is a common case in e.g. the omnibox.
+TEST_F(DCompPresenterSkiaGoldTest,
+       NoSeamsBetweenAdjacentSolidColorsWithSharedRoundedCorner) {
+  // We specifically don't want to ignore anti-aliasing in this test
+  InitializeTest(gfx::Size(100, 100));
+
+  InitializeRootAndScheduleRootSurface(current_window_size(), SkColors::kBlack);
+
+  gfx::RRectF bounds = gfx::RRectF(gfx::RectF(current_window_size()), 0);
+  // Give the rounded rect a radius, but ensure that it is not visible so AA
+  // doesn't affect this test.
+  bounds.Outset(5);
+
+  std::vector<gfx::Rect> quads = {
+      gfx::Rect(55, 45, 45, 55),
+      gfx::Rect(0, 45, 55, 55),
+
+      gfx::Rect(45, 0, 55, 45),
+      gfx::Rect(0, 0, 45, 45),
+  };
+
+  int overlay_z_order = 1;
+  for (auto& quad : quads) {
+    auto overlay = std::make_unique<DCLayerOverlayParams>();
+    overlay->quad_rect = quad;
+    overlay->background_color = absl::optional<SkColor4f>(SkColors::kWhite);
+    overlay->z_order = overlay_z_order;
+    overlay->rounded_corner_bounds = bounds;
+    presenter_->ScheduleDCLayer(std::move(overlay));
+
+    overlay_z_order++;
+  }
+
+  PresentAndCheckScreenshot();
+}
+
+// Check that we get a soft border when we translate the overlay so that both
+// the right and left edges cover half a pixel.
+TEST_F(DCompPresenterSkiaGoldTest, SoftBordersFromNonIntegralTranslation) {
+  InitializeTest(gfx::Size(100, 100));
+
+  InitializeRootAndScheduleRootSurface(current_window_size(), SkColors::kBlack);
+
+  auto overlay = CreateParamsFromImage(
+      CreateDCompSurface(gfx::Size(20, 20), SkColors::kWhite));
+  overlay->quad_rect = gfx::Rect(overlay->overlay_image->size());
+  overlay->transform.Translate(kPaddingFromEdgeForAntiAliasedOutput,
+                               kPaddingFromEdgeForAntiAliasedOutput);
+  overlay->transform.Translate(0.5, 0);
+  overlay->z_order = 1;
+  presenter_->ScheduleDCLayer(std::move(overlay));
+
+  PresentAndCheckScreenshot();
+}
+
+// Check that we get a soft border when we scale the overlay so the right edge
+// covers half a pixel.
+TEST_F(DCompPresenterSkiaGoldTest, SoftBordersFromNonIntegralScaling) {
+  InitializeTest(gfx::Size(100, 100));
+
+  InitializeRootAndScheduleRootSurface(current_window_size(), SkColors::kBlack);
+
+  auto overlay = CreateParamsFromImage(
+      CreateDCompSurface(gfx::Size(20, 20), SkColors::kWhite));
+  overlay->quad_rect = gfx::Rect(overlay->overlay_image->size());
+  overlay->transform.Translate(kPaddingFromEdgeForAntiAliasedOutput,
+                               kPaddingFromEdgeForAntiAliasedOutput);
+  overlay->transform.Scale(
+      (static_cast<float>(overlay->quad_rect.width()) + 0.5) /
+          static_cast<float>(overlay->quad_rect.width()),
+      1);
+  overlay->z_order = 1;
+  presenter_->ScheduleDCLayer(std::move(overlay));
+
+  PresentAndCheckScreenshot();
+}
+
+// Check that we get a soft border when we create a non-integral rounded corner
+// bounds so the right edge covers half a pixel.
+TEST_F(DCompPresenterSkiaGoldTest,
+       SoftBordersFromNonIntegralRoundedCornerBounds) {
+  InitializeTest(gfx::Size(100, 100));
+
+  InitializeRootAndScheduleRootSurface(current_window_size(), SkColors::kBlack);
+
+  auto overlay = CreateParamsFromImage(
+      CreateDCompSurface(gfx::Size(21, 20), SkColors::kWhite));
+  overlay->quad_rect = gfx::Rect(overlay->overlay_image->size());
+
+  // DComp seems to not actually use soft borders unless there's a non-zero
+  // radius.
+  const double kForceDCompRoundedCornerSoftBorder =
+      std::numeric_limits<float>::epsilon();
+
+  overlay->rounded_corner_bounds = gfx::RRectF(
+      gfx::RectF(0, 0, 20.5, 20), kForceDCompRoundedCornerSoftBorder);
+  overlay->rounded_corner_bounds.Offset(kPaddingFromEdgeForAntiAliasedOutput,
+                                        kPaddingFromEdgeForAntiAliasedOutput);
+  overlay->transform.Translate(kPaddingFromEdgeForAntiAliasedOutput,
+                               kPaddingFromEdgeForAntiAliasedOutput);
+  overlay->z_order = 1;
+  presenter_->ScheduleDCLayer(std::move(overlay));
+
+  PresentAndCheckScreenshot();
+}
+
+// Check that DCLayerTree sorts overlays by their z-order instead of using the
+// schedule order.
+TEST_F(DCompPresenterSkiaGoldTest, OverlaysAreSortedByZOrder) {
+  InitializeTest(gfx::Size(100, 100));
+
+  // Insert overlays out of order with respect to z-ordering
+  std::vector<std::pair<SkColor4f, int>> color_and_z_order = {
+      {SkColors::kGreen, 2},
+      {SkColors::kGreen, -1},
+      {SkColors::kRed, -2},
+      {SkColors::kRed, 1},
+  };
+
+  for (const auto& [color, z_order] : color_and_z_order) {
+    gfx::Rect quad_rect = gfx::Rect(15 + z_order * 5, 15 + z_order * 5, 30, 30);
+    auto overlay =
+        CreateParamsFromImage(CreateDCompSurface(quad_rect.size(), color));
+    overlay->quad_rect = quad_rect;
+    overlay->z_order = z_order;
+
+    presenter_->ScheduleDCLayer(std::move(overlay));
+  }
+
+  // Insert a translucent root plane so that we can easily see underlays
+  SkColor4f translucent_blue = SkColors::kBlue;
+  translucent_blue.fA = 0.5;
+  InitializeRootAndScheduleRootSurface(current_window_size(), translucent_blue);
+
+  {
+    // Insert a black backdrop since our root surface is not opaque. This is not
+    // strictly required, but it ensures that we explicitly make all pixels in
+    // our output opaque.
+    auto overlay = CreateParamsFromImage(
+        CreateDCompSurface(current_window_size(), SkColors::kBlack));
+    overlay->quad_rect = gfx::Rect(current_window_size());
+    overlay->z_order = INT_MIN;
+    presenter_->ScheduleDCLayer(std::move(overlay));
+  }
+
+  PresentAndCheckScreenshot();
+}
+
+// Check that an overlay with a non-opaque image can show a background color.
+TEST_F(DCompPresenterSkiaGoldTest, ImageWithBackgroundColor) {
+  InitializeTest(gfx::Size(100, 100));
+
+  InitializeRootAndScheduleRootSurface(current_window_size(), SkColors::kBlack);
+
+  auto overlay = CreateParamsFromImage(CreateDCompSurface(
+      gfx::Size(100, 50), SkColors::kTransparent,
+      {
+          {gfx::Rect(5, 5, 20, 20),
+           SkColor4f::FromColor(SkColorSetA(SK_ColorRED, 0x80))},
+          {gfx::Rect(15, 15, 20, 20),
+           SkColor4f::FromColor(SkColorSetA(SK_ColorBLUE, 0x80))},
+      }));
+  overlay->quad_rect = gfx::Rect(100, 50);
+  overlay->background_color = SkColors::kGreen;
+  overlay->z_order = 1;
+
+  EXPECT_TRUE(presenter_->ScheduleDCLayer(std::move(overlay)));
+
+  PresentAndCheckScreenshot();
+}
+
+// Test that we support sampling from overlay images with non-integral content
+// rects. This test should output a blue square with a faint green outline.
+TEST_F(DCompPresenterSkiaGoldTest, NonIntegralContentRectHalfCoverage) {
+  InitializeTest(gfx::Size(100, 100));
+
+  InitializeRootAndScheduleRootSurface(current_window_size(), SkColors::kBlack);
+
+  gfx::Size image_size = gfx::Size(50, 50);
+  gfx::Rect image_inner_rect = gfx::Rect(image_size);
+  image_inner_rect.Inset(1);
+  auto overlay = CreateParamsFromImage(CreateDCompSurface(
+      image_size, SkColors::kGreen, {{image_inner_rect, SkColors::kBlue}}));
+  overlay->content_rect.Inset(0.5);
+  overlay->quad_rect = gfx::Rect(
+      gfx::Point(20, 20),
+      gfx::Size(overlay->content_rect.width(), overlay->content_rect.height()));
+  overlay->z_order = 1;
+  presenter_->ScheduleDCLayer(std::move(overlay));
 
   PresentAndCheckScreenshot();
 }
@@ -1604,16 +2213,15 @@ TEST_P(DCompPresenterBufferCountTest, VideoSwapChainBufferCount) {
   constexpr gfx::Size texture_size(50, 50);
 
   Microsoft::WRL::ComPtr<ID3D11Device> d3d11_device =
-      QueryD3D11DeviceObjectFromANGLE();
+      GetDirectCompositionD3D11Device();
   ASSERT_TRUE(d3d11_device);
 
   Microsoft::WRL::ComPtr<ID3D11Texture2D> texture =
       CreateNV12Texture(d3d11_device, texture_size);
   ASSERT_NE(texture, nullptr);
 
-  auto params = std::make_unique<DCLayerOverlayParams>();
-  params->overlay_image.emplace(texture_size, texture);
-  params->content_rect = gfx::Rect(texture_size);
+  auto params =
+      CreateParamsFromImage(DCLayerOverlayImage(texture_size, texture));
   params->quad_rect = gfx::Rect(window_size);
   params->color_space = gfx::ColorSpace::CreateREC709();
   EXPECT_TRUE(presenter_->ScheduleDCLayer(std::move(params)));
@@ -1639,5 +2247,709 @@ INSTANTIATE_TEST_SUITE_P(All,
                          DCompPresenterBufferCountTest,
                          testing::Bool(),
                          &DCompPresenterBufferCountTest::GetParamName);
+
+class DCompPresenterLetterboxingTest
+    : public DCompPresenterTest,
+      public testing::WithParamInterface<bool> {
+ protected:
+  void SetUp() override {
+    SetupScopedFeatureList();
+
+    DCompPresenterTest::SetUp();
+  }
+
+  virtual void SetupScopedFeatureList() {
+    if (GetParam()) {
+      scoped_feature_list_.InitAndEnableFeature(
+          features::kDirectCompositionLetterboxVideoOptimization);
+    } else {
+      scoped_feature_list_.InitAndDisableFeature(
+          features::kDirectCompositionLetterboxVideoOptimization);
+    }
+  }
+
+  base::test::ScopedFeatureList scoped_feature_list_;
+};
+
+INSTANTIATE_TEST_SUITE_P(All, DCompPresenterLetterboxingTest, testing::Bool());
+
+TEST_P(DCompPresenterLetterboxingTest, FullScreenLetterboxingResizeVideoLayer) {
+  // Define 1920x1200 monitor size.
+  const gfx::Size monitor_size(1920, 1200);
+  SetDirectCompositionScaledOverlaysSupportedForTesting(true);
+  SetDirectCompositionMonitorInfoForTesting(1, monitor_size);
+  EXPECT_TRUE(presenter_->Resize(monitor_size, 1.0, gfx::ColorSpace(), true));
+
+  // Schedule the overlay for root surface.
+  InitializeRootAndScheduleRootSurface(monitor_size, SkColors::kBlack);
+
+  // Make a 1080p texture as display input.
+  Microsoft::WRL::ComPtr<ID3D11Device> d3d11_device =
+      GetDirectCompositionD3D11Device();
+  const gfx::Size texture_size(1920, 1080);
+  Microsoft::WRL::ComPtr<ID3D11Texture2D> texture =
+      CreateNV12Texture(d3d11_device, texture_size);
+  ASSERT_NE(texture, nullptr);
+
+  // First test if swap chain and its visual info is adjusted to fit the
+  // monitor when letterboxing is generated for full screen presentation.
+  const int letterboxing_height =
+      (monitor_size.height() - texture_size.height()) / 2;
+  const gfx::Rect quad_rect =
+      gfx::Rect(0, 0, texture_size.width(), texture_size.height());
+  gfx::Rect clip_rect = gfx::Rect(0, letterboxing_height, texture_size.width(),
+                                  texture_size.height());
+  gfx::Transform quad_to_root_transform(
+      gfx::AxisTransform2d(1, gfx::Vector2dF(0, letterboxing_height)));
+  {
+    auto dc_layer_params =
+        CreateParamsFromImage(DCLayerOverlayImage(texture_size, texture));
+    dc_layer_params->quad_rect = quad_rect;
+    dc_layer_params->transform = quad_to_root_transform;
+    dc_layer_params->clip_rect = clip_rect;
+    dc_layer_params->color_space = gfx::ColorSpace::CreateREC709();
+    dc_layer_params->z_order = 1;
+    dc_layer_params->possible_video_fullscreen_letterboxing = true;
+    presenter_->ScheduleDCLayer(std::move(dc_layer_params));
+
+    PresentAndCheckSwapResult(gfx::SwapResult::SWAP_ACK);
+  }
+
+  // Swap chain size is set to onscreen content size.
+  DXGI_SWAP_CHAIN_DESC1 desc;
+  Microsoft::WRL::ComPtr<IDXGISwapChain1> swap_chain =
+      presenter_->GetLayerSwapChainForTesting(0);
+  ASSERT_TRUE(swap_chain);
+  EXPECT_HRESULT_SUCCEEDED(swap_chain->GetDesc1(&desc));
+  EXPECT_EQ(1920u, desc.Width);
+  EXPECT_EQ(1080u, desc.Height);
+
+  // Make sure the new transform matrix is adjusted, so it transforms the swap
+  // chain to |new_on_screen_rect| which fits the monitor.
+  gfx::Transform visual_transform;
+  gfx::Point visual_offset;
+  gfx::Rect visual_clip_rect;
+  presenter_->GetSwapChainVisualInfoForTesting(
+      0, &visual_transform, &visual_offset, &visual_clip_rect);
+
+  if (GetParam()) {
+    // In case DirectCompositionLetterboxVideoOptimization feature is enabled,
+    // DWM will do the swap chain positioning in case of overlay. And visual
+    // clip rect has been set to monitor rect.
+    EXPECT_EQ(gfx::Rect(monitor_size), visual_clip_rect);
+  } else {
+    // In case DirectCompositionLetterboxVideoOptimization feature is disabled,
+    // keep the origin clip rect from DCLayerOverlayParams.
+    EXPECT_EQ(quad_to_root_transform, visual_transform);
+    EXPECT_EQ(clip_rect, visual_clip_rect);
+  }
+
+  // Second test if swap chain visual info is adjusted to fit the monitor when
+  // some negative offset from typical letterboxing positioning.
+  texture = CreateNV12Texture(d3d11_device, texture_size);
+  clip_rect = gfx::Rect(0, letterboxing_height - 2, texture_size.width(),
+                        texture_size.height());
+  quad_to_root_transform = gfx::Transform(
+      gfx::AxisTransform2d(1, gfx::Vector2dF(0, letterboxing_height - 2)));
+  {
+    auto dc_layer_params =
+        CreateParamsFromImage(DCLayerOverlayImage(texture_size, texture));
+    dc_layer_params->quad_rect = quad_rect;
+    dc_layer_params->transform = quad_to_root_transform;
+    dc_layer_params->clip_rect = clip_rect;
+    dc_layer_params->color_space = gfx::ColorSpace::CreateREC709();
+    dc_layer_params->z_order = 1;
+    dc_layer_params->possible_video_fullscreen_letterboxing = true;
+    presenter_->ScheduleDCLayer(std::move(dc_layer_params));
+    PresentAndCheckSwapResult(gfx::SwapResult::SWAP_ACK);
+  }
+
+  // Swap chain size is set to onscreen content size.
+  DXGI_SWAP_CHAIN_DESC1 desc2;
+  Microsoft::WRL::ComPtr<IDXGISwapChain1> swap_chain2 =
+      presenter_->GetLayerSwapChainForTesting(0);
+  ASSERT_TRUE(swap_chain2);
+  EXPECT_HRESULT_SUCCEEDED(swap_chain2->GetDesc1(&desc2));
+
+  if (GetParam()) {
+    // In case DirectCompositionLetterboxVideoOptimization feature is enabled,
+    // there would be four pixels more to cover extra blank bar since the
+    // adjustment is basically a padding without movedown.
+    EXPECT_EQ(1920u, desc2.Width);
+    EXPECT_EQ(1084u, desc2.Height);
+  } else {
+    EXPECT_EQ(1920u, desc2.Width);
+    EXPECT_EQ(1080u, desc2.Height);
+  }
+
+  // Make sure the new transform matrix is adjusted, so it transforms the swap
+  // chain to |new_on_screen_rect| which fits the monitor.
+  gfx::Transform visual_transform2;
+  gfx::Point visual_offset2;
+  gfx::Rect visual_clip_rect2;
+  presenter_->GetSwapChainVisualInfoForTesting(
+      0, &visual_transform2, &visual_offset2, &visual_clip_rect2);
+
+  if (GetParam()) {
+    // In case DirectCompositionLetterboxVideoOptimization feature is enabled,
+    // DWM will do the swap chain positioning in case of overlay. And visual
+    // clip rect has been set to monitor rect.
+    EXPECT_EQ(gfx::Rect(monitor_size), visual_clip_rect2);
+  } else {
+    // In case DirectCompositionLetterboxVideoOptimization feature is disabled,
+    // keep the origin clip rect from DCLayerOverlayParams.
+    EXPECT_EQ(quad_to_root_transform, visual_transform2);
+    EXPECT_EQ(clip_rect, visual_clip_rect2);
+  }
+
+  // Third test if swap chain visual info is adjusted to fit the monitor when
+  // some positive offset from typical letterboxing positioning.
+  texture = CreateNV12Texture(d3d11_device, texture_size);
+  clip_rect = gfx::Rect(0, letterboxing_height + 2, texture_size.width(),
+                        texture_size.height());
+  quad_to_root_transform = gfx::Transform(
+      gfx::AxisTransform2d(1, gfx::Vector2dF(0, letterboxing_height + 2)));
+  {
+    auto dc_layer_params =
+        CreateParamsFromImage(DCLayerOverlayImage(texture_size, texture));
+    dc_layer_params->quad_rect = quad_rect;
+    dc_layer_params->transform = quad_to_root_transform;
+    dc_layer_params->clip_rect = clip_rect;
+    dc_layer_params->color_space = gfx::ColorSpace::CreateREC709();
+    dc_layer_params->z_order = 1;
+    dc_layer_params->possible_video_fullscreen_letterboxing = true;
+    presenter_->ScheduleDCLayer(std::move(dc_layer_params));
+    PresentAndCheckSwapResult(gfx::SwapResult::SWAP_ACK);
+  }
+
+  // Swap chain size is set to onscreen content size
+  DXGI_SWAP_CHAIN_DESC1 desc3;
+  Microsoft::WRL::ComPtr<IDXGISwapChain1> swap_chain3 =
+      presenter_->GetLayerSwapChainForTesting(0);
+  ASSERT_TRUE(swap_chain3);
+  EXPECT_HRESULT_SUCCEEDED(swap_chain3->GetDesc1(&desc3));
+  if (GetParam()) {
+    // In case DirectCompositionLetterboxVideoOptimization feature is enabled,
+    // there would be two pixels more to cover extra blank bar since the
+    // adjustment is basically a moveup.
+    EXPECT_EQ(1920u, desc3.Width);
+    EXPECT_EQ(1082u, desc3.Height);
+  } else {
+    EXPECT_EQ(1920u, desc3.Width);
+    EXPECT_EQ(1080u, desc3.Height);
+  }
+
+  // Make sure the new transform matrix is adjusted, so it transforms the swap
+  // chain to |new_on_screen_rect| which fits the monitor.
+  gfx::Transform visual_transform3;
+  gfx::Point visual_offset3;
+  gfx::Rect visual_clip_rect3;
+  presenter_->GetSwapChainVisualInfoForTesting(
+      0, &visual_transform3, &visual_offset3, &visual_clip_rect3);
+
+  if (GetParam()) {
+    // In case DirectCompositionLetterboxVideoOptimization feature is enabled,
+    // DWM will do the swap chain positioning in case of overlay. And visual
+    // clip rect has been set to monitor rect.
+    EXPECT_EQ(gfx::Rect(monitor_size), visual_clip_rect3);
+  } else {
+    // In case DirectCompositionLetterboxVideoOptimization feature is disabled,
+    // keep the origin clip rect from DCLayerOverlayParams.
+    EXPECT_EQ(quad_to_root_transform, visual_transform3);
+    EXPECT_EQ(clip_rect, visual_clip_rect3);
+  }
+}
+
+TEST_P(DCompPresenterLetterboxingTest,
+       FullScreenLetterboxingWithDesktopPlaneRemoval) {
+  // Define 1920x1200 monitor size.
+  const gfx::Size monitor_size(1920, 1200);
+  SetDirectCompositionScaledOverlaysSupportedForTesting(true);
+  SetDirectCompositionMonitorInfoForTesting(1, monitor_size);
+  EXPECT_TRUE(presenter_->Resize(monitor_size, 1.0, gfx::ColorSpace(), true));
+
+  // Schedule the overlay for root surface.
+  InitializeRootAndScheduleRootSurface(monitor_size, SkColors::kBlack);
+
+  // Make a 1080p texture as display input.
+  Microsoft::WRL::ComPtr<ID3D11Device> d3d11_device =
+      GetDirectCompositionD3D11Device();
+  const gfx::Size texture_size(1920, 1080);
+  Microsoft::WRL::ComPtr<ID3D11Texture2D> texture =
+      CreateNV12Texture(d3d11_device, texture_size);
+  ASSERT_NE(texture, nullptr);
+
+  // Test if swap chain and its visual info is adjusted to fit the monitor when
+  // letterboxing is generated for full screen presentation.
+  const int letterboxing_height =
+      (monitor_size.height() - texture_size.height()) / 2;
+  const gfx::Rect quad_rect =
+      gfx::Rect(0, 0, texture_size.width(), texture_size.height());
+  const gfx::Rect clip_rect = gfx::Rect(
+      0, letterboxing_height, texture_size.width(), texture_size.height());
+  const gfx::Transform quad_to_root_transform(
+      gfx::AxisTransform2d(1, gfx::Vector2dF(0, letterboxing_height)));
+  {
+    auto dc_layer_params =
+        CreateParamsFromImage(DCLayerOverlayImage(texture_size, texture));
+    dc_layer_params->quad_rect = quad_rect;
+    dc_layer_params->transform = quad_to_root_transform;
+    dc_layer_params->clip_rect = clip_rect;
+    dc_layer_params->color_space = gfx::ColorSpace::CreateREC709();
+    dc_layer_params->z_order = 1;
+    dc_layer_params->possible_video_fullscreen_letterboxing = true;
+    presenter_->ScheduleDCLayer(std::move(dc_layer_params));
+
+    PresentAndCheckSwapResult(gfx::SwapResult::SWAP_ACK);
+  }
+
+  // Swap chain size is set to onscreen content size.
+  DXGI_SWAP_CHAIN_DESC1 desc;
+  Microsoft::WRL::ComPtr<IDXGISwapChain1> swap_chain =
+      presenter_->GetLayerSwapChainForTesting(0);
+  ASSERT_TRUE(swap_chain);
+  EXPECT_HRESULT_SUCCEEDED(swap_chain->GetDesc1(&desc));
+  EXPECT_EQ(1920u, desc.Width);
+  EXPECT_EQ(1080u, desc.Height);
+
+  if (GetParam()) {
+    // Check desktop plane removal part 1.
+    Microsoft::WRL::ComPtr<IDXGIDecodeSwapChain> decode_swap_chain;
+    EXPECT_HRESULT_SUCCEEDED(
+        swap_chain->QueryInterface(IID_PPV_ARGS(&decode_swap_chain)));
+    // The dest size has been set to monitor size.
+    uint32_t dest_width, dest_height;
+    EXPECT_HRESULT_SUCCEEDED(
+        decode_swap_chain->GetDestSize(&dest_width, &dest_height));
+    EXPECT_EQ(1920u, dest_width);
+    EXPECT_EQ(1200u, dest_height);
+
+    // The target rect has been set to the onscreen content rect.
+    RECT target_rect;
+    EXPECT_HRESULT_SUCCEEDED(decode_swap_chain->GetTargetRect(&target_rect));
+    EXPECT_EQ(clip_rect, gfx::Rect(target_rect));
+  }
+
+  // Swap chain visual is clipped to the whole monitor size.
+  gfx::Transform visual_transform;
+  gfx::Point visual_offset;
+  gfx::Rect visual_clip_rect;
+  presenter_->GetSwapChainVisualInfoForTesting(
+      0, &visual_transform, &visual_offset, &visual_clip_rect);
+  if (GetParam()) {
+    // Check desktop plane removal part 2.
+    // In case DirectCompositionLetterboxVideoOptimization feature is enabled,
+    // DWM will do the swap chain positioning in case of overlay.
+    EXPECT_TRUE(visual_transform.IsIdentity());
+    // Visual clip rect has been set to monitor rect.
+    EXPECT_EQ(gfx::Rect(monitor_size), visual_clip_rect);
+  } else {
+    // In case DirectCompositionLetterboxVideoOptimization feature is disabled,
+    // keep the origin transform and clip rect from DCLayerOverlayParams.
+    EXPECT_EQ(quad_to_root_transform, visual_transform);
+    EXPECT_EQ(clip_rect, visual_clip_rect);
+  }
+}
+
+TEST_P(DCompPresenterLetterboxingTest, FullScreenLetterboxingKeepVisualInfo) {
+  // Define 1920x1200 monitor size.
+  const gfx::Size monitor_size(1920, 1200);
+  SetDirectCompositionScaledOverlaysSupportedForTesting(true);
+  SetDirectCompositionMonitorInfoForTesting(1, monitor_size);
+  EXPECT_TRUE(presenter_->Resize(monitor_size, 1.0, gfx::ColorSpace(), true));
+
+  // Schedule the overlay for root surface.
+  InitializeRootAndScheduleRootSurface(monitor_size, SkColors::kBlack);
+
+  // Make a 1080p texture as display input.
+  Microsoft::WRL::ComPtr<ID3D11Device> d3d11_device =
+      GetDirectCompositionD3D11Device();
+  const gfx::Size texture_size(1920, 1080);
+  Microsoft::WRL::ComPtr<ID3D11Texture2D> texture =
+      CreateNV12Texture(d3d11_device, texture_size);
+  ASSERT_NE(texture, nullptr);
+
+  // First full screen presentation with letterboxing.
+  const int letterboxing_height =
+      (monitor_size.height() - texture_size.height()) / 2;
+  const gfx::Rect quad_rect =
+      gfx::Rect(0, 0, texture_size.width(), texture_size.height());
+  const gfx::Rect clip_rect = gfx::Rect(
+      0, letterboxing_height, texture_size.width(), texture_size.height());
+  const gfx::Transform quad_to_root_transform(
+      gfx::AxisTransform2d(1, gfx::Vector2dF(0, letterboxing_height)));
+  {
+    auto dc_layer_params =
+        CreateParamsFromImage(DCLayerOverlayImage(texture_size, texture));
+    dc_layer_params->quad_rect = quad_rect;
+    dc_layer_params->transform = quad_to_root_transform;
+    dc_layer_params->clip_rect = clip_rect;
+    dc_layer_params->color_space = gfx::ColorSpace::CreateREC709();
+    dc_layer_params->z_order = 1;
+    dc_layer_params->possible_video_fullscreen_letterboxing = true;
+    presenter_->ScheduleDCLayer(std::move(dc_layer_params));
+
+    PresentAndCheckSwapResult(gfx::SwapResult::SWAP_ACK);
+  }
+
+  // Make sure it's a valid swap chain presentation
+  Microsoft::WRL::ComPtr<IDXGISwapChain1> swap_chain =
+      presenter_->GetLayerSwapChainForTesting(0);
+  ASSERT_TRUE(swap_chain);
+
+  // One present is normal, and a second present because it's the first frame
+  // and the other buffer needs to be drawn to.
+  UINT last_present_count = 0;
+  EXPECT_HRESULT_SUCCEEDED(
+      swap_chain->GetLastPresentCount(&last_present_count));
+  EXPECT_EQ(2u, last_present_count);
+
+  // Swap chain visual info is collected for the first presentation.
+  gfx::Transform visual_transform1;
+  gfx::Point visual_offset1;
+  gfx::Rect visual_clip_rect1;
+  presenter_->GetSwapChainVisualInfoForTesting(
+      0, &visual_transform1, &visual_offset1, &visual_clip_rect1);
+
+  // Followed by second presentation with the same image.
+  {
+    auto dc_layer_params =
+        CreateParamsFromImage(DCLayerOverlayImage(texture_size, texture));
+    dc_layer_params->quad_rect = quad_rect;
+    dc_layer_params->transform = quad_to_root_transform;
+    dc_layer_params->clip_rect = clip_rect;
+    dc_layer_params->color_space = gfx::ColorSpace::CreateREC709();
+    dc_layer_params->z_order = 1;
+    dc_layer_params->possible_video_fullscreen_letterboxing = true;
+    presenter_->ScheduleDCLayer(std::move(dc_layer_params));
+
+    PresentAndCheckSwapResult(gfx::SwapResult::SWAP_ACK);
+  }
+
+  // It's the same image, so it should have the same swapchain.
+  Microsoft::WRL::ComPtr<IDXGISwapChain1> swap_chain2 =
+      presenter_->GetLayerSwapChainForTesting(0);
+  EXPECT_EQ(swap_chain2.Get(), swap_chain.Get());
+
+  // No new presentation happened and no present count increase since it's with
+  // the same image.
+  EXPECT_HRESULT_SUCCEEDED(
+      swap_chain->GetLastPresentCount(&last_present_count));
+  EXPECT_EQ(2u, last_present_count);
+
+  // Swap chain visual info should be kept same as the previous presentation.
+  gfx::Transform visual_transform2;
+  gfx::Point visual_offset2;
+  gfx::Rect visual_clip_rect2;
+  presenter_->GetSwapChainVisualInfoForTesting(
+      0, &visual_transform2, &visual_offset2, &visual_clip_rect2);
+  EXPECT_EQ(visual_transform1, visual_transform2);
+  EXPECT_EQ(visual_offset1, visual_offset2);
+  EXPECT_EQ(visual_clip_rect1, visual_clip_rect2);
+
+  // More checks followed by third presentation with a new image.
+  texture = CreateNV12Texture(d3d11_device, texture_size);
+  ASSERT_NE(texture, nullptr);
+
+  {
+    auto dc_layer_params =
+        CreateParamsFromImage(DCLayerOverlayImage(texture_size, texture));
+    dc_layer_params->quad_rect = quad_rect;
+    dc_layer_params->transform = quad_to_root_transform;
+    dc_layer_params->clip_rect = clip_rect;
+    dc_layer_params->color_space = gfx::ColorSpace::CreateREC709();
+    dc_layer_params->z_order = 1;
+    dc_layer_params->possible_video_fullscreen_letterboxing = true;
+    presenter_->ScheduleDCLayer(std::move(dc_layer_params));
+
+    PresentAndCheckSwapResult(gfx::SwapResult::SWAP_ACK);
+  }
+
+  Microsoft::WRL::ComPtr<IDXGISwapChain1> swap_chain3 =
+      presenter_->GetLayerSwapChainForTesting(0);
+  EXPECT_HRESULT_SUCCEEDED(
+      swap_chain3->GetLastPresentCount(&last_present_count));
+  // The present count should increase with the new image presentation.
+  EXPECT_EQ(3u, last_present_count);
+}
+
+// Pillarboxing is generally considered as a special letterboxing.
+TEST_P(DCompPresenterLetterboxingTest, FullScreenPillarboxingResizeVideoLayer) {
+  // Define 1920x1200 monitor size.
+  const gfx::Size monitor_size(1920, 1200);
+  SetDirectCompositionScaledOverlaysSupportedForTesting(true);
+  SetDirectCompositionMonitorInfoForTesting(1, monitor_size);
+  EXPECT_TRUE(presenter_->Resize(monitor_size, 1.0, gfx::ColorSpace(), true));
+
+  // Schedule the overlay for root surface.
+  InitializeRootAndScheduleRootSurface(monitor_size, SkColors::kBlack);
+
+  // Make a 1800*1200 texture as display input.
+  Microsoft::WRL::ComPtr<ID3D11Device> d3d11_device =
+      GetDirectCompositionD3D11Device();
+  const gfx::Size texture_size(1800, 1200);
+  Microsoft::WRL::ComPtr<ID3D11Texture2D> texture =
+      CreateNV12Texture(d3d11_device, texture_size);
+  ASSERT_NE(texture, nullptr);
+
+  // First test if swap chain and its visual info is adjusted to fit the
+  // monitor when letterboxing is generated for full screen presentation.
+  const int letterboxing_width =
+      (monitor_size.width() - texture_size.width()) / 2;
+  const gfx::Rect quad_rect =
+      gfx::Rect(0, 0, texture_size.width(), texture_size.height());
+  gfx::Rect clip_rect = gfx::Rect(letterboxing_width, 0, texture_size.width(),
+                                  texture_size.height());
+  gfx::Transform quad_to_root_transform(
+      gfx::AxisTransform2d(1, gfx::Vector2dF(letterboxing_width, 0)));
+  {
+    auto dc_layer_params =
+        CreateParamsFromImage(DCLayerOverlayImage(texture_size, texture));
+    dc_layer_params->quad_rect = quad_rect;
+    dc_layer_params->transform = quad_to_root_transform;
+    dc_layer_params->clip_rect = clip_rect;
+    dc_layer_params->color_space = gfx::ColorSpace::CreateREC709();
+    dc_layer_params->z_order = 1;
+    dc_layer_params->possible_video_fullscreen_letterboxing = true;
+    presenter_->ScheduleDCLayer(std::move(dc_layer_params));
+
+    PresentAndCheckSwapResult(gfx::SwapResult::SWAP_ACK);
+  }
+
+  // Swap chain size is set to onscreen content size.
+  DXGI_SWAP_CHAIN_DESC1 desc;
+  Microsoft::WRL::ComPtr<IDXGISwapChain1> swap_chain =
+      presenter_->GetLayerSwapChainForTesting(0);
+  ASSERT_TRUE(swap_chain);
+  EXPECT_HRESULT_SUCCEEDED(swap_chain->GetDesc1(&desc));
+  EXPECT_EQ(1800u, desc.Width);
+  EXPECT_EQ(1200u, desc.Height);
+
+  // Make sure the new transform matrix is adjusted, so it transforms the swap
+  // chain to |new_on_screen_rect| which fits the monitor.
+  gfx::Transform visual_transform;
+  gfx::Point visual_offset;
+  gfx::Rect visual_clip_rect;
+  presenter_->GetSwapChainVisualInfoForTesting(
+      0, &visual_transform, &visual_offset, &visual_clip_rect);
+
+  if (GetParam()) {
+    // In case DirectCompositionLetterboxVideoOptimization feature is enabled,
+    // DWM will do the swap chain positioning in case of overlay. And visual
+    // clip rect has been set to monitor rect.
+    EXPECT_EQ(gfx::Rect(monitor_size), visual_clip_rect);
+  } else {
+    // In case DirectCompositionLetterboxVideoOptimization feature is disabled,
+    // keep the origin clip rect from DCLayerOverlayParams.
+    EXPECT_EQ(quad_to_root_transform, visual_transform);
+    EXPECT_EQ(clip_rect, visual_clip_rect);
+  }
+
+  // Second test if swap chain visual info is adjusted to fit the monitor when
+  // some negative offset from typical letterboxing positioning.
+  texture = CreateNV12Texture(d3d11_device, texture_size);
+  clip_rect = gfx::Rect(letterboxing_width - 2, 0, texture_size.width(),
+                        texture_size.height());
+  quad_to_root_transform = gfx::Transform(
+      gfx::AxisTransform2d(1, gfx::Vector2dF(letterboxing_width - 2, 0)));
+  {
+    auto dc_layer_params =
+        CreateParamsFromImage(DCLayerOverlayImage(texture_size, texture));
+    dc_layer_params->quad_rect = quad_rect;
+    dc_layer_params->transform = quad_to_root_transform;
+    dc_layer_params->clip_rect = clip_rect;
+    dc_layer_params->color_space = gfx::ColorSpace::CreateREC709();
+    dc_layer_params->z_order = 1;
+    dc_layer_params->possible_video_fullscreen_letterboxing = true;
+    presenter_->ScheduleDCLayer(std::move(dc_layer_params));
+    PresentAndCheckSwapResult(gfx::SwapResult::SWAP_ACK);
+  }
+
+  // Swap chain size is set to onscreen content size.
+  DXGI_SWAP_CHAIN_DESC1 desc2;
+  Microsoft::WRL::ComPtr<IDXGISwapChain1> swap_chain2 =
+      presenter_->GetLayerSwapChainForTesting(0);
+  ASSERT_TRUE(swap_chain2);
+  EXPECT_HRESULT_SUCCEEDED(swap_chain2->GetDesc1(&desc2));
+
+  if (GetParam()) {
+    // In case DirectCompositionLetterboxVideoOptimization feature is enabled,
+    // there would be four pixels more to cover extra blank bar since the
+    // adjustment is basically a padding without move-right.
+    EXPECT_EQ(1804u, desc2.Width);
+    EXPECT_EQ(1200u, desc2.Height);
+  } else {
+    EXPECT_EQ(1800u, desc2.Width);
+    EXPECT_EQ(1200u, desc2.Height);
+  }
+
+  // Make sure the new transform matrix is adjusted, so it transforms the swap
+  // chain to |new_on_screen_rect| which fits the monitor.
+  gfx::Transform visual_transform2;
+  gfx::Point visual_offset2;
+  gfx::Rect visual_clip_rect2;
+  presenter_->GetSwapChainVisualInfoForTesting(
+      0, &visual_transform2, &visual_offset2, &visual_clip_rect2);
+
+  if (GetParam()) {
+    // In case DirectCompositionLetterboxVideoOptimization feature is enabled,
+    // DWM will do the swap chain positioning in case of overlay. And visual
+    // clip rect has been set to monitor rect.
+    EXPECT_EQ(gfx::Rect(monitor_size), visual_clip_rect2);
+  } else {
+    // In case DirectCompositionLetterboxVideoOptimization feature is disabled,
+    // keep the origin clip rect from DCLayerOverlayParams.
+    EXPECT_EQ(quad_to_root_transform, visual_transform2);
+    EXPECT_EQ(clip_rect, visual_clip_rect2);
+  }
+
+  // Third test if swap chain visual info is adjusted to fit the monitor when
+  // some positive offset from typical letterboxing positioning.
+  texture = CreateNV12Texture(d3d11_device, texture_size);
+  clip_rect = gfx::Rect(letterboxing_width + 2, 0, texture_size.width(),
+                        texture_size.height());
+  quad_to_root_transform = gfx::Transform(
+      gfx::AxisTransform2d(1, gfx::Vector2dF(letterboxing_width + 2, 0)));
+  {
+    auto dc_layer_params =
+        CreateParamsFromImage(DCLayerOverlayImage(texture_size, texture));
+    dc_layer_params->quad_rect = quad_rect;
+    dc_layer_params->transform = quad_to_root_transform;
+    dc_layer_params->clip_rect = clip_rect;
+    dc_layer_params->color_space = gfx::ColorSpace::CreateREC709();
+    dc_layer_params->z_order = 1;
+    dc_layer_params->possible_video_fullscreen_letterboxing = true;
+    presenter_->ScheduleDCLayer(std::move(dc_layer_params));
+    PresentAndCheckSwapResult(gfx::SwapResult::SWAP_ACK);
+  }
+
+  // Swap chain size is set to onscreen content size
+  DXGI_SWAP_CHAIN_DESC1 desc3;
+  Microsoft::WRL::ComPtr<IDXGISwapChain1> swap_chain3 =
+      presenter_->GetLayerSwapChainForTesting(0);
+  ASSERT_TRUE(swap_chain3);
+  EXPECT_HRESULT_SUCCEEDED(swap_chain3->GetDesc1(&desc3));
+  if (GetParam()) {
+    // In case DirectCompositionLetterboxVideoOptimization feature is enabled,
+    // there would be two pixels more to cover extra blank bar since the
+    // adjustment is basically a move-left.
+    EXPECT_EQ(1802u, desc3.Width);
+    EXPECT_EQ(1200u, desc3.Height);
+  } else {
+    EXPECT_EQ(1800u, desc3.Width);
+    EXPECT_EQ(1200u, desc3.Height);
+  }
+
+  // Make sure the new transform matrix is adjusted, so it transforms the swap
+  // chain to |new_on_screen_rect| which fits the monitor.
+  gfx::Transform visual_transform3;
+  gfx::Point visual_offset3;
+  gfx::Rect visual_clip_rect3;
+  presenter_->GetSwapChainVisualInfoForTesting(
+      0, &visual_transform3, &visual_offset3, &visual_clip_rect3);
+
+  if (GetParam()) {
+    // In case DirectCompositionLetterboxVideoOptimization feature is enabled,
+    // DWM will do the swap chain positioning in case of overlay. And visual
+    // clip rect has been set to monitor rect.
+    EXPECT_EQ(gfx::Rect(monitor_size), visual_clip_rect3);
+  } else {
+    // In case DirectCompositionLetterboxVideoOptimization feature is disabled,
+    // keep the origin clip rect from DCLayerOverlayParams.
+    EXPECT_EQ(quad_to_root_transform, visual_transform3);
+    EXPECT_EQ(clip_rect, visual_clip_rect3);
+  }
+}
+
+TEST_P(DCompPresenterLetterboxingTest,
+       FullScreenPillarboxingWithDesktopPlaneRemoval) {
+  // Define 1920x1200 monitor size.
+  const gfx::Size monitor_size(1920, 1200);
+  SetDirectCompositionScaledOverlaysSupportedForTesting(true);
+  SetDirectCompositionMonitorInfoForTesting(1, monitor_size);
+  EXPECT_TRUE(presenter_->Resize(monitor_size, 1.0, gfx::ColorSpace(), true));
+
+  // Schedule the overlay for root surface.
+  InitializeRootAndScheduleRootSurface(monitor_size, SkColors::kBlack);
+
+  // Make a 1800*1200 texture as display input.
+  Microsoft::WRL::ComPtr<ID3D11Device> d3d11_device =
+      GetDirectCompositionD3D11Device();
+  const gfx::Size texture_size(1800, 1200);
+  Microsoft::WRL::ComPtr<ID3D11Texture2D> texture =
+      CreateNV12Texture(d3d11_device, texture_size);
+  ASSERT_NE(texture, nullptr);
+
+  // Test if swap chain and its visual info is adjusted to fit the monitor when
+  // letterboxing is generated for full screen presentation.
+  const int letterboxing_width =
+      (monitor_size.width() - texture_size.width()) / 2;
+  const gfx::Rect quad_rect =
+      gfx::Rect(0, 0, texture_size.width(), texture_size.height());
+  const gfx::Rect clip_rect = gfx::Rect(
+      letterboxing_width, 0, texture_size.width(), texture_size.height());
+  const gfx::Transform quad_to_root_transform(
+      gfx::AxisTransform2d(1, gfx::Vector2dF(letterboxing_width, 0)));
+  {
+    auto dc_layer_params =
+        CreateParamsFromImage(DCLayerOverlayImage(texture_size, texture));
+    dc_layer_params->quad_rect = quad_rect;
+    dc_layer_params->transform = quad_to_root_transform;
+    dc_layer_params->clip_rect = clip_rect;
+    dc_layer_params->color_space = gfx::ColorSpace::CreateREC709();
+    dc_layer_params->z_order = 1;
+    dc_layer_params->possible_video_fullscreen_letterboxing = true;
+    presenter_->ScheduleDCLayer(std::move(dc_layer_params));
+
+    PresentAndCheckSwapResult(gfx::SwapResult::SWAP_ACK);
+  }
+
+  // Swap chain size is set to onscreen content size.
+  DXGI_SWAP_CHAIN_DESC1 desc;
+  Microsoft::WRL::ComPtr<IDXGISwapChain1> swap_chain =
+      presenter_->GetLayerSwapChainForTesting(0);
+  ASSERT_TRUE(swap_chain);
+  EXPECT_HRESULT_SUCCEEDED(swap_chain->GetDesc1(&desc));
+  EXPECT_EQ(1800u, desc.Width);
+  EXPECT_EQ(1200u, desc.Height);
+
+  if (GetParam()) {
+    // Check desktop plane removal part 1.
+    Microsoft::WRL::ComPtr<IDXGIDecodeSwapChain> decode_swap_chain;
+    EXPECT_HRESULT_SUCCEEDED(
+        swap_chain->QueryInterface(IID_PPV_ARGS(&decode_swap_chain)));
+    // The dest size has been set to monitor size.
+    uint32_t dest_width, dest_height;
+    EXPECT_HRESULT_SUCCEEDED(
+        decode_swap_chain->GetDestSize(&dest_width, &dest_height));
+    EXPECT_EQ(1920u, dest_width);
+    EXPECT_EQ(1200u, dest_height);
+
+    // The target rect has been set to the onscreen content rect.
+    RECT target_rect;
+    EXPECT_HRESULT_SUCCEEDED(decode_swap_chain->GetTargetRect(&target_rect));
+    EXPECT_EQ(clip_rect, gfx::Rect(target_rect));
+  }
+
+  // Swap chain visual is clipped to the whole monitor size.
+  gfx::Transform visual_transform;
+  gfx::Point visual_offset;
+  gfx::Rect visual_clip_rect;
+  presenter_->GetSwapChainVisualInfoForTesting(
+      0, &visual_transform, &visual_offset, &visual_clip_rect);
+  if (GetParam()) {
+    // Check desktop plane removal part 2.
+    // In case DirectCompositionLetterboxVideoOptimization feature is enabled,
+    // DWM will do the swap chain positioning in case of overlay.
+    EXPECT_TRUE(visual_transform.IsIdentity());
+    // Visual clip rect has been set to monitor rect.
+    EXPECT_EQ(gfx::Rect(monitor_size), visual_clip_rect);
+  } else {
+    // In case DirectCompositionLetterboxVideoOptimization feature is disabled,
+    // keep the origin transform and clip rect from DCLayerOverlayParams.
+    EXPECT_EQ(quad_to_root_transform, visual_transform);
+    EXPECT_EQ(clip_rect, visual_clip_rect);
+  }
+}
 
 }  // namespace gl

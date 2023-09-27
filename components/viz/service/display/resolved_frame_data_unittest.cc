@@ -44,13 +44,14 @@ void AddRenderPassQuad(CompositorRenderPass* render_pass,
                        CompositorRenderPassId render_pass_id) {
   auto* sqs = render_pass->CreateAndAppendSharedQuadState();
   sqs->SetAll(gfx::Transform(), kOutputRect, kOutputRect, gfx::MaskFilterInfo(),
-              absl::nullopt, /*are_contents_opaque=*/false, 1,
-              SkBlendMode::kSrcOver, 0);
+              /*clip=*/absl::nullopt, /*contents_opaque=*/false, 1,
+              SkBlendMode::kSrcOver, /*sorting_context=*/0,
+              /*layer_id=*/0u, /*fast_rounded_corner=*/false);
   auto* quad =
       render_pass->CreateAndAppendDrawQuad<CompositorRenderPassDrawQuad>();
   quad->SetNew(sqs, kOutputRect, kOutputRect, render_pass_id,
-               kInvalidResourceId, gfx::RectF(), gfx::Size(), gfx::Vector2dF(),
-               gfx::PointF(), gfx::RectF(),
+               kInvalidResourceId, gfx::RectF(), gfx::Size(),
+               gfx::Vector2dF(1.0f, 1.0f), gfx::PointF(), gfx::RectF(),
                /*force_anti_aliasing_off=*/false,
                /*backdrop_filter_quality=*/1.0f);
 }

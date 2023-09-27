@@ -10,6 +10,7 @@
 #include "ash/wm/wm_metrics.h"
 #include "base/time/time.h"
 #include "chromeos/ui/frame/caption_buttons/snap_controller.h"
+#include "chromeos/ui/frame/multitask_menu/float_controller_base.h"
 #include "ui/display/display.h"
 #include "ui/display/display_observer.h"
 #include "ui/gfx/geometry/rect.h"
@@ -79,9 +80,6 @@ enum WMEventType {
   // See description of WM_EVENT_CYCLE_SNAP_PRIMARY.
   WM_EVENT_CYCLE_SNAP_SECONDARY,
 
-  // A user requested to center a window.
-  WM_EVENT_CENTER,
-
   // TODO(oshima): Investigate if this can be removed from ash.
   // Widget requested to show in inactive state.
   WM_EVENT_SHOW_INACTIVE,
@@ -93,12 +91,9 @@ enum WMEventType {
   // display disconnection or dragging.
   WM_EVENT_ADDED_TO_WORKSPACE,
 
-  // Bounds of the display has changed.
-  WM_EVENT_DISPLAY_BOUNDS_CHANGED,
-
-  // Bounds of the work area has changed. This will not occur when the work
-  // area has changed as a result of DISPLAY_BOUNDS_CHANGED.
-  WM_EVENT_WORKAREA_BOUNDS_CHANGED,
+  // A display metric has changed. See DisplayObserver::DisplayMetric for
+  // display related metrics.
+  WM_EVENT_DISPLAY_METRICS_CHANGED,
 
   // A user requested to pin a window.
   WM_EVENT_PIN,
@@ -110,19 +105,13 @@ enum WMEventType {
   // WM_EVENT_PIN but does not allow user to exit the mode by shortcut key.
   WM_EVENT_TRUSTED_PIN,
 
-  // A system ui area has changed. Currently, this includes the virtual
-  // keyboard and the message center. A change can be a change in visibility
-  // or bounds.
-  // TODO(oshima): Consider consolidating this into
-  // WM_EVENT_WORKAREA_BOUNDS_CHANGED
-  WM_EVENT_SYSTEM_UI_AREA_CHANGED,
-
   // A user requested to float a window.
   WM_EVENT_FLOAT,
 };
 
 class SetBoundsWMEvent;
 class DisplayMetricsChangedWMEvent;
+class WindowFloatWMEvent;
 class WindowSnapWMEvent;
 
 class ASH_EXPORT WMEvent {
@@ -161,11 +150,12 @@ class ASH_EXPORT WMEvent {
   // True if the event is a window snap event.
   bool IsSnapEvent() const;
 
-  // Returns `this` if it's a WindowSnapWMEvent, otherwise returns nullptr.
-  virtual const WindowSnapWMEvent* AsSnapEvent() const;
-
   // Utility methods to downcast to specific WMEvent types.
-  const DisplayMetricsChangedWMEvent* AsDisplayMetricsChangedWMEvent() const;
+  virtual const SetBoundsWMEvent* AsSetBoundsWMEvent() const;
+  virtual const DisplayMetricsChangedWMEvent* AsDisplayMetricsChangedWMEvent()
+      const;
+  virtual const WindowFloatWMEvent* AsFloatEvent() const;
+  virtual const WindowSnapWMEvent* AsSnapEvent() const;
 
  private:
   WMEventType type_;
@@ -185,6 +175,9 @@ class ASH_EXPORT SetBoundsWMEvent : public WMEvent {
 
   ~SetBoundsWMEvent() override;
 
+  // WMevent:
+  const SetBoundsWMEvent* AsSetBoundsWMEvent() const override;
+
   const gfx::Rect& requested_bounds() const { return requested_bounds_; }
 
   bool animate() const { return animate_; }
@@ -201,7 +194,6 @@ class ASH_EXPORT SetBoundsWMEvent : public WMEvent {
 };
 
 // A WMEvent sent when display metrics have changed.
-// TODO(oshima): Consolidate with WM_EVENT_WORKAREA_BOUNDS_CHANGED.
 class ASH_EXPORT DisplayMetricsChangedWMEvent : public WMEvent {
  public:
   explicit DisplayMetricsChangedWMEvent(int display_metrics);
@@ -212,14 +204,41 @@ class ASH_EXPORT DisplayMetricsChangedWMEvent : public WMEvent {
 
   ~DisplayMetricsChangedWMEvent() override;
 
+  bool display_bounds_changed() const {
+    return changed_metrics_ & display::DisplayObserver::DISPLAY_METRIC_BOUNDS;
+  }
+
   bool primary_changed() const {
     return changed_metrics_ & display::DisplayObserver::DISPLAY_METRIC_PRIMARY;
   }
 
-  uint32_t changed_metrics() const { return changed_metrics_; }
+  bool work_area_changed() const {
+    return changed_metrics_ &
+           display::DisplayObserver::DISPLAY_METRIC_WORK_AREA;
+  }
 
  private:
   const uint32_t changed_metrics_;
+};
+
+// An WMEvent to float a window.
+class ASH_EXPORT WindowFloatWMEvent : public WMEvent {
+ public:
+  explicit WindowFloatWMEvent(
+      chromeos::FloatStartLocation float_start_location);
+  WindowFloatWMEvent(const WindowFloatWMEvent&) = delete;
+  WindowFloatWMEvent& operator=(const WindowFloatWMEvent&) = delete;
+  ~WindowFloatWMEvent() override;
+
+  // WMEvent:
+  const WindowFloatWMEvent* AsFloatEvent() const override;
+
+  chromeos::FloatStartLocation float_start_location() const {
+    return float_start_location_;
+  }
+
+ private:
+  const chromeos::FloatStartLocation float_start_location_;
 };
 
 // An WMEvent to snap a window.

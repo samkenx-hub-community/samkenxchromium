@@ -9,7 +9,8 @@
 #include <vector>
 
 #include "mojo/public/cpp/bindings/pending_receiver.h"
-#include "services/webnn/public/mojom/webnn_service.mojom.h"
+#include "mojo/public/cpp/bindings/receiver.h"
+#include "services/webnn/public/mojom/webnn_context_provider.mojom.h"
 
 namespace webnn {
 
@@ -32,6 +33,19 @@ class WebNNContextProviderImpl : public mojom::WebNNContextProvider {
   // Called when a WebNNContextImpl has a connection error. After this call, it
   // is no longer safe to access |impl|.
   void OnConnectionError(WebNNContextImpl* impl);
+
+  // The test cases can override the context creating behavior by implementing
+  // this class and setting its instance by SetBackendForTesting().
+  class BackendForTesting {
+   public:
+    virtual void CreateWebNNContext(
+        std::vector<std::unique_ptr<WebNNContextImpl>>& context_impls,
+        WebNNContextProviderImpl* context_provider_impl,
+        mojom::CreateContextOptionsPtr options,
+        CreateWebNNContextCallback callback) = 0;
+  };
+
+  static void SetBackendForTesting(BackendForTesting* backend_for_testing);
 
  private:
   // mojom::WebNNContextProvider

@@ -41,7 +41,8 @@ class DesktopMediaTabListTest : public testing::Test {
     picker_views_ = std::make_unique<DesktopMediaPickerViews>();
 
     const std::u16string kAppName = u"foo";
-    DesktopMediaPicker::Params picker_params;
+    DesktopMediaPicker::Params picker_params{
+        DesktopMediaPicker::Params::RequestSource::kUnknown};
     picker_params.context = test_helper_.GetContext();
     picker_params.app_name = kAppName;
     picker_params.target_name = kAppName;
@@ -61,7 +62,7 @@ class DesktopMediaTabListTest : public testing::Test {
 
     tab_list_ =
         static_cast<DesktopMediaTabList*>(test_api_.GetSelectedListView());
-    list_ = tab_list_->list_;
+    list_ = tab_list_->table_;
     preview_ = tab_list_->preview_;
     preview_label_ = tab_list_->preview_label_;
 

@@ -7,7 +7,7 @@
 
 #include "third_party/blink/renderer/core/core_export.h"
 #include "third_party/blink/renderer/core/layout/ng/inline/ng_inline_items_data.h"
-#include "third_party/blink/renderer/core/layout/ng/svg/svg_inline_node_data.h"
+#include "third_party/blink/renderer/core/layout/svg/svg_inline_node_data.h"
 
 namespace blink {
 
@@ -23,6 +23,7 @@ struct CORE_EXPORT NGInlineNodeData final : NGInlineItemsData {
     return static_cast<TextDirection>(base_direction_);
   }
 
+  bool HasFloats() const { return has_floats_; }
   bool HasInitialLetterBox() const { return has_initial_letter_box_; }
   bool HasRuby() const { return has_ruby_; }
 
@@ -71,6 +72,8 @@ struct CORE_EXPORT NGInlineNodeData final : NGInlineItemsData {
 
   unsigned is_bidi_enabled_ : 1;
   unsigned base_direction_ : 1;  // TextDirection
+
+  unsigned has_floats_ : 1;
 
   // True if this node contains initial letter box. This value is used for
   // clearing. To control whether subsequent blocks overlap with initial

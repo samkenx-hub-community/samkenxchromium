@@ -6,8 +6,8 @@
 
 #import <UserNotifications/UserNotifications.h>
 
+#import "base/apple/foundation_util.h"
 #import "base/ios/ios_util.h"
-#import "base/mac/foundation_util.h"
 #import "base/metrics/histogram_functions.h"
 #import "base/metrics/user_metrics.h"
 #import "base/strings/sys_string_conversions.h"
@@ -24,7 +24,8 @@
 #import "ios/chrome/app/chrome_overlay_window.h"
 #import "ios/chrome/app/main_application_delegate_testing.h"
 #import "ios/chrome/app/main_controller.h"
-#import "ios/chrome/browser/commerce/push_notification/push_notification_feature.h"
+#import "ios/chrome/app/startup/app_launch_metrics.h"
+#import "ios/chrome/browser/commerce/model/push_notification/push_notification_feature.h"
 #import "ios/chrome/browser/crash_report/crash_keys_helper.h"
 #import "ios/chrome/browser/download/background_service/background_download_service_factory.h"
 #import "ios/chrome/browser/feature_engagement/tracker_factory.h"
@@ -39,10 +40,8 @@
 #import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/ui/keyboard/menu_builder.h"
 #import "ios/web/common/uikit_ui_util.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
+#import "ios/web/public/thread/web_task_traits.h"
+#import "ios/web/public/thread/web_thread.h"
 
 namespace {
 // The time delay after firstSceneWillEnterForeground: before checking for main
@@ -62,17 +61,15 @@ const int kMainIntentCheckDelay = 1;
   // The set of "scene sessions" that needs to be discarded. See
   // -application:didDiscardSceneSessions: for details.
   NSSet<UISceneSession*>* _sceneSessionsToDiscard;
-  // Delegate that handles delivered push notification workflow.
-  PushNotificationDelegate* _pushNotificationDelegate;
-  // YES if the application was able to successfully register itself with APNS
-  // and obtain its APNS token.
-  BOOL _didRegisterDeviceWithAPNS;
 }
 
 // YES if application:didFinishLaunchingWithOptions: was called. Used to
 // determine whether or not shutdown should be invoked from
 // applicationWillTerminate:.
 @property(nonatomic, assign) BOOL didFinishLaunching;
+
+// Delegate that handles delivered push notification workflow.
+@property(nonatomic, strong) PushNotificationDelegate* pushNotificationDelegate;
 
 @end
 
@@ -89,6 +86,7 @@ const int kMainIntentCheckDelay = 1;
         [[AppState alloc] initWithStartupInformation:_startupInformation];
     _pushNotificationDelegate =
         [[PushNotificationDelegate alloc] initWithAppState:_appState];
+    [PushNotificationUtil registerDeviceWithAPNS];
     [_mainController setAppState:_appState];
   }
   return self;
@@ -219,7 +217,7 @@ const int kMainIntentCheckDelay = 1;
   // application. In that case, the user must relaunch the application or must
   // restart the device before the system will launch the application and invoke
   // this function.
-  UIBackgroundFetchResult result = [_pushNotificationDelegate
+  UIBackgroundFetchResult result = [self.pushNotificationDelegate
       applicationWillProcessIncomingRemoteNotification:userInfo];
   if (completionHandler) {
     completionHandler(result);
@@ -230,10 +228,13 @@ const int kMainIntentCheckDelay = 1;
     didRegisterForRemoteNotificationsWithDeviceToken:(NSData*)deviceToken {
   // This method is invoked by iOS on the successful registration of the app to
   // APNS and retrieval of the device's APNS token.
-  _didRegisterDeviceWithAPNS = YES;
   base::UmaHistogramBoolean("IOS.PushNotification.APNSDeviceRegistration",
                             true);
-  [_pushNotificationDelegate applicationDidRegisterWithAPNS:deviceToken];
+  web::GetUIThreadTaskRunner({})->PostTask(
+      FROM_HERE, base::BindOnce(^{
+        [self.pushNotificationDelegate
+            applicationDidRegisterWithAPNS:deviceToken];
+      }));
 }
 
 - (void)application:(UIApplication*)application
@@ -289,9 +290,9 @@ const int kMainIntentCheckDelay = 1;
 
 - (void)sceneWillConnect:(NSNotification*)notification {
   UIWindowScene* scene =
-      base::mac::ObjCCastStrict<UIWindowScene>(notification.object);
+      base::apple::ObjCCastStrict<UIWindowScene>(notification.object);
   SceneDelegate* sceneDelegate =
-      base::mac::ObjCCastStrict<SceneDelegate>(scene.delegate);
+      base::apple::ObjCCastStrict<SceneDelegate>(scene.delegate);
 
   // Under some iOS 15 betas, Chrome gets scene connection events for some
   // system scene connections. To handle this, early return if the connecting
@@ -348,14 +349,14 @@ const int kMainIntentCheckDelay = 1;
           }
         }
         if (!appStartupFromExternalIntent) {
+          base::UmaHistogramEnumeration(kAppLaunchSource,
+                                        AppLaunchSource::APP_ICON);
           base::RecordAction(base::UserMetricsAction("IOSOpenByMainIntent"));
         } else {
           [self notifyFETAppStartupFromExternalIntent];
           base::RecordAction(base::UserMetricsAction("IOSOpenByViewIntent"));
         }
       });
-
-  [self registerDeviceForPushNotifications];
 
   [_appState applicationWillEnterForeground:UIApplication.sharedApplication
                             metricsMediator:_metricsMediator
@@ -392,13 +393,13 @@ const int kMainIntentCheckDelay = 1;
 #pragma mark - Testing methods
 
 + (AppState*)sharedAppState {
-  return base::mac::ObjCCast<MainApplicationDelegate>(
+  return base::apple::ObjCCast<MainApplicationDelegate>(
              [[UIApplication sharedApplication] delegate])
       .appState;
 }
 
 + (MainController*)sharedMainController {
-  return base::mac::ObjCCast<MainApplicationDelegate>(
+  return base::apple::ObjCCast<MainApplicationDelegate>(
              [[UIApplication sharedApplication] delegate])
       .mainController;
 }
@@ -408,16 +409,6 @@ const int kMainIntentCheckDelay = 1;
 }
 
 #pragma mark - Private
-
-// Registers the device with APNS to enable receiving push notifications to the
-// device. In addition, the function sets the UNUserNotificationCenter's
-// delegate which enables the application to display push notifications that
-// were received while Chrome was open.
-- (void)registerDeviceForPushNotifications {
-  if (!_didRegisterDeviceWithAPNS && IsPriceNotificationsEnabled()) {
-    [PushNotificationUtil registerDeviceWithAPNS];
-  }
-}
 
 // Notifies the Feature Engagement Tracker (FET) that the app has launched from
 // an external intent (i.e. through the share sheet), which is an eligibility

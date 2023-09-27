@@ -4,6 +4,7 @@
 
 #include "chrome/browser/lacros/lacros_url_handling.h"
 
+#include "base/check_is_test.h"
 #include "chrome/browser/ui/browser_navigator_params.h"
 #include "chrome/browser/ui/webui/chrome_web_ui_controller_factory.h"
 #include "chrome/common/webui_url_constants.h"
@@ -18,9 +19,9 @@ namespace lacros_url_handling {
 bool IsNavigationInterceptable(const NavigateParams& params,
                                const GURL& source_url) {
   const auto qualifier = PageTransitionGetQualifier(params.transition);
-  // True if this was triggered by the user through a bookmark, or typing into
-  // the Omnibox.
-  const bool is_omnibox_navigation =
+  // True if this was triggered by the user typing into the Omnibox or via
+  // crosapi (see BrowserServiceLacros::OpenUrlImpl).
+  const bool is_omnibox_or_crosapi_navigation =
       (PageTransitionCoreTypeIs(params.transition, ui::PAGE_TRANSITION_TYPED) ||
        PageTransitionCoreTypeIs(params.transition,
                                 ui::PAGE_TRANSITION_GENERATED)) &&
@@ -33,7 +34,7 @@ bool IsNavigationInterceptable(const NavigateParams& params,
   const bool is_system_navigation =
       PageTransitionCoreTypeIs(params.transition, ui::PAGE_TRANSITION_LINK) &&
       source_url.SchemeIs(content::kChromeUIScheme);
-  return (is_omnibox_navigation || is_system_navigation ||
+  return (is_omnibox_or_crosapi_navigation || is_system_navigation ||
           is_bookmark_navigation);
 }
 
@@ -53,17 +54,26 @@ bool IsUrlHandledByLacros(const GURL& url) {
 
 bool IsUrlAcceptedByAsh(const GURL& requested_url) {
   auto* init_params = chromeos::BrowserParamsProxy::Get();
-  if (!init_params->AcceptedInternalAshUrls().has_value()) {
-    // For Ash backwards compatibility allow URLs to be used which were
-    // allowed before crosapi passed allowed URLs.
-    return requested_url == GURL(chrome::kChromeUIOSSettingsURL)
-                                .DeprecatedGetOriginAsURL() ||
-           requested_url ==
-               GURL(chrome::kChromeUIFlagsURL).DeprecatedGetOriginAsURL();
+  const absl::optional<std::vector<GURL>>& accepted_urls =
+      init_params->AcceptedInternalAshUrls();
+  if (!accepted_urls.has_value()) {
+    CHECK_IS_TEST();
+    return false;
+  }
+
+  GURL sanitized_url =
+      crosapi::gurl_os_handler_utils::SanitizeAshURL(requested_url);
+
+  // For compatibility with older Ash.
+  // TOOD(neis): Remove in M118.
+  if (crosapi::gurl_os_handler_utils::IsUrlInList(sanitized_url,
+                                                  *accepted_urls)) {
+    return true;
   }
 
   return crosapi::gurl_os_handler_utils::IsUrlInList(
-      requested_url, *init_params->AcceptedInternalAshUrls());
+      crosapi::gurl_os_handler_utils::GetTargetURLFromLacrosURL(sanitized_url),
+      *accepted_urls);
 }
 
 bool NavigateInAsh(const GURL& url) {

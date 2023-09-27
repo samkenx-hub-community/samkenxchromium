@@ -181,8 +181,7 @@ class SyncerTest : public testing::Test,
     context_ = std::make_unique<SyncCycleContext>(
         mock_server_.get(), extensions_activity_.get(), listeners,
         debug_info_getter_.get(), model_type_registry_.get(),
-        "fake_invalidator_client_id", local_cache_guid(),
-        mock_server_->store_birthday(), "fake_bag_of_chips",
+        local_cache_guid(), mock_server_->store_birthday(), "fake_bag_of_chips",
         /*poll_interval=*/base::Minutes(30));
     auto syncer = std::make_unique<Syncer>(&cancelation_signal_);
     // The syncer is destroyed with the scheduler that owns it.
@@ -495,18 +494,18 @@ TEST_F(SyncerTest, CommitManyItemsInOneGo_PostBufferFail) {
   EXPECT_FALSE(SyncShareNudge());
 
   EXPECT_EQ(1U, mock_server_->commit_messages().size());
-  EXPECT_EQ(
-      SyncerError::SYNC_SERVER_ERROR,
-      cycle_->status_controller().model_neutral_state().commit_result.value());
+  ASSERT_EQ(
+      cycle_->status_controller().model_neutral_state().commit_result.type(),
+      SyncerError::Type::kHttpError);
 
   // Since the second batch fails, the third one should not even be gathered.
   EXPECT_EQ(2, GetProcessor(PREFERENCES)->GetLocalChangesCallCount());
 
   histogram_tester.ExpectBucketCount("Sync.CommitResponse.PREFERENCE",
-                                     SyncerError::SYNC_SERVER_ERROR,
+                                     SyncerErrorValueForUma::kSyncServerError,
                                      /*expected_count=*/1);
   histogram_tester.ExpectBucketCount("Sync.CommitResponse",
-                                     SyncerError::SYNC_SERVER_ERROR,
+                                     SyncerErrorValueForUma::kSyncServerError,
                                      /*expected_count=*/1);
 }
 

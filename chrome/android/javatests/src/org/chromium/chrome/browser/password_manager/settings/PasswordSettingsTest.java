@@ -6,6 +6,9 @@ package org.chromium.chrome.browser.password_manager.settings;
 
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.when;
 
 import static org.chromium.ui.test.util.ViewUtils.onViewWaiting;
@@ -34,7 +37,8 @@ import org.chromium.chrome.browser.preferences.Pref;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.settings.SettingsActivity;
 import org.chromium.chrome.browser.settings.SettingsActivityTestRule;
-import org.chromium.chrome.browser.sync.SyncService;
+import org.chromium.chrome.browser.sync.SyncServiceFactory;
+import org.chromium.chrome.test.AutomotiveContextWrapperTestRule;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.R;
 import org.chromium.components.browser_ui.settings.ChromeSwitchPreference;
@@ -42,6 +46,7 @@ import org.chromium.components.browser_ui.settings.PlaceholderSettingsForTest;
 import org.chromium.components.prefs.PrefService;
 import org.chromium.components.sync.ModelType;
 import org.chromium.components.sync.PassphraseType;
+import org.chromium.components.sync.SyncService;
 import org.chromium.components.user_prefs.UserPrefs;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
 
@@ -65,6 +70,10 @@ public class PasswordSettingsTest {
     public SettingsActivityTestRule<PasswordSettings> mPasswordSettingsActivityTestRule =
             new SettingsActivityTestRule<>(PasswordSettings.class);
 
+    @Rule
+    public AutomotiveContextWrapperTestRule mAutomotiveContextWrapperTestRule =
+            new AutomotiveContextWrapperTestRule();
+
     @Mock
     private PasswordCheck mPasswordCheck;
 
@@ -80,7 +89,8 @@ public class PasswordSettingsTest {
 
         // By default sync is off. Tests can override this later.
         setSyncServiceState(false, false);
-        TestThreadUtils.runOnUiThreadBlocking(() -> SyncService.overrideForTests(mMockSyncService));
+        TestThreadUtils.runOnUiThreadBlocking(
+                () -> SyncServiceFactory.setInstanceForTesting(mMockSyncService));
 
         // This initializes the browser, so some tests can do setup before PasswordSettings is
         // launched. ChromeTabbedActivityTestRule.startMainActivityOnBlankPage() is more commonly
@@ -104,7 +114,7 @@ public class PasswordSettingsTest {
     public void testResetListEmpty() {
         // Load the preferences, they should show the empty list.
         mTestHelper.startPasswordSettingsFromMainSettings(mPasswordSettingsActivityTestRule);
-        onViewWaiting(withText(R.string.password_settings_title));
+        onViewWaiting(withText(R.string.password_manager_settings_title));
 
         TestThreadUtils.runOnUiThreadBlocking(() -> {
             PasswordSettings savePasswordPreferences =
@@ -127,23 +137,23 @@ public class PasswordSettingsTest {
 
         final SettingsActivity settingsActivity = mTestHelper.startPasswordSettingsFromMainSettings(
                 mPasswordSettingsActivityTestRule);
-        onViewWaiting(withText(R.string.password_settings_title));
+        onViewWaiting(withText(R.string.password_manager_settings_title));
 
         TestThreadUtils.runOnUiThreadBlocking(() -> {
             PasswordSettings savedPasswordPrefs = mPasswordSettingsActivityTestRule.getFragment();
             ChromeSwitchPreference onOffSwitch =
                     (ChromeSwitchPreference) savedPasswordPrefs.findPreference(
                             PasswordSettings.PREF_SAVE_PASSWORDS_SWITCH);
-            Assert.assertTrue(onOffSwitch.isChecked());
+            assertTrue(onOffSwitch.isChecked());
 
             onOffSwitch.performClick();
-            Assert.assertFalse(getPrefService().getBoolean(Pref.CREDENTIALS_ENABLE_SERVICE));
+            assertFalse(getPrefService().getBoolean(Pref.CREDENTIALS_ENABLE_SERVICE));
             Assert.assertEquals(1,
                     RecordHistogram.getHistogramValueCountForTesting(
                             OFFER_TO_SAVE_PASSWORDS_HISTOGRAM, 0));
 
             onOffSwitch.performClick();
-            Assert.assertTrue(getPrefService().getBoolean(Pref.CREDENTIALS_ENABLE_SERVICE));
+            assertTrue(getPrefService().getBoolean(Pref.CREDENTIALS_ENABLE_SERVICE));
             Assert.assertEquals(1,
                     RecordHistogram.getHistogramValueCountForTesting(
                             OFFER_TO_SAVE_PASSWORDS_HISTOGRAM, 1));
@@ -154,13 +164,13 @@ public class PasswordSettingsTest {
         });
 
         mTestHelper.startPasswordSettingsFromMainSettings(mPasswordSettingsActivityTestRule);
-        onViewWaiting(withText(R.string.password_settings_title));
+        onViewWaiting(withText(R.string.password_manager_settings_title));
         TestThreadUtils.runOnUiThreadBlocking(() -> {
             PasswordSettings savedPasswordPrefs = mPasswordSettingsActivityTestRule.getFragment();
             ChromeSwitchPreference onOffSwitch =
                     (ChromeSwitchPreference) savedPasswordPrefs.findPreference(
                             PasswordSettings.PREF_SAVE_PASSWORDS_SWITCH);
-            Assert.assertFalse(onOffSwitch.isChecked());
+            assertFalse(onOffSwitch.isChecked());
         });
     }
 
@@ -253,6 +263,7 @@ public class PasswordSettingsTest {
     @SmallTest
     @Feature({"Preferences"})
     public void testAutoSignInCheckbox() {
+        mAutomotiveContextWrapperTestRule.setIsAutomotive(false);
         TestThreadUtils.runOnUiThreadBlocking(
                 () -> { getPrefService().setBoolean(Pref.CREDENTIALS_ENABLE_AUTOSIGNIN, true); });
 
@@ -264,15 +275,15 @@ public class PasswordSettingsTest {
             ChromeSwitchPreference onOffSwitch =
                     (ChromeSwitchPreference) passwordPrefs.findPreference(
                             PasswordSettings.PREF_AUTOSIGNIN_SWITCH);
-            Assert.assertTrue(onOffSwitch.isChecked());
+            assertTrue(onOffSwitch.isChecked());
 
             onOffSwitch.performClick();
-            Assert.assertFalse(getPrefService().getBoolean(Pref.CREDENTIALS_ENABLE_AUTOSIGNIN));
+            assertFalse(getPrefService().getBoolean(Pref.CREDENTIALS_ENABLE_AUTOSIGNIN));
             Assert.assertEquals(
                     1, RecordHistogram.getHistogramValueCountForTesting(AUTO_SIGNIN_HISTOGRAM, 0));
 
             onOffSwitch.performClick();
-            Assert.assertTrue(getPrefService().getBoolean(Pref.CREDENTIALS_ENABLE_AUTOSIGNIN));
+            assertTrue(getPrefService().getBoolean(Pref.CREDENTIALS_ENABLE_AUTOSIGNIN));
             Assert.assertEquals(
                     1, RecordHistogram.getHistogramValueCountForTesting(AUTO_SIGNIN_HISTOGRAM, 1));
 
@@ -287,7 +298,30 @@ public class PasswordSettingsTest {
             ChromeSwitchPreference onOffSwitch =
                     (ChromeSwitchPreference) passwordPrefs.findPreference(
                             PasswordSettings.PREF_AUTOSIGNIN_SWITCH);
-            Assert.assertFalse(onOffSwitch.isChecked());
+            assertFalse(onOffSwitch.isChecked());
+        });
+    }
+
+    /**
+     * Ensure that the "Auto Sign-in" switch in "Save Passwords" settings is not present on
+     * automotive.
+     */
+    @Test
+    @SmallTest
+    @Feature({"Preferences"})
+    public void testAutoSignInCheckboxIsNotPresentOnAutomotive() {
+        mAutomotiveContextWrapperTestRule.setIsAutomotive(true);
+
+        final SettingsActivity settingsActivity = mTestHelper.startPasswordSettingsFromMainSettings(
+                mPasswordSettingsActivityTestRule);
+
+        TestThreadUtils.runOnUiThreadBlocking(() -> {
+            PasswordSettings passwordPrefs = mPasswordSettingsActivityTestRule.getFragment();
+            ChromeSwitchPreference onOffSwitch =
+                    (ChromeSwitchPreference) passwordPrefs.findPreference(
+                            PasswordSettings.PREF_AUTOSIGNIN_SWITCH);
+            assertNull("There should be no autosignin switch.", onOffSwitch);
+            settingsActivity.finish();
         });
     }
 
@@ -330,6 +364,16 @@ public class PasswordSettingsTest {
         Assert.assertNotNull(PasswordCheckFactory.getPasswordCheckInstance());
         // Clean up the password check component.
         PasswordCheckFactory.destroy();
+    }
+
+    @Test
+    @MediumTest
+    @Feature({"Preferences"})
+    public void testLocalPasswordsMigrationSheetTriggeredWhenShouldShow() {
+        mTestHelper.setPasswordSourceWithMultipleEntries(PasswordSettingsTestHelper.GREEK_GODS);
+        assertFalse(mTestHelper.getHandler().wasShowWarningCalled());
+        mTestHelper.startPasswordSettingsFromMainSettings(mPasswordSettingsActivityTestRule);
+        assertTrue(mTestHelper.getHandler().wasShowWarningCalled());
     }
 
     private static PrefService getPrefService() {

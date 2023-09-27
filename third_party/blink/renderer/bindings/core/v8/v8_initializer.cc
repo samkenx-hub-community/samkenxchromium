@@ -78,6 +78,7 @@
 #include "third_party/blink/renderer/core/workers/worklet_global_scope.h"
 #include "third_party/blink/renderer/platform/bindings/active_script_wrappable_manager.h"
 #include "third_party/blink/renderer/platform/bindings/dom_wrapper_world.h"
+#include "third_party/blink/renderer/platform/bindings/exception_state.h"
 #include "third_party/blink/renderer/platform/bindings/source_location.h"
 #include "third_party/blink/renderer/platform/bindings/v8_dom_wrapper.h"
 #include "third_party/blink/renderer/platform/bindings/v8_per_context_data.h"
@@ -106,6 +107,12 @@
 #endif
 
 namespace blink {
+
+#if BUILDFLAG(IS_WIN)
+// Defined in v8_initializer_win.cc.
+bool FilterETWSessionByURLCallback(v8::Local<v8::Context> context,
+                                   const std::string& json_payload);
+#endif  // BUILDFLAG(IS_WIN)
 
 static String ExtractMessageForConsole(v8::Isolate* isolate,
                                        v8::Local<v8::Value> data) {
@@ -231,30 +238,6 @@ void V8Initializer::MessageHandlerInWorker(v8::Local<v8::Message> message,
   }
 }
 
-namespace {
-
-bool IsRejectedPromisesPerWindowAgent() {
-  static bool g_rejected_promises_per_window_agent =
-      base::FeatureList::IsEnabled(scheduler::kRejectedPromisesPerWindowAgent);
-  return g_rejected_promises_per_window_agent;
-}
-
-static RejectedPromises& RejectedPromisesOnMainThread() {
-  DCHECK(IsMainThread());
-  DCHECK(!IsRejectedPromisesPerWindowAgent());
-  DEFINE_STATIC_LOCAL(scoped_refptr<RejectedPromises>, rejected_promises,
-                      (RejectedPromises::Create()));
-  return *rejected_promises;
-}
-
-}  // namespace
-
-void V8Initializer::ReportRejectedPromisesOnMainThread() {
-  if (IsRejectedPromisesPerWindowAgent())
-    return;
-  RejectedPromisesOnMainThread().ProcessQueue();
-}
-
 static void PromiseRejectHandler(v8::PromiseRejectMessage data,
                                  RejectedPromises& rejected_promises,
                                  ScriptState* script_state) {
@@ -332,12 +315,8 @@ static void PromiseRejectHandlerInMainThread(v8::PromiseRejectMessage data) {
   if (!script_state->ContextIsValid())
     return;
 
-  RejectedPromises* rejected_promises;
-  if (IsRejectedPromisesPerWindowAgent()) {
-    rejected_promises = &window->GetAgent()->GetRejectedPromises();
-  } else {
-    rejected_promises = &RejectedPromisesOnMainThread();
-  }
+  RejectedPromises* rejected_promises =
+      &window->GetAgent()->GetRejectedPromises();
   PromiseRejectHandler(data, *rejected_promises, script_state);
 }
 
@@ -367,10 +346,14 @@ static void PromiseRejectHandlerInWorker(v8::PromiseRejectMessage data) {
 static void FailedAccessCheckCallbackInMainThread(v8::Local<v8::Object> holder,
                                                   v8::AccessType type,
                                                   v8::Local<v8::Value> data) {
-  // FIXME: We should modify V8 to pass in more contextual information (context,
-  // property, and object).
+  // FIXME: This is the access check callback of last resort. We should modify
+  // V8 to pass in more contextual information, so that we can build a full
+  // ExceptionState.
+  ExceptionState exception_state(
+      holder->GetIsolate(), ExceptionContextType::kUnknown, nullptr, nullptr);
   BindingSecurity::FailedAccessCheckFor(holder->GetIsolate(),
-                                        WrapperTypeInfo::Unwrap(data), holder);
+                                        WrapperTypeInfo::Unwrap(data), holder,
+                                        exception_state);
 }
 
 // Check whether Content Security Policy allows script execution.
@@ -405,8 +388,8 @@ TrustedTypesCodeGenerationCheck(v8::Local<v8::Context> context,
                                 v8::Local<v8::Value> source,
                                 bool is_code_like) {
   v8::Isolate* isolate = context->GetIsolate();
-  ExceptionState exception_state(isolate, ExceptionState::kExecutionContext,
-                                 "eval", "");
+  ExceptionState exception_state(
+      isolate, ExceptionContextType::kOperationInvoke, "eval", "");
 
   // If the input is not a string or TrustedScript, pass it through.
   if (!source->IsString() && !is_code_like &&
@@ -595,6 +578,25 @@ bool WasmGCEnabledCallback(v8::Local<v8::Context> context) {
   return RuntimeEnabledFeatures::WebAssemblyGCEnabled(execution_context);
 }
 
+bool WasmJSStringBuiltinsEnabledCallback(v8::Local<v8::Context> context) {
+  ExecutionContext* execution_context = ToExecutionContext(context);
+  if (!execution_context) {
+    return false;
+  }
+  return RuntimeEnabledFeatures::WebAssemblyJSStringBuiltinsEnabled(
+      execution_context);
+}
+
+bool JavaScriptCompileHintsMagicEnabledCallback(
+    v8::Local<v8::Context> context) {
+  ExecutionContext* execution_context = ToExecutionContext(context);
+  if (!execution_context) {
+    return false;
+  }
+  return RuntimeEnabledFeatures::JavaScriptCompileHintsMagicRuntimeEnabled(
+      execution_context);
+}
+
 v8::MaybeLocal<v8::Promise> HostImportModuleDynamically(
     v8::Local<v8::Context> context,
     v8::Local<v8::Data> v8_host_defined_options,
@@ -649,14 +651,24 @@ v8::MaybeLocal<v8::Promise> HostImportModuleDynamically(
           script_state->GetContext(), v8::Local<v8::Module>(),
           v8_import_assertions, /*v8_import_assertions_has_positions=*/false));
 
-  ReferrerScriptInfo referrer_info =
-      ReferrerScriptInfo::FromV8HostDefinedOptions(
-          context, v8_host_defined_options, referrer_resource_url);
-
-  auto* resolver = MakeGarbageCollected<ScriptPromiseResolver>(script_state);
-  resolver->SetPropertyName("import");
+  auto* resolver = MakeGarbageCollected<ScriptPromiseResolver>(
+      script_state,
+      ExceptionContext(ExceptionContextType::kUnknown, "", "import"));
   ScriptPromise promise = resolver->Promise();
-  modulator->ResolveDynamically(module_request, referrer_info, resolver);
+
+  String invalid_attribute_key;
+  if (module_request.HasInvalidImportAttributeKey(&invalid_attribute_key)) {
+    resolver->Reject(V8ThrowException::CreateTypeError(
+        script_state->GetIsolate(),
+        "Invalid attribute key \"" + invalid_attribute_key + "\"."));
+  } else {
+    ReferrerScriptInfo referrer_info =
+        ReferrerScriptInfo::FromV8HostDefinedOptions(
+            context, v8_host_defined_options, referrer_resource_url);
+
+    modulator->ResolveDynamically(module_request, referrer_info, resolver);
+  }
+
   return v8::Local<v8::Promise>::Cast(promise.V8Value());
 }
 
@@ -703,12 +715,20 @@ void InitializeV8Common(v8::Isolate* isolate) {
   isolate->SetWasmModuleCallback(WasmModuleOverride);
   isolate->SetWasmInstanceCallback(WasmInstanceOverride);
   isolate->SetWasmGCEnabledCallback(WasmGCEnabledCallback);
+  isolate->SetWasmImportedStringsEnabledCallback(
+      WasmJSStringBuiltinsEnabledCallback);
   isolate->SetSharedArrayBufferConstructorEnabledCallback(
       SharedArrayBufferConstructorEnabledCallback);
+  isolate->SetJavaScriptCompileHintsMagicEnabledCallback(
+      JavaScriptCompileHintsMagicEnabledCallback);
   isolate->SetHostImportModuleDynamicallyCallback(HostImportModuleDynamically);
   isolate->SetHostInitializeImportMetaObjectCallback(
       HostGetImportMetaProperties);
   isolate->SetMetricsRecorder(std::make_shared<V8MetricsRecorder>(isolate));
+
+#if BUILDFLAG(IS_WIN)
+  isolate->SetFilterETWSessionByURLCallback(FilterETWSessionByURLCallback);
+#endif  // BUILDFLAG(IS_WIN)
 
   V8ContextSnapshot::EnsureInterfaceTemplates(isolate);
 
@@ -856,8 +876,8 @@ void V8Initializer::InitializeMainThread(
     add_histogram_sample_callback = AddHistogramSample;
   }
   v8::Isolate* isolate = V8PerIsolateData::Initialize(
-      scheduler->V8TaskRunner(), snapshot_mode, create_histogram_callback,
-      add_histogram_sample_callback);
+      scheduler->V8TaskRunner(), scheduler->V8LowPriorityTaskRunner(),
+      snapshot_mode, create_histogram_callback, add_histogram_sample_callback);
   scheduler->SetV8Isolate(isolate);
 
   // ThreadState::isolate_ needs to be set before setting the EmbedderHeapTracer
@@ -899,12 +919,13 @@ void V8Initializer::InitializeMainThread(
 }
 
 // Stack size for workers is limited to 500KB because default stack size for
-// secondary threads is 512KB on Mac OS X. See GetDefaultThreadStackSize() in
-// base/threading/platform_thread_mac.mm for details.
-// For 32bit Windows, the stack region always starts with an odd number of
+// secondary threads is 512KB on macOS. See GetDefaultThreadStackSize() in
+// base/threading/platform_thread_apple.mm for details.
+//
+// For 32-bit Windows, the stack region always starts with an odd number of
 // reserved pages, followed by two guard pages, followed by the committed
 // memory for the stack, and the worker stack size need to be reduced
-// (crbug.com/1412239).
+// (https://crbug.com/1412239).
 #if defined(ARCH_CPU_32_BITS) && BUILDFLAG(IS_WIN)
 static const int kWorkerMaxStackSize = 492 * 1024;
 #else

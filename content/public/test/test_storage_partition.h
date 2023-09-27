@@ -148,6 +148,10 @@ class TestStoragePartition : public StoragePartition {
 
   AttributionDataModel* GetAttributionDataModel() override;
 
+  PrivateAggregationDataModel* GetPrivateAggregationDataModel() override;
+
+  CookieDeprecationLabelManager* GetCookieDeprecationLabelManager() override;
+
   void set_browsing_topics_site_data_manager(
       BrowsingTopicsSiteDataManager* manager) {
     browsing_topics_site_data_manager_ = manager;

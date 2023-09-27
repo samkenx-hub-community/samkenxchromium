@@ -36,8 +36,8 @@ class PasswordManagerDriver
     : public base::SupportsWeakPtr<PasswordManagerDriver> {
  public:
 #if BUILDFLAG(IS_ANDROID)
-  using ShowVirtualKeyboard =
-      base::StrongAlias<class ShowVirtualKeyboardTag, bool>;
+  using ToShowVirtualKeyboard =
+      base::StrongAlias<class ToShowVirtualKeyboardTag, bool>;
 #endif
 
   PasswordManagerDriver() = default;
@@ -96,7 +96,7 @@ class PasswordManagerDriver
   // Fill sheet) has been closed. Indicates whether the virtual keyboard should
   // be shown instead.
   virtual void KeyboardReplacingSurfaceClosed(
-      ShowVirtualKeyboard show_virtual_keyboard) {}
+      ToShowVirtualKeyboard show_virtual_keyboard) {}
 
   // Triggers form submission on the last interacted web input element.
   virtual void TriggerFormSubmission() {}
@@ -117,7 +117,7 @@ class PasswordManagerDriver
   // |generation_element_id|. It is critical for a11y to keep it updated
   // to make proper announcements.
   virtual void SetSuggestionAvailability(
-      autofill::FieldRendererId generation_element_id,
+      autofill::FieldRendererId element_id,
       const autofill::mojom::AutofillState state) = 0;
 
   // Returns the PasswordGenerationFrameHelper associated with this instance.
@@ -139,9 +139,6 @@ class PasswordManagerDriver
   // Returns true iff a popup can be shown on the behalf of the associated
   // frame.
   virtual bool CanShowAutofillUi() const = 0;
-
-  // Returns the ax tree id associated with this driver.
-  virtual ::ui::AXTreeID GetAxTreeId() const = 0;
 
   // Returns the frame ID of the frame associated with this driver.
   virtual int GetFrameId() const = 0;

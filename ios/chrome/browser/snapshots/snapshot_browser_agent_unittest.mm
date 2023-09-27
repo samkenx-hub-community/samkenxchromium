@@ -11,10 +11,6 @@
 #import "ios/chrome/browser/shared/model/browser_state/test_chrome_browser_state.h"
 #import "testing/platform_test.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 namespace {
 
 class SnapshotBrowserAgentTest : public PlatformTest {
@@ -30,14 +26,14 @@ class SnapshotBrowserAgentTest : public PlatformTest {
   std::unique_ptr<Browser> browser_;
 };
 
-TEST_F(SnapshotBrowserAgentTest, SnapshotCacheCreatedAfterSettingSessionID) {
+TEST_F(SnapshotBrowserAgentTest, SnapshotStorageCreatedAfterSettingSessionID) {
   SnapshotBrowserAgent::CreateForBrowser(browser_.get());
   SnapshotBrowserAgent* agent =
       SnapshotBrowserAgent::FromBrowser(browser_.get());
   EXPECT_NE(nullptr, agent);
-  EXPECT_EQ(nil, agent->snapshot_cache());
+  EXPECT_EQ(nil, agent->snapshot_storage());
   agent->SetSessionID([[NSUUID UUID] UUIDString]);
-  EXPECT_NE(nil, agent->snapshot_cache());
+  EXPECT_NE(nil, agent->snapshot_storage());
 }
 
 }  // anonymous namespace

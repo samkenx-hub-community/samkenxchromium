@@ -1,5 +1,5 @@
 This is a testharness.js-based test.
-Found 365 tests; 349 PASS, 16 FAIL, 0 TIMEOUT, 0 NOTRUN.
+Found 364 tests; 351 PASS, 13 FAIL, 0 TIMEOUT, 0 NOTRUN.
 PASS Loading data…
 PASS Origin parsing: <http://example	.
 org> against <http://example.org/foo/bar>
@@ -121,7 +121,7 @@ PASS Origin parsing: <http://example.com/foo%2zbar> without base
 PASS Origin parsing: <http://example.com/foo%2Â©zbar> without base
 PASS Origin parsing: <http://example.com/foo%41%7a> without base
 PASS Origin parsing: <http://example.com/foo	%91> without base
-FAIL Origin parsing: <http://example.com/foo%00%51> without base Failed to construct 'URL': Invalid URL
+PASS Origin parsing: <http://example.com/foo%00%51> without base
 PASS Origin parsing: <http://example.com/(%28:%3A%29)> without base
 PASS Origin parsing: <http://example.com/%3A%3a%3C%3c> without base
 PASS Origin parsing: <http://example.com/foo	bar> without base
@@ -265,8 +265,8 @@ PASS Origin parsing: <sc::a@example.net> without base
 PASS Origin parsing: <wow:%NBD> without base
 PASS Origin parsing: <wow:%1G> without base
 PASS Origin parsing: <wow:￿> without base
-FAIL Origin parsing: <http://example.com/U+d800𐟾U+dfff﷐﷏﷯ﷰ￾￿?U+d800𐟾U+dfff﷐﷏﷯ﷰ￾￿> without base Failed to construct 'URL': Invalid URL
-FAIL Origin parsing: <http://!"$&'()*+,-.;=_`{}~/> without base Failed to construct 'URL': Invalid URL
+PASS Origin parsing: <http://example.com/U+d800𐟾U+dfff﷐﷏﷯ﷰ￾￿?U+d800𐟾U+dfff﷐﷏﷯ﷰ￾￿> without base
+FAIL Origin parsing: <http://!"$&'()*+,-.;=_`{}~/> without base assert_equals: origin expected "http://!\"$&'()*+,-.;=_`{}~" but got "http://!\"$&'()%2A+,-.;=_`{}~"
 PASS Origin parsing: <sc://!"$%&'()*+,-.;=_`{}~/> without base
 PASS Origin parsing: <ftp://%e2%98%83> without base
 PASS Origin parsing: <https://%e2%98%83> without base
@@ -329,7 +329,6 @@ PASS Origin parsing: <blob:> without base
 PASS Origin parsing: <blob:blob:> without base
 PASS Origin parsing: <blob:blob:https://example.org/> without base
 PASS Origin parsing: <blob:about:blank> without base
-FAIL Origin parsing: <blob:file://host/path> without base assert_equals: origin expected "null" but got "file://"
 FAIL Origin parsing: <blob:ftp://host/path> without base assert_equals: origin expected "null" but got "ftp://host"
 FAIL Origin parsing: <blob:ws://example.org/> without base assert_equals: origin expected "null" but got "ws://example.org"
 FAIL Origin parsing: <blob:wss://example.org/> without base assert_equals: origin expected "null" but got "wss://example.org"
@@ -342,7 +341,7 @@ PASS Origin parsing: <wss:// !"$%&'()*+,-.;<=>@[]^_`{|}~@host/> without base
 PASS Origin parsing: <foo://joe: !"$%&'()*+,-.:;<=>@[\]^_`{|}~@host/> without base
 PASS Origin parsing: <wss://joe: !"$%&'()*+,-.:;<=>@[]^_`{|}~@host/> without base
 PASS Origin parsing: <foo://!"$%&'()*+,-.;=_`{}~/> without base
-FAIL Origin parsing: <wss://!"$&'()*+,-.;=_`{}~/> without base Failed to construct 'URL': Invalid URL
+FAIL Origin parsing: <wss://!"$&'()*+,-.;=_`{}~/> without base assert_equals: origin expected "wss://!\"$&'()*+,-.;=_`{}~" but got "wss://!\"$&'()%2A+,-.;=_`{}~"
 PASS Origin parsing: <foo://host/ !"$%&'()*+,-./:;<=>@[\]^_`{|}~> without base
 PASS Origin parsing: <wss://host/ !"$%&'()*+,-./:;<=>@[\]^_`{|}~> without base
 PASS Origin parsing: <foo://host/dir/? !"$%&'()*+,-./:;<=>?@[\]^_`{|}~> without base

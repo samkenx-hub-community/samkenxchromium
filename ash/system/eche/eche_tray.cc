@@ -170,6 +170,8 @@ std::unique_ptr<views::Button> CreateButton(
     const gfx::VectorIcon& icon,
     int message_id) {
   auto button = views::CreateVectorImageButton(std::move(callback));
+
+  // TODO(b/297056011): Remove Jelly flag checks post-M120.
   views::SetImageFromVectorIconWithColorId(
       button.get(), icon,
       chromeos::features::IsJellyrollEnabled()
@@ -233,18 +235,9 @@ EcheTray::EcheTray(Shelf* shelf)
       icon_(
           tray_container()->AddChildView(std::make_unique<views::ImageView>())),
       event_interceptor_(std::make_unique<EventInterceptor>(this)) {
-  SetPressedCallback(base::BindRepeating(
-      [](EcheTray* eche_tray, const ui::Event& event) {
-        // The `bubble_` is cached, so don't check for existence (which is the
-        // base TrayBackgroundView implementation), check for visibility to
-        // decide on whether to show or hide.
-        if (eche_tray->IsBubbleVisible()) {
-          eche_tray->HideBubble();
-          return;
-        }
-        eche_tray->ShowBubble();
-      },
-      base::Unretained(this)));
+  SetCallback(
+      base::BindRepeating(&EcheTray::OnButtonPressed, base::Unretained(this)));
+
   const int icon_padding = (kTrayItemSize - kIconSize) / 2;
 
   icon_->SetBorder(
@@ -254,8 +247,13 @@ EcheTray::EcheTray(Shelf* shelf)
   // Note: `ScreenLayoutObserver` starts observing at its constructor.
   observed_session_.Observe(Shell::Get()->session_controller());
   icon_->SetTooltipText(GetAccessibleNameForTray());
-  icon_->SetImage(ui::ImageModel::FromVectorIcon(kPhoneHubPhoneIcon,
-                                                 kColorAshIconColorPrimary));
+  if (chromeos::features::IsJellyEnabled()) {
+    UpdateTrayItemColor(is_active());
+  } else {
+    icon_->SetImage(ui::ImageModel::FromVectorIcon(kPhoneHubPhoneIcon,
+                                                   kColorAshIconColorPrimary));
+  }
+
   shelf_observation_.Observe(shelf);
   tablet_mode_observation_.Observe(Shell::Get()->tablet_mode_controller());
   shell_observer_.Observe(Shell::Get());
@@ -278,6 +276,14 @@ bool EcheTray::IsInitialized() const {
 
 void EcheTray::ClickedOutsideBubble() {
   //  Do nothing
+}
+
+void EcheTray::UpdateTrayItemColor(bool is_active) {
+  DCHECK(chromeos::features::IsJellyEnabled());
+  icon_->SetImage(ui::ImageModel::FromVectorIcon(
+      kPhoneHubPhoneIcon, is_active
+                              ? cros_tokens::kCrosSysSystemOnPrimaryContainer
+                              : cros_tokens::kCrosSysOnSurface));
 }
 
 std::u16string EcheTray::GetAccessibleNameForTray() {
@@ -330,7 +336,12 @@ void EcheTray::ShowBubble() {
 
   bubble_->GetBubbleWidget()->Show();
   bubble_->GetBubbleWidget()->Activate();
+
   bubble_->bubble_view()->SetVisible(true);
+  // Since this tray already initialize the bubble before showing it in
+  // `LoadBubble()`, we need to call `NotifyTrayBubbleOpen()` here.
+  bubble_->bubble_view()->NotifyTrayBubbleOpen();
+
   SetIsActive(true);
   web_view_->GetInitiallyFocusedView()->RequestFocus();
 
@@ -345,6 +356,9 @@ void EcheTray::ShowBubble() {
   bubble_->GetBubbleWidget()->GetNativeWindow()->AddPreTargetHandler(
       event_interceptor_.get());
   shelf()->UpdateAutoHideState();
+  if (bubble_shown_callback_) {
+    bubble_shown_callback_.Run(web_view_);
+  }
 }
 
 TrayBubbleView* EcheTray::GetBubbleView() {
@@ -373,11 +387,6 @@ void EcheTray::OnAnyBubbleVisibilityChanged(views::Widget* bubble_widget,
 
 bool EcheTray::CacheBubbleViewForHide() const {
   return true;
-}
-
-void EcheTray::OnThemeChanged() {
-  TrayBackgroundView::OnThemeChanged();
-  RefreshHeaderView();
 }
 
 std::u16string EcheTray::GetAccessibleNameForBubble() {
@@ -469,6 +478,13 @@ void EcheTray::OnConnectionStatusChanged(
         eche_connection_status_handler_->SetConnectionStatusForUi(
             eche_app::mojom::ConnectionStatus::kConnectionStatusFailed);
       }
+      // If the status is changed kConnectionStatusDisconnected before the
+      // timeout, manually cancel the timeout task. Also notify that the
+      // connection has been closed so that each component can clean up.
+      if (initializer_timeout_) {
+        initializer_timeout_.reset();
+        eche_connection_status_handler_->NotifyConnectionClosed();
+      }
       initializer_webview_.reset();
       break;
   }
@@ -504,8 +520,6 @@ void EcheTray::OnBackgroundConnectionTimeout() {
   // timeouts, this happens automatically for other failures.
   eche_connection_status_handler_->SetConnectionStatusForUi(
       eche_app::mojom::ConnectionStatus::kConnectionStatusFailed);
-  eche_connection_status_handler_->OnConnectionStatusChanged(
-      eche_app::mojom::ConnectionStatus::kConnectionStatusDisconnected);
   StartGracefulCloseInitializer();
 }
 
@@ -519,6 +533,17 @@ void EcheTray::StartGracefulCloseInitializer() {
   unload_timer_ = std::make_unique<base::DelayTimer>(
       FROM_HERE, kUnloadTimeoutDuration, this, &EcheTray::CloseInitializer);
   unload_timer_->Reset();  // Starts the timer.
+}
+
+void EcheTray::OnButtonPressed() {
+  // The `bubble_` is cached, so don't check for existence (which is the base
+  // TrayBackgroundView implementation), check for visibility to decide on
+  // whether to show or hide.
+  if (IsBubbleVisible()) {
+    HideBubble();
+    return;
+  }
+  ShowBubble();
 }
 
 void EcheTray::SetUrl(const GURL& url) {
@@ -573,8 +598,8 @@ bool EcheTray::LoadBubble(
   StartLoadingAnimation();
   auto* phone_hub_tray = GetPhoneHubTray();
   if (phone_hub_tray) {
-    phone_hub_tray->SetEcheIconActivationCallback(
-        base::BindRepeating(&EcheTray::PerformAction, base::Unretained(this)));
+    phone_hub_tray->SetEcheIconActivationCallback(base::BindRepeating(
+        &EcheTray::OnButtonPressed, base::Unretained(this)));
   }
   // Hide bubble first until the streaming is ready.
   HideBubble();
@@ -618,6 +643,14 @@ void EcheTray::SetGracefulGoBackCallback(
   graceful_go_back_callback_ = std::move(graceful_go_back_callback);
 }
 
+void EcheTray::SetBubbleShownCallback(
+    BubbleShownCallback bubble_shown_callback) {
+  if (!bubble_shown_callback) {
+    return;
+  }
+  bubble_shown_callback_ = std::move(bubble_shown_callback);
+}
+
 void EcheTray::HideBubble() {
   if (!bubble_)
     return;
@@ -625,6 +658,11 @@ void EcheTray::HideBubble() {
       event_interceptor_.get());
   SetIsActive(false);
   bubble_->bubble_view()->SetVisible(false);
+
+  // Since this tray just hide and do not destroy the bubble when closing, we
+  // need to call `NotifyTrayBubbleClosed()`.
+  bubble_->bubble_view()->NotifyTrayBubbleClosed();
+
   bubble_->GetBubbleWidget()->Deactivate();
   bubble_->GetBubbleWidget()->Hide();
   shelf()->UpdateAutoHideState();
@@ -683,23 +721,19 @@ void EcheTray::InitBubble(
     }
   }
   init_stream_timestamp_ = base::TimeTicks::Now();
-  TrayBubbleView::InitParams init_params;
-  init_params.delegate = GetWeakPtr();
+  TrayBubbleView::InitParams init_params = CreateInitParamsForTrayBubble(
+      /*tray=*/this, /*anchor_to_shelf_corner=*/true);
+
   // Note: The container id must be smaller than `kShellWindowId_ShelfContainer`
   // in order to let the notifications be shown on top of the eche window.
   init_params.parent_window = Shell::GetContainer(
       tray_container()->GetWidget()->GetNativeWindow()->GetRootWindow(),
       kShellWindowId_AlwaysOnTopContainer);
-  init_params.anchor_mode = TrayBubbleView::AnchorMode::kRect;
-  init_params.anchor_rect = GetAnchor();
-  init_params.insets = GetTrayBubbleInsets(GetBubbleWindowContainer());
-  init_params.shelf_alignment = shelf()->alignment();
   const gfx::Size eche_size = CalculateSizeForEche();
   init_params.preferred_width = eche_size.width();
   init_params.close_on_deactivate = false;
-  init_params.translucent = true;
   init_params.reroute_event_handler = false;
-  init_params.corner_radius = kTrayItemCornerRadius;
+
   phone_name_ = phone_name;
 
   auto bubble_view = std::make_unique<TrayBubbleView>(init_params);
@@ -894,29 +928,14 @@ EcheIconLoadingIndicatorView* EcheTray::GetLoadingIndicator() {
   return phone_hub_tray->eche_loading_indicator();
 }
 
-void EcheTray::RefreshHeaderView() {
-  if (!header_view_ || !bubble_) {
-    return;
-  }
-
-  auto* bubble_view = bubble_->GetBubbleView();
-  bubble_view->RemoveChildView(header_view_);
-  header_view_ = bubble_view->AddChildViewAt(
-      CreateBubbleHeaderView(phone_name_), /* index= */ 0);
-
-  static_cast<views::BoxLayout*>(bubble_view->GetLayoutManager())
-      ->SetFlexForView(header_view_, 0, true);
-  static_cast<views::BoxLayout*>(bubble_view->GetLayoutManager())
-      ->set_inside_border_insets(kBubblePadding);
-}
-
 void EcheTray::UpdateEcheSizeAndBubbleBounds() {
   if (!bubble_ || !bubble_->GetBubbleView())
     return;
   gfx::Size eche_size = CalculateSizeForEche();
   bubble_->GetBubbleView()->SetPreferredWidth(eche_size.width());
   web_view_->SetPreferredSize(eche_size);
-  bubble_->GetBubbleView()->ChangeAnchorRect(GetAnchor());
+  bubble_->GetBubbleView()->ChangeAnchorRect(
+      shelf()->GetSystemTrayAnchorRect());
 }
 
 void EcheTray::OnDisplayConfigurationChanged() {
@@ -963,10 +982,6 @@ void EcheTray::OnStreamOrientationChanged(bool is_landscape) {
 
   is_landscape_ = is_landscape;
   UpdateEcheSizeAndBubbleBounds();
-}
-
-gfx::Rect EcheTray::GetAnchor() {
-  return shelf()->GetSystemTrayAnchorRect();
 }
 
 // TODO(b/234848974): Try to use View::AddAccelerator for the bubble view

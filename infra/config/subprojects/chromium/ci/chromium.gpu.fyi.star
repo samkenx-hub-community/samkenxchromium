@@ -21,6 +21,7 @@ ci.defaults.set(
     reclient_instance = reclient.instance.DEFAULT_TRUSTED,
     reclient_jobs = reclient.jobs.DEFAULT,
     service_account = ci.gpu.SERVICE_ACCOUNT,
+    shadow_service_account = ci.gpu.SHADOW_SERVICE_ACCOUNT,
     thin_tester_cores = 2,
 )
 
@@ -85,6 +86,7 @@ ci.thin_tester(
         category = "Android|P32|NVDA",
         short_name = "STV",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -101,7 +103,7 @@ ci.thin_tester(
         chromium_config = builder_config.chromium_config(
             config = "android",
             apply_configs = [
-                "download_vr_test_apks",
+                "download_xr_test_apks",
             ],
             target_platform = builder_config.target_platform.ANDROID,
         ),
@@ -113,6 +115,7 @@ ci.thin_tester(
         category = "Android|M64|QCOM",
         short_name = "N5X",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -138,6 +141,7 @@ ci.thin_tester(
         category = "Android|P32|QCOM",
         short_name = "P2",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -163,6 +167,7 @@ ci.thin_tester(
         category = "Android|R32|QCOM",
         short_name = "P4",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -180,7 +185,7 @@ ci.thin_tester(
         chromium_config = builder_config.chromium_config(
             config = "android",
             apply_configs = [
-                "download_vr_test_apks",
+                "download_xr_test_apks",
             ],
             target_platform = builder_config.target_platform.ANDROID,
         ),
@@ -193,8 +198,10 @@ ci.thin_tester(
         category = "Android|S64|ARM",
         short_name = "P6",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
+# TODO(crbug.com/1485734): Add a trybot for this builder when there's capacity.
 ci.thin_tester(
     name = "Android FYI Release (Samsung A13)",
     triggered_by = ["GPU FYI Android arm Builder"],
@@ -218,8 +225,10 @@ ci.thin_tester(
         category = "Android|S32|ARM",
         short_name = "A13",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
+# TODO(crbug.com/1485734): Add a trybot for this builder when there's capacity.
 ci.thin_tester(
     name = "Android FYI Release (Samsung A23)",
     triggered_by = ["GPU FYI Android arm Builder"],
@@ -243,6 +252,7 @@ ci.thin_tester(
         category = "Android|S32|QCOM",
         short_name = "A23",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.gpu.linux_builder(
@@ -273,6 +283,7 @@ ci.gpu.linux_builder(
         category = "ChromeOS|LLVM",
         short_name = "gen",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
     # Runs a lot of tests + VMs are slower than real hardware, so increase the
     # timeout.
     execution_timeout = 8 * time.hour,
@@ -308,6 +319,7 @@ ci.gpu.linux_builder(
         category = "ChromeOS|ARM",
         short_name = "kvn",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
     reclient_jobs = reclient.jobs.HIGH_JOBS_FOR_CI,
 )
 
@@ -348,6 +360,7 @@ ci.gpu.linux_builder(
         category = "ChromeOS|ARM",
         short_name = "kvn",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
     # Given the capacity constraints, the default 6 hour timeout is not
     # sufficient.
     execution_timeout = 12 * time.hour,
@@ -364,6 +377,7 @@ ci.gpu.linux_builder(
     console_view_entry = consoles.console_view_entry(
         short_name = "flk",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
     properties = {
         "scripts": [
             {
@@ -407,6 +421,7 @@ ci.gpu.linux_builder(
         category = "Android|Builder",
         short_name = "arm",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
     reclient_jobs = reclient.jobs.HIGH_JOBS_FOR_CI,
 )
 
@@ -423,7 +438,7 @@ ci.gpu.linux_builder(
         chromium_config = builder_config.chromium_config(
             config = "android",
             apply_configs = [
-                "download_vr_test_apks",
+                "download_xr_test_apks",
             ],
             target_platform = builder_config.target_platform.ANDROID,
         ),
@@ -435,6 +450,7 @@ ci.gpu.linux_builder(
         category = "Android|Builder",
         short_name = "arm64",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
     reclient_jobs = reclient.jobs.HIGH_JOBS_FOR_CI,
 )
 
@@ -457,6 +473,7 @@ ci.gpu.linux_builder(
         category = "Lacros|Builder",
         short_name = "rel",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
     reclient_jobs = reclient.jobs.HIGH_JOBS_FOR_CI,
 )
 
@@ -481,6 +498,7 @@ ci.gpu.linux_builder(
         category = "Linux|Builder",
         short_name = "rel",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
     reclient_jobs = reclient.jobs.HIGH_JOBS_FOR_CI,
 )
 
@@ -503,6 +521,7 @@ ci.gpu.linux_builder(
         category = "Linux|Builder",
         short_name = "dbg",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
     reclient_jobs = reclient.jobs.HIGH_JOBS_FOR_CI,
 )
 
@@ -526,6 +545,7 @@ ci.gpu.linux_builder(
         category = "Linux",
         short_name = "tsn",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.gpu.mac_builder(
@@ -548,6 +568,7 @@ ci.gpu.mac_builder(
         category = "Mac|Builder",
         short_name = "rel",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.gpu.mac_builder(
@@ -570,6 +591,7 @@ ci.gpu.mac_builder(
         category = "Mac|Builder",
         short_name = "asn",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.gpu.mac_builder(
@@ -592,6 +614,7 @@ ci.gpu.mac_builder(
         category = "Mac|Builder",
         short_name = "dbg",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.gpu.mac_builder(
@@ -615,6 +638,7 @@ ci.gpu.mac_builder(
         category = "Mac|Builder",
         short_name = "arm",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -639,6 +663,7 @@ ci.thin_tester(
         category = "Lacros|AMD",
         short_name = "amd",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -663,6 +688,7 @@ ci.thin_tester(
         category = "Lacros|Intel",
         short_name = "int",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -687,6 +713,7 @@ ci.thin_tester(
         category = "Linux|Nvidia",
         short_name = "dbg",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -713,6 +740,7 @@ ci.thin_tester(
     #     short_name = "exp",
     # ),
     list_view = "chromium.gpu.experimental",
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -763,6 +791,7 @@ ci.thin_tester(
         category = "Linux|Nvidia",
         short_name = "rel",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -787,6 +816,7 @@ ci.thin_tester(
         category = "Linux|AMD",
         short_name = "rel",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -811,6 +841,7 @@ ci.thin_tester(
         category = "Linux|Intel",
         short_name = "rel",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -836,6 +867,7 @@ ci.thin_tester(
         category = "Mac|Intel",
         short_name = "dbg",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -857,11 +889,12 @@ ci.thin_tester(
         run_tests_serially = True,
     ),
     # Uncomment this entry when this experimental tester is actually in use.
-    console_view_entry = consoles.console_view_entry(
-        category = "Mac|Apple",
-        short_name = "exp",
-    ),
+    # console_view_entry = consoles.console_view_entry(
+    #     category = "Mac|Apple",
+    #     short_name = "exp",
+    # ),
     list_view = "chromium.gpu.experimental",
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -889,6 +922,7 @@ ci.thin_tester(
     #     short_name = "exp",
     # ),
     list_view = "chromium.gpu.experimental",
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -916,6 +950,7 @@ ci.thin_tester(
     #     short_name = "exp",
     # ),
     list_view = "chromium.gpu.experimental",
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -943,9 +978,9 @@ ci.thin_tester(
     #     short_name = "exp",
     # ),
     list_view = "chromium.gpu.experimental",
+    contact_team_email = "chrome-gpu-infra@google.com",
     # This bot has one machine backing its tests at the moment.
     # If it gets more, this can be removed.
-    # See crbug.com/853307 for more context.
     execution_timeout = 12 * time.hour,
 )
 
@@ -973,6 +1008,7 @@ ci.thin_tester(
         category = "Mac|Apple",
         short_name = "m1",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -999,6 +1035,7 @@ ci.thin_tester(
         category = "Mac|Apple",
         short_name = "m2",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -1024,6 +1061,7 @@ ci.thin_tester(
         category = "Mac|Intel",
         short_name = "asn",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -1049,6 +1087,7 @@ ci.thin_tester(
         category = "Mac|Intel",
         short_name = "rel",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -1074,6 +1113,7 @@ ci.thin_tester(
         category = "Mac|AMD|Retina",
         short_name = "asn",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -1099,6 +1139,7 @@ ci.thin_tester(
         category = "Mac|AMD|Retina",
         short_name = "dbg",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -1124,6 +1165,7 @@ ci.thin_tester(
         category = "Mac|AMD|Retina",
         short_name = "rel",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -1149,6 +1191,7 @@ ci.thin_tester(
         category = "Mac|Nvidia",
         short_name = "rel",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -1174,6 +1217,7 @@ ci.thin_tester(
         category = "Mac|AMD|Pro",
         short_name = "rel",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -1198,6 +1242,7 @@ ci.thin_tester(
         category = "Windows|10|x64|Nvidia",
         short_name = "dbg",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -1222,6 +1267,7 @@ ci.thin_tester(
         category = "Windows|10|x64|Nvidia|dx12vk",
         short_name = "dbg",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -1246,6 +1292,7 @@ ci.thin_tester(
         category = "Windows|10|x64|Nvidia|dx12vk",
         short_name = "rel",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -1272,6 +1319,7 @@ ci.thin_tester(
     #     short_name = "exp",
     # ),
     list_view = "chromium.gpu.experimental",
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -1322,6 +1370,7 @@ ci.thin_tester(
         category = "Windows|10|x64|AMD",
         short_name = "rel",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -1346,6 +1395,7 @@ ci.thin_tester(
         category = "Windows|10|x64|Intel",
         short_name = "rel",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -1370,6 +1420,7 @@ ci.thin_tester(
         category = "Windows|10|x64|Nvidia",
         short_name = "rel",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -1394,6 +1445,7 @@ ci.thin_tester(
         category = "Windows|10|x64|Nvidia",
         short_name = "xr",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 ci.thin_tester(
@@ -1418,6 +1470,7 @@ ci.thin_tester(
         category = "Windows|10|x86|Nvidia",
         short_name = "rel",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
 )
 
 gpu_fyi_windows_builder(
@@ -1461,6 +1514,7 @@ gpu_fyi_windows_builder(
         category = "Windows|Builder|Release",
         short_name = "x64",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
     reclient_jobs = reclient.jobs.LOW_JOBS_FOR_CI,
 )
 
@@ -1505,6 +1559,7 @@ gpu_fyi_windows_builder(
         category = "Windows|Builder|dx12vk",
         short_name = "rel",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
     reclient_jobs = reclient.jobs.LOW_JOBS_FOR_CI,
 )
 
@@ -1527,6 +1582,7 @@ gpu_fyi_windows_builder(
         category = "Windows|Builder|dx12vk",
         short_name = "dbg",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
     reclient_jobs = reclient.jobs.LOW_JOBS_FOR_CI,
 )
 
@@ -1556,5 +1612,6 @@ gpu_fyi_windows_builder(
         category = "Windows|Builder|XR",
         short_name = "x64",
     ),
+    contact_team_email = "chrome-gpu-infra@google.com",
     reclient_jobs = reclient.jobs.LOW_JOBS_FOR_CI,
 )

@@ -6,8 +6,6 @@ package org.chromium.chrome.browser.history;
 
 import android.os.Bundle;
 
-import androidx.annotation.VisibleForTesting;
-
 import org.chromium.base.IntentUtils;
 import org.chromium.chrome.browser.IntentHandler;
 import org.chromium.chrome.browser.SnackbarActivity;
@@ -33,9 +31,11 @@ public class HistoryActivity extends SnackbarActivity {
                 getIntent(), HistoryClustersConstants.EXTRA_SHOW_HISTORY_CLUSTERS, false);
         String historyClustersQuery = IntentUtils.safeGetStringExtra(
                 getIntent(), HistoryClustersConstants.EXTRA_HISTORY_CLUSTERS_QUERY);
-        mHistoryManager = new HistoryManager(this, true, getSnackbarManager(), isIncognito,
+        Profile profile = Profile.getLastUsedRegularProfile();
+        mHistoryManager = new HistoryManager(this, true, getSnackbarManager(),
+                isIncognito ? profile.getPrimaryOTRProfile(true) : profile,
                 /* Supplier<Tab>= */ null, showHistoryClustersImmediately, historyClustersQuery,
-                new BrowsingHistoryBridge(Profile.getLastUsedRegularProfile()));
+                new BrowsingHistoryBridge(profile));
         setContentView(mHistoryManager.getView());
         if (BackPressManager.isSecondaryActivityEnabled()) {
             BackPressHelper.create(
@@ -53,7 +53,6 @@ public class HistoryActivity extends SnackbarActivity {
         super.onDestroy();
     }
 
-    @VisibleForTesting
     HistoryManager getHistoryManagerForTests() {
         return mHistoryManager;
     }

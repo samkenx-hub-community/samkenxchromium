@@ -29,6 +29,7 @@
 #include "base/strings/string_util.h"
 #include "base/test/bind.h"
 #include "base/test/scoped_feature_list.h"
+#include "chromeos/constants/chromeos_features.h"
 
 namespace ash {
 
@@ -41,7 +42,8 @@ class AppListItemViewPixelTest
                      /*use_dense_ui=*/bool,
                      /*use_rtl=*/bool,
                      /*is_new_install=*/bool,
-                     /*has_notification=*/bool>> {
+                     /*has_notification=*/bool,
+                     /*jelly_enabled=*/bool>> {
  public:
   // AshTestBase:
   absl::optional<pixel_test::InitParams> CreatePixelTestInitParams()
@@ -53,6 +55,10 @@ class AppListItemViewPixelTest
 
   // AshTestBase:
   void SetUp() override {
+    scoped_feature_list_.InitWithFeatureStates(
+        {{app_list_features::kDragAndDropRefactor, use_drag_drop_refactor()},
+         {chromeos::features::kJelly, jelly_enabled()}});
+
     AshTestBase::SetUp();
 
     // As per `app_list_config_provider.cc`, dense values are used for screens
@@ -64,10 +70,6 @@ class AppListItemViewPixelTest
           std::make_unique<DragDropControllerTestApi>(drag_controller);
       drag_controller->SetDisableNestedLoopForTesting(true);
     }
-
-    scoped_feature_list_.InitWithFeatureStates(
-        {{app_list_features::kDragAndDropRefactor, use_drag_drop_refactor()},
-         {features::kAppCollectionFolderRefresh, use_folder_icon_refresh()}});
   }
 
   void TearDown() override {
@@ -123,13 +125,16 @@ class AppListItemViewPixelTest
   }
 
   std::string GenerateScreenshotName() {
-    std::string stringified_params = base::JoinString(
-        {use_tablet_mode() ? "tablet_mode" : "clamshell_mode",
-         use_dense_ui() ? "dense_ui" : "regular_ui", use_rtl() ? "rtl" : "ltr",
-         is_new_install() ? "new_install=true" : "new_install=false",
-         has_notification() ? "has_notification=true"
-                            : "has_notification=false"},
-        "|");
+    std::vector<std::string> parameters = {
+        use_tablet_mode() ? "tablet_mode" : "clamshell_mode",
+        use_dense_ui() ? "dense_ui" : "regular_ui", use_rtl() ? "rtl" : "ltr",
+        is_new_install() ? "new_install=true" : "new_install=false",
+        has_notification() ? "has_notification=true"
+                           : "has_notification=false"};
+    if (jelly_enabled()) {
+      parameters.push_back("jelly_enabled");
+    }
+    std::string stringified_params = base::JoinString(parameters, "|");
     return base::JoinString({"app_list_item_view", stringified_params}, ".");
   }
 
@@ -142,10 +147,13 @@ class AppListItemViewPixelTest
   }
 
   size_t GetRevisionNumber() {
-    size_t base_revision_number = 3;
-    if (use_folder_icon_refresh()) {
-      ++base_revision_number;
+    if (jelly_enabled()) {
+      // Revision numbers reset with Jelly.
+      return 5;
     }
+
+    size_t base_revision_number = 8;
+
     if (use_drag_drop_refactor()) {
       ++base_revision_number;
     }
@@ -160,6 +168,7 @@ class AppListItemViewPixelTest
   bool use_rtl() const { return std::get<4>(GetParam()); }
   bool is_new_install() const { return std::get<5>(GetParam()); }
   bool has_notification() const { return std::get<6>(GetParam()); }
+  bool jelly_enabled() const { return std::get<7>(GetParam()); }
 
  private:
   std::unique_ptr<DragDropControllerTestApi> drag_drop_controller_test_api_;
@@ -175,20 +184,16 @@ INSTANTIATE_TEST_SUITE_P(
                      /*use_dense_ui=*/testing::Bool(),
                      /*use_rtl=*/testing::Bool(),
                      /*is_new_install=*/testing::Bool(),
-                     /*has_notification=*/testing::Bool()));
+                     /*has_notification=*/testing::Bool(),
+                     /*jelly_enabled=*/testing::Bool()));
 
 TEST_P(AppListItemViewPixelTest, AppListItemView) {
-  // Folder icon refresh doesn't change the app list item view.
-  if (use_folder_icon_refresh()) {
-    return;
-  }
   CreateAppListItem("App");
   CreateAppListItem("App with a loooooooong name");
 
   ShowAppList();
-
   EXPECT_TRUE(GetPixelDiffer()->CompareUiComponentsOnPrimaryScreen(
-      GenerateScreenshotName(), /*revision_number=*/1, GetItemViewAt(0),
+      GenerateScreenshotName(), /*revision_number=*/3, GetItemViewAt(0),
       GetItemViewAt(1)));
 }
 
@@ -196,7 +201,7 @@ TEST_P(AppListItemViewPixelTest, AppListItemView) {
 TEST_P(AppListItemViewPixelTest, AppListFolderItemsLayoutInIcon) {
   // Skip the case where the apps are newly installed as it doesn't change the
   // folder icons.
-  if (is_new_install()) {
+  if (!use_folder_icon_refresh() || is_new_install()) {
     return;
   }
 
@@ -206,21 +211,21 @@ TEST_P(AppListItemViewPixelTest, AppListFolderItemsLayoutInIcon) {
   AppListConfigProvider::Get().ResetForTesting();
 
   // To test the item counter on folder icons, set the maximum number of the
-  // items in a folder to 5. For legacy folder icons, set the max items to 4 to
-  // reduce the revisions.
-  const int max_items_in_folder = use_folder_icon_refresh() ? 5 : 4;
+  // items in a folder to 5.
+  const int max_items_in_folder = 5;
   CreateFoldersContainingDifferentNumOfItems(max_items_in_folder);
   ShowAppList();
 
-  if (use_folder_icon_refresh()) {
+  if (jelly_enabled()) {
     EXPECT_TRUE(GetPixelDiffer()->CompareUiComponentsOnPrimaryScreen(
-        GenerateScreenshotName(), /*revision_number=*/2, GetItemViewAt(0),
+        GenerateScreenshotName(), /*revision_number=*/4, GetItemViewAt(0),
         GetItemViewAt(1), GetItemViewAt(2), GetItemViewAt(3),
         GetItemViewAt(4)));
   } else {
     EXPECT_TRUE(GetPixelDiffer()->CompareUiComponentsOnPrimaryScreen(
-        GenerateScreenshotName(), /*revision_number=*/1, GetItemViewAt(0),
-        GetItemViewAt(1), GetItemViewAt(2), GetItemViewAt(3)));
+        GenerateScreenshotName(), /*revision_number=*/5, GetItemViewAt(0),
+        GetItemViewAt(1), GetItemViewAt(2), GetItemViewAt(3),
+        GetItemViewAt(4)));
   }
 }
 
@@ -228,7 +233,7 @@ TEST_P(AppListItemViewPixelTest, AppListFolderItemsLayoutInIcon) {
 TEST_P(AppListItemViewPixelTest, AppListFolderIconExtendedState) {
   // Skip the case where the apps are newly installed as it doesn't change the
   // folder icons.
-  if (is_new_install()) {
+  if (!use_folder_icon_refresh() || is_new_install()) {
     return;
   }
 
@@ -238,9 +243,8 @@ TEST_P(AppListItemViewPixelTest, AppListFolderIconExtendedState) {
   AppListConfigProvider::Get().ResetForTesting();
 
   // To test the item counter on folder icons, set the maximum number of the
-  // items in a folder to 5. For legacy folder icons, set the max items to 4 to
-  // reduce the revisions.
-  const int max_items_in_folder = use_folder_icon_refresh() ? 5 : 4;
+  // items in a folder to 5.
+  const int max_items_in_folder = 5;
   CreateFoldersContainingDifferentNumOfItems(max_items_in_folder);
   CreateAppListItem("App");
   ShowAppList();
@@ -257,15 +261,16 @@ TEST_P(AppListItemViewPixelTest, AppListFolderIconExtendedState) {
     GetItemViewAt(i)->OnDraggedViewEnter();
   }
 
-  if (use_folder_icon_refresh()) {
+  if (jelly_enabled()) {
     EXPECT_TRUE(GetPixelDiffer()->CompareUiComponentsOnPrimaryScreen(
-        GenerateScreenshotName(), /*revision_number=*/2, GetItemViewAt(0),
+        GenerateScreenshotName(), /*revision_number=*/4, GetItemViewAt(0),
         GetItemViewAt(1), GetItemViewAt(2), GetItemViewAt(3),
         GetItemViewAt(4)));
   } else {
     EXPECT_TRUE(GetPixelDiffer()->CompareUiComponentsOnPrimaryScreen(
-        GenerateScreenshotName(), /*revision_number=*/1, GetItemViewAt(0),
-        GetItemViewAt(1), GetItemViewAt(2), GetItemViewAt(3)));
+        GenerateScreenshotName(), /*revision_number=*/5, GetItemViewAt(0),
+        GetItemViewAt(1), GetItemViewAt(2), GetItemViewAt(3),
+        GetItemViewAt(4)));
   }
 
   // Reset the states.
@@ -281,7 +286,7 @@ TEST_P(AppListItemViewPixelTest, AppListFolderIconExtendedState) {
 TEST_P(AppListItemViewPixelTest, DraggedAppListFolderIcon) {
   // Skip the case where the apps are newly installed or have notifications as
   // they don't change the folder icons.
-  if (is_new_install() || has_notification()) {
+  if (!use_folder_icon_refresh() || is_new_install() || has_notification()) {
     return;
   }
 
@@ -310,48 +315,49 @@ TEST_P(AppListItemViewPixelTest, DraggedAppListFolderIcon) {
   const size_t revision_number = GetRevisionNumber();
 
   auto verify_folder_widget =
-      base::BindLambdaForTesting([&](int number_of_items) {
+      [&](int number_of_items) {
         std::string filename =
             base::NumberToString(number_of_items) + "_items_folder";
         EXPECT_TRUE(GetPixelDiffer()->CompareUiComponentsOnPrimaryScreen(
             base::JoinString({GenerateScreenshotName(), filename}, "."),
             revision_number, GetDraggedWidget()));
-        // Release the drag.
-        if (use_tablet_mode()) {
-          event_generator->ReleaseTouch();
-        } else {
-          event_generator->ReleaseLeftButton();
-        }
-      });
+      };
 
   for (size_t i = 0; i < max_items_in_folder; ++i) {
     gfx::Point folder_icon_center =
         folder_list[i]->GetIconBoundsInScreen().CenterPoint();
 
-    if (use_drag_drop_refactor()) {
-      ShellTestApi().drag_drop_controller()->SetLoopClosureForTesting(
-          base::BindRepeating(verify_folder_widget, /*number_of_items=*/i + 1),
-          /*quit_closure=*/base::DoNothing());
-    }
+    std::list<base::OnceClosure> tasks;
+    tasks.push_back(base::BindLambdaForTesting([&]() {
+      if (use_tablet_mode()) {
+        event_generator->PressTouch(folder_icon_center);
+        folder_list[i]->FireTouchDragTimerForTest();
+      } else {
+        event_generator->MoveMouseTo(folder_icon_center);
+        event_generator->PressLeftButton();
+        folder_list[i]->FireMouseDragTimerForTest();
+      }
+    }));
+    tasks.push_back(base::BindLambdaForTesting([&]() {
+      if (use_tablet_mode()) {
+        event_generator->MoveTouch(grid_center);
+      } else {
+        event_generator->MoveMouseTo(grid_center);
+      }
+      test::AppsGridViewTestApi(apps_grid_view).WaitForItemMoveAnimationDone();
+    }));
+    tasks.push_back(base::BindLambdaForTesting(
+        [&]() { verify_folder_widget(/*number_of_items=*/i + 1); }));
+    tasks.push_back(base::BindLambdaForTesting([&]() {
+      if (use_tablet_mode()) {
+        event_generator->ReleaseTouch();
+      } else {
+        event_generator->ReleaseLeftButton();
+      }
+    }));
 
-    // Start dragging the folder icon.
-    if (use_tablet_mode()) {
-      event_generator->PressTouch(folder_icon_center);
-      folder_list[i]->FireTouchDragTimerForTest();
-      event_generator->MoveTouch(grid_center);
-      std::unique_ptr<test::AppsGridViewTestApi> test_api =
-          std::make_unique<test::AppsGridViewTestApi>(apps_grid_view);
-      test_api->WaitForItemMoveAnimationDone();
-    } else {
-      event_generator->MoveMouseTo(folder_icon_center);
-      event_generator->PressLeftButton();
-      folder_list[i]->FireMouseDragTimerForTest();
-      event_generator->MoveMouseTo(grid_center);
-    }
-
-    if (!use_drag_drop_refactor()) {
-      verify_folder_widget.Run(/*number_of_items=*/i + 1);
-    }
+    MaybeRunDragAndDropSequenceForAppList(&tasks,
+                                          /*is_touch=*/use_tablet_mode());
   }
 }
 

@@ -7,13 +7,13 @@
 
 #import <UIKit/UIKit.h>
 
-#import "ios/chrome/browser/ui/gestures/layout_switcher.h"
+#import <set>
+
 #import "ios/chrome/browser/ui/incognito_reauth/incognito_reauth_consumer.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_collection_consumer.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/grid/grid_theme.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/inactive_tabs/inactive_tabs_info_consumer.h"
 #import "ios/chrome/browser/ui/tab_switcher/tab_grid/tab_grid_paging.h"
-#import "ios/chrome/browser/ui/thumb_strip/thumb_strip_supporting.h"
 
 @protocol TabContextMenuProvider;
 @protocol TabCollectionDragDropHandler;
@@ -23,8 +23,10 @@
 @class GridViewController;
 @protocol IncognitoReauthCommands;
 @protocol PriceCardDataSource;
-@protocol ThumbStripCommands;
 @protocol SuggestedActionsDelegate;
+namespace web {
+class WebStateID;
+}  // namespace web
 
 // Protocol used to relay relevant user interactions from a grid UI.
 @protocol GridViewControllerDelegate
@@ -32,19 +34,15 @@
 // Tells the delegate that the item with `itemID` was selected in
 // `gridViewController`.
 - (void)gridViewController:(GridViewController*)gridViewController
-       didSelectItemWithID:(NSString*)itemID;
+       didSelectItemWithID:(web::WebStateID)itemID;
 // Tells the delegate that the item with `itemID` was closed in
 // `gridViewController`.
 - (void)gridViewController:(GridViewController*)gridViewController
-        didCloseItemWithID:(NSString*)itemID;
-// Tells the delegate that the plus sign was tapped in `gridViewController`,
-// i.e., there was an intention to create a new item.
-- (void)didTapPlusSignInGridViewController:
-    (GridViewController*)gridViewController;
+        didCloseItemWithID:(web::WebStateID)itemID;
 // Tells the delegate that the item with `itemID` was moved to
 // `destinationIndex`.
 - (void)gridViewController:(GridViewController*)gridViewController
-         didMoveItemWithID:(NSString*)itemID
+         didMoveItemWithID:(web::WebStateID)itemID
                    toIndex:(NSUInteger)destinationIndex;
 // Tells the delegate that the the number of items in `gridViewController`
 // changed to `count`.
@@ -52,7 +50,7 @@
         didChangeItemCount:(NSUInteger)count;
 // Tells the delegate that the item with `itemID` was removed.
 - (void)gridViewController:(GridViewController*)gridViewController
-       didRemoveItemWIthID:(NSString*)itemID;
+       didRemoveItemWIthID:(web::WebStateID)itemID;
 
 // Tells the delegate that the visibility of the last item of the grid changed.
 - (void)didChangeLastItemVisibilityInGridViewController:
@@ -101,9 +99,7 @@
 // A view controller that contains a grid of items.
 @interface GridViewController : UIViewController <InactiveTabsInfoConsumer,
                                                   IncognitoReauthConsumer,
-                                                  LayoutSwitcher,
-                                                  TabCollectionConsumer,
-                                                  ThumbStripSupporting>
+                                                  TabCollectionConsumer>
 // The gridView is accessible to manage the content inset behavior.
 @property(nonatomic, readonly) UIScrollView* gridView;
 // The view that is shown when there are no items.
@@ -122,8 +118,6 @@
 @property(nonatomic, copy) NSString* searchText;
 // Handler for reauth commands.
 @property(nonatomic, weak) id<IncognitoReauthCommands> reauthHandler;
-// Handler for thumbstrip commands.
-@property(nonatomic, weak) id<ThumbStripCommands> thumbStripHandler;
 // Delegate for search results suggested actions.
 @property(nonatomic, weak) id<SuggestedActionsDelegate>
     suggestedActionsDelegate;
@@ -138,8 +132,6 @@
 // YES if the selected cell is visible in the grid.
 @property(nonatomic, readonly, getter=isSelectedCellVisible)
     BOOL selectedCellVisible;
-// The fraction of the last item of the grid that is visible.
-@property(nonatomic, assign, readonly) CGFloat fractionVisibleOfLastItem;
 // YES when the current contents are hidden from the user before a successful
 // biometric authentication.
 @property(nonatomic, assign) BOOL contentNeedsAuthentication;
@@ -150,11 +142,12 @@
     shareableItemsProvider;
 
 // The item IDs of selected items for editing.
-@property(nonatomic, readonly) NSArray<NSString*>* selectedItemIDsForEditing;
+@property(nonatomic, readonly) std::set<web::WebStateID>
+    selectedItemIDsForEditing;
 // The item IDs of selected items for editing which are shareable outside of the
 // application.
-@property(nonatomic, readonly)
-    NSArray<NSString*>* selectedShareableItemIDsForEditing;
+@property(nonatomic, readonly) std::set<web::WebStateID>
+    selectedShareableItemIDsForEditing;
 
 // Whether or not all items are selected. NO if `mode` is not
 // TabGridModeSelection.

@@ -4,6 +4,7 @@
 
 #include "third_party/blink/renderer/bindings/core/v8/v8_code_cache.h"
 
+#include "base/feature_list.h"
 #include "base/metrics/histogram_functions.h"
 #include "build/build_config.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
@@ -28,6 +29,13 @@ namespace blink {
 
 namespace {
 
+BASE_FEATURE(kConfigurableV8CodeCacheHotHours,
+             "ConfigurableV8CodeCacheHotHours",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+constexpr base::FeatureParam<int>
+    kV8CodeCacheHotHours(&kConfigurableV8CodeCacheHotHours, "HotHours", 72);
+
 enum CacheTagKind { kCacheTagCode = 0, kCacheTagTimeStamp = 1, kCacheTagLast };
 
 static const int kCacheTagKindSize = 1;
@@ -50,7 +58,7 @@ uint32_t CacheTag(CacheTagKind kind, const String& encoding) {
 
 // Check previously stored timestamp.
 bool IsResourceHotForCaching(const CachedMetadataHandler* cache_handler) {
-  static constexpr base::TimeDelta kHotHours = base::Hours(72);
+  const base::TimeDelta kHotHours = base::Hours(kV8CodeCacheHotHours.Get());
   scoped_refptr<CachedMetadata> cached_metadata =
       cache_handler->GetCachedMetadata(
           V8CodeCache::TagForTimeStamp(cache_handler));
@@ -64,6 +72,14 @@ bool IsResourceHotForCaching(const CachedMetadataHandler* cache_handler) {
       base::TimeTicks() + base::Milliseconds(time_stamp_ms);
   return (base::TimeTicks::Now() - time_stamp) < kHotHours;
 }
+
+// Flags that can be set in the CacheMetadata header, describing how the code
+// cache data was produced so that the consumer can generate better trace
+// messages.
+enum class DetailFlags : uint64_t {
+  kNone = 0,
+  kFull = 1,
+};
 
 }  // namespace
 
@@ -107,11 +123,13 @@ std::tuple<v8::ScriptCompiler::CompileOptions,
            v8::ScriptCompiler::NoCacheReason>
 V8CodeCache::GetCompileOptions(mojom::blink::V8CacheOptions cache_options,
                                const ClassicScript& classic_script,
-                               bool might_generate_compile_hints) {
-  return GetCompileOptions(
-      cache_options, classic_script.CacheHandler(),
-      classic_script.SourceText().length(), classic_script.SourceLocationType(),
-      classic_script.SourceUrl(), might_generate_compile_hints);
+                               bool might_generate_compile_hints,
+                               bool can_use_compile_hints) {
+  return GetCompileOptions(cache_options, classic_script.CacheHandler(),
+                           classic_script.SourceText().length(),
+                           classic_script.SourceLocationType(),
+                           classic_script.SourceUrl(),
+                           might_generate_compile_hints, can_use_compile_hints);
 }
 
 std::tuple<v8::ScriptCompiler::CompileOptions,
@@ -122,7 +140,8 @@ V8CodeCache::GetCompileOptions(mojom::blink::V8CacheOptions cache_options,
                                size_t source_text_length,
                                ScriptSourceLocationType source_location_type,
                                const KURL& url,
-                               bool might_generate_compile_hints) {
+                               bool might_generate_compile_hints,
+                               bool can_use_compile_hints) {
   static const int kMinimalCodeLength = 1024;
   v8::ScriptCompiler::NoCacheReason no_cache_reason;
 
@@ -146,6 +165,11 @@ V8CodeCache::GetCompileOptions(mojom::blink::V8CacheOptions cache_options,
     // cached scripts (especially if they've been eagerly compiled by a
     // ServiceWorker) and omitting cached scripts would deteriorate the data.
     no_code_cache_compile_options = v8::ScriptCompiler::kProduceCompileHints;
+  } else if (url.ProtocolIsInHTTPFamily() && can_use_compile_hints) {
+    // This doesn't need to be gated behind a runtime flag, because there won't
+    // be any data unless the v8_compile_hints::kConsumeCompileHints
+    // flag is on.
+    no_code_cache_compile_options = v8::ScriptCompiler::kConsumeCompileHints;
   }
 
   switch (source_location_type) {
@@ -234,6 +258,11 @@ V8CodeCache::GetCompileOptions(mojom::blink::V8CacheOptions cache_options,
                          v8::ScriptCompiler::kNoCacheNoReason);
 }
 
+bool V8CodeCache::IsFull(const CachedMetadata* metadata) {
+  const uint64_t full_flag = static_cast<uint64_t>(DetailFlags::kFull);
+  return (metadata->tag() & full_flag) != 0;
+}
+
 template <typename UnboundScript>
 static void ProduceCacheInternal(
     v8::Isolate* isolate,
@@ -268,15 +297,6 @@ static void ProduceCacheInternal(
       if (cached_data) {
         const uint8_t* data = cached_data->data;
         int length = cached_data->length;
-        if (length > 1024) {
-          // Omit histogram samples for small cache data to avoid outliers.
-          int cache_size_ratio =
-              static_cast<int>(100.0 * length / source_text_length);
-          DEFINE_THREAD_SAFE_STATIC_LOCAL(
-              CustomCountHistogram, code_cache_size_histogram,
-              ("V8.CodeCacheSizeRatio", 1, 10000, 50));
-          code_cache_size_histogram.Count(cache_size_ratio);
-        }
         cache_handler->ClearCachedMetadata(
             code_cache_host, CachedMetadataHandler::kClearLocally);
         cache_handler->SetCachedMetadata(
@@ -404,9 +424,9 @@ scoped_refptr<CachedMetadata> V8CodeCache::GenerateFullCodeCache(
     std::unique_ptr<v8::ScriptCompiler::CachedData> cached_data(
         v8::ScriptCompiler::CreateCodeCache(unbound_script));
     if (cached_data && cached_data->length) {
-      cached_metadata =
-          CachedMetadata::Create(CacheTag(kCacheTagCode, encoding.GetName()),
-                                 cached_data->data, cached_data->length);
+      cached_metadata = CachedMetadata::Create(
+          CacheTag(kCacheTagCode, encoding.GetName()), cached_data->data,
+          cached_data->length, static_cast<uint64_t>(DetailFlags::kFull));
     }
 
     TRACE_EVENT_END1(kTraceEventCategoryGroup, "v8.produceCache", "data",

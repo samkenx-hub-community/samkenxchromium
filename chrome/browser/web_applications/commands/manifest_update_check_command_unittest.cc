@@ -7,18 +7,18 @@
 #include <utility>
 
 #include "base/auto_reset.h"
-#include "base/run_loop.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/bind.h"
+#include "base/test/test_future.h"
 #include "chrome/browser/web_applications/commands/manifest_update_check_command.h"
 #include "chrome/browser/web_applications/manifest_update_utils.h"
-#include "chrome/browser/web_applications/test/fake_data_retriever.h"
 #include "chrome/browser/web_applications/test/fake_web_app_provider.h"
+#include "chrome/browser/web_applications/test/fake_web_contents_manager.h"
 #include "chrome/browser/web_applications/test/web_app_icon_test_utils.h"
 #include "chrome/browser/web_applications/test/web_app_install_test_utils.h"
 #include "chrome/browser/web_applications/test/web_app_test.h"
 #include "chrome/browser/web_applications/web_app_callback_app_identity.h"
-#include "chrome/browser/web_applications/web_app_command_manager.h"
+#include "chrome/browser/web_applications/web_app_command_scheduler.h"
 #include "chrome/browser/web_applications/web_app_helpers.h"
 #include "chrome/browser/web_applications/web_app_icon_generator.h"
 #include "chrome/browser/web_applications/web_app_icon_manager.h"
@@ -29,6 +29,7 @@
 #include "components/services/app_service/public/cpp/url_handler_info.h"
 #include "components/webapps/browser/installable/installable_logging.h"
 #include "content/public/browser/web_contents.h"
+#include "content/public/test/web_contents_tester.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "third_party/blink/public/mojom/manifest/manifest.mojom.h"
@@ -348,6 +349,8 @@ class ManifestUpdateCheckCommandTest : public WebAppTest {
   void SetUp() override {
     WebAppTest::SetUp();
     test::AwaitStartWebAppProviderAndSubsystems(profile());
+
+    web_contents_manager().SetUrlLoaded(web_contents(), app_url());
   }
 
  protected:
@@ -356,40 +359,46 @@ class ManifestUpdateCheckCommandTest : public WebAppTest {
     absl::optional<WebAppInstallInfo> new_install_info;
   };
 
-  RunResult RunCommandAndGetResult(
-      const GURL& url,
-      const AppId& app_id,
-      std::unique_ptr<FakeDataRetriever> data_retriever) {
-    base::RunLoop loop;
+  RunResult RunCommandAndGetResult(const GURL& url,
+                                   const webapps::AppId& app_id) {
+    base::test::TestFuture<ManifestUpdateCheckResult,
+                           absl::optional<WebAppInstallInfo>>
+        manifest_update_check_future;
     RunResult output_result;
-    provider().command_manager().ScheduleCommand(
-        std::make_unique<ManifestUpdateCheckCommand>(
-            url, app_id, base::Time::Now(), web_contents()->GetWeakPtr(),
-            base::BindLambdaForTesting(
-                [&](ManifestUpdateCheckResult check_result,
-                    absl::optional<WebAppInstallInfo> new_install_info) {
-                  output_result.check_result = check_result;
-                  output_result.new_install_info = std::move(new_install_info);
-                  loop.Quit();
-                }),
-            std::move(data_retriever),
-            std::make_unique<WebAppIconDownloader>()));
-    loop.Run();
+    provider().scheduler().ScheduleManifestUpdateCheck(
+        url, app_id, base::Time::Now(), web_contents()->GetWeakPtr(),
+        manifest_update_check_future.GetCallback());
+    EXPECT_TRUE(manifest_update_check_future.Wait());
+    auto [update_result, new_install_info] =
+        manifest_update_check_future.Take();
+    output_result.check_result = update_result;
+    output_result.new_install_info = std::move(new_install_info);
     return output_result;
   }
 
-  AppId InstallAppFromInfo(std::unique_ptr<WebAppInstallInfo> info) {
+  webapps::AppId InstallAppFromInfo(std::unique_ptr<WebAppInstallInfo> info) {
     return test::InstallWebApp(profile(), std::move(info));
   }
 
-  std::unique_ptr<FakeDataRetriever> GetFakeDataRetriever(
-      webapps::InstallableStatusCode error_code,
-      const WebAppInstallInfo& info) {
-    auto data_retriever = std::make_unique<FakeDataRetriever>();
-    data_retriever->SetManifest(GetManifestFromInfo(info), error_code);
-    return data_retriever;
+  void SetupPageState(const WebAppInstallInfo& info) {
+    auto& page_state = web_contents_manager().GetOrCreatePageState(app_url());
+
+    page_state.has_service_worker = true;
+    page_state.opt_manifest = GetManifestFromInfo(info);
+    page_state.valid_manifest_for_web_app = true;
+    page_state.error_code = webapps::InstallableStatusCode::NO_ERROR_DETECTED;
   }
 
+  WebAppProvider& provider() { return *WebAppProvider::GetForTest(profile()); }
+
+  FakeWebContentsManager& web_contents_manager() {
+    return static_cast<FakeWebContentsManager&>(
+        provider().web_contents_manager());
+  }
+
+  GURL app_url() { return app_url_; }
+
+ private:
   blink::mojom::ManifestPtr GetManifestFromInfo(const WebAppInstallInfo& info) {
     auto manifest = blink::mojom::Manifest::New();
     manifest->start_url = info.start_url;
@@ -404,22 +413,17 @@ class ManifestUpdateCheckCommandTest : public WebAppTest {
     return manifest;
   }
 
-  WebAppProvider& provider() { return *WebAppProvider::GetForTest(profile()); }
-
-  GURL app_url() { return app_url_; }
-
- private:
   const GURL app_url_{"http://www.foo.bar/web_apps/basic.html"};
   base::AutoReset<absl::optional<AppIdentityUpdate>> update_dialog_scope_;
 };
 
-TEST_F(ManifestUpdateCheckCommandTest, VerifySuccessfulNameUpdate) {
+TEST_F(ManifestUpdateCheckCommandTest, Verify) {
   auto install_info = std::make_unique<WebAppInstallInfo>();
   install_info->start_url = app_url();
   install_info->scope = app_url().GetWithoutFilename();
   install_info->display_mode = DisplayMode::kStandalone;
   install_info->title = u"Foo App";
-  AppId app_id = InstallAppFromInfo(std::move(install_info));
+  webapps::AppId app_id = InstallAppFromInfo(std::move(install_info));
 
   // Verify name changes are properly propagated.
   WebAppInstallInfo new_info;
@@ -428,10 +432,8 @@ TEST_F(ManifestUpdateCheckCommandTest, VerifySuccessfulNameUpdate) {
   new_info.display_mode = DisplayMode::kStandalone;
   new_info.title = u"New Name";
 
-  RunResult result = RunCommandAndGetResult(
-      app_url(), app_id,
-      GetFakeDataRetriever(webapps::InstallableStatusCode::NO_ERROR_DETECTED,
-                           new_info));
+  SetupPageState(new_info);
+  RunResult result = RunCommandAndGetResult(app_url(), app_id);
 
   EXPECT_EQ(result.check_result, ManifestUpdateCheckResult::kAppUpdateNeeded);
   EXPECT_EQ(result.new_install_info.value().title, u"New Name");
@@ -443,7 +445,7 @@ TEST_F(ManifestUpdateCheckCommandTest, VerifySuccessfulScopeUpdate) {
   install_info->scope = app_url().GetWithoutFilename();
   install_info->display_mode = DisplayMode::kStandalone;
   install_info->title = u"Foo App";
-  AppId app_id = InstallAppFromInfo(std::move(install_info));
+  webapps::AppId app_id = InstallAppFromInfo(std::move(install_info));
 
   // Verify scope changes are properly propagated.
   WebAppInstallInfo new_info;
@@ -452,10 +454,8 @@ TEST_F(ManifestUpdateCheckCommandTest, VerifySuccessfulScopeUpdate) {
   new_info.display_mode = DisplayMode::kStandalone;
   new_info.title = u"Foo App";
 
-  RunResult result = RunCommandAndGetResult(
-      app_url(), app_id,
-      GetFakeDataRetriever(webapps::InstallableStatusCode::NO_ERROR_DETECTED,
-                           new_info));
+  SetupPageState(new_info);
+  RunResult result = RunCommandAndGetResult(app_url(), app_id);
 
   EXPECT_EQ(result.check_result, ManifestUpdateCheckResult::kAppUpdateNeeded);
   EXPECT_EQ(result.new_install_info.value().scope,
@@ -468,7 +468,7 @@ TEST_F(ManifestUpdateCheckCommandTest, VerifySuccessfulDisplayModeUpdate) {
   install_info->scope = app_url().GetWithoutFilename();
   install_info->display_mode = DisplayMode::kStandalone;
   install_info->title = u"Foo App";
-  AppId app_id = InstallAppFromInfo(std::move(install_info));
+  webapps::AppId app_id = InstallAppFromInfo(std::move(install_info));
 
   // Verify display mode changes are properly propagated.
   WebAppInstallInfo new_info;
@@ -477,10 +477,8 @@ TEST_F(ManifestUpdateCheckCommandTest, VerifySuccessfulDisplayModeUpdate) {
   new_info.display_mode = DisplayMode::kMinimalUi;
   new_info.title = u"Foo App";
 
-  RunResult result = RunCommandAndGetResult(
-      app_url(), app_id,
-      GetFakeDataRetriever(webapps::InstallableStatusCode::NO_ERROR_DETECTED,
-                           new_info));
+  SetupPageState(new_info);
+  RunResult result = RunCommandAndGetResult(app_url(), app_id);
 
   EXPECT_EQ(result.check_result, ManifestUpdateCheckResult::kAppUpdateNeeded);
   EXPECT_EQ(result.new_install_info.value().display_mode,
@@ -493,7 +491,7 @@ TEST_F(ManifestUpdateCheckCommandTest, MultiDataUpdate) {
   install_info->scope = app_url().GetWithoutFilename();
   install_info->display_mode = DisplayMode::kStandalone;
   install_info->title = u"Foo App";
-  AppId app_id = InstallAppFromInfo(std::move(install_info));
+  webapps::AppId app_id = InstallAppFromInfo(std::move(install_info));
 
   // Verify display mode changes are properly propagated.
   WebAppInstallInfo new_info;
@@ -502,10 +500,8 @@ TEST_F(ManifestUpdateCheckCommandTest, MultiDataUpdate) {
   new_info.display_mode = DisplayMode::kMinimalUi;
   new_info.title = u"Foo App 2";
 
-  RunResult result = RunCommandAndGetResult(
-      app_url(), app_id,
-      GetFakeDataRetriever(webapps::InstallableStatusCode::NO_ERROR_DETECTED,
-                           new_info));
+  SetupPageState(new_info);
+  RunResult result = RunCommandAndGetResult(app_url(), app_id);
 
   EXPECT_EQ(result.check_result, ManifestUpdateCheckResult::kAppUpdateNeeded);
   EXPECT_EQ(result.new_install_info.value().display_mode,
@@ -521,7 +517,7 @@ TEST_F(ManifestUpdateCheckCommandTest, NoAppUpdateNeeded) {
   install_info->scope = app_url().GetWithoutFilename();
   install_info->display_mode = DisplayMode::kStandalone;
   install_info->title = u"Foo App";
-  AppId app_id = InstallAppFromInfo(std::move(install_info));
+  webapps::AppId app_id = InstallAppFromInfo(std::move(install_info));
 
   // No fields are changed, so no updates should be needed.
   WebAppInstallInfo new_info;
@@ -530,33 +526,29 @@ TEST_F(ManifestUpdateCheckCommandTest, NoAppUpdateNeeded) {
   new_info.display_mode = DisplayMode::kStandalone;
   new_info.title = u"Foo App";
 
-  RunResult result = RunCommandAndGetResult(
-      app_url(), app_id,
-      GetFakeDataRetriever(webapps::InstallableStatusCode::NO_ERROR_DETECTED,
-                           new_info));
+  SetupPageState(new_info);
+  RunResult result = RunCommandAndGetResult(app_url(), app_id);
 
   EXPECT_EQ(result.check_result, ManifestUpdateCheckResult::kAppUpToDate);
 }
 
-TEST_F(ManifestUpdateCheckCommandTest, AppNotEligible) {
+TEST_F(ManifestUpdateCheckCommandTest, AppNotEligibleNoManifest) {
   auto install_info = std::make_unique<WebAppInstallInfo>();
   install_info->start_url = app_url();
   install_info->scope = app_url().GetWithoutFilename();
   install_info->display_mode = DisplayMode::kStandalone;
   install_info->title = u"Foo App";
-  AppId app_id = InstallAppFromInfo(std::move(install_info));
+  webapps::AppId app_id = InstallAppFromInfo(std::move(install_info));
 
-  // start_url changing should not move ahead with a manifest update.
   WebAppInstallInfo new_info;
   new_info.start_url = app_url();
   new_info.scope = app_url().GetWithoutFilename();
   new_info.display_mode = DisplayMode::kMinimalUi;
   new_info.title = u"Foo App";
 
-  RunResult result = RunCommandAndGetResult(
-      app_url(), app_id,
-      GetFakeDataRetriever(webapps::InstallableStatusCode::NO_MANIFEST,
-                           new_info));
+  // SetUpPageStateForTesting() is purposefully not called here to mimic
+  // the behavior that a manifest does not exist to the FakeWebAppDataRetriever.
+  RunResult result = RunCommandAndGetResult(app_url(), app_id);
 
   EXPECT_EQ(result.check_result, ManifestUpdateCheckResult::kAppNotEligible);
 }
@@ -567,7 +559,7 @@ TEST_F(ManifestUpdateCheckCommandTest, AppIdMismatch) {
   install_info->scope = app_url().GetWithoutFilename();
   install_info->display_mode = DisplayMode::kStandalone;
   install_info->title = u"Foo App";
-  AppId app_id = InstallAppFromInfo(std::move(install_info));
+  webapps::AppId app_id = InstallAppFromInfo(std::move(install_info));
 
   // start_url changing should not move ahead with a manifest update as the
   // generated app_id is different.
@@ -577,10 +569,8 @@ TEST_F(ManifestUpdateCheckCommandTest, AppIdMismatch) {
   new_info.display_mode = DisplayMode::kMinimalUi;
   new_info.title = u"Foo App";
 
-  RunResult result = RunCommandAndGetResult(
-      app_url(), app_id,
-      GetFakeDataRetriever(webapps::InstallableStatusCode::NO_ERROR_DETECTED,
-                           new_info));
+  SetupPageState(new_info);
+  RunResult result = RunCommandAndGetResult(app_url(), app_id);
 
   EXPECT_EQ(result.check_result, ManifestUpdateCheckResult::kAppIdMismatch);
 }
@@ -592,7 +582,7 @@ TEST_F(ManifestUpdateCheckCommandTest, AppNameReverted) {
   install_info->display_mode = DisplayMode::kStandalone;
   install_info->theme_color = SK_ColorRED;
   install_info->title = u"Foo App";
-  AppId app_id = InstallAppFromInfo(
+  webapps::AppId app_id = InstallAppFromInfo(
       std::make_unique<WebAppInstallInfo>(install_info->Clone()));
 
   WebAppInstallInfo new_info = install_info->Clone();
@@ -603,10 +593,8 @@ TEST_F(ManifestUpdateCheckCommandTest, AppNameReverted) {
   base::AutoReset<absl::optional<AppIdentityUpdate>> dialog_action_scope =
       SetIdentityUpdateDialogActionForTesting(AppIdentityUpdate::kSkipped);
 
-  RunResult result = RunCommandAndGetResult(
-      app_url(), app_id,
-      GetFakeDataRetriever(webapps::InstallableStatusCode::NO_ERROR_DETECTED,
-                           new_info));
+  SetupPageState(new_info);
+  RunResult result = RunCommandAndGetResult(app_url(), app_id);
 
   EXPECT_EQ(result.check_result, ManifestUpdateCheckResult::kAppUpdateNeeded);
   EXPECT_EQ(result.new_install_info->theme_color, SK_ColorGREEN);
@@ -619,7 +607,7 @@ TEST_F(ManifestUpdateCheckCommandTest, IconReadFromDiskFailed) {
   install_info->scope = app_url().GetWithoutFilename();
   install_info->display_mode = DisplayMode::kStandalone;
   install_info->title = u"Foo App";
-  AppId app_id = InstallAppFromInfo(std::move(install_info));
+  webapps::AppId app_id = InstallAppFromInfo(std::move(install_info));
 
   WebAppInstallInfo new_info;
   new_info.start_url = app_url();
@@ -627,18 +615,14 @@ TEST_F(ManifestUpdateCheckCommandTest, IconReadFromDiskFailed) {
   new_info.display_mode = DisplayMode::kMinimalUi;
   new_info.title = u"Foo App 2";
 
-  base::RunLoop run_loop;
-  provider().icon_manager().DeleteData(
-      app_id, base::BindLambdaForTesting([&](bool success) {
-        EXPECT_TRUE(success);
-        run_loop.Quit();
-      }));
-  run_loop.Run();
+  base::test::TestFuture<bool> icon_delete_future;
+  provider().icon_manager().DeleteData(app_id,
+                                       icon_delete_future.GetCallback());
+  EXPECT_TRUE(icon_delete_future.Wait());
+  EXPECT_TRUE(icon_delete_future.Get<bool>());
 
-  RunResult result = RunCommandAndGetResult(
-      app_url(), app_id,
-      GetFakeDataRetriever(webapps::InstallableStatusCode::NO_ERROR_DETECTED,
-                           new_info));
+  SetupPageState(new_info);
+  RunResult result = RunCommandAndGetResult(app_url(), app_id);
 
   EXPECT_EQ(result.check_result,
             ManifestUpdateCheckResult::kIconReadFromDiskFailed);
@@ -653,7 +637,7 @@ TEST_F(ManifestUpdateCheckCommandTest, DoNotAcceptAppUpdateDialog) {
   install_info->scope = app_url().GetWithoutFilename();
   install_info->display_mode = DisplayMode::kStandalone;
   install_info->title = u"Foo App";
-  AppId app_id = InstallAppFromInfo(std::move(install_info));
+  webapps::AppId app_id = InstallAppFromInfo(std::move(install_info));
 
   WebAppInstallInfo new_info;
   new_info.start_url = app_url();
@@ -661,12 +645,97 @@ TEST_F(ManifestUpdateCheckCommandTest, DoNotAcceptAppUpdateDialog) {
   new_info.display_mode = DisplayMode::kStandalone;
   new_info.title = u"Foo App 2";
 
-  RunResult result = RunCommandAndGetResult(
-      app_url(), app_id,
-      GetFakeDataRetriever(webapps::InstallableStatusCode::NO_ERROR_DETECTED,
-                           new_info));
+  SetupPageState(new_info);
+  RunResult result = RunCommandAndGetResult(app_url(), app_id);
 
   EXPECT_EQ(result.check_result, ManifestUpdateCheckResult::kAppUpToDate);
+}
+
+TEST_F(ManifestUpdateCheckCommandTest,
+       NavigationToDifferentOriginKillsCommand) {
+  auto install_info = std::make_unique<WebAppInstallInfo>();
+  install_info->start_url = app_url();
+  install_info->scope = app_url().GetWithoutFilename();
+  install_info->display_mode = DisplayMode::kStandalone;
+  install_info->title = u"Foo App";
+  webapps::AppId app_id = InstallAppFromInfo(std::move(install_info));
+
+  WebAppInstallInfo new_info;
+  new_info.start_url = app_url();
+  new_info.scope = app_url().GetWithoutFilename();
+  new_info.display_mode = DisplayMode::kStandalone;
+  new_info.title = u"New Name";
+
+  base::test::TestFuture<void> manifest_fetch_future;
+  base::test::TestFuture<ManifestUpdateCheckResult,
+                         absl::optional<WebAppInstallInfo>>
+      manifest_update_check_future;
+
+  SetupPageState(new_info);
+
+  auto& page_state = web_contents_manager().GetOrCreatePageState(app_url());
+  page_state.on_manifest_fetch = manifest_fetch_future.GetCallback();
+  provider().scheduler().ScheduleManifestUpdateCheck(
+      app_url(), app_id, base::Time::Now(), web_contents()->GetWeakPtr(),
+      manifest_update_check_future.GetCallback());
+
+  EXPECT_TRUE(manifest_fetch_future.Wait());
+  // Trigger a navigation once we reach the async installability check.
+  content::WebContentsTester::For(web_contents())
+      ->NavigateAndCommit(GURL("https://www.abc.com"));
+
+  EXPECT_TRUE(manifest_update_check_future.Wait());
+  EXPECT_EQ(manifest_update_check_future.Get<ManifestUpdateCheckResult>(),
+            ManifestUpdateCheckResult::kCancelledDueToMainFrameNavigation);
+}
+
+TEST_F(ManifestUpdateCheckCommandTest,
+       MainFrameNavigationSameOriginAllowsSuccessfulCompletion) {
+  // Mimic a first navigation to the app url.
+  content::WebContentsTester::For(web_contents())->NavigateAndCommit(app_url());
+  const GURL different_app_with_same_origin =
+      GURL("http://www.foo.bar/web_apps/basic1.html");
+
+  auto install_info = std::make_unique<WebAppInstallInfo>();
+  install_info->start_url = app_url();
+  install_info->scope = app_url().GetWithoutFilename();
+  install_info->display_mode = DisplayMode::kStandalone;
+  install_info->title = u"Foo App";
+  webapps::AppId app_id = InstallAppFromInfo(std::move(install_info));
+
+  WebAppInstallInfo new_info;
+  new_info.start_url = app_url();
+  new_info.scope = app_url().GetWithoutFilename();
+  new_info.display_mode = DisplayMode::kStandalone;
+  new_info.title = u"New Name";
+
+  base::test::TestFuture<void> manifest_fetch_future;
+  base::test::TestFuture<ManifestUpdateCheckResult,
+                         absl::optional<WebAppInstallInfo>>
+      manifest_update_check_future;
+
+  SetupPageState(new_info);
+
+  auto& page_state = web_contents_manager().GetOrCreatePageState(app_url());
+  page_state.on_manifest_fetch = manifest_fetch_future.GetCallback();
+  provider().scheduler().ScheduleManifestUpdateCheck(
+      app_url(), app_id, base::Time::Now(), web_contents()->GetWeakPtr(),
+      manifest_update_check_future.GetCallback());
+
+  EXPECT_TRUE(manifest_fetch_future.Wait());
+  // Trigger a 2nd navigation once we reach the async installability check.
+  content::WebContentsTester::For(web_contents())
+      ->NavigateAndCommit(different_app_with_same_origin);
+
+  EXPECT_TRUE(manifest_update_check_future.Wait());
+  EXPECT_EQ(manifest_update_check_future.Get<ManifestUpdateCheckResult>(),
+            ManifestUpdateCheckResult::kAppUpdateNeeded);
+
+  EXPECT_EQ(
+      manifest_update_check_future.Get<absl::optional<WebAppInstallInfo>>()
+          .value()
+          .title,
+      u"New Name");
 }
 
 }  // namespace web_app

@@ -9,6 +9,7 @@
 #include <utility>
 #include <vector>
 
+#include "base/check.h"
 #include "base/containers/flat_set.h"
 #include "base/i18n/number_formatting.h"
 #include "base/json/json_writer.h"
@@ -24,16 +25,19 @@
 #include "base/values.h"
 #include "build/build_config.h"
 #include "build/chromeos_buildflags.h"
+#include "chrome/browser/printing/print_preview_dialog_controller.h"
 #include "chrome/browser/printing/print_test_utils.h"
 #include "chrome/browser/printing/print_view_manager.h"
 #include "chrome/browser/ui/webui/print_preview/fake_print_render_frame.h"
 #include "chrome/browser/ui/webui/print_preview/policy_settings.h"
 #include "chrome/browser/ui/webui/print_preview/print_preview_metrics.h"
 #include "chrome/browser/ui/webui/print_preview/print_preview_ui.h"
+#include "chrome/browser/ui/webui/print_preview/print_preview_utils.h"
 #include "chrome/browser/ui/webui/print_preview/printer_handler.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/test/base/testing_browser_process.h"
 #include "chrome/test/base/testing_profile.h"
+#include "components/enterprise/buildflags/buildflags.h"
 #include "components/prefs/pref_service.h"
 #include "components/sync_preferences/testing_pref_service_syncable.h"
 #include "content/public/browser/render_frame_host.h"
@@ -50,14 +54,14 @@
 #include "third_party/abseil-cpp/absl/types/optional.h"
 
 #if BUILDFLAG(ENABLE_PRINT_CONTENT_ANALYSIS)
-#include "chrome/browser/enterprise/connectors/analysis/fake_content_analysis_delegate.h"
 #include "chrome/browser/enterprise/connectors/common.h"
+#include "chrome/browser/enterprise/connectors/test/deep_scanning_test_utils.h"
+#include "chrome/browser/enterprise/connectors/test/fake_content_analysis_delegate.h"
 #include "chrome/browser/policy/dm_token_utils.h"
-#include "chrome/browser/safe_browsing/cloud_content_scanning/deep_scanning_test_utils.h"
 
-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
-#include "chrome/browser/enterprise/connectors/analysis/fake_content_analysis_sdk_manager.h"  //nogncheck
-#endif
+#if BUILDFLAG(ENTERPRISE_LOCAL_CONTENT_ANALYSIS)
+#include "chrome/browser/enterprise/connectors/analysis/fake_content_analysis_sdk_manager.h"  // nogncheck
+#endif  // BUILDFLAG(ENTERPRISE_LOCAL_CONTENT_ANALYSIS)
 #endif  // BUILDFLAG(ENABLE_PRINT_CONTENT_ANALYSIS)
 
 #if BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(ENABLE_PRINT_CONTENT_ANALYSIS)
@@ -89,10 +93,10 @@ const char16_t kDummyInitiatorName16[] = u"TestInitiator";
 const char kEmptyPrinterName[] = "EmptyPrinter";
 const char kTestData[] = "abc";
 
-#if BUILDFLAG(ENABLE_PRINT_CONTENT_ANALYSIS)
+#if BUILDFLAG(ENTERPRISE_LOCAL_CONTENT_ANALYSIS)
 constexpr char kFakeDmToken[] = "fake-dm-token";
 constexpr char kCallbackId[] = "test-callback-id-1";
-#endif  // BUILDFLAG(ENABLE_PRINT_CONTENT_ANALYSIS)
+#endif  // BUILDFLAG(ENTERPRISE_LOCAL_CONTENT_ANALYSIS)
 
 // Array of all mojom::PrinterTypes.
 constexpr mojom::PrinterType kAllTypes[] = {mojom::PrinterType::kExtension,
@@ -429,15 +433,15 @@ class TestPrintPreviewHandlerForContentAnalysis
   bool print_called_after_scan() const { return print_called_after_scan_; }
 
  private:
-  void FinishHandlePrint(UserActionBuckets user_action,
-                         base::Value::Dict settings,
-                         scoped_refptr<base::RefCountedMemory> data,
-                         const std::string& callback_id) override {
+  void FinishHandleDoPrint(UserActionBuckets user_action,
+                           base::Value::Dict settings,
+                           scoped_refptr<base::RefCountedMemory> data,
+                           const std::string& callback_id) override {
     ASSERT_EQ(base::StringPiece(data->front_as<const char>(), data->size()),
               kTestData);
     print_called_after_scan_ = true;
-    PrintPreviewHandler::FinishHandlePrint(user_action, std::move(settings),
-                                           data, callback_id);
+    PrintPreviewHandler::FinishHandleDoPrint(user_action, std::move(settings),
+                                             data, callback_id);
   }
 
   bool print_called_after_scan_ = false;
@@ -464,9 +468,18 @@ class PrintPreviewHandlerTest : public testing::Test {
 #endif
 
   void SetProfileForInitialSettings(TestingProfile* profile) {
+    auto* dialog_controller = PrintPreviewDialogController::GetInstance();
+    CHECK(dialog_controller);
+    if (preview_web_contents_) {
+      dialog_controller->DisassociateWebContentsesForTesting(
+          preview_web_contents_.get());
+    }
+
     preview_web_contents_ = content::WebContents::Create(
         content::WebContents::CreateParams(profile));
     web_ui_->set_web_contents(preview_web_contents_.get());
+    dialog_controller->AssociateWebContentsesForTesting(
+        initiator_web_contents_.get(), preview_web_contents_.get());
   }
 
   void SetUp() override {
@@ -479,6 +492,8 @@ class PrintPreviewHandlerTest : public testing::Test {
     ash::LoginState::Initialize();
     manager_ = crosapi::CreateCrosapiManagerWithTestRegistry();
 #endif
+
+    // Create the initiator.
     initiator_web_contents_ = content::WebContents::Create(
         content::WebContents::CreateParams(&profile_));
     content::WebContents* initiator = initiator_web_contents_.get();
@@ -486,13 +501,15 @@ class PrintPreviewHandlerTest : public testing::Test {
     // the print code will not bother to send IPCs to a non-live RenderFrame.
     content::NavigationSimulator::NavigateAndCommitFromDocument(
         GURL("about:blank"), initiator->GetPrimaryMainFrame());
-    preview_web_contents_ = content::WebContents::Create(
-        content::WebContents::CreateParams(&profile_));
+
+    // Create the print preview.
+    web_ui_ = std::make_unique<content::TestWebUI>();
+    SetProfileForInitialSettings(&profile_);
+
+    // Create the PrintViewManager and put it to work.
     PrintViewManager::CreateForWebContents(initiator);
     PrintViewManager::FromWebContents(initiator)->PrintPreviewNow(
         initiator->GetPrimaryMainFrame(), false);
-    web_ui_ = std::make_unique<content::TestWebUI>();
-    web_ui_->set_web_contents(preview_web_contents_.get());
 
     printers_.push_back(GetSimplePrinterInfo(test::kPrinterName, true));
     auto printer_handler = CreatePrinterHandler(printers_);
@@ -522,6 +539,11 @@ class PrintPreviewHandlerTest : public testing::Test {
 #endif
     PrintViewManager::FromWebContents(initiator_web_contents_.get())
         ->PrintPreviewDone();
+
+    auto* dialog_controller = PrintPreviewDialogController::GetInstance();
+    CHECK(dialog_controller);
+    dialog_controller->DisassociateWebContentsesForTesting(
+        preview_web_contents_.get());
   }
 
 #if BUILDFLAG(IS_CHROMEOS)
@@ -1292,6 +1314,64 @@ TEST_F(PrintPreviewHandlerTest, GetNoDenyListPrinterCapabilities) {
   }
 }
 
+TEST_F(PrintPreviewHandlerTest, GetPrinterCapabilitiesContinuousMedia) {
+  // Add two media sizes to our printer - one with discrete sizes and one with
+  // continuous feed.  The continuous feed media should get filtered out when
+  // the capabilities are retrieved.
+  base::Value::Dict media_1;
+  media_1.Set("width_microns", 100);
+  media_1.Set("height_microns", 200);
+  base::Value::Dict media_2;
+  media_2.Set("width_microns", 300);
+  media_2.Set("is_continuous_feed", true);
+  // After filtering, the expected media will just have the discrete media.
+  base::Value::List expected_media;
+  expected_media.Append(media_1.Clone());
+
+  base::Value::List option_list;
+  option_list.Append(std::move(media_1));
+  option_list.Append(std::move(media_2));
+  base::Value::Dict media_size;
+  media_size.Set("option", std::move(option_list));
+  base::Value::Dict printer;
+  printer.Set("media_size", std::move(media_size));
+  base::Value::Dict cdd;
+  cdd.Set("printer", std::move(printer));
+
+  ASSERT_EQ(1u, printers().size());
+  printers()[0].capabilities.Set(kSettingCapabilities, std::move(cdd));
+  printer_handler()->SetPrinters(printers());
+
+  const base::Value::Dict* capabilities =
+      printers()[0].capabilities.FindDict(kSettingCapabilities);
+  ASSERT_TRUE(capabilities);
+  const base::Value::List* options = GetMediaSizeOptionsFromCdd(*capabilities);
+
+  ASSERT_TRUE(options);
+  EXPECT_EQ(2u, options->size());
+
+  // Initial settings first to enable javascript.
+  Initialize();
+
+  std::string callback_id_in = "test-callback-id";
+  handler()->reset_calls();
+  SendGetPrinterCapabilities(mojom::PrinterType::kLocal, callback_id_in,
+                             test::kPrinterName);
+  ASSERT_EQ(2u, web_ui()->call_data().size());
+
+  // Validate printer capabilities only has one media type (the continuous feed
+  // option should get filtered out).
+  const content::TestWebUI::CallData& data = *web_ui()->call_data().back();
+  CheckWebUIResponse(data, callback_id_in, true);
+  ASSERT_TRUE(data.arg3()->is_dict());
+  const base::Value::Dict& settings = data.arg3()->GetDict();
+  capabilities = settings.FindDict(kSettingCapabilities);
+  ASSERT_TRUE(capabilities);
+  options = GetMediaSizeOptionsFromCdd(*capabilities);
+  ASSERT_TRUE(options);
+  EXPECT_EQ(expected_media, *options);
+}
+
 TEST_F(PrintPreviewHandlerTest, Print) {
   Initialize();
 
@@ -1319,7 +1399,7 @@ TEST_F(PrintPreviewHandlerTest, Print) {
     std::string json;
     base::JSONWriter::Write(print_ticket, &json);
     print_args.Append(json);
-    handler()->HandlePrint(print_args);
+    handler()->HandleDoPrint(print_args);
 
     CheckHistograms(histograms, type);
 
@@ -1545,19 +1625,19 @@ TEST_F(PrintPreviewHandlerFailingTest, GetPrinterCapabilities) {
   }
 }
 
-#if BUILDFLAG(ENABLE_PRINT_CONTENT_ANALYSIS)
+#if BUILDFLAG(ENTERPRISE_LOCAL_CONTENT_ANALYSIS)
 class ContentAnalysisPrintPreviewHandlerTest
     : public PrintPreviewHandlerTest,
       public testing::WithParamInterface<bool> {
  public:
   ContentAnalysisPrintPreviewHandlerTest() {
-    feature_list_.InitAndEnableFeature(features::kEnablePrintScanAfterPreview);
+    feature_list_.InitAndEnableFeature(features::kEnableLocalScanAfterPreview);
   }
 
   void SetUp() override {
     enterprise_connectors::ContentAnalysisDelegate::SetFactoryForTesting(
         base::BindRepeating(
-            &enterprise_connectors::FakeContentAnalysisDelegate::Create,
+            &enterprise_connectors::test::FakeContentAnalysisDelegate::Create,
             run_loop_.QuitClosure(),
             base::BindRepeating(
                 &ContentAnalysisPrintPreviewHandlerTest::ScanningResponse,
@@ -1568,7 +1648,7 @@ class ContentAnalysisPrintPreviewHandlerTest
     PrintPreviewHandlerTest::SetUp();
 
     // Set the policy that enables local content analysis for print.
-    safe_browsing::SetAnalysisConnector(
+    enterprise_connectors::test::SetAnalysisConnector(
         profile()->GetPrefs(), enterprise_connectors::AnalysisConnector::PRINT,
         R"({
           "service_provider": "local_system_agent",
@@ -1615,12 +1695,11 @@ class ContentAnalysisPrintPreviewHandlerTest
  private:
   base::test::ScopedFeatureList feature_list_;
   base::RunLoop run_loop_;
-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+
   // This installs a fake SDK manager that creates fake SDK clients when
   // its GetClient() method is called. This is needed so that calls to
   // ContentAnalysisSdkManager::Get()->GetClient() do not fail.
   enterprise_connectors::FakeContentAnalysisSdkManager sdk_manager_;
-#endif
 };
 
 TEST_P(ContentAnalysisPrintPreviewHandlerTest, LocalScanBeforePrinting) {
@@ -1637,7 +1716,7 @@ TEST_P(ContentAnalysisPrintPreviewHandlerTest, LocalScanBeforePrinting) {
   base::JSONWriter::Write(print_ticket, &json);
   print_args.Append(json);
 
-  handler()->HandlePrint(print_args);
+  handler()->HandleDoPrint(print_args);
   WaitForScan();
 
   auto* print_preview_handler =
@@ -1656,6 +1735,6 @@ INSTANTIATE_TEST_SUITE_P(All,
                          ContentAnalysisPrintPreviewHandlerTest,
                          /*scanning_allows_print=*/testing::Bool());
 
-#endif  // BUILDFLAG(ENABLE_PRINT_CONTENT_ANALYSIS)
+#endif  // BUILDFLAG(ENTERPRISE_LOCAL_CONTENT_ANALYSIS)
 
 }  // namespace printing

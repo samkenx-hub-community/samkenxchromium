@@ -36,7 +36,12 @@ constexpr int kDeskBarDeskPreviewViewFocusRingThicknessAndPadding = 4;
 
 // The minimum horizontal padding of the scroll view. This is set to make sure
 // there is enough space for the scroll buttons.
-constexpr int kDeskBarScrollViewMinimumHorizontalPadding = 32;
+constexpr int kDeskBarScrollViewMinimumHorizontalPaddingOverview = 32;
+constexpr int kDeskBarScrollViewMinimumHorizontalPaddingDeskButton = 16;
+
+// The corner radius of the desk bar.
+constexpr float kDeskBarCornerRadiusOverview = 0.f;
+constexpr float kDeskBarCornerRadiusOverviewDeskButton = 16.f;
 
 constexpr int kDeskBarScrollButtonWidth = 36;
 
@@ -58,6 +63,26 @@ constexpr int kDeskBarDeskIconButtonAndLabelSpacing = 8;
 
 // For desk button desk bar, the spacing between shelf and desk bar.
 constexpr int kDeskBarShelfAndBarSpacing = 8;
+
+// For desk button desk bar, number of desk activation shortcuts
+// supported.
+constexpr int kDeskBarMaxDeskShortcut = 8;
+
+// For desk button desk bar, time in milliseconds it takes from when the desk
+// button desk bar enter event was received and successfully processed to when
+// the next frame is shown to the user.
+inline constexpr char kDeskBarEnterPresentationHistogram[] =
+    "Ash.Desks.DeskButton.DeskBar.Enter.PresentationTime";
+
+// For desk button desk bar, time in milliseconds it takes from when the desk
+// button desk bar exit event was received and successfully processed to when
+// the next frame is shown to the user.
+inline constexpr char kDeskBarExitPresentationHistogram[] =
+    "Ash.Desks.DeskButton.DeskBar.Exit.PresentationTime";
+
+// For desk button desk bar, max latency of entering/exiting the desk bar.
+inline constexpr base::TimeDelta kDeskBarEnterExitPresentationMaxLatency =
+    base::Seconds(2);
 
 }  // namespace ash
 

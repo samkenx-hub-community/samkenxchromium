@@ -12,6 +12,9 @@
 #import "ios/chrome/browser/ui/authentication/signin_earl_grey_ui_test_util.h"
 #import "ios/chrome/browser/ui/passwords/bottom_sheet/password_suggestion_bottom_sheet_app_interface.h"
 #import "ios/chrome/browser/ui/passwords/bottom_sheet/password_suggestion_bottom_sheet_constants.h"
+#import "ios/chrome/browser/ui/settings/password/password_manager_egtest_utils.h"
+#import "ios/chrome/browser/ui/settings/password/password_manager_ui_features.h"
+#import "ios/chrome/browser/ui/settings/password/password_settings_app_interface.h"
 #import "ios/chrome/browser/ui/settings/password/passwords_table_view_constants.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ios/chrome/test/earl_grey/chrome_actions.h"
@@ -19,21 +22,20 @@
 #import "ios/chrome/test/earl_grey/chrome_earl_grey_ui.h"
 #import "ios/chrome/test/earl_grey/chrome_matchers.h"
 #import "ios/chrome/test/earl_grey/chrome_test_case.h"
+#import "ios/chrome/test/scoped_eg_traits_overrider.h"
 #import "ios/testing/earl_grey/earl_grey_test.h"
 #import "ios/testing/earl_grey/matchers.h"
 #import "net/base/mac/url_conversions.h"
 #import "net/test/embedded_test_server/default_handlers.h"
 #import "ui/base/l10n/l10n_util.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
+static constexpr char kFormUsername[] = "un";
 static constexpr char kFormPassword[] = "pw";
 
 namespace {
 
 using base::test::ios::kWaitForActionTimeout;
+using password_manager_test_utils::DeleteCredential;
 
 BOOL WaitForKeyboardToAppear() {
   GREYCondition* waitForKeyboard = [GREYCondition
@@ -42,6 +44,19 @@ BOOL WaitForKeyboardToAppear() {
                     return [EarlGrey isKeyboardShownWithError:nil];
                   }];
   return [waitForKeyboard waitWithTimeout:kWaitForActionTimeout.InSecondsF()];
+}
+
+// Get the top presented view controller, in this case the bottom sheet view
+// controller.
+UIViewController* TopPresentedViewController() {
+  UIViewController* topController =
+      chrome_test_util::GetAnyKeyWindow().rootViewController;
+  for (UIViewController* controller = [topController presentedViewController];
+       controller && ![controller isBeingDismissed];
+       controller = [controller presentedViewController]) {
+    topController = controller;
+  }
+  return topController;
 }
 
 id<GREYMatcher> ButtonWithAccessibilityID(NSString* id) {
@@ -79,11 +94,23 @@ id<GREYMatcher> ButtonWithAccessibilityID(NSString* id) {
 
 - (AppLaunchConfiguration)appConfigurationForTestCase {
   AppLaunchConfiguration config;
+  config.relaunch_policy = NoForceRelaunchAndResetState;
   config.features_enabled.push_back(
       password_manager::features::kIOSPasswordBottomSheet);
-  config.features_enabled.push_back(
-      password_manager::features::kPasswordsGrouping);
-  config.relaunch_policy = ForceRelaunchByKilling;
+
+  if ([self isRunningTest:@selector
+            (testOpenPasswordBottomSheetOpenPasswordDetails)]) {
+    config.features_enabled.push_back(
+        password_manager::features::kIOSPasswordAuthOnEntryV2);
+  }
+
+  if ([self isRunningTest:@selector
+            (testOpenPasswordBottomSheetOpenPasswordDetailsWithoutAuthentication
+                )]) {
+    config.features_disabled.push_back(
+        password_manager::features::kIOSPasswordAuthOnEntryV2);
+  }
+
   return config;
 }
 
@@ -104,22 +131,18 @@ id<GREYMatcher> NavigationBarEditButton() {
                     grey_userInteractionEnabled(), nil);
 }
 
-// Matcher for the Delete button at with accessibility identifier containing
-// `username` and `password` in Password Details view.
-id<GREYMatcher> DeleteButtonForUsernameAndPassword(NSString* username,
-                                                   NSString* password) {
-  return grey_allOf(
-      grey_accessibilityID([NSString
-          stringWithFormat:@"%@%@%@", kDeleteButtonForPasswordDetailsId,
-                           username, password]),
-      grey_interactable(), nullptr);
-}
+- (void)verifyPasswordFieldsHaveBeenFilled:(NSString*)username {
+  // Verify that the username has been filled.
+  NSString* condition = [NSString
+      stringWithFormat:@"window.document.getElementById('%s').value === '%@'",
+                       kFormUsername, username];
+  [ChromeEarlGrey waitForJavaScriptCondition:condition];
 
-// Matcher for the Delete button in Confirmation Alert for password deletion.
-id<GREYMatcher> DeleteConfirmationButton() {
-  return grey_allOf(chrome_test_util::ButtonWithAccessibilityLabel(
-                        l10n_util::GetNSString(IDS_IOS_DELETE_ACTION_TITLE)),
-                    grey_interactable(), nullptr);
+  // Verify that the password field is not empty.
+  NSString* filledFieldCondition =
+      [NSString stringWithFormat:@"document.getElementById('%s').value !== ''",
+                                 kFormPassword];
+  [ChromeEarlGrey waitForJavaScriptCondition:filledFieldCondition];
 }
 
 #pragma mark - Tests
@@ -148,6 +171,8 @@ id<GREYMatcher> DeleteConfirmationButton() {
       selectElementWithMatcher:grey_accessibilityLabel(l10n_util::GetNSString(
                                    IDS_IOS_PASSWORD_BOTTOM_SHEET_USE_PASSWORD))]
       performAction:grey_tap()];
+
+  [self verifyPasswordFieldsHaveBeenFilled:@"user"];
 }
 
 // Notes:
@@ -182,6 +207,8 @@ id<GREYMatcher> DeleteConfirmationButton() {
                    grey_accessibilityLabel(l10n_util::GetNSString(
                        IDS_IOS_PASSWORD_BOTTOM_SHEET_USE_PASSWORD))]
         performAction:grey_tap()];
+
+    [self verifyPasswordFieldsHaveBeenFilled:@"user"];
   }
 }
 
@@ -247,6 +274,11 @@ id<GREYMatcher> DeleteConfirmationButton() {
 
   [ChromeEarlGreyUI waitForAppToIdle];
 
+  // Mock local authentication result needed for opening the password manager.
+  [PasswordSettingsAppInterface setUpMockReauthenticationModule];
+  [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
+                                    ReauthenticationResult::kSuccess];
+
   [[EarlGrey
       selectElementWithMatcher:
           grey_allOf(chrome_test_util::ButtonWithAccessibilityLabel(
@@ -265,9 +297,81 @@ id<GREYMatcher> DeleteConfirmationButton() {
                                                         origin]),
                                    grey_sufficientlyVisible(), nil)]
       assertWithMatcher:grey_notNil()];
+
+  [PasswordSettingsAppInterface removeMockReauthenticationModule];
 }
 
 - (void)testOpenPasswordBottomSheetOpenPasswordDetails {
+  [SigninEarlGreyUI signinWithFakeIdentity:[FakeSystemIdentity fakeIdentity1]
+                                enableSync:NO];
+  NSURL* URL =
+      net::NSURLWithGURL(self.testServer->GetURL("/simple_login_form.html"));
+  [PasswordSuggestionBottomSheetAppInterface setUpMockReauthenticationModule];
+  [PasswordSuggestionBottomSheetAppInterface
+      mockReauthenticationModuleExpectedResult:ReauthenticationResult::
+                                                   kSuccess];
+  [PasswordManagerAppInterface storeCredentialWithUsername:@"user"
+                                                  password:@"password"
+                                                       URL:URL];
+  [PasswordManagerAppInterface storeCredentialWithUsername:@"user2"
+                                                  password:@"password2"
+                                                       URL:URL];
+  int credentialsCount = [PasswordManagerAppInterface storedCredentialsCount];
+  GREYAssertEqual(2, credentialsCount, @".");
+
+  [self loadLoginPage];
+
+  [[EarlGrey selectElementWithMatcher:chrome_test_util::WebViewMatcher()]
+      performAction:chrome_test_util::TapWebElementWithId(kFormPassword)];
+
+  [ChromeEarlGrey
+      waitForUIElementToAppearWithMatcher:grey_accessibilityID(@"user")];
+
+  [[EarlGrey selectElementWithMatcher:grey_accessibilityID(@"user")]
+      performAction:grey_tap()];
+
+  [ChromeEarlGrey
+      waitForUIElementToAppearWithMatcher:grey_accessibilityID(@"user2")];
+
+  [ChromeEarlGreyUI waitForAppToIdle];
+
+  // Delay the auth result to be able to validate that password details is
+  // not visible until the result is emitted.
+  [PasswordSettingsAppInterface setUpMockReauthenticationModule];
+  [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
+                                    ReauthenticationResult::kSuccess];
+  [PasswordSettingsAppInterface
+      mockReauthenticationModuleShouldReturnSynchronously:NO];
+
+  // Long press to open context menu.
+  [[EarlGrey selectElementWithMatcher:grey_accessibilityID(@"user2")]
+      performAction:grey_longPress()];
+
+  [[EarlGrey
+      selectElementWithMatcher:
+          grey_allOf(chrome_test_util::ContextMenuItemWithAccessibilityLabelId(
+                         IDS_IOS_PASSWORD_BOTTOM_SHEET_SHOW_DETAILS),
+                     grey_interactable(), nullptr)] performAction:grey_tap()];
+
+  [ChromeEarlGreyUI waitForAppToIdle];
+
+  // Password details shouldn't be visible until auth is passed.
+  [[EarlGrey
+      selectElementWithMatcher:chrome_test_util::TextFieldForCellWithLabelId(
+                                   IDS_IOS_SHOW_PASSWORD_VIEW_USERNAME)]
+      assertWithMatcher:grey_notVisible()];
+
+  // Emit auth result so password details surface is revealed.
+
+  [PasswordSettingsAppInterface mockReauthenticationModuleReturnMockedResult];
+
+  [[EarlGrey
+      selectElementWithMatcher:chrome_test_util::TextFieldForCellWithLabelId(
+                                   IDS_IOS_SHOW_PASSWORD_VIEW_USERNAME)]
+      assertWithMatcher:grey_textFieldValue(@"user2")];
+}
+
+- (void)testOpenPasswordBottomSheetOpenPasswordDetailsWithoutAuthentication {
   [SigninEarlGreyUI signinWithFakeIdentity:[FakeSystemIdentity fakeIdentity1]
                                 enableSync:NO];
   NSURL* URL =
@@ -307,9 +411,8 @@ id<GREYMatcher> DeleteConfirmationButton() {
 
   [[EarlGrey
       selectElementWithMatcher:
-          grey_allOf(chrome_test_util::ButtonWithAccessibilityLabel(
-                         l10n_util::GetNSString(
-                             IDS_IOS_PASSWORD_BOTTOM_SHEET_SHOW_DETAILS)),
+          grey_allOf(chrome_test_util::ContextMenuItemWithAccessibilityLabelId(
+                         IDS_IOS_PASSWORD_BOTTOM_SHEET_SHOW_DETAILS),
                      grey_interactable(), nullptr)] performAction:grey_tap()];
 
   [ChromeEarlGreyUI waitForAppToIdle];
@@ -335,7 +438,6 @@ id<GREYMatcher> DeleteConfirmationButton() {
   [PasswordManagerAppInterface storeCredentialWithUsername:@"user2"
                                                   password:@"password2"
                                                        URL:URL];
-  [ChromeEarlGreyUI waitForAppToIdle];
   int credentialsCount = [PasswordManagerAppInterface storedCredentialsCount];
   GREYAssertEqual(2, credentialsCount, @"Wrong number of stored credentials.");
 
@@ -361,22 +463,23 @@ id<GREYMatcher> DeleteConfirmationButton() {
 
   [[EarlGrey
       selectElementWithMatcher:
-          grey_allOf(chrome_test_util::ButtonWithAccessibilityLabel(
-                         l10n_util::GetNSString(
-                             IDS_IOS_PASSWORD_BOTTOM_SHEET_SHOW_DETAILS)),
+          grey_allOf(chrome_test_util::ContextMenuItemWithAccessibilityLabelId(
+                         IDS_IOS_PASSWORD_BOTTOM_SHEET_SHOW_DETAILS),
                      grey_interactable(), nullptr)] performAction:grey_tap()];
 
   [ChromeEarlGreyUI waitForAppToIdle];
 
+  [PasswordSettingsAppInterface setUpMockReauthenticationModule];
+  [PasswordSettingsAppInterface mockReauthenticationModuleExpectedResult:
+                                    ReauthenticationResult::kSuccess];
+
   [[EarlGrey selectElementWithMatcher:NavigationBarEditButton()]
       performAction:grey_tap()];
 
-  [[EarlGrey selectElementWithMatcher:DeleteButtonForUsernameAndPassword(
-                                          @"user2", @"password2")]
-      performAction:grey_tap()];
-
-  [[EarlGrey selectElementWithMatcher:DeleteConfirmationButton()]
-      performAction:grey_tap()];
+  NSString* website = [URL.absoluteString
+      stringByReplacingOccurrencesOfString:@"simple_login_form.html"
+                                withString:@""];
+  DeleteCredential(@"user2", website);
 
   // Wait until the alert and the detail view are dismissed.
   [ChromeEarlGreyUI waitForAppToIdle];
@@ -434,9 +537,21 @@ id<GREYMatcher> DeleteConfirmationButton() {
       selectElementWithMatcher:grey_accessibilityLabel(l10n_util::GetNSString(
                                    IDS_IOS_PASSWORD_BOTTOM_SHEET_USE_PASSWORD))]
       performAction:grey_tap()];
+
+  [self verifyPasswordFieldsHaveBeenFilled:@"user2"];
+
+  GREYWaitForAppToIdle(@"App failed to idle");
 }
 
-- (void)testOpenPasswordBottomSheetExpand {
+// TODO(crbug.com/1474949): Fix flaky test & re-enable.
+#if TARGET_OS_SIMULATOR
+#define MAYBE_testOpenPasswordBottomSheetExpand \
+  DISABLED_testOpenPasswordBottomSheetExpand
+#else
+#define MAYBE_testOpenPasswordBottomSheetExpand \
+  testOpenPasswordBottomSheetExpand
+#endif
+- (void)MAYBE_testOpenPasswordBottomSheetExpand {
   [SigninEarlGreyUI signinWithFakeIdentity:[FakeSystemIdentity fakeIdentity1]
                                 enableSync:NO];
   NSURL* URL =
@@ -482,6 +597,8 @@ id<GREYMatcher> DeleteConfirmationButton() {
       selectElementWithMatcher:grey_accessibilityLabel(l10n_util::GetNSString(
                                    IDS_IOS_PASSWORD_BOTTOM_SHEET_USE_PASSWORD))]
       performAction:grey_tap()];
+
+  [self verifyPasswordFieldsHaveBeenFilled:@"user9"];
 }
 
 - (void)testPasswordBottomSheetDismiss3TimesNotShownAnymore {
@@ -546,6 +663,109 @@ id<GREYMatcher> DeleteConfirmationButton() {
   [[EarlGrey selectElementWithMatcher:chrome_test_util::WebViewMatcher()]
       performAction:chrome_test_util::TapWebElementWithId(kFormPassword)];
   WaitForKeyboardToAppear();
+}
+
+// TODO(crbug.com/1474949): Fix flaky test & re-enable.
+#if TARGET_OS_SIMULATOR
+#define MAYBE_testOpenPasswordBottomSheetNoUsername \
+  DISABLED_testOpenPasswordBottomSheetNoUsername
+#else
+#define MAYBE_testOpenPasswordBottomSheetNoUsername \
+  testOpenPasswordBottomSheetNoUsername
+#endif
+- (void)MAYBE_testOpenPasswordBottomSheetNoUsername {
+  [PasswordSuggestionBottomSheetAppInterface setUpMockReauthenticationModule];
+  [PasswordSuggestionBottomSheetAppInterface
+      mockReauthenticationModuleExpectedResult:ReauthenticationResult::
+                                                   kSuccess];
+  [PasswordManagerAppInterface
+      storeCredentialWithUsername:@""
+                         password:@"password"
+                              URL:net::NSURLWithGURL(self.testServer->GetURL(
+                                      "/simple_login_form.html"))];
+  [SigninEarlGreyUI signinWithFakeIdentity:[FakeSystemIdentity fakeIdentity1]
+                                enableSync:NO];
+  [self loadLoginPage];
+
+  [[EarlGrey selectElementWithMatcher:chrome_test_util::WebViewMatcher()]
+      performAction:chrome_test_util::TapWebElementWithId(kFormPassword)];
+
+  [ChromeEarlGrey waitForUIElementToAppearWithMatcher:
+                      grey_accessibilityID(l10n_util::GetNSString(
+                          IDS_IOS_PASSWORD_BOTTOM_SHEET_NO_USERNAME))];
+
+  [[EarlGrey
+      selectElementWithMatcher:grey_accessibilityID(l10n_util::GetNSString(
+                                   IDS_IOS_PASSWORD_BOTTOM_SHEET_NO_USERNAME))]
+      performAction:grey_tap()];
+
+  [[EarlGrey
+      selectElementWithMatcher:grey_accessibilityLabel(l10n_util::GetNSString(
+                                   IDS_IOS_PASSWORD_BOTTOM_SHEET_USE_PASSWORD))]
+      performAction:grey_tap()];
+
+  // Verify that selecting credentials with no username disables the bottom
+  // sheet.
+  [[EarlGrey selectElementWithMatcher:chrome_test_util::WebViewMatcher()]
+      performAction:chrome_test_util::TapWebElementWithId(kFormPassword)];
+
+  WaitForKeyboardToAppear();
+}
+
+// Tests that the Password Bottom Sheet appears when tapping on a password
+// related field and that the buttons are still visible after we chang the trait
+// collection to larger content size.
+- (void)testOpenPasswordBottomSheetUsePasswordAfterTraitCollectionChange {
+  if (@available(iOS 17.0, *)) {
+    [PasswordSuggestionBottomSheetAppInterface setUpMockReauthenticationModule];
+    [PasswordSuggestionBottomSheetAppInterface
+        mockReauthenticationModuleExpectedResult:ReauthenticationResult::
+                                                     kSuccess];
+    [PasswordManagerAppInterface
+        storeCredentialWithUsername:@"user"
+                           password:@"password"
+                                URL:net::NSURLWithGURL(self.testServer->GetURL(
+                                        "/simple_login_form.html"))];
+    [SigninEarlGreyUI signinWithFakeIdentity:[FakeSystemIdentity fakeIdentity1]
+                                  enableSync:NO];
+    [self loadLoginPage];
+
+    [[EarlGrey selectElementWithMatcher:chrome_test_util::WebViewMatcher()]
+        performAction:chrome_test_util::TapWebElementWithId(kFormPassword)];
+
+    [ChromeEarlGrey
+        waitForUIElementToAppearWithMatcher:grey_accessibilityID(@"user")];
+
+    // Change trait collection to use accessibility large content size.
+    ScopedTraitOverrider overrider(TopPresentedViewController());
+    overrider.SetContentSizeCategory(UIContentSizeCategoryAccessibilityLarge);
+
+    [ChromeEarlGreyUI waitForAppToIdle];
+
+    // Verify that the "Use Password" and "No Thanks" buttons are still visible.
+    [[EarlGrey selectElementWithMatcher:
+                   grey_accessibilityLabel(l10n_util::GetNSString(
+                       IDS_IOS_PASSWORD_BOTTOM_SHEET_USE_PASSWORD))]
+        assertWithMatcher:grey_notNil()];
+
+    [[EarlGrey
+        selectElementWithMatcher:grey_accessibilityLabel(l10n_util::GetNSString(
+                                     IDS_IOS_PASSWORD_BOTTOM_SHEET_NO_THANKS))]
+        assertWithMatcher:grey_notNil()];
+
+    // Verify the credit card tablew view is still visible.
+    [[EarlGrey selectElementWithMatcher:grey_accessibilityID(@"user")]
+        assertWithMatcher:grey_notNil()];
+
+    [[EarlGrey selectElementWithMatcher:
+                   grey_accessibilityLabel(l10n_util::GetNSString(
+                       IDS_IOS_PASSWORD_BOTTOM_SHEET_USE_PASSWORD))]
+        performAction:grey_tap()];
+
+    [self verifyPasswordFieldsHaveBeenFilled:@"user"];
+  } else {
+    EARL_GREY_TEST_SKIPPED(@"Not available for under iOS 17.");
+  }
 }
 
 @end

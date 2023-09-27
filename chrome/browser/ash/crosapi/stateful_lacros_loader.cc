@@ -73,10 +73,10 @@ void PreloadComponent(
     std::string component) {
   if (!component.empty()) {
     LOG(WARNING) << "Preloading stateful lacros. " << component;
-    manager->Load(
-        component, component_updater::CrOSComponentManager::MountPolicy::kMount,
-        component_updater::CrOSComponentManager::UpdatePolicy::kDontForce,
-        base::BindOnce(&DonePreloading));
+    manager->Load(component,
+                  component_updater::CrOSComponentManager::MountPolicy::kMount,
+                  component_updater::CrOSComponentManager::UpdatePolicy::kSkip,
+                  base::BindOnce(&DonePreloading));
   }
 }
 
@@ -148,7 +148,7 @@ StatefulLacrosLoader::StatefulLacrosLoader(
 
 StatefulLacrosLoader::~StatefulLacrosLoader() = default;
 
-void StatefulLacrosLoader::Load(LoadCompletionCallback callback) {
+void StatefulLacrosLoader::Load(LoadCompletionCallback callback, bool forced) {
   LOG(WARNING) << "Loading stateful lacros.";
 
   // If stateful lacros-chrome is already loaded once, run `callback`
@@ -161,7 +161,7 @@ void StatefulLacrosLoader::Load(LoadCompletionCallback callback) {
     return;
   }
 
-  LoadInternal(std::move(callback));
+  LoadInternal(std::move(callback), forced);
 }
 
 void StatefulLacrosLoader::Unload() {
@@ -190,6 +190,8 @@ void StatefulLacrosLoader::GetVersion(
     return;
   }
 
+  // TODO(crbug.com/1455070): There's KI that the current implementation
+  // occasionally wrongly identifies there exists. Fix the logic.
   // If there currently isn't a stateful lacros-chrome binary, set `verison_`
   // null to proceed to use the rootfs lacros-chrome binary and start the
   // installation of the stateful lacros-chrome binary in the background.
@@ -200,13 +202,21 @@ void StatefulLacrosLoader::GetVersion(
                      weak_factory_.GetWeakPtr(), std::move(callback)));
 }
 
-void StatefulLacrosLoader::LoadInternal(LoadCompletionCallback callback) {
+void StatefulLacrosLoader::LoadInternal(LoadCompletionCallback callback,
+                                        bool forced) {
+  // If a compatible installation exists, use that and download any updates in
+  // the background. If not, report just there is no available stateful lacros
+  // unless stateful lacros is forced by policy or about:flag entry.
+  // If stateful lacros is forced, we cannot fallback to rootfs lacros, so wait
+  // until the installation of stateful to be completed.
+  auto update_policy =
+      forced ? component_updater::CrOSComponentManager::UpdatePolicy::kDontForce
+             : component_updater::CrOSComponentManager::UpdatePolicy::kSkip;
+
   component_manager_->Load(
       lacros_component_name_,
       component_updater::CrOSComponentManager::MountPolicy::kMount,
-      // If a compatible installation exists, use that and download any updates
-      // in the background.
-      component_updater::CrOSComponentManager::UpdatePolicy::kDontForce,
+      update_policy,
       // If `callback` is null, means stateful lacros-chrome should be
       // installed/updated but rootfs lacros-chrome will be used.
       base::BindOnce(&StatefulLacrosLoader::OnLoad, weak_factory_.GetWeakPtr(),
@@ -258,16 +268,18 @@ void StatefulLacrosLoader::OnCheckInstalledToGetVersion(
     // lacros-chrome in the background.
     // TODO(crbug.com/1432069): Reconsider `version_` and `path_` values
     // semantics.
-    LoadInternal({});
+    LoadInternal({}, /*forced=*/false);
     std::move(callback).Run(base::Version());
     return;
   }
 
   LoadInternal(base::BindOnce(
-      [](base::OnceCallback<void(const base::Version&)> callback,
-         base::Version version,
-         const base::FilePath&) { std::move(callback).Run(version); },
-      std::move(callback)));
+                   [](base::OnceCallback<void(const base::Version&)> callback,
+                      base::Version version, const base::FilePath&) {
+                     std::move(callback).Run(version);
+                   },
+                   std::move(callback)),
+               false);
 }
 
 void StatefulLacrosLoader::OnCheckInstalledToUnload(bool was_installed) {
@@ -277,7 +289,7 @@ void StatefulLacrosLoader::OnCheckInstalledToUnload(bool was_installed) {
     return;
   }
 
-  // Workaround for login crash when the user un-sets the LacrosSupport flag.
+  // Workaround for login crash when the user disables Lacros.
   // CrOSComponentManager::Unload() calls into code in MetadataTable that
   // assumes that system salt is available. This isn't always true when chrome
   // restarts to apply non-owner flags. It's hard to make MetadataTable async.

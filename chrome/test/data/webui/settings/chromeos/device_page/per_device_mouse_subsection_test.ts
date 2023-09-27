@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import 'chrome://os-settings/os_settings.js';
 import 'chrome://resources/polymer/v3_0/iron-test-helpers/mock-interactions.js';
 
-import {CrToggleElement, FakeInputDeviceSettingsProvider, fakeMice, Mouse, PolicyStatus, Router, routes, setInputDeviceSettingsProviderForTesting, SettingsDropdownMenuElement, SettingsPerDeviceMouseSubsectionElement, SettingsSliderElement, SettingsToggleButtonElement} from 'chrome://os-settings/os_settings.js';
+import {CrLinkRowElement, CrToggleElement, FakeInputDeviceSettingsProvider, fakeMice, Mouse, PolicyStatus, Router, routes, setInputDeviceSettingsProviderForTesting, SettingsDropdownMenuElement, SettingsPerDeviceMouseSubsectionElement, SettingsSliderElement, SettingsToggleButtonElement} from 'chrome://os-settings/os_settings.js';
+import {loadTimeData} from 'chrome://resources/ash/common/load_time_data.m.js';
 import {assert} from 'chrome://resources/js/assert_ts.js';
 import {assertEquals, assertFalse, assertTrue} from 'chrome://webui-test/chai_assert.js';
 import {flushTasks, waitAfterNextRender} from 'chrome://webui-test/polymer_test_util.js';
@@ -15,6 +17,10 @@ const MOUSE_ACCELERATION_SETTING_ID = 408;
 suite('<settings-per-device-mouse-subsection>', function() {
   let subsection: SettingsPerDeviceMouseSubsectionElement;
   let provider: FakeInputDeviceSettingsProvider;
+
+  setup(() => {
+    setPeripheralCustomizationEnabled(true);
+  });
 
   teardown(() => {
     subsection.remove();
@@ -40,9 +46,20 @@ suite('<settings-per-device-mouse-subsection>', function() {
   }
 
   /**
+   * Override enablePeripheralCustomization feature flag.
+   * @param {!boolean} isEnabled
+   */
+  function setPeripheralCustomizationEnabled(isEnabled: boolean): void {
+    loadTimeData.overrideValues({
+      enablePeripheralCustomization: isEnabled,
+    });
+  }
+
+  /**
    * Test that API are updated when mouse settings change.
    */
   test('Update API when mouse settings change', async () => {
+    setPeripheralCustomizationEnabled(false);
     await initializePerDeviceMouseSubsection();
     const mouseSwapButtonDropdown =
         subsection.shadowRoot!.querySelector<SettingsDropdownMenuElement>(
@@ -89,16 +106,16 @@ suite('<settings-per-device-mouse-subsection>', function() {
         updatedMice[0]!.settings.reverseScrolling,
         mouseReverseScrollToggleButton.checked);
 
-    const mouseScrollAccelerationToggleButton =
-        subsection.shadowRoot!.querySelector<SettingsToggleButtonElement>(
-            '#mouseScrollAcceleration');
-    assert(mouseScrollAccelerationToggleButton);
-    mouseScrollAccelerationToggleButton.click();
+    const mouseControlledScrollingToggleButton =
+        subsection.shadowRoot!.querySelector<CrToggleElement>(
+            '#mouseControlledScrolling');
+    assert(mouseControlledScrollingToggleButton);
+    mouseControlledScrollingToggleButton.click();
     await flushTasks();
     updatedMice = await provider.getConnectedMouseSettings();
     assertEquals(
         updatedMice[0]!.settings.scrollAcceleration,
-        mouseScrollAccelerationToggleButton.pref!.value);
+        !mouseControlledScrollingToggleButton.checked);
 
     const mouseScrollSpeedSlider =
         subsection.shadowRoot!.querySelector<SettingsSliderElement>(
@@ -118,7 +135,16 @@ suite('<settings-per-device-mouse-subsection>', function() {
    */
   test('Verify mouse settings data', async () => {
     await initializePerDeviceMouseSubsection();
+    // Verify that swapright setting will not be visible when
+    // peripheralCustomization flag is enabled.
     let mouseSwapButtonDropdown =
+        subsection.shadowRoot!.querySelector<SettingsDropdownMenuElement>(
+            '#mouseSwapButtonDropdown');
+    assert(!mouseSwapButtonDropdown);
+
+    setPeripheralCustomizationEnabled(false);
+    await initializePerDeviceMouseSubsection();
+    mouseSwapButtonDropdown =
         subsection.shadowRoot!.querySelector<SettingsDropdownMenuElement>(
             '#mouseSwapButtonDropdown');
     assertEquals(
@@ -137,13 +163,13 @@ suite('<settings-per-device-mouse-subsection>', function() {
     assertEquals(
         fakeMice[0]!.settings.reverseScrolling,
         subsection.get('reverseScrollValue'));
-    let mouseScrollAccelerationToggleButton =
-        subsection.shadowRoot!.querySelector<SettingsSliderElement>(
-            '#mouseScrollAcceleration');
-    assertTrue(isVisible(mouseScrollAccelerationToggleButton));
+    let mouseControlledScrollingToggleButton =
+        subsection.shadowRoot!.querySelector<CrToggleElement>(
+            '#mouseControlledScrolling');
+    assertTrue(isVisible(mouseControlledScrollingToggleButton));
     assertEquals(
         fakeMice[0]!.settings.scrollAcceleration,
-        mouseScrollAccelerationToggleButton!.pref!.value);
+        !mouseControlledScrollingToggleButton!.checked);
     let mouseScrollSpeedSlider =
         subsection.shadowRoot!.querySelector<SettingsSliderElement>(
             '#mouseScrollSpeedSlider');
@@ -171,9 +197,9 @@ suite('<settings-per-device-mouse-subsection>', function() {
     assertEquals(
         fakeMice[1]!.settings.reverseScrolling,
         subsection.get('reverseScrollValue'));
-    mouseScrollAccelerationToggleButton =
-        subsection.shadowRoot!.querySelector('#mouseScrollAcceleration');
-    assertFalse(isVisible(mouseScrollAccelerationToggleButton));
+    mouseControlledScrollingToggleButton =
+        subsection.shadowRoot!.querySelector('#mouseControlledScrolling');
+    assertFalse(isVisible(mouseControlledScrollingToggleButton));
     mouseScrollSpeedSlider =
         subsection.shadowRoot!.querySelector('#mouseScrollSpeedSlider');
     assertFalse(isVisible(mouseScrollSpeedSlider));
@@ -229,7 +255,9 @@ suite('<settings-per-device-mouse-subsection>', function() {
    * Verifies that the policy indicator is properly reflected in the UI.
    */
   test('swap right policy reflected in UI', async () => {
+    setPeripheralCustomizationEnabled(false);
     await initializePerDeviceMouseSubsection();
+    flushTasks();
     subsection.set('mousePolicies', {
       swapRightPolicy: {policy_status: PolicyStatus.kManaged, value: false},
     });
@@ -247,4 +275,63 @@ suite('<settings-per-device-mouse-subsection>', function() {
         swapRightDropdown.shadowRoot!.querySelector('cr-policy-pref-indicator');
     assertFalse(isVisible(policyIndicator));
   });
+
+  /**
+   * Verify clicking the customize mouse buttons row will be redirecting to the
+   * customize mouse buttons subpage.
+   */
+  test('click customize mouse buttons redirect to new subpage', async () => {
+    await initializePerDeviceMouseSubsection();
+    const customizeButtonsRow =
+        subsection.shadowRoot!.querySelector<CrLinkRowElement>(
+            '#customizeMouseButtons');
+    assertTrue(!!customizeButtonsRow);
+    customizeButtonsRow.click();
+
+    await flushTasks();
+    assertEquals(
+        routes.CUSTOMIZE_MOUSE_BUTTONS, Router.getInstance().currentRoute);
+
+    const urlSearchQuery =
+        Router.getInstance().getQueryParameters().get('mouseId');
+    assertTrue(!!urlSearchQuery);
+    const mouseId = Number(urlSearchQuery);
+    assertFalse(isNaN(mouseId));
+    const expectedMouseId = subsection.get('mouse.id');
+    assertEquals(expectedMouseId, mouseId);
+  });
+
+  /**
+   * Test that turn on controlled scrolling will enable scrolling speed slider.
+   */
+  test(
+      'turn on controlled scrolling will enable scrolling speed slider',
+      async () => {
+        await initializePerDeviceMouseSubsection();
+        const mouseControlledScrollingToggleButton =
+            subsection.shadowRoot!.querySelector<SettingsToggleButtonElement>(
+                '#mouseControlledScrolling');
+        assert(mouseControlledScrollingToggleButton);
+        const mouseScrollSpeedSlider =
+            subsection.shadowRoot!.querySelector<SettingsSliderElement>(
+                '#mouseScrollSpeedSlider');
+        assert(mouseScrollSpeedSlider);
+
+        // When controlled scrolling is on, scroll speed slider is enabled.
+        assertFalse(fakeMice[0]!.settings.scrollAcceleration);
+        assertFalse(mouseScrollSpeedSlider.disabled);
+
+        mouseControlledScrollingToggleButton.click();
+        // Refresh the whole subsection page is necessary since the slider
+        // element has some issue getting updated.
+        await initializePerDeviceMouseSubsection();
+
+        // When controlled scrolling is off, scroll speed slider is disabled.
+        assertTrue(fakeMice[0]!.settings.scrollAcceleration);
+        const updatedMouseScrollSpeedSlider =
+            subsection.shadowRoot!.querySelector<SettingsSliderElement>(
+                '#mouseScrollSpeedSlider');
+        assert(updatedMouseScrollSpeedSlider);
+        assertTrue(updatedMouseScrollSpeedSlider.disabled);
+      });
 });

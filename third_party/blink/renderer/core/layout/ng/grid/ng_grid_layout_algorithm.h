@@ -18,8 +18,6 @@
 
 namespace blink {
 
-class NGBoxFragment;
-
 // This enum corresponds to each step used to accommodate grid items across
 // intrinsic tracks according to their min and max track sizing functions, as
 // defined in https://drafts.csswg.org/css-grid-2/#algo-spanning-items.
@@ -88,12 +86,6 @@ class CORE_EXPORT NGGridLayoutAlgorithm
 
   LayoutUnit ComputeIntrinsicBlockSizeIgnoringChildren() const;
 
-  LayoutUnit GetLogicalBaseline(const NGBoxFragment&,
-                                const bool is_last_baseline) const;
-  LayoutUnit GetSynthesizedLogicalBaseline(const LayoutUnit block_size,
-                                           const bool is_flipped_lines,
-                                           const bool is_last_baseline) const;
-
   // Returns the size that a grid item will distribute across the tracks with an
   // intrinsic sizing function it spans in the relevant track direction.
   LayoutUnit ContributionSizeForGridItem(
@@ -114,7 +106,8 @@ class CORE_EXPORT NGGridLayoutAlgorithm
 
   // Determines the major/minor alignment baselines for each row/column based on
   // each item in |grid_items|, and stores the results in |track_collection|.
-  void ComputeGridItemBaselines(const NGGridSizingSubtree& sizing_subtree,
+  void ComputeGridItemBaselines(const NGGridLayoutSubtree& layout_subtree,
+                                const NGGridSizingSubtree& sizing_subtree,
                                 GridTrackSizingDirection track_direction,
                                 SizingConstraint sizing_constraint) const;
 
@@ -161,6 +154,7 @@ class CORE_EXPORT NGGridLayoutAlgorithm
 
   // Performs the final baseline alignment pass of a grid sizing subtree.
   void ComputeBaselineAlignment(
+      const NGGridLayoutSubtree& layout_subtree,
       const NGGridSizingSubtree& sizing_subtree,
       const NGSubgriddedItemData& opt_subgrid_data,
       const absl::optional<GridTrackSizingDirection>& opt_track_direction,
@@ -225,11 +219,13 @@ class CORE_EXPORT NGGridLayoutAlgorithm
       absl::optional<LayoutUnit> opt_fragment_relative_block_offset =
           absl::nullopt) const;
 
+  // `containing_grid_area` is an optional out parameter that holds the computed
+  // grid area (offset and size) of the specified grid item.
   NGConstraintSpace CreateConstraintSpaceForLayout(
       const GridItemData& grid_item,
       const NGGridLayoutData& layout_data,
-      LogicalRect* containing_grid_area,
       NGGridLayoutSubtree&& opt_layout_subtree = NGGridLayoutSubtree(),
+      LogicalRect* containing_grid_area = nullptr,
       LayoutUnit unavailable_block_size = LayoutUnit(),
       bool min_block_size_should_encompass_intrinsic_size = false,
       absl::optional<LayoutUnit> opt_fragment_relative_block_offset =
@@ -252,8 +248,7 @@ class CORE_EXPORT NGGridLayoutAlgorithm
   // This is used for fragmentation which requires us to know the final offset
   // of each item before fragmentation occurs.
   void PlaceGridItems(
-      const GridItems& grid_items,
-      const NGGridLayoutSubtree& layout_subtree,
+      const NGGridSizingTree& sizing_tree,
       Vector<EBreakBetween>* out_row_break_between,
       Vector<GridItemPlacementData>* out_grid_items_placement_data = nullptr);
 
@@ -263,9 +258,8 @@ class CORE_EXPORT NGGridLayoutAlgorithm
   // This will go through all the grid_items and place fragments which belong
   // within this fragmentainer.
   void PlaceGridItemsForFragmentation(
-      const GridItems& grid_items,
+      const NGGridSizingTree& sizing_tree,
       const Vector<EBreakBetween>& row_break_between,
-      NGGridLayoutData* layout_data,
       Vector<GridItemPlacementData>* grid_item_placement_data,
       Vector<LayoutUnit>* row_offset_adjustments,
       LayoutUnit* intrinsic_block_size,

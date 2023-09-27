@@ -8,6 +8,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import android.app.Activity;
+import android.content.res.Resources;
 import android.graphics.drawable.Drawable;
 import android.view.View;
 
@@ -33,6 +34,7 @@ import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.toolbar.adaptive.AdaptiveToolbarButtonVariant;
 import org.chromium.chrome.browser.user_education.IPHCommandBuilder;
 import org.chromium.chrome.test.util.browser.Features;
+import org.chromium.chrome.test.util.browser.Features.EnableFeatures;
 import org.chromium.components.feature_engagement.FeatureConstants;
 import org.chromium.ui.modaldialog.ModalDialogManager;
 
@@ -41,7 +43,7 @@ import org.chromium.ui.modaldialog.ModalDialogManager;
  */
 @RunWith(BaseRobolectricTestRunner.class)
 @Config(manifest = Config.NONE)
-@Features.EnableFeatures({ChromeFeatureList.CONTEXTUAL_PAGE_ACTION_PRICE_TRACKING,
+@EnableFeatures({ChromeFeatureList.CONTEXTUAL_PAGE_ACTION_PRICE_TRACKING,
         ChromeFeatureList.ADAPTIVE_BUTTON_IN_TOP_TOOLBAR_CUSTOMIZATION_V2})
 public class BaseButtonDataProviderTest {
     private class TestButtonDataProvider extends BaseButtonDataProvider {
@@ -50,7 +52,8 @@ public class BaseButtonDataProviderTest {
                 String contentDescription, int actionChipLabelResId, boolean supportsTinting,
                 int adaptiveButtonVariant) {
             super(activeTabSupplier, modalDialogManager, buttonDrawable, contentDescription,
-                    actionChipLabelResId, supportsTinting, null, adaptiveButtonVariant);
+                    actionChipLabelResId, supportsTinting, null, adaptiveButtonVariant,
+                    Resources.ID_NULL, false);
         }
 
         @Override

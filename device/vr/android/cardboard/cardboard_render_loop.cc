@@ -10,7 +10,6 @@
 #include "base/task/bind_post_task.h"
 #include "device/vr/android/cardboard/cardboard_image_transport.h"
 #include "device/vr/android/cardboard/cardboard_sdk.h"
-#include "device/vr/android/xr_java_coordinator.h"
 #include "device/vr/public/mojom/isolated_xr_service.mojom.h"
 #include "device/vr/public/mojom/vr_service.mojom-shared.h"
 #include "device/vr/util/transform_utils.h"
@@ -72,17 +71,9 @@ void CardboardRenderLoop::GetEnvironmentIntegrationProvider(
       "Environment integration is not supported.");
 }
 
-void CardboardRenderLoop::SetInputSourceButtonListener(
-    mojo::PendingAssociatedRemote<device::mojom::XRInputSourceButtonListener>) {
-  // Input eventing is not supported. This call should not
-  // be made on this device.
-  frame_data_receiver_.ReportBadMessage("Input eventing is not supported.");
-}
-
 void CardboardRenderLoop::CreateSession(
     CardboardRequestSessionCallback session_request_callback,
     base::OnceClosure session_shutdown_callback,
-    XrJavaCoordinator* java_coordinator,
     CardboardSdk* cardboard_sdk,
     gfx::AcceleratedWidget drawing_widget,
     const gfx::Size& frame_size,
@@ -92,11 +83,11 @@ void CardboardRenderLoop::CreateSession(
   CHECK(!session_request_callback_);
   CHECK(!frame_size.IsEmpty());
   DVLOG(1) << __func__;
+  cardboard_sdk_ = cardboard_sdk;
 
   // The initial frame size given here should correspond with the display size.
   cardboard_image_transport_ = cardboard_image_transport_factory_->Create(
       std::move(mailbox_bridge_), frame_size);
-  cardboard_sdk_ = cardboard_sdk;
   session_request_callback_ = std::move(session_request_callback);
   session_shutdown_callback_ = std::move(session_shutdown_callback);
   texture_size_ = frame_size;
@@ -107,6 +98,16 @@ void CardboardRenderLoop::CreateSession(
                            options->required_features.end());
   enabled_features_.insert(options->optional_features.begin(),
                            options->optional_features.end());
+
+  if (!InitializeGl(drawing_widget)) {
+    std::move(session_request_callback_).Run(nullptr);
+    return;
+  }
+
+  cardboard_image_transport_->Initialize(
+      webxr_.get(),
+      base::BindOnce(&CardboardRenderLoop::OnCardboardImageTransportReady,
+                     weak_ptr_factory_.GetWeakPtr()));
 
   left_eye_ = mojom::XRView::New();
   left_eye_->eye = mojom::XREye::kLeft;
@@ -126,26 +127,6 @@ void CardboardRenderLoop::CreateSession(
   right_eye_->mojo_from_view = gfx::Transform();
   right_eye_->field_of_view =
       cardboard_image_transport_->GetFOV(CardboardEye::kRight);
-
-  if (!InitializeGl(drawing_widget)) {
-    std::move(session_request_callback_).Run(nullptr);
-    return;
-  }
-
-  base::android::ScopedJavaLocalRef<jobject> application_context =
-      java_coordinator->GetCurrentActivityContext();
-  if (!application_context.obj()) {
-    DLOG(ERROR) << "Unable to retrieve the Java context/activity!";
-    std::move(session_request_callback_).Run(nullptr);
-    return;
-  }
-
-  cardboard_sdk_->Initialize(application_context.obj());
-
-  cardboard_image_transport_->Initialize(
-      webxr_.get(),
-      base::BindOnce(&CardboardRenderLoop::OnCardboardImageTransportReady,
-                     weak_ptr_factory_.GetWeakPtr()));
 
   head_tracker_ = internal::ScopedCardboardObject<CardboardHeadTracker*>(
       CardboardHeadTracker_create());
@@ -198,6 +179,10 @@ bool CardboardRenderLoop::InitializeGl(gfx::AcceleratedWidget drawing_widget) {
     DLOG(ERROR) << "gl::GLContext::MakeCurrent() failed";
     return false;
   }
+
+  // Swap the surface once so that it will show an empty texture rather than
+  // just being transparent.
+  surface->SwapBuffers(base::DoNothing(), gfx::FrameData());
 
   // Assign the surface and context members now that initialization has
   // succeeded.
@@ -367,9 +352,10 @@ void CardboardRenderLoop::GetFrameData(
   xr_frame->bounds_right = right_bounds_;
 
   if (CardboardImageTransport::UseSharedBuffer()) {
-    // TODO(https://crbug.com/1429099): Do we need to pass a uv_transform?
+    // We aren't modifying the texture that we give to the page, so we just pass
+    // in identity for the uv_transform.
     frame_data->buffer_holder = cardboard_image_transport_->TransferFrame(
-        webxr_.get(), texture_size_, /*uv_transform=*/gfx::Transform());
+        webxr_.get(), texture_size_, gfx::Transform());
   }
 
   // Get the head pose
@@ -412,6 +398,10 @@ void CardboardRenderLoop::GetFrameData(
 }
 
 bool CardboardRenderLoop::IsSubmitFrameExpected(int16_t frame_index) {
+  DVLOG(3) << __func__ << ": Frame Index=" << frame_index
+           << " submit_client_=" << !!submit_client_.get()
+           << " HaveAnimatingFrame()=" << webxr_->HaveAnimatingFrame()
+           << " pending_shutdown_=" << pending_shutdown_;
   // submit_client_ could be null when we exit presentation, if there were
   // pending SubmitFrame messages queued.  XRSessionClient::OnExitPresent
   // will clean up state in blink, so it doesn't wait for
@@ -445,7 +435,7 @@ bool CardboardRenderLoop::IsSubmitFrameExpected(int16_t frame_index) {
 void CardboardRenderLoop::SubmitFrameMissing(int16_t frame_index,
                                              const gpu::SyncToken& sync_token) {
   TRACE_EVENT1("gpu", __func__, "frame", frame_index);
-  DVLOG(2) << __func__;
+  DVLOG(2) << __func__ << ": frame=" << frame_index;
 
   if (!IsSubmitFrameExpected(frame_index)) {
     return;
@@ -454,6 +444,10 @@ void CardboardRenderLoop::SubmitFrameMissing(int16_t frame_index,
   webxr_->RecycleUnusedAnimatingFrame();
   cardboard_image_transport_->WaitSyncToken(sync_token);
   FinishFrame(frame_index);
+
+  if (pending_getframedata_) {
+    std::move(pending_getframedata_).Run();
+  }
 }
 
 void CardboardRenderLoop::SubmitFrame(int16_t frame_index,
@@ -480,7 +474,8 @@ void CardboardRenderLoop::ProcessFrameFromMailbox(
   CHECK(webxr_->HaveProcessingFrame());
   CHECK(!CardboardImageTransport::UseSharedBuffer());
 
-  // TODO(https://crbug.com/1429099): Do we need to pass a uv_transform?
+  // We aren't modifying the texture that we've received from the page, so we
+  // just pass in identity.
   cardboard_image_transport_->CopyMailboxToSurfaceAndSwap(
       texture_size_, mailbox, gfx::Transform());
 
@@ -517,6 +512,10 @@ void CardboardRenderLoop::ProcessFrameDrawnIntoTexture(
   cardboard_image_transport_->CreateGpuFenceForSyncToken(
       sync_token,
       base::BindOnce(&CardboardRenderLoop::OnWebXrTokenSignaled, GetWeakPtr()));
+
+  if (pending_getframedata_) {
+    std::move(pending_getframedata_).Run();
+  }
 }
 
 void CardboardRenderLoop::OnWebXrTokenSignaled(

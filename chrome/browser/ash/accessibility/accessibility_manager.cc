@@ -11,6 +11,7 @@
 
 #include "ash/accessibility/autoclick/autoclick_controller.h"
 #include "ash/accessibility/sticky_keys/sticky_keys_controller.h"
+#include "ash/color_enhancement/color_enhancement_controller.h"
 #include "ash/constants/ash_constants.h"
 #include "ash/constants/ash_pref_names.h"
 #include "ash/constants/ash_switches.h"
@@ -43,7 +44,7 @@
 #include "base/task/thread_pool.h"
 #include "base/threading/scoped_blocking_call.h"
 #include "base/values.h"
-#include "chrome/browser/accessibility/accessibility_extension_api_chromeos.h"
+#include "chrome/browser/accessibility/accessibility_extension_api_ash.h"
 #include "chrome/browser/accessibility/pdf_ocr_controller.h"
 #include "chrome/browser/accessibility/pdf_ocr_controller_factory.h"
 #include "chrome/browser/ash/accessibility/accessibility_extension_loader.h"
@@ -63,7 +64,6 @@
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/ui/ash/keyboard/chrome_keyboard_controller_client.h"
 #include "chrome/browser/ui/ash/multi_user/multi_user_util.h"
-#include "chrome/browser/ui/scoped_tabbed_browser_displayer.h"
 #include "chrome/browser/ui/singleton_tabs.h"
 #include "chrome/common/chrome_paths.h"
 #include "chrome/common/extensions/api/accessibility_private.h"
@@ -76,6 +76,7 @@
 #include "chromeos/ash/components/browser_context_helper/browser_context_helper.h"
 #include "chromeos/ash/components/browser_context_helper/browser_context_types.h"
 #include "chromeos/ash/components/dbus/upstart/upstart_client.h"
+#include "chromeos/ash/components/language_packs/language_pack_manager.h"
 #include "chromeos/constants/devicetype.h"
 #include "chromeos/dbus/power/power_manager_client.h"
 #include "components/language/core/browser/pref_names.h"
@@ -108,6 +109,7 @@
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/resource/resource_bundle.h"
 #include "ui/events/keycodes/keyboard_codes_posix.h"
+#include "ui/strings/grit/ui_strings.h"
 #include "ui/views/widget/widget.h"
 #include "ui/views/widget/widget_observer.h"
 #include "url/gurl.h"
@@ -382,16 +384,7 @@ AccessibilityManager* AccessibilityManager::Get() {
 
 // static
 void AccessibilityManager::ShowAccessibilityHelp() {
-  if (crosapi::browser_util::IsLacrosPrimaryBrowser()) {
-    crosapi::BrowserManager::Get()->SwitchToTab(
-        GURL(chrome::kChromeAccessibilityHelpURL),
-        /*path_behavior=*/NavigateParams::RESPECT);
-    return;
-  }
-
-  chrome::ScopedTabbedBrowserDisplayer displayer(
-      ProfileManager::GetActiveUserProfile());
-  ShowSingletonTab(displayer.browser(),
+  ShowSingletonTab(ProfileManager::GetActiveUserProfile(),
                    GURL(chrome::kChromeAccessibilityHelpURL));
 }
 
@@ -563,6 +556,11 @@ bool AccessibilityManager::ShouldShowAccessibilityMenu() {
         prefs->GetBoolean(prefs::kDockedMagnifierEnabled)) {
       return true;
     }
+    if (::features::
+            AreExperimentalAccessibilityColorEnhancementSettingsEnabled() &&
+        prefs->GetBoolean(prefs::kAccessibilityColorCorrectionEnabled)) {
+      return true;
+    }
   }
   return false;
 }
@@ -669,15 +667,11 @@ void AccessibilityManager::OnSpokenFeedbackChanged() {
         profile_,
         base::BindOnce(&AccessibilityManager::PostSwitchChromeVoxProfile,
                        weak_ptr_factory_.GetWeakPtr()));
-    if (accessibility_service_client_)
-      accessibility_service_client_->SetProfile(profile_);
 
     if (::features::IsPdfOcrEnabled()) {
       // Create PdfOcrController when both the PDF OCR feature flag and
       // Chromevox are enabled.
       ::screen_ai::PdfOcrControllerFactory::GetForProfile(profile());
-      // TODO(crbug.com/1393069): Destroy `PdfOcrController` when no longer
-      // needed.
     }
   }
 
@@ -857,8 +851,6 @@ void AccessibilityManager::OnAccessibilityCommonChanged(
   if (enabled) {
     accessibility_common_extension_loader_->SetBrowserContext(
         profile_, base::OnceClosure() /* done_callback */);
-    if (accessibility_service_client_)
-      accessibility_service_client_->SetProfile(profile_);
   }
 
   size_t pref_count = accessibility_common_enabled_features_.count(pref_name);
@@ -1255,8 +1247,6 @@ void AccessibilityManager::OnSelectToSpeakChanged() {
       prefs::kAccessibilitySelectToSpeakEnabled);
   if (enabled) {
     select_to_speak_loader_->SetBrowserContext(profile_, base::OnceClosure());
-    if (accessibility_service_client_)
-      accessibility_service_client_->SetProfile(profile_);
   }
 
   if (select_to_speak_enabled_ == enabled)
@@ -1284,6 +1274,25 @@ void AccessibilityManager::OnSelectToSpeakChanged() {
     select_to_speak_loader_->Unload();
     select_to_speak_event_handler_delegate_.reset();
   }
+}
+
+void AccessibilityManager::OnSelectToSpeakContextMenuClick() {
+  if (!profile_) {
+    return;
+  }
+
+  extensions::EventRouter* event_router =
+      extensions::EventRouter::Get(profile_);
+
+  // Send an event to the Select-to-Speak extension requesting a state change.
+  std::unique_ptr<extensions::Event> event(new extensions::Event(
+      extensions::events::
+          ACCESSIBILITY_PRIVATE_ON_SELECT_TO_SPEAK_CONTEXT_MENU_CLICKED,
+      extensions::api::accessibility_private::
+          OnSelectToSpeakContextMenuClicked::kEventName,
+      base::Value::List()));
+  event_router->DispatchEventWithLazyListener(
+      extension_misc::kSelectToSpeakExtensionId, std::move(event));
 }
 
 void AccessibilityManager::SetSwitchAccessEnabled(bool enabled) {
@@ -1317,9 +1326,6 @@ void AccessibilityManager::OnSwitchAccessChanged() {
 
     switch_access_loader_->SetBrowserContext(profile_, base::OnceClosure());
 
-    if (accessibility_service_client_)
-      accessibility_service_client_->SetProfile(profile_);
-
     // Make sure we always update the VK state, on every profile transition.
     ChromeKeyboardControllerClient::Get()->SetEnableFlag(
         keyboard::KeyboardEnableFlag::kExtensionEnabled);
@@ -1347,6 +1353,22 @@ void AccessibilityManager::OnSwitchAccessChanged() {
 
 void AccessibilityManager::OnSwitchAccessDisabled() {
   switch_access_loader_->Unload();
+}
+
+void AccessibilityManager::SetColorCorrectionEnabled(bool enabled) {
+  if (!profile_) {
+    return;
+  }
+
+  PrefService* pref_service = profile_->GetPrefs();
+  pref_service->SetBoolean(prefs::kAccessibilityColorCorrectionEnabled,
+                           enabled);
+  pref_service->CommitPendingWrite();
+}
+
+bool AccessibilityManager::IsColorCorrectionEnabled() const {
+  return profile_ && profile_->GetPrefs()->GetBoolean(
+                         prefs::kAccessibilityColorCorrectionEnabled);
 }
 
 bool AccessibilityManager::IsBrailleDisplayConnected() const {
@@ -1559,15 +1581,16 @@ void AccessibilityManager::SetProfile(Profile* profile) {
             &AccessibilityManager::UpdateChromeOSAccessibilityHistograms,
             base::Unretained(this)));
 
-    if (accessibility_service_client_)
-      accessibility_service_client_->SetProfile(profile);
-
     extensions::ExtensionRegistry* registry =
         extensions::ExtensionRegistry::Get(profile);
     if (!extension_registry_observations_.IsObservingSource(registry))
       extension_registry_observations_.AddObservation(registry);
 
     profile_observation_.Observe(profile);
+  }
+
+  if (accessibility_service_client_) {
+    accessibility_service_client_->SetProfile(profile);
   }
 
   bool had_profile = (profile_ != nullptr);
@@ -1684,6 +1707,23 @@ void AccessibilityManager::UpdateChromeOSAccessibilityHistograms() {
     base::UmaHistogramBoolean(
         "Accessibility.CrosCursorColor",
         prefs->GetBoolean(prefs::kAccessibilityCursorColorEnabled));
+
+    if (::features::
+            AreExperimentalAccessibilityColorEnhancementSettingsEnabled()) {
+      bool color_correction_enabled = IsColorCorrectionEnabled();
+      base::UmaHistogramBoolean("Accessibility.CrosColorCorrection",
+                                color_correction_enabled);
+      if (color_correction_enabled) {
+        base::UmaHistogramEnumeration(
+            "Accessibility.CrosColorCorrection.FilterType",
+            static_cast<ColorVisionCorrectionType>(prefs->GetInteger(
+                prefs::kAccessibilityColorVisionCorrectionType)));
+        base::UmaHistogramPercentage(
+            "Accessibility.CrosColorCorrection.FilterAmount",
+            prefs->GetInteger(
+                prefs::kAccessibilityColorVisionCorrectionAmount));
+      }
+    }
   }
   base::UmaHistogramBoolean("Accessibility.CrosCaretHighlight",
                             IsCaretHighlightEnabled());
@@ -1816,7 +1856,7 @@ void AccessibilityManager::PostLoadChromeVox() {
   audio_focus_manager_->SetEnforcementMode(
       media_session::mojom::EnforcementMode::kNone);
 
-  InitializeFocusRings(extension_id);
+  InitializeFocusRings(ax::mojom::AssistiveTechnologyType::kChromeVox);
 
   // Force volume slide gesture to be on for Chromebox for Meetings provisioned
   // devices.
@@ -1838,7 +1878,7 @@ void AccessibilityManager::PostUnloadChromeVox() {
 
   PlayEarcon(Sound::kSpokenFeedbackDisabled, PlaySoundOption::kAlways);
 
-  RemoveFocusRings(extension_misc::kChromeVoxExtensionId);
+  RemoveFocusRings(ax::mojom::AssistiveTechnologyType::kChromeVox);
 
   if (chromevox_panel_) {
     chromevox_panel_->Close();
@@ -1877,7 +1917,7 @@ void AccessibilityManager::OnChromeVoxPanelDestroying() {
 }
 
 void AccessibilityManager::PostLoadSelectToSpeak() {
-  InitializeFocusRings(extension_misc::kSelectToSpeakExtensionId);
+  InitializeFocusRings(ax::mojom::AssistiveTechnologyType::kSelectToSpeak);
 
   UpdateEnhancedNetworkTts();
 }
@@ -1887,7 +1927,7 @@ void AccessibilityManager::PostUnloadSelectToSpeak() {
   // unloads.
 
   // Clear the accessibility focus ring and highlight.
-  RemoveFocusRings(extension_misc::kSelectToSpeakExtensionId);
+  RemoveFocusRings(ax::mojom::AssistiveTechnologyType::kSelectToSpeak);
   HideHighlights();
 
   UpdateEnhancedNetworkTts();
@@ -1960,7 +2000,7 @@ void AccessibilityManager::PostLoadEnhancedNetworkTts() {
 }
 
 void AccessibilityManager::PostLoadSwitchAccess() {
-  InitializeFocusRings(extension_misc::kSwitchAccessExtensionId);
+  InitializeFocusRings(ax::mojom::AssistiveTechnologyType::kSwitchAccess);
 }
 
 void AccessibilityManager::PostUnloadSwitchAccess() {
@@ -1968,7 +2008,7 @@ void AccessibilityManager::PostUnloadSwitchAccess() {
   // unloads.
 
   // Clear the accessibility focus ring.
-  RemoveFocusRings(extension_misc::kSwitchAccessExtensionId);
+  RemoveFocusRings(ax::mojom::AssistiveTechnologyType::kSwitchAccess);
 
   if (!was_vk_enabled_before_switch_access_) {
     ChromeKeyboardControllerClient::Get()->ClearEnableFlag(
@@ -1982,14 +2022,18 @@ void AccessibilityManager::PostLoadAccessibilityCommon() {
   // Do any setup work needed immediately after the Accessibility Common
   // extension actually loads. This may be used by all features which make
   // use of the Accessibility Common extension.
-  InitializeFocusRings(extension_misc::kAccessibilityCommonExtensionId);
+  // Autoclick uses a focus ring to highlight the scrollable area.
+  InitializeFocusRings(ax::mojom::AssistiveTechnologyType::kAutoClick);
+  // Magnifier may use a focus ring to draw the user debug rect.
+  InitializeFocusRings(ax::mojom::AssistiveTechnologyType::kMagnifier);
 }
 
 void AccessibilityManager::PostUnloadAccessibilityCommon() {
   // Do any teardown work needed immediately after the Accessibility Common
   // extension actually unloads. This may be used by all features which make
   // use of the Accessibility Common extension.
-  RemoveFocusRings(extension_misc::kAccessibilityCommonExtensionId);
+  RemoveFocusRings(ax::mojom::AssistiveTechnologyType::kAutoClick);
+  RemoveFocusRings(ax::mojom::AssistiveTechnologyType::kMagnifier);
 }
 
 void AccessibilityManager::SetKeyboardListenerExtensionId(
@@ -2035,31 +2079,32 @@ bool AccessibilityManager::ToggleDictation() {
 }
 
 const std::string AccessibilityManager::GetFocusRingId(
-    const std::string& extension_id,
+    ax::mojom::AssistiveTechnologyType at_type,
     const std::string& focus_ring_name) {
   // Add the focus ring name to the list of focus rings for the extension.
-  focus_ring_names_for_extension_id_.find(extension_id)
-      ->second.insert(focus_ring_name);
-  return extension_id + '-' + focus_ring_name;
+  focus_ring_names_for_at_type_.find(at_type)->second.insert(focus_ring_name);
+  std::ostringstream typeStringStream;
+  typeStringStream << at_type;
+  return typeStringStream.str() + '-' + focus_ring_name;
 }
 
 void AccessibilityManager::InitializeFocusRings(
-    const std::string& extension_id) {
-  if (focus_ring_names_for_extension_id_.count(extension_id) == 0) {
-    focus_ring_names_for_extension_id_.emplace(extension_id,
-                                               std::set<std::string>());
+    ax::mojom::AssistiveTechnologyType at_type) {
+  if (focus_ring_names_for_at_type_.count(at_type) == 0) {
+    focus_ring_names_for_at_type_.emplace(at_type, std::set<std::string>());
   }
 }
 
-void AccessibilityManager::RemoveFocusRings(const std::string& extension_id) {
-  if (focus_ring_names_for_extension_id_.count(extension_id) != 0) {
+void AccessibilityManager::RemoveFocusRings(
+    ax::mojom::AssistiveTechnologyType at_type) {
+  if (focus_ring_names_for_at_type_.count(at_type) != 0) {
     const std::set<std::string>& focus_ring_names =
-        focus_ring_names_for_extension_id_.find(extension_id)->second;
+        focus_ring_names_for_at_type_.find(at_type)->second;
 
     for (const std::string& focus_ring_name : focus_ring_names)
-      HideFocusRing(GetFocusRingId(extension_id, focus_ring_name));
+      HideFocusRing(GetFocusRingId(at_type, focus_ring_name));
   }
-  focus_ring_names_for_extension_id_.erase(extension_id);
+  focus_ring_names_for_at_type_.erase(at_type);
 }
 
 void AccessibilityManager::SetFocusRing(
@@ -2354,7 +2399,7 @@ void AccessibilityManager::ShowNetworkDictationDialog() {
   const std::u16string text =
       l10n_util::GetStringUTF16(IDS_ACCESSIBILITY_DICTATION_CONFIRMATION_TEXT);
   AccessibilityController::Get()->ShowConfirmationDialog(
-      title, text,
+      title, text, l10n_util::GetStringUTF16(IDS_APP_CANCEL),
       base::BindOnce(&AccessibilityManager::OnNetworkDictationDialogAccepted,
                      base::Unretained(this)),
       base::BindOnce(&AccessibilityManager::OnNetworkDictationDialogDismissed,
@@ -2625,66 +2670,82 @@ void AccessibilityManager::OnPumpkinError(const std::string& error) {
 
 void AccessibilityManager::GetDlcContents(DlcType dlc,
                                           GetDlcContentsCallback callback) {
-  // This API currently only supports TTS DLCs.
-  base::FilePath path = TtsDlcTypeToPath(dlc);
+  // Convert enum to locale. Note that this API currently only supports TTS
+  // DLCs.
+  static constexpr auto kTtsDlcTypeToLocale =
+      base::MakeFixedFlatMap<DlcType, const char*>(
+          {{DlcType::DLC_TYPE_TTSBNBD, "bn-bd"},
+           {DlcType::DLC_TYPE_TTSCSCZ, "cs-cz"},
+           {DlcType::DLC_TYPE_TTSDADK, "da-dk"},
+           {DlcType::DLC_TYPE_TTSDEDE, "de-de"},
+           {DlcType::DLC_TYPE_TTSELGR, "el-gr"},
+           {DlcType::DLC_TYPE_TTSENAU, "en-au"},
+           {DlcType::DLC_TYPE_TTSENGB, "en-gb"},
+           {DlcType::DLC_TYPE_TTSENUS, "en-us"},
+           {DlcType::DLC_TYPE_TTSESES, "es-es"},
+           {DlcType::DLC_TYPE_TTSESUS, "es-us"},
+           {DlcType::DLC_TYPE_TTSFIFI, "fi-fi"},
+           {DlcType::DLC_TYPE_TTSFILPH, "fil-ph"},
+           {DlcType::DLC_TYPE_TTSFRFR, "fr-fr"},
+           {DlcType::DLC_TYPE_TTSHIIN, "hi-in"},
+           {DlcType::DLC_TYPE_TTSHUHU, "hu-hu"},
+           {DlcType::DLC_TYPE_TTSIDID, "id-id"},
+           {DlcType::DLC_TYPE_TTSITIT, "it-it"},
+           {DlcType::DLC_TYPE_TTSJAJP, "ja-jp"},
+           {DlcType::DLC_TYPE_TTSKMKH, "km-kh"},
+           {DlcType::DLC_TYPE_TTSKOKR, "ko-kr"},
+           {DlcType::DLC_TYPE_TTSNBNO, "nb-no"},
+           {DlcType::DLC_TYPE_TTSNENP, "ne-np"},
+           {DlcType::DLC_TYPE_TTSNLNL, "nl-nl"},
+           {DlcType::DLC_TYPE_TTSPLPL, "pl-pl"},
+           {DlcType::DLC_TYPE_TTSPTBR, "pt-br"},
+           {DlcType::DLC_TYPE_TTSSILK, "si-lk"},
+           {DlcType::DLC_TYPE_TTSSKSK, "sk-sk"},
+           {DlcType::DLC_TYPE_TTSSVSE, "sv-se"},
+           {DlcType::DLC_TYPE_TTSTHTH, "th-th"},
+           {DlcType::DLC_TYPE_TTSTRTR, "tr-tr"},
+           {DlcType::DLC_TYPE_TTSUKUA, "uk-ua"},
+           {DlcType::DLC_TYPE_TTSVIVN, "vi-vn"},
+           {DlcType::DLC_TYPE_TTSYUEHK, "yue-hk"}});
+
+  // Use LanguagePackManager to get the path of the DLC.
+  std::string locale = kTtsDlcTypeToLocale.find(dlc)->second;
+  language_packs::LanguagePackManager::GetInstance()->GetPackState(
+      language_packs::kTtsFeatureId, locale,
+      base::BindOnce(&AccessibilityManager::GetDlcContentsOnPackState,
+                     weak_ptr_factory_.GetWeakPtr(), std::move(callback)));
+}
+
+void AccessibilityManager::GetDlcContentsOnPackState(
+    GetDlcContentsCallback callback,
+    const language_packs::PackResult& pack_result) {
+  base::FilePath path;
+  if (!dlc_path_for_test_.empty()) {
+    // This path will only be set for tests. We need to skip the below install
+    // check during tests because there is currently no way to set a DLC as
+    // installed from a browsertest.
+    path = dlc_path_for_test_.Append("voice.zvoice");
+    base::ThreadPool::PostTaskAndReplyWithResult(
+        FROM_HERE, {base::MayBlock()}, base::BindOnce(&ReadDlcFile, path),
+        base::BindOnce(&OnReadDlcFile, std::move(callback)));
+    return;
+  }
+
+  // Verify that the pack is installed.
+  if (pack_result.pack_state !=
+      language_packs::PackResult::StatusCode::kInstalled) {
+    std::string error =
+        "Error: TTS language pack with locale is not installed: " +
+        pack_result.language_code;
+    std::move(callback).Run(std::vector<uint8_t>(), error);
+    return;
+  }
+
+  // Extract the path and read the file.
+  path = base::FilePath(pack_result.path).Append("voice.zvoice");
   base::ThreadPool::PostTaskAndReplyWithResult(
       FROM_HERE, {base::MayBlock()}, base::BindOnce(&ReadDlcFile, path),
       base::BindOnce(&OnReadDlcFile, std::move(callback)));
-}
-
-base::FilePath AccessibilityManager::TtsDlcTypeToPath(DlcType dlc) {
-  if (!dlc_path_for_test_.empty())
-    return dlc_path_for_test_.Append("voice.zvoice");
-
-  // Paths to TTS DLCs.
-  static constexpr auto kTtsDlcTypeToSubDir =
-      base::MakeFixedFlatMap<DlcType, base::StringPiece>(
-          {{DlcType::DLC_TYPE_TTSBNBD, "tts-bn-bd/"},
-           {DlcType::DLC_TYPE_TTSCSCZ, "tts-cs-cz/"},
-           {DlcType::DLC_TYPE_TTSDADK, "tts-da-dk/"},
-           {DlcType::DLC_TYPE_TTSDEDE, "tts-de-de/"},
-           {DlcType::DLC_TYPE_TTSELGR, "tts-el-gr/"},
-           {DlcType::DLC_TYPE_TTSENAU, "tts-en-au/"},
-           {DlcType::DLC_TYPE_TTSENGB, "tts-en-gb/"},
-           {DlcType::DLC_TYPE_TTSENUS, "tts-en-us/"},
-           {DlcType::DLC_TYPE_TTSESES, "tts-es-es/"},
-           {DlcType::DLC_TYPE_TTSESUS, "tts-es-us/"},
-           {DlcType::DLC_TYPE_TTSFIFI, "tts-fi-fi/"},
-           {DlcType::DLC_TYPE_TTSFILPH, "tts-fil-ph/"},
-           {DlcType::DLC_TYPE_TTSFRFR, "tts-fr-fr/"},
-           {DlcType::DLC_TYPE_TTSHIIN, "tts-hi-in/"},
-           {DlcType::DLC_TYPE_TTSHUHU, "tts-hu-hu/"},
-           {DlcType::DLC_TYPE_TTSIDID, "tts-id-id/"},
-           {DlcType::DLC_TYPE_TTSITIT, "tts-it-it/"},
-           {DlcType::DLC_TYPE_TTSJAJP, "tts-ja-jp/"},
-           {DlcType::DLC_TYPE_TTSKMKH, "tts-km-kh/"},
-           {DlcType::DLC_TYPE_TTSKOKR, "tts-ko-kr/"},
-           {DlcType::DLC_TYPE_TTSNBNO, "tts-nb-no/"},
-           {DlcType::DLC_TYPE_TTSNENP, "tts-ne-np/"},
-           {DlcType::DLC_TYPE_TTSNLNL, "tts-nl-nl/"},
-           {DlcType::DLC_TYPE_TTSPLPL, "tts-pl-pl/"},
-           {DlcType::DLC_TYPE_TTSPTBR, "tts-pt-br/"},
-           {DlcType::DLC_TYPE_TTSSILK, "tts-si-lk/"},
-           {DlcType::DLC_TYPE_TTSSKSK, "tts-sk-sk/"},
-           {DlcType::DLC_TYPE_TTSSVSE, "tts-sv-se/"},
-           {DlcType::DLC_TYPE_TTSTHTH, "tts-th-th/"},
-           {DlcType::DLC_TYPE_TTSTRTR, "tts-tr-tr/"},
-           {DlcType::DLC_TYPE_TTSUKUA, "tts-uk-ua/"},
-           {DlcType::DLC_TYPE_TTSVIVN, "tts-vi-vn/"},
-           {DlcType::DLC_TYPE_TTSYUEHK, "tts-yue-hk/"}});
-
-  if (!base::Contains(kTtsDlcTypeToSubDir, dlc)) {
-    NOTREACHED();
-    return base::FilePath();
-  }
-
-  // TODO(akihiroota): Add these to a DLC constants file.
-  static constexpr char kDlcRootDir[] = "/run/imageloader/";
-  static constexpr char kVoicePath[] = "package/root/voice.zvoice";
-  // Example final path: /run/imageloader/tts-fr-fr/package/root/voice.zvoice.
-  return base::FilePath(kDlcRootDir)
-      .Append(kTtsDlcTypeToSubDir.find(dlc)->second)
-      .Append(kVoicePath);
 }
 
 void AccessibilityManager::SetDlcPathForTest(base::FilePath path) {

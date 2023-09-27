@@ -48,6 +48,8 @@ int GetIconIdAndroid(RequestType type) {
       return IDR_ANDROID_INFOBAR_IDLE_DETECTION;
     case RequestType::kMicStream:
       return IDR_ANDROID_INFOBAR_MEDIA_STREAM_MIC;
+    case RequestType::kMidi:
+      // kMidi and kMidiSysex share the same Android icon ID.
     case RequestType::kMidiSysex:
       return IDR_ANDROID_INFOBAR_MIDI;
     case RequestType::kMultipleDownloads:
@@ -60,7 +62,10 @@ int GetIconIdAndroid(RequestType type) {
       return IDR_ANDROID_INFOBAR_PROTECTED_MEDIA_IDENTIFIER;
     case RequestType::kStorageAccess:
     case RequestType::kTopLevelStorageAccess:
-      return IDR_ANDROID_INFOBAR_PERMISSION_COOKIE;
+      return base::FeatureList::IsEnabled(
+                 permissions::features::kPermissionStorageAccessAPI)
+                 ? IDR_ANDROID_STORAGE_ACCESS
+                 : IDR_ANDROID_INFOBAR_PERMISSION_COOKIE;
   }
   NOTREACHED();
   return 0;
@@ -99,6 +104,8 @@ const gfx::VectorIcon& GetIconIdDesktop(RequestType type) {
     case RequestType::kMicStream:
       return cr23 ? vector_icons::kMicChromeRefreshIcon
                   : vector_icons::kMicIcon;
+    case RequestType::kMidi:
+      // kMidi and kMidiSysex share the same desktop icon ID.
     case RequestType::kMidiSysex:
       return cr23 ? vector_icons::kMidiChromeRefreshIcon
                   : vector_icons::kMidiIcon;
@@ -116,12 +123,12 @@ const gfx::VectorIcon& GetIconIdDesktop(RequestType type) {
 #endif
     case RequestType::kRegisterProtocolHandler:
       return vector_icons::kProtocolHandlerIcon;
-    case RequestType::kSecurityAttestation:
-      return kUsbSecurityKeyIcon;
-    case RequestType::kU2fApiRequest:
-      return kUsbSecurityKeyIcon;
     case RequestType::kStorageAccess:
     case RequestType::kTopLevelStorageAccess:
+      if (base::FeatureList::IsEnabled(
+              permissions::features::kPermissionStorageAccessAPI)) {
+        return vector_icons::kStorageAccessIcon;
+      }
       return cr23 ? vector_icons::kCookieChromeRefreshIcon
                   : vector_icons::kCookieIcon;
     case RequestType::kWindowManagement:
@@ -157,11 +164,13 @@ const gfx::VectorIcon& GetBlockedIconIdDesktop(RequestType type) {
     case RequestType::kMicStream:
       return cr23 ? vector_icons::kMicOffChromeRefreshIcon
                   : vector_icons::kMicOffIcon;
+    case RequestType::kMidi:
+      // kMidi and kMidiSysex share the same desktop block icon ID.
     case RequestType::kMidiSysex:
       return cr23 ? vector_icons::kMidiOffChromeRefreshIcon
                   : vector_icons::kMidiOffIcon;
     case RequestType::kStorageAccess:
-      return vector_icons::kCookieOffChromeRefreshIcon;
+      return vector_icons::kStorageAccessOffIcon;
     default:
       NOTREACHED();
   }
@@ -169,6 +178,12 @@ const gfx::VectorIcon& GetBlockedIconIdDesktop(RequestType type) {
   return gfx::kNoneIcon;
 }
 #endif  // !BUILDFLAG(IS_ANDROID)
+
+}  // namespace
+
+bool IsRequestablePermissionType(ContentSettingsType content_settings_type) {
+  return !!ContentSettingsTypeToRequestTypeIfExists(content_settings_type);
+}
 
 absl::optional<RequestType> ContentSettingsTypeToRequestTypeIfExists(
     ContentSettingsType content_settings_type) {
@@ -195,6 +210,12 @@ absl::optional<RequestType> ContentSettingsTypeToRequestTypeIfExists(
       return RequestType::kIdleDetection;
     case ContentSettingsType::MEDIASTREAM_MIC:
       return RequestType::kMicStream;
+    case ContentSettingsType::MIDI:
+      if (base::FeatureList::IsEnabled(features::kBlockMidiByDefault)) {
+        return RequestType::kMidi;
+      } else {
+        return absl::nullopt;
+      }
     case ContentSettingsType::MIDI_SYSEX:
       return RequestType::kMidiSysex;
     case ContentSettingsType::NOTIFICATIONS:
@@ -220,12 +241,6 @@ absl::optional<RequestType> ContentSettingsTypeToRequestTypeIfExists(
     default:
       return absl::nullopt;
   }
-}
-
-}  // namespace
-
-bool IsRequestablePermissionType(ContentSettingsType content_settings_type) {
-  return !!ContentSettingsTypeToRequestTypeIfExists(content_settings_type);
 }
 
 RequestType ContentSettingsTypeToRequestType(
@@ -261,6 +276,12 @@ absl::optional<ContentSettingsType> RequestTypeToContentSettingsType(
       return ContentSettingsType::IDLE_DETECTION;
     case RequestType::kMicStream:
       return ContentSettingsType::MEDIASTREAM_MIC;
+    case RequestType::kMidi:
+      if (base::FeatureList::IsEnabled(features::kBlockMidiByDefault)) {
+        return ContentSettingsType::MIDI;
+      } else {
+        return absl::nullopt;
+      }
     case RequestType::kMidiSysex:
       return ContentSettingsType::MIDI_SYSEX;
 #if BUILDFLAG(IS_ANDROID)
@@ -345,6 +366,12 @@ const char* PermissionKeyForRequestType(permissions::RequestType request_type) {
       return "idle_detection";
     case permissions::RequestType::kMicStream:
       return "mic_stream";
+    case permissions::RequestType::kMidi:
+      if (base::FeatureList::IsEnabled(features::kBlockMidiByDefault)) {
+        return "midi";
+      } else {
+        return nullptr;
+      }
     case permissions::RequestType::kMidiSysex:
       return "midi_sysex";
     case permissions::RequestType::kMultipleDownloads:
@@ -362,26 +389,20 @@ const char* PermissionKeyForRequestType(permissions::RequestType request_type) {
 #if !BUILDFLAG(IS_ANDROID)
     case permissions::RequestType::kRegisterProtocolHandler:
       return "register_protocol_handler";
-    case permissions::RequestType::kSecurityAttestation:
-      return "security_attestation";
 #endif
     case permissions::RequestType::kStorageAccess:
       return "storage_access";
     case permissions::RequestType::kTopLevelStorageAccess:
       return "top_level_storage_access";
-#if !BUILDFLAG(IS_ANDROID)
-    case permissions::RequestType::kU2fApiRequest:
-      return "u2f_api_request";
-#endif
     case permissions::RequestType::kVrSession:
       return "vr_session";
 #if !BUILDFLAG(IS_ANDROID)
     case permissions::RequestType::kWindowManagement:
       if (base::FeatureList::IsEnabled(
-              features::kWindowManagementPermissionAlias)) {
-        return "window_management";
-      } else {
+              features::kWindowPlacementPermissionAlias)) {
         return "window_placement";
+      } else {
+        return "window_management";
       }
 #endif
   }

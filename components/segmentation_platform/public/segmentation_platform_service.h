@@ -44,6 +44,8 @@ struct TrainingLabels {
   // Name and sample of the output metric to be collected as training data.
   absl::optional<std::pair<std::string, base::HistogramBase::Sample>>
       output_metric;
+
+  TrainingLabels(const TrainingLabels& other);
 };
 
 // The core class of segmentation platform that integrates all the required
@@ -109,13 +111,6 @@ class SegmentationPlatformService : public KeyedService,
   // result.
   virtual SegmentSelectionResult GetCachedSegmentResult(
       const std::string& segmentation_key) = 0;
-
-  // Given a client and a set of inputs, runs the required models on demand and
-  // returns the result in the supplied callback.
-  virtual void GetSelectedSegmentOnDemand(
-      const std::string& segmentation_key,
-      scoped_refptr<InputContext> input_context,
-      SegmentSelectionCallback callback) = 0;
 
   // Called to trigger training data collection for a given request ID. Request
   // IDs are given when |GetClassificationResult| is called.

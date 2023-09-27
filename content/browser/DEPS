@@ -40,6 +40,7 @@ include_rules = [
   "+components/url_formatter",
   "+components/viz",
   "+components/web_package",
+  "+components/webauthn/json",
   "+components/cbor",
   "+components/os_crypt/sync/os_crypt_switches.h",
   # *********************************** NOTE ***********************************
@@ -135,6 +136,9 @@ specific_include_rules = {
   ],
   ".*test_utils\.(h|cc)": [
     "+services/network/test",
+  ],
+  "browser_interface_binders\.cc": [
+    "+components/ml/webnn/features.h",
   ],
   "browser_main_loop\.cc": [
     # TODO(crbug.com/1049894): Remove.

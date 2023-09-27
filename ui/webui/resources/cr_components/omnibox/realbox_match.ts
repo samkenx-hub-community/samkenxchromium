@@ -13,7 +13,7 @@ import {loadTimeData} from '//resources/js/load_time_data.js';
 import {sanitizeInnerHtml} from '//resources/js/parse_html_subset.js';
 import {PolymerElement} from '//resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
-import {ACMatchClassification, Action, AutocompleteMatch, NavigationPredictor, PageHandlerInterface, SideType} from './omnibox.mojom-webui.js';
+import {ACMatchClassification, Action, AutocompleteMatch, NavigationPredictor, OmniboxPopupSelection, PageHandlerInterface, SelectionLineState, SideType} from './omnibox.mojom-webui.js';
 import {RealboxBrowserProxy} from './realbox_browser_proxy.js';
 import {RealboxIconElement} from './realbox_icon.js';
 import {getTemplate} from './realbox_match.html.js';
@@ -162,6 +162,17 @@ export class RealboxMatchElement extends PolymerElement {
         type: String,
         computed: `computeTailSuggestPrefix_(match)`,
       },
+
+      /**
+         Conditional CSS class that enables styling of elements differently
+          according to feature state.
+       */
+      simplifiedClass_: {
+        type: Boolean,
+        value: () => loadTimeData.getBoolean('omniboxActionsUISimplification') ?
+            'simplified' :
+            '',
+      },
     };
   }
 
@@ -216,14 +227,13 @@ export class RealboxMatchElement extends PolymerElement {
       return;
     }
 
-    this.dispatchEvent(new CustomEvent('match-click', {
-      bubbles: true,
-      composed: true,
-      detail: {index: this.matchIndex, event: e},
-    }));
-
     e.preventDefault();   // Prevents default browser action (navigation).
     e.stopPropagation();  // Prevents <iron-selector> from selecting the match.
+
+    this.pageHandler_.openAutocompleteMatch(
+        this.matchIndex, this.match.destinationUrl,
+        /* are_matches_showing */ true, e.button || 0, e.altKey, e.ctrlKey,
+        e.metaKey, e.shiftKey);
   }
 
   private onMatchFocusin_() {
@@ -245,14 +255,12 @@ export class RealboxMatchElement extends PolymerElement {
       // Only handle main (generally left) button presses.
       return;
     }
-    this.dispatchEvent(new CustomEvent('match-remove', {
-      bubbles: true,
-      composed: true,
-      detail: this.matchIndex,
-    }));
 
     e.preventDefault();   // Prevents default browser action (navigation).
     e.stopPropagation();  // Prevents <iron-selector> from selecting the match.
+
+    this.pageHandler_.deleteAutocompleteMatch(
+        this.matchIndex, this.match.destinationUrl);
   }
 
   private onRemoveButtonMouseDown_(e: Event) {
@@ -367,6 +375,17 @@ export class RealboxMatchElement extends PolymerElement {
     return sideTypeToClass(this.sideType);
   }
 
+  private showActionsInlined_(): boolean {
+    // Always show inlined div when feature is enabled, so that it will
+    // grow and push other elements like remove button to the right.
+    return loadTimeData.getBoolean('omniboxActionsUISimplification');
+  }
+
+  private showActionsUnderneath_(match: AutocompleteMatch): boolean {
+    return match.actions.length > 0 &&
+        !loadTimeData.getBoolean('omniboxActionsUISimplification');
+  }
+
   /**
    * Decodes the AcMatchClassificationStyle enteries encoded in the given
    * ACMatchClassification style field, maps each entry to a CSS
@@ -414,6 +433,21 @@ export class RealboxMatchElement extends PolymerElement {
           container.appendChild(currentElement);
           return container;
         }, document.createElement('span'));
+  }
+
+  updateSelection(selection: OmniboxPopupSelection) {
+    this.$.remove.classList.toggle(
+        'selected',
+        selection.state === SelectionLineState.kFocusedButtonRemoveSuggestion);
+
+    const actions =
+        Array.from(this.shadowRoot!.querySelectorAll('cr-realbox-action'));
+    actions.forEach((action, index) => {
+      action.classList.toggle(
+          'selected',
+          selection.state === SelectionLineState.kFocusedButtonAction &&
+              selection.actionIndex === index);
+    });
   }
 }
 

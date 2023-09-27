@@ -372,7 +372,6 @@ gpu_mac_builder(
     pool = "luci.chromium.gpu.mac.retina.nvidia.try",
     # This bot has one machine backing its tests at the moment.
     # If it gets more, the modified execution_timeout should be removed.
-    # See crbug.com/853307 for more context.
     execution_timeout = 12 * time.hour,
 )
 
@@ -494,4 +493,14 @@ gpu_win_builder(
         "ci/Win10 FYI x64 Release (NVIDIA)",
     ],
     pool = "luci.chromium.gpu.win10.nvidia.try",
+)
+
+gpu_win_builder(
+    name = "gpu-try-win-nvidia-dbg",
+    mirrors = [
+        "ci/GPU Win x64 Builder (dbg)",
+        "ci/Win10 x64 Debug (NVIDIA)",
+    ],
+    pool = "luci.chromium.gpu.win10.nvidia.try",
+    contact_team_email = "chrome-gpu-infra@google.com",
 )

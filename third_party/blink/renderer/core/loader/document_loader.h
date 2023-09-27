@@ -54,6 +54,7 @@
 #include "third_party/blink/public/mojom/navigation/navigation_params.mojom-shared.h"
 #include "third_party/blink/public/mojom/page/page.mojom-blink-forward.h"
 #include "third_party/blink/public/mojom/page_state/page_state.mojom-blink.h"
+#include "third_party/blink/public/mojom/runtime_feature_state/runtime_feature_state.mojom-blink-forward.h"
 #include "third_party/blink/public/mojom/service_worker/controller_service_worker_mode.mojom-blink.h"
 #include "third_party/blink/public/mojom/timing/resource_timing.mojom-blink-forward.h"
 #include "third_party/blink/public/platform/scheduler/web_scoped_virtual_time_pauser.h"
@@ -152,8 +153,6 @@ class CORE_EXPORT DocumentLoader : public GarbageCollected<DocumentLoader>,
 
   LocalFrame* GetFrame() const { return frame_; }
 
-  mojom::blink::ResourceTimingInfoPtr TakeNavigationTimingInfo();
-
   void DetachFromFrame(bool flush_microtask_queue);
 
   uint64_t MainResourceIdentifier() const;
@@ -207,6 +206,7 @@ class CORE_EXPORT DocumentLoader : public GarbageCollected<DocumentLoader>,
   WebString OriginCalculationDebugInfo() const override {
     return origin_calculation_debug_info_;
   }
+  bool HasLoadedNonInitialEmptyDocument() const override;
 
   MHTMLArchive* Archive() const { return archive_.Get(); }
 
@@ -573,7 +573,6 @@ class CORE_EXPORT DocumentLoader : public GarbageCollected<DocumentLoader>,
                            int64_t total_encoded_data_length,
                            int64_t total_encoded_body_length,
                            int64_t total_decoded_body_length,
-                           bool should_report_corb_blocking,
                            const absl::optional<WebURLError>& error) override;
   ProcessBackgroundDataCallback TakeProcessBackgroundDataCallback() override;
 
@@ -819,6 +818,15 @@ class CORE_EXPORT DocumentLoader : public GarbageCollected<DocumentLoader>,
   // Only container-initiated navigations (e.g. iframe change src) report
   // their resource timing to the parent.
   mojom::blink::ParentResourceTimingAccess parent_resource_timing_access_;
+
+  // Indicates which browsing context group this frame belongs to. It is only
+  // set for a main frame committing in another browsing context group.
+  const absl::optional<BrowsingContextGroupInfo> browsing_context_group_info_;
+
+  // Runtime feature state override is applied to the document. They are applied
+  // before JavaScript context creation (i.e. CreateParserPostCommit).
+  const base::flat_map<mojom::blink::RuntimeFeatureState, bool>
+      modified_runtime_features_;
 };
 
 DECLARE_WEAK_IDENTIFIER_MAP(DocumentLoader);

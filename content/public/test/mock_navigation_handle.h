@@ -108,8 +108,10 @@ class MockNavigationHandle : public NavigationHandle {
   }
   MOCK_METHOD0(GetSearchableFormURL, const GURL&());
   MOCK_METHOD0(GetSearchableFormEncoding, const std::string&());
-  ReloadType GetReloadType() override { return reload_type_; }
-  RestoreType GetRestoreType() override { return RestoreType::kNotRestored; }
+  ReloadType GetReloadType() const override { return reload_type_; }
+  RestoreType GetRestoreType() const override {
+    return RestoreType::kNotRestored;
+  }
   const GURL& GetBaseURLForDataURL() override { return base_url_for_data_url_; }
   MOCK_METHOD0(IsPost, bool());
   const blink::mojom::Referrer& GetReferrer() override { return referrer_; }
@@ -145,6 +147,12 @@ class MockNavigationHandle : public NavigationHandle {
   const net::HttpResponseHeaders* GetResponseHeaders() override {
     return response_headers_.get();
   }
+  MOCK_METHOD1(
+      SetLCPPNavigationHint,
+      void(const blink::mojom::LCPCriticalPathPredictorNavigationTimeHint&));
+  MOCK_METHOD0(
+      GetLCPPNavigationHint,
+      const blink::mojom::LCPCriticalPathPredictorNavigationTimeHintPtr&());
   MOCK_METHOD0(GetConnectionInfo, net::HttpResponseInfo::ConnectionInfo());
   const absl::optional<net::SSLInfo>& GetSSLInfo() override {
     return ssl_info_;
@@ -176,7 +184,7 @@ class MockNavigationHandle : public NavigationHandle {
       override {
     return initiator_frame_token_;
   }
-  int GetInitiatorProcessID() override { return initiator_process_id_; }
+  int GetInitiatorProcessId() override { return initiator_process_id_; }
   const absl::optional<url::Origin>& GetInitiatorOrigin() override {
     return initiator_origin_;
   }
@@ -197,13 +205,14 @@ class MockNavigationHandle : public NavigationHandle {
               RegisterSubresourceOverride,
               (blink::mojom::TransferrableURLLoaderPtr));
   MOCK_METHOD(bool, IsSameProcess, ());
-  MOCK_METHOD(NavigationEntry*, GetNavigationEntry, ());
+  MOCK_METHOD(NavigationEntry*, GetNavigationEntry, (), (const, override));
   MOCK_METHOD(int, GetNavigationEntryOffset, ());
   MOCK_METHOD(void,
               ForceEnableOriginTrials,
               (const std::vector<std::string>& trials));
   MOCK_METHOD(void, SetIsOverridingUserAgent, (bool));
   MOCK_METHOD(void, SetSilentlyIgnoreErrors, ());
+  MOCK_METHOD(network::mojom::WebSandboxFlags, SandboxFlagsInitiator, ());
   MOCK_METHOD(network::mojom::WebSandboxFlags, SandboxFlagsInherited, ());
   MOCK_METHOD(network::mojom::WebSandboxFlags, SandboxFlagsToCommit, ());
   MOCK_METHOD(bool, IsWaitingToCommit, ());
@@ -214,6 +223,7 @@ class MockNavigationHandle : public NavigationHandle {
   MOCK_METHOD(PrerenderTriggerType, GetPrerenderTriggerType, ());
   MOCK_METHOD(std::string, GetPrerenderEmbedderHistogramSuffix, ());
   MOCK_METHOD(void, SetAllowCookiesFromBrowser, (bool));
+  MOCK_METHOD(void, GetResponseBody, (ResponseBodyCallback));
 
 #if BUILDFLAG(IS_ANDROID)
   MOCK_METHOD(const base::android::JavaRef<jobject>&,

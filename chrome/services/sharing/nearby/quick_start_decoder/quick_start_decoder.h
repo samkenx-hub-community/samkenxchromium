@@ -7,6 +7,8 @@
 
 #include <vector>
 
+#include "base/types/expected.h"
+#include "base/values.h"
 #include "chromeos/ash/services/nearby/public/mojom/quick_start_decoder.mojom.h"
 #include "chromeos/ash/services/nearby/public/mojom/quick_start_decoder_types.mojom-forward.h"
 #include "chromeos/ash/services/nearby/public/mojom/quick_start_decoder_types.mojom.h"
@@ -31,46 +33,57 @@ class QuickStartDecoder : public mojom::QuickStartDecoder {
 
   // mojom::QuickStartDecoder;
   void DecodeBootstrapConfigurations(
-      const std::vector<uint8_t>& data,
+      const absl::optional<std::vector<uint8_t>>& data,
       DecodeBootstrapConfigurationsCallback callback) override;
 
   void DecodeGetAssertionResponse(
-      const std::vector<uint8_t>& data,
+      const absl::optional<std::vector<uint8_t>>& data,
       DecodeGetAssertionResponseCallback callback) override;
 
   void DecodeWifiCredentialsResponse(
-      const std::vector<uint8_t>& data,
+      const absl::optional<std::vector<uint8_t>>& data,
       DecodeWifiCredentialsResponseCallback callback) override;
 
   void DecodeNotifySourceOfUpdateResponse(
-      const std::vector<uint8_t>& data,
+      const absl::optional<std::vector<uint8_t>>& data,
       DecodeNotifySourceOfUpdateResponseCallback callback) override;
 
   void DecodeUserVerificationResult(
-      const std::vector<uint8_t>& data,
+      const absl::optional<std::vector<uint8_t>>& data,
       DecodeUserVerificationResultCallback callback) override;
 
   void DecodeUserVerificationRequested(
-      const std::vector<uint8_t>& data,
+      const absl::optional<std::vector<uint8_t>>& data,
       DecodeUserVerificationRequestedCallback callback) override;
+
+  void DecodeQuickStartMessage(
+      const absl::optional<std::vector<uint8_t>>& data,
+      DecodeQuickStartMessageCallback callback) override;
   // mojom::QuickStartDecoder:
 
  private:
   friend class QuickStartDecoderTest;
   void DoDecodeBootstrapConfigurations(
-      const std::vector<uint8_t>& data,
+      const absl::optional<std::vector<uint8_t>>& data,
       DecodeBootstrapConfigurationsCallback callback);
-  mojom::GetAssertionResponsePtr DoDecodeGetAssertionResponse(
-      const std::vector<uint8_t>& data);
+  void DoDecodeGetAssertionResponse(
+      const absl::optional<std::vector<uint8_t>>& data,
+      DecodeGetAssertionResponseCallback callback);
   void DoDecodeWifiCredentialsResponse(
-      const std::vector<uint8_t>& data,
+      const absl::optional<std::vector<uint8_t>>& data,
       DecodeWifiCredentialsResponseCallback callback);
-  absl::optional<std::vector<uint8_t>> ExtractFidoDataFromJsonResponse(
-      const std::vector<uint8_t>& data);
-  // If the kNotifySourceOfUpdateAckKey boolean is present in the response, this
-  // method returns its value.
-  absl::optional<bool> DoDecodeNotifySourceOfUpdateResponse(
-      const std::vector<uint8_t>& data);
+
+  base::expected<mojom::QuickStartMessagePtr, mojom::QuickStartDecoderError>
+  DoDecodeQuickStartMessage(const std::vector<uint8_t>& data);
+  base::expected<mojom::QuickStartMessagePtr, mojom::QuickStartDecoderError>
+  DecodeSecondDeviceAuthPayload(const base::Value::Dict& payload);
+  base::expected<mojom::QuickStartMessagePtr, mojom::QuickStartDecoderError>
+  DecodeBootstrapConfigurations(const base::Value::Dict& payload);
+  base::expected<mojom::QuickStartMessagePtr, mojom::QuickStartDecoderError>
+  DecodeQuickStartPayload(const base::Value::Dict& payload);
+  base::expected<mojom::QuickStartMessagePtr, mojom::QuickStartDecoderError>
+  DecodeWifiCredentials(const base::Value::Dict& wifi_network_information);
+
   mojo::Receiver<mojom::QuickStartDecoder> receiver_;
 };
 

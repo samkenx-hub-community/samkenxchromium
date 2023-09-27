@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "base/containers/contains.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
@@ -67,7 +68,8 @@ class FileSystemAccessFileWriterBrowserTest : public ContentBrowserTest {
     EXPECT_TRUE(base::WriteFile(test_file, contents));
 
     ui::SelectFileDialog::SetFactory(
-        new FakeSelectFileDialogFactory({test_file}));
+        std::make_unique<FakeSelectFileDialogFactory>(
+            std::vector<base::FilePath>{test_file}));
     EXPECT_TRUE(NavigateToURL(shell(), test_url_));
     EXPECT_EQ(test_file.BaseName().AsUTF8Unsafe(),
               EvalJs(shell(),
@@ -91,7 +93,8 @@ class FileSystemAccessFileWriterBrowserTest : public ContentBrowserTest {
     EXPECT_TRUE(base::WriteFile(test_file, file_data));
 
     ui::SelectFileDialog::SetFactory(
-        new FakeSelectFileDialogFactory({test_file}));
+        std::make_unique<FakeSelectFileDialogFactory>(
+            std::vector<base::FilePath>{test_file}));
     EXPECT_TRUE(NavigateToURL(shell(), test_url_));
     EXPECT_EQ(test_file.BaseName().AsUTF8Unsafe(),
               EvalJs(shell(),
@@ -336,7 +339,8 @@ IN_PROC_BROWSER_TEST_F(FileSystemAccessFileWriterBrowserTest,
         temp_dir_.GetPath(), FILE_PATH_LITERAL("parent"), &test_dir));
 
     ui::SelectFileDialog::SetFactory(
-        new FakeSelectFileDialogFactory({test_dir}));
+        std::make_unique<FakeSelectFileDialogFactory>(
+            std::vector<base::FilePath>{test_dir}));
     EXPECT_TRUE(NavigateToURL(shell(), test_url_));
     EXPECT_EQ(test_dir.BaseName().AsUTF8Unsafe(),
               EvalJs(shell(),
@@ -358,8 +362,7 @@ IN_PROC_BROWSER_TEST_F(FileSystemAccessFileWriterBrowserTest,
       "{create:false});"
       "return (await self.swapFile.createWritable());"
       "})()");
-  EXPECT_TRUE(result.error.find("modifications are not allowed.") !=
-              std::string::npos)
+  EXPECT_TRUE(base::Contains(result.error, "modifications are not allowed."))
       << result.error;
 
   auto close_result = EvalJs(shell(),
@@ -418,8 +421,7 @@ IN_PROC_BROWSER_TEST_F(FileSystemAccessFileWriterBrowserTest,
   auto result = EvalJs(shell(),
                        "(async () => {"
                        "  return (await self.entry.createWritable()); })()");
-  EXPECT_TRUE(result.error.find("Cannot write to a read-only file.") !=
-              std::string::npos)
+  EXPECT_TRUE(base::Contains(result.error, "Cannot write to a read-only file."))
       << result.error;
 }
 #endif  // BUILDFLAG(IS_POSIX) || BUILDFLAG(IS_WIN)

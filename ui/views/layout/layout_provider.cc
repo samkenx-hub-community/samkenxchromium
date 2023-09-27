@@ -11,7 +11,7 @@
 #include "ui/base/ui_base_features.h"
 #include "ui/gfx/font_list.h"
 #include "ui/views/controls/focus_ring.h"
-#include "ui/views/style/typography.h"
+#include "ui/views/style/typography_provider.h"
 #include "ui/views/views_delegate.h"
 
 namespace views {
@@ -40,7 +40,8 @@ LayoutProvider* LayoutProvider::Get() {
 int LayoutProvider::GetControlHeightForFont(int context,
                                             int style,
                                             const gfx::FontList& font) {
-  return std::max(style::GetLineHeight(context, style), font.GetHeight()) +
+  return std::max(TypographyProvider::Get().GetLineHeight(context, style),
+                  font.GetHeight()) +
          Get()->GetDistanceMetric(DISTANCE_CONTROL_VERTICAL_TEXT_PADDING) * 2;
 }
 
@@ -193,6 +194,10 @@ ShapeSysTokens GetShapeSysToken(ShapeContextTokens id) {
           {ShapeContextTokens::kMenuTouchRadius, ShapeSysTokens::kSmall},
           {ShapeContextTokens::kOmniboxExpandedRadius, ShapeSysTokens::kMedium},
           {ShapeContextTokens::kTextfieldRadius, ShapeSysTokens::kSmall},
+          {ShapeContextTokens::kSidePanelContentRadius,
+           ShapeSysTokens::kMedium},
+          {ShapeContextTokens::kSidePanelPageContentRadius,
+           ShapeSysTokens::kSmall},
       });
   const auto* it = shape_token_map.find(id);
   return it == shape_token_map.end() ? ShapeSysTokens::kDefault : it->second;
@@ -219,6 +224,8 @@ int LayoutProvider::GetCornerRadiusMetric(ShapeContextTokens id,
         return 16;
       case ShapeContextTokens::kTextfieldRadius:
         return FocusRing::kDefaultCornerRadiusDp;
+      case ShapeContextTokens::kSidePanelContentRadius:
+        return GetCornerRadiusMetric(Emphasis::kMedium);
       default:
         return 0;
     }

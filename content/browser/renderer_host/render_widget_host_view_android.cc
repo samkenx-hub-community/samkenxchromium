@@ -71,7 +71,6 @@
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_widget_host_iterator.h"
 #include "content/public/common/content_client.h"
-#include "content/public/common/content_features.h"
 #include "content/public/common/content_switches.h"
 #include "third_party/blink/public/mojom/input/input_handler.mojom-blink.h"
 #include "third_party/skia/include/core/SkBitmap.h"
@@ -82,7 +81,6 @@
 #include "ui/android/window_android.h"
 #include "ui/android/window_android_compositor.h"
 #include "ui/base/cursor/cursor.h"
-#include "ui/base/layout.h"
 #include "ui/base/ui_base_types.h"
 #include "ui/display/display_util.h"
 #include "ui/events/android/gesture_event_android.h"
@@ -106,7 +104,6 @@ namespace content {
 
 namespace {
 
-static const char kAsyncReadBackString[] = "Compositing.CopyFromSurfaceTime";
 static const base::TimeDelta kClickCountInterval = base::Seconds(0.5);
 static const float kClickCountRadiusSquaredDIP = 25;
 static const base::TimeDelta kThrottleTimeout = base::Milliseconds(200);
@@ -583,7 +580,8 @@ void RenderWidgetHostViewAndroid::ScreenStateChangeHandler::Unthrottle() {
 
 RenderWidgetHostViewAndroid::RenderWidgetHostViewAndroid(
     RenderWidgetHostImpl* widget_host,
-    gfx::NativeView parent_native_view)
+    gfx::NativeView parent_native_view,
+    cc::slim::Layer* parent_layer)
     : RenderWidgetHostViewBase(widget_host),
       is_showing_(!widget_host->is_hidden()),
       is_window_visible_(true),
@@ -645,16 +643,20 @@ RenderWidgetHostViewAndroid::RenderWidgetHostViewAndroid(
 
   host()->SetView(this);
   touch_selection_controller_client_manager_ =
-      std::make_unique<TouchSelectionControllerClientManagerAndroid>(
-          this, GetHostFrameSinkManager());
+      std::make_unique<TouchSelectionControllerClientManagerAndroid>(this);
 
-  UpdateNativeViewTree(parent_native_view);
+  // `parent_native_view` and `parent_layer` must be null or non-null at the
+  // same time.
+  CHECK(!(!!parent_native_view ^ !!parent_layer));
+
+  UpdateNativeViewTree(parent_native_view, parent_layer);
   // This RWHVA may have been created speculatively. We should give any
   // existing RWHVAs priority for receiving input events, otherwise a
   // speculative RWHVA could be sent input events intended for the currently
   // showing RWHVA.
-  if (parent_native_view)
+  if (parent_native_view) {
     parent_native_view->MoveToBack(&view_);
+  }
 
   CreateOverscrollControllerIfPossible();
 
@@ -665,7 +667,8 @@ RenderWidgetHostViewAndroid::RenderWidgetHostViewAndroid(
 }
 
 RenderWidgetHostViewAndroid::~RenderWidgetHostViewAndroid() {
-  UpdateNativeViewTree(nullptr);
+  UpdateNativeViewTree(/*parent_native_view=*/nullptr,
+                       /*parent_layer=*/nullptr);
   view_.set_event_handler(nullptr);
   DCHECK(!ime_adapter_android_);
   DCHECK(!delegated_frame_host_);
@@ -1243,19 +1246,24 @@ void RenderWidgetHostViewAndroid::OnUpdateTextInputStateCalled(
 
 void RenderWidgetHostViewAndroid::OnImeCompositionRangeChanged(
     TextInputManager* text_input_manager,
-    RenderWidgetHostViewBase* updated_view) {
+    RenderWidgetHostViewBase* updated_view,
+    bool character_bounds_changed,
+    const absl::optional<std::vector<gfx::Rect>>& line_bounds) {
   DCHECK_EQ(text_input_manager_, text_input_manager);
-  const TextInputManager::CompositionRangeInfo* info =
-      text_input_manager_->GetCompositionRangeInfo();
-  if (!info)
+  if (!ime_adapter_android_) {
     return;
+  }
 
-  std::vector<gfx::RectF> character_bounds;
-  for (const gfx::Rect& rect : info->character_bounds)
-    character_bounds.emplace_back(rect);
+  if (character_bounds_changed) {
+    const TextInputManager::CompositionRangeInfo* info =
+        text_input_manager_->GetCompositionRangeInfo();
+    ime_adapter_android_->SetBounds(
+        info ? info->character_bounds : std::vector<gfx::Rect>(),
+        character_bounds_changed, line_bounds);
+    return;
+  }
 
-  if (ime_adapter_android_)
-    ime_adapter_android_->SetCharacterBounds(character_bounds);
+  ime_adapter_android_->SetBounds(std::vector<gfx::Rect>(), false, line_bounds);
 }
 
 void RenderWidgetHostViewAndroid::OnImeCancelComposition(
@@ -1469,7 +1477,7 @@ void RenderWidgetHostViewAndroid::ResetGestureDetection() {
   }
 }
 
-void RenderWidgetHostViewAndroid::OnDidNavigateMainFrameToNewPage() {
+void RenderWidgetHostViewAndroid::DidNavigateMainFramePreCommit() {
   // Move to front only if we are the primary page (we don't want to receive
   // events in the Prerender). GetMainRenderFrameHost() may be null in
   // tests.
@@ -1483,7 +1491,25 @@ void RenderWidgetHostViewAndroid::OnDidNavigateMainFrameToNewPage() {
   }
   ResetGestureDetection();
   if (delegated_frame_host_)
-    delegated_frame_host_->OnNavigateToNewPage();
+    delegated_frame_host_->DidNavigateMainFramePreCommit();
+}
+
+void RenderWidgetHostViewAndroid::DidEnterBackForwardCache() {
+  local_surface_id_allocator_.GenerateId();
+  delegated_frame_host_->DidEnterBackForwardCache();
+  // If we have the fallback content timer running, force it to stop. Else, when
+  // the page is restored the timer could also fire, setting whatever
+  // `DelegatedFrameHostAndroid::first_local_surface_id_after_navigation_`
+  // as the fallback to our Surfacelayer.
+  //
+  // This is safe for BFCache restore because we will supply specific fallback
+  // surfaces for BFCache.
+  //
+  // We do not want to call this in `RWHImpl::WasHidden()` because in the case
+  // of `Visibility::OCCLUDED` we still want to keep the timer running.
+  //
+  // Called after to prevent prematurely evict the BFCached surface.
+  host()->ForceFirstFrameAfterNavigationTimeout();
 }
 
 void RenderWidgetHostViewAndroid::SetDoubleTapSupportEnabled(bool enabled) {
@@ -1529,7 +1555,8 @@ void RenderWidgetHostViewAndroid::RenderProcessGone() {
 void RenderWidgetHostViewAndroid::Destroy() {
   host()->render_frame_metadata_provider()->RemoveObserver(this);
   host()->ViewDestroyed();
-  UpdateNativeViewTree(nullptr);
+  UpdateNativeViewTree(/*parent_native_view=*/nullptr,
+                       /*parent_layer=*/nullptr);
   delegated_frame_host_.reset();
 
   if (GetTextInputManager() && GetTextInputManager()->HasObserver(this))
@@ -1581,8 +1608,6 @@ void RenderWidgetHostViewAndroid::CopyFromSurface(
     return;
   }
 
-  base::TimeTicks start_time = base::TimeTicks::Now();
-
   if (!using_browser_compositor_) {
     SynchronousCopyContents(src_subrect, output_size, std::move(callback));
     return;
@@ -1593,16 +1618,32 @@ void RenderWidgetHostViewAndroid::CopyFromSurface(
       src_subrect, output_size,
       base::BindOnce(
           [](base::OnceCallback<void(const SkBitmap&)> callback,
-             base::TimeTicks start_time, const SkBitmap& bitmap) {
+             const SkBitmap& bitmap) {
             TRACE_EVENT0(
                 "cc", "RenderWidgetHostViewAndroid::CopyFromSurface finished");
-            // TODO(crbug/1110301): Make the Compositing.CopyFromSurfaceTime
-            // histogram obsolete.
-            UMA_HISTOGRAM_TIMES(kAsyncReadBackString,
-                                base::TimeTicks::Now() - start_time);
             std::move(callback).Run(bitmap);
           },
-          std::move(callback), start_time));
+          std::move(callback)),
+      /*capture_exact_surface_id=*/false);
+}
+
+void RenderWidgetHostViewAndroid::CopyFromExactSurface(
+    const gfx::Rect& src_rect,
+    const gfx::Size& output_size,
+    base::OnceCallback<void(const SkBitmap&)> callback) {
+  CHECK(IsSurfaceAvailableForCopy())
+      << "To copy the exact surface, it must be available for copy (embedded "
+         "via the browser).";
+  CHECK(using_browser_compositor_);
+  CHECK(delegated_frame_host_);
+
+  delegated_frame_host_->CopyFromCompositingSurface(
+      src_rect, output_size,
+      base::BindOnce(
+          [](base::OnceCallback<void(const SkBitmap&)> callback,
+             const SkBitmap& bitmap) { std::move(callback).Run(bitmap); },
+          std::move(callback)),
+      /*capture_exact_surface_id=*/true);
 }
 
 void RenderWidgetHostViewAndroid::EnsureSurfaceSynchronizedForWebTest() {
@@ -1778,7 +1819,8 @@ RenderWidgetHostViewAndroid::CreateDrawable() {
   }
   if (!selection_popup_controller_)
     return nullptr;
-  return selection_popup_controller_->CreateTouchHandleDrawable();
+  return selection_popup_controller_->CreateTouchHandleDrawable(
+      view_.parent(), view_.GetLayer()->parent());
 }
 
 void RenderWidgetHostViewAndroid::DidScroll() {}
@@ -2066,7 +2108,7 @@ bool RenderWidgetHostViewAndroid::Animate(base::TimeTicks frame_time) {
   bool needs_animate = false;
   if (overscroll_controller_) {
     needs_animate |=
-        overscroll_controller_->Animate(frame_time, view_.parent()->GetLayer());
+        overscroll_controller_->Animate(frame_time, view_.GetLayer()->parent());
   }
   // TODO(wjmaclean): Investigate how animation here does or doesn't affect
   // an OOPIF client.
@@ -2104,7 +2146,7 @@ void RenderWidgetHostViewAndroid::ProcessAckedTouchEvent(
   // |is_source_touch_event_set_non_blocking| defines a blocking behaviour of
   // the future inputs.
   const bool is_source_touch_event_set_non_blocking =
-      InputEventResultStateIsSetNonBlocking(ack_result);
+      InputEventResultStateIsSetBlocking(ack_result);
   // |was_touch_blocked| indicates whether the current event was dispatched
   // blocking to the Renderer.
   const bool was_touch_blocked =
@@ -2187,7 +2229,7 @@ RenderWidgetHostViewAndroid::FilterInputEvent(
     return blink::mojom::InputEventResultState::kNotConsumed;
 
   if (input_event.GetType() == blink::WebInputEvent::Type::kTouchStart) {
-    GpuProcessHost::CallOnIO(FROM_HERE, GPU_PROCESS_KIND_SANDBOXED,
+    GpuProcessHost::CallOnUI(FROM_HERE, GPU_PROCESS_KIND_SANDBOXED,
                              false /* force_create */,
                              base::BindOnce(&WakeUpGpu));
   }
@@ -2320,6 +2362,13 @@ void RenderWidgetHostViewAndroid::SendGestureEvent(
             event.TimeStamp(), event.PositionInWidget());
         break;
 
+      case blink::WebInputEvent::Type::kGestureTapDown:
+        if (event.data.tap_down.tap_down_count == 2) {
+          touch_selection_controller_->HandleDoublePressEvent(
+              event.TimeStamp(), event.PositionInWidget());
+        }
+        break;
+
       case blink::WebInputEvent::Type::kGestureTap:
         touch_selection_controller_->HandleTapEvent(event.PositionInWidget(),
                                                     event.data.tap.tap_count);
@@ -2430,7 +2479,12 @@ const viz::FrameSinkId& RenderWidgetHostViewAndroid::GetFrameSinkId() const {
 }
 
 void RenderWidgetHostViewAndroid::UpdateNativeViewTree(
-    gfx::NativeView parent_native_view) {
+    gfx::NativeView parent_native_view,
+    cc::slim::Layer* parent_layer) {
+  // `parent_native_view` and `parent_layer` must be null or non-null at the
+  // same time.
+  CHECK(!(!!parent_native_view ^ !!parent_layer));
+
   bool will_build_tree = parent_native_view != nullptr;
   bool has_view_tree = view_.parent() != nullptr;
 
@@ -2451,7 +2505,7 @@ void RenderWidgetHostViewAndroid::UpdateNativeViewTree(
     if (will_build_tree) {
       view_.AddObserver(this);
       parent_native_view->AddChild(&view_);
-      parent_native_view->GetLayer()->AddChild(view_.GetLayer());
+      parent_layer->AddChild(view_.GetLayer());
     }
 
     // TODO(yusufo) : Get rid of the below conditions and have a better handling
@@ -2705,6 +2759,17 @@ void RenderWidgetHostViewAndroid::OnAnimate(base::TimeTicks begin_frame_time) {
     SetNeedsAnimate();
 }
 
+void RenderWidgetHostViewAndroid::OnUnfoldStarted(
+    base::TimeTicks unfold_begin_time) {
+  TRACE_EVENT0("browser", "RenderWidgetHostViewAndroid::OnUnfoldStarted");
+  host()->RequestSuccessfulPresentationTimeForNextFrame(
+      blink::mojom::RecordContentToVisibleTimeRequest::New(
+          unfold_begin_time, /*destination_is_loaded=*/false,
+          /*show_reason_tab_switching=*/false,
+          /*show_reason_bfcache_restore=*/false,
+          /*show_reason_unfolding=*/true));
+}
+
 void RenderWidgetHostViewAndroid::OnActivityStopped() {
   TRACE_EVENT0("browser", "RenderWidgetHostViewAndroid::OnActivityStopped");
   DCHECK(observing_root_window_);
@@ -2719,6 +2784,16 @@ void RenderWidgetHostViewAndroid::OnActivityStarted() {
   ShowInternal();
 }
 
+void RenderWidgetHostViewAndroid::SetTextHandlesHiddenForDropdownMenu(
+    bool hide_handles) {
+  if (!touch_selection_controller_ ||
+      handles_hidden_by_dropdown_menu_ == hide_handles) {
+    return;
+  }
+  handles_hidden_by_dropdown_menu_ = hide_handles;
+  SetTextHandlesHiddenInternal();
+}
+
 void RenderWidgetHostViewAndroid::SetTextHandlesHiddenForStylus(
     bool hide_handles) {
   if (!touch_selection_controller_ || handles_hidden_by_stylus_ == hide_handles)
@@ -2731,7 +2806,8 @@ void RenderWidgetHostViewAndroid::SetTextHandlesHiddenInternal() {
   if (!touch_selection_controller_)
     return;
   touch_selection_controller_->SetTemporarilyHidden(
-      handles_hidden_by_stylus_ || handles_hidden_by_selection_ui_);
+      handles_hidden_by_dropdown_menu_ || handles_hidden_by_stylus_ ||
+      handles_hidden_by_selection_ui_);
 }
 
 void RenderWidgetHostViewAndroid::OnStylusSelectBegin(float x0,
@@ -3176,6 +3252,11 @@ void RenderWidgetHostViewAndroid::SetHasPersistentVideo(
   screen_state_change_handler_.SetHasPersistentVideo(has_persistent_video);
 }
 
+void RenderWidgetHostViewAndroid::InvalidateLocalSurfaceIdAndAllocationGroup() {
+  local_surface_id_allocator_.Invalidate(
+      /*also_invalidate_allocation_group=*/true);
+}
+
 void RenderWidgetHostViewAndroid::HandleSwipeToMoveCursorGestureAck(
     const blink::WebGestureEvent& event) {
   if (!touch_selection_controller_ || !selection_popup_controller_) {
@@ -3234,6 +3315,9 @@ void RenderWidgetHostViewAndroid::WasEvicted() {
         local_surface_id_allocator_.GetCurrentLocalSurfaceId());
   } else {
     EvictInternal();
+  }
+  if (sync_compositor_) {
+    sync_compositor_->WasEvicted();
   }
 }
 

@@ -32,9 +32,10 @@ import org.chromium.base.test.util.MinAndroidSdkLevel;
 import org.chromium.chrome.browser.device.DeviceClassManager;
 import org.chromium.chrome.browser.document.ChromeLauncherActivity;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
+import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
+import org.chromium.chrome.browser.preferences.SharedPreferencesManager;
 import org.chromium.chrome.browser.tab.TabImpl;
 import org.chromium.chrome.browser.tab.TabLaunchType;
-import org.chromium.chrome.browser.tab.state.CriticalPersistedTabData;
 import org.chromium.chrome.browser.tabmodel.ChromeTabCreator;
 import org.chromium.chrome.browser.tabmodel.TabModel;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
@@ -122,7 +123,6 @@ public class ChromeTabbedActivityTest {
         Assert.assertEquals(animationsEnabled, DeviceClassManager.enableAnimations());
     }
 
-    // Tests the fix for the regression reported in crbug.com/1444638.
     @Test
     @SmallTest
     @MinAndroidSdkLevel(Build.VERSION_CODES.S)
@@ -138,9 +138,19 @@ public class ChromeTabbedActivityTest {
 
         var tabModelSelectorObserver = mActivity.getTabModelSelectorObserverForTesting();
         TestThreadUtils.runOnUiThreadBlocking(tabModelSelectorObserver::onTabStateInitialized);
-        Assert.assertNotNull(
-                "A TabModelSelectorTabModelObserver should be registered by MultiInstanceManager on tab state initialization.",
-                mActivity.getMultiInstanceMangerForTesting().getTabModelObserverForTesting());
+        Assert.assertTrue(
+                "Regular tab count should be written to SharedPreferences after tab state initialization.",
+                SharedPreferencesManager.getInstance()
+                                .readIntsWithPrefix(ChromePreferenceKeys.MULTI_INSTANCE_TAB_COUNT)
+                                .size()
+                        > 0);
+        Assert.assertTrue(
+                "Incognito tab count should be written to SharedPreferences after tab state initialization.",
+                SharedPreferencesManager.getInstance()
+                                .readIntsWithPrefix(
+                                        ChromePreferenceKeys.MULTI_INSTANCE_INCOGNITO_TAB_COUNT)
+                                .size()
+                        > 0);
 
         // Restore the original value of |mCreatedTabOnStartup|.
         mActivity.setCreatedTabOnStartupForTesting(createdTabOnStartup);
@@ -186,11 +196,9 @@ public class ChromeTabbedActivityTest {
             int parentId = tabModel.getTabAt(0).getId();
             Criteria.checkThat(
                     tabModel.getTabAt(1).getUrl().getSpec(), Matchers.endsWith("second"));
-            Criteria.checkThat(CriticalPersistedTabData.from(tabModel.getTabAt(1)).getParentId(),
-                    Matchers.is(parentId));
+            Criteria.checkThat(tabModel.getTabAt(1).getParentId(), Matchers.is(parentId));
             Criteria.checkThat(tabModel.getTabAt(2).getUrl().getSpec(), Matchers.endsWith("third"));
-            Criteria.checkThat(CriticalPersistedTabData.from(tabModel.getTabAt(2)).getParentId(),
-                    Matchers.is(parentId));
+            Criteria.checkThat(tabModel.getTabAt(2).getParentId(), Matchers.is(parentId));
         });
 
         viewIntent.putExtra(IntentHandler.EXTRA_OPEN_NEW_INCOGNITO_TAB, true);

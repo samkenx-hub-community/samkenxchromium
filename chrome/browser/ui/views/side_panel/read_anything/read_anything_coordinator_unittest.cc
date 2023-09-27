@@ -35,12 +35,41 @@ class ReadAnythingCoordinatorTest : public TestWithBrowserView {
     scoped_feature_list_.InitWithFeatures({features::kReadAnything}, {});
     TestWithBrowserView::SetUp();
 
+    // Ensure a kReadAnything entry is added to the contextual registry for the
+    // first tab.
+    AddTab(browser_view()->browser(), GURL("http://foo1.com"));
+    content::WebContents* active_contents =
+        browser_view()->GetActiveWebContents();
+    auto* tab_one_registry = SidePanelRegistry::Get(active_contents);
     side_panel_coordinator_ =
         SidePanelUtil::GetSidePanelCoordinatorForBrowser(browser());
-    side_panel_registry_ =
-        SidePanelCoordinator::GetGlobalSidePanelRegistry(browser());
     read_anything_coordinator_ =
         ReadAnythingCoordinator::GetOrCreateForBrowser(browser());
+    contextual_registries_.push_back(tab_one_registry);
+
+    // Ensure a kReadAnything entry is added to the contextual registry for the
+    // second tab.
+    AddTab(browser_view()->browser(), GURL("http://foo2.com"));
+    active_contents = browser_view()->GetActiveWebContents();
+    auto* tab_two_registry = SidePanelRegistry::Get(active_contents);
+    contextual_registries_.push_back(tab_two_registry);
+
+    // Verify the first tab has one entry, kReadAnything.
+    browser_view()->browser()->tab_strip_model()->ActivateTabAt(0);
+    active_contents = browser_view()->GetActiveWebContents();
+    SidePanelRegistry* contextual_registry =
+        SidePanelRegistry::Get(active_contents);
+    ASSERT_EQ(contextual_registry->entries().size(), 1u);
+    EXPECT_EQ(contextual_registry->entries()[0]->key().id(),
+              SidePanelEntry::Id::kReadAnything);
+
+    // Verify the second tab has one entry, kReadAnything.
+    browser_view()->browser()->tab_strip_model()->ActivateTabAt(1);
+    active_contents = browser_view()->GetActiveWebContents();
+    contextual_registry = SidePanelRegistry::Get(active_contents);
+    ASSERT_EQ(contextual_registry->entries().size(), 1u);
+    EXPECT_EQ(contextual_registry->entries()[0]->key().id(),
+              SidePanelEntry::Id::kReadAnything);
   }
 
   // Wrapper methods around the ReadAnythingCoordinator. These do nothing more
@@ -62,10 +91,15 @@ class ReadAnythingCoordinatorTest : public TestWithBrowserView {
     return read_anything_coordinator_->CreateContainerView();
   }
 
+  void OnBrowserSetLastActive(Browser* browser) {
+    read_anything_coordinator_->OnBrowserSetLastActive(browser);
+  }
+
  protected:
   raw_ptr<SidePanelCoordinator, DanglingUntriaged> side_panel_coordinator_ =
       nullptr;
-  raw_ptr<SidePanelRegistry, DanglingUntriaged> side_panel_registry_ = nullptr;
+  std::vector<raw_ptr<SidePanelRegistry, DanglingUntriaged>>
+      contextual_registries_;
   raw_ptr<ReadAnythingCoordinator, DanglingUntriaged>
       read_anything_coordinator_ = nullptr;
 
@@ -117,7 +151,7 @@ TEST_F(ReadAnythingCoordinatorTest, ActivateCalled_ShowAndCloseSidePanel) {
 TEST_F(ReadAnythingCoordinatorTest,
        ActivateCalled_ShowAndHideReadAnythingEntry) {
   AddObserver(&coordinator_observer_);
-  SidePanelEntry* entry = side_panel_registry_->GetEntryForKey(
+  SidePanelEntry* entry = contextual_registries_[0]->GetEntryForKey(
       SidePanelEntry::Key(SidePanelEntry::Id::kReadAnything));
 
   EXPECT_CALL(coordinator_observer_, Activate(true)).Times(1);
@@ -125,6 +159,55 @@ TEST_F(ReadAnythingCoordinatorTest,
 
   EXPECT_CALL(coordinator_observer_, Activate(false)).Times(1);
   entry->OnEntryHidden();
+}
+
+TEST_F(ReadAnythingCoordinatorTest,
+       OnBrowserSetLastActive_SidePanelIsNotVisible) {
+  Browser* browser = browser_view()->browser();
+  OnBrowserSetLastActive(browser);
+
+  EXPECT_FALSE(side_panel_coordinator_->IsSidePanelShowing());
+}
+
+class ReadAnythingCoordinatorScreen2xDataCollectionModeTest
+    : public TestWithBrowserView {
+ public:
+  void SetUp() override {
+    base::test::ScopedFeatureList features;
+    scoped_feature_list_.InitWithFeatures(
+        {features::kReadAnything, features::kDataCollectionModeForScreen2x},
+        {});
+    TestWithBrowserView::SetUp();
+
+    side_panel_coordinator_ =
+        SidePanelUtil::GetSidePanelCoordinatorForBrowser(browser());
+    read_anything_coordinator_ =
+        ReadAnythingCoordinator::GetOrCreateForBrowser(browser());
+
+    AddTab(browser_view()->browser(), GURL("http://foo1.com"));
+    browser_view()->browser()->tab_strip_model()->ActivateTabAt(0);
+  }
+
+  void OnBrowserSetLastActive(Browser* browser) {
+    read_anything_coordinator_->OnBrowserSetLastActive(browser);
+  }
+
+ protected:
+  raw_ptr<SidePanelCoordinator, DanglingUntriaged> side_panel_coordinator_ =
+      nullptr;
+  raw_ptr<ReadAnythingCoordinator, DanglingUntriaged>
+      read_anything_coordinator_ = nullptr;
+  base::test::ScopedFeatureList scoped_feature_list_;
+};
+
+TEST_F(ReadAnythingCoordinatorScreen2xDataCollectionModeTest,
+       OnBrowserSetLastActive_SidePanelIsVisible) {
+  Browser* browser = browser_view()->browser();
+  OnBrowserSetLastActive(browser);
+
+  EXPECT_TRUE(side_panel_coordinator_->IsSidePanelShowing());
+  EXPECT_EQ(SidePanelUI::GetSidePanelUIForBrowser(browser)->GetCurrentEntryId(),
+            SidePanelEntryId::kReadAnything);
 }
 
 #endif  // !defined(ADDRESS_SANITIZER)

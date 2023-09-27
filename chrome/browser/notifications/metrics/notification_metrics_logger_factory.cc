@@ -18,7 +18,8 @@ NotificationMetricsLoggerFactory::GetForBrowserContext(
 // static
 NotificationMetricsLoggerFactory*
 NotificationMetricsLoggerFactory::GetInstance() {
-  return base::Singleton<NotificationMetricsLoggerFactory>::get();
+  static base::NoDestructor<NotificationMetricsLoggerFactory> instance;
+  return instance.get();
 }
 
 NotificationMetricsLoggerFactory::NotificationMetricsLoggerFactory()
@@ -31,7 +32,8 @@ NotificationMetricsLoggerFactory::NotificationMetricsLoggerFactory()
               .WithGuest(ProfileSelection::kRedirectedToOriginal)
               .Build()) {}
 
-KeyedService* NotificationMetricsLoggerFactory::BuildServiceInstanceFor(
+std::unique_ptr<KeyedService>
+NotificationMetricsLoggerFactory::BuildServiceInstanceForBrowserContext(
     content::BrowserContext* context) const {
-  return new NotificationMetricsLogger();
+  return std::make_unique<NotificationMetricsLogger>();
 }

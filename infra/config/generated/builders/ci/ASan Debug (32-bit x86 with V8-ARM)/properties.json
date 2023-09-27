@@ -40,13 +40,20 @@
           "builder": "ASan Debug (32-bit x86 with V8-ARM)",
           "project": "chromium"
         }
+      ],
+      "mirroring_builder_group_and_names": [
+        {
+          "builder": "linux-asan-v8-arm-dbg",
+          "group": "tryserver.chromium.fuzz"
+        }
       ]
     }
   },
   "$build/reclient": {
     "instance": "rbe-chromium-trusted",
     "jobs": 250,
-    "metrics_project": "chromium-reclient-metrics"
+    "metrics_project": "chromium-reclient-metrics",
+    "scandeps_server": true
   },
   "$recipe_engine/resultdb/test_presentation": {
     "column_keys": [],

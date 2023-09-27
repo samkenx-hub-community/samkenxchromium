@@ -326,9 +326,9 @@ class VideoTrackAdapterFixtureTest : public ::testing::Test {
     }
   }
 
-  void OnFrameDropped() {
+  void OnFrameDropped(media::VideoCaptureFrameDropReason reason) {
     if (frame_dropped_callback_) {
-      frame_dropped_callback_.Run();
+      frame_dropped_callback_.Run(reason);
       frame_processed_.Signal();
     }
   }
@@ -366,12 +366,13 @@ class VideoTrackAdapterFixtureTest : public ::testing::Test {
             did_process_all_frames.Signal();
           }
         }));
-    SetFrameDroppedCallback(base::BindLambdaForTesting([&]() {
-      num_dropped++;
-      if (num_delivered + num_dropped == num_frames) {
-        did_process_all_frames.Signal();
-      }
-    }));
+    SetFrameDroppedCallback(
+        base::BindLambdaForTesting([&](media::VideoCaptureFrameDropReason) {
+          num_dropped++;
+          if (num_delivered + num_dropped == num_frames) {
+            did_process_all_frames.Signal();
+          }
+        }));
 
     for (int i = 0; i < num_frames; ++i) {
       auto frame = CreateTestFrame(
@@ -422,9 +423,7 @@ class VideoTrackAdapterFixtureTest : public ::testing::Test {
             std::vector<scoped_refptr<media::VideoFrame>> scaled_frames,
             base::TimeTicks estimated_capture_time) {
           EXPECT_FALSE(frame->visible_rect().x() & 1);
-          EXPECT_FALSE(frame->visible_rect().width() & 1);
           EXPECT_FALSE(frame->visible_rect().y() & 1);
-          EXPECT_FALSE(frame->visible_rect().height() & 1);
         };
     SetFrameValidationCallback(base::BindLambdaForTesting(check_settings));
     DeliverAndValidateFrame(frame, base::TimeTicks());
@@ -545,6 +544,18 @@ TEST_F(VideoTrackAdapterFixtureTest,
   const gfx::Size kCodedSize(1280, 720);
   const gfx::Rect kVisibleRect(0, 0, 1280, 720);
   const gfx::Size kDesiredSize(1280, 718);
+  const gfx::Size kNaturalSize(1280, 720);
+  TestDeliversFrameWithVisibleRectWithEvenOriginAndSize(
+      CreateTestFrame(kCodedSize, kVisibleRect, kNaturalSize,
+                      media::VideoFrame::STORAGE_OWNED_MEMORY),
+      media::PIXEL_FORMAT_I420, kDesiredSize);
+}
+
+TEST_F(VideoTrackAdapterFixtureTest,
+       DeliversSWFrameOddVisibleRectWithEvenOriginAndHeight) {
+  const gfx::Size kCodedSize(1280, 720);
+  const gfx::Rect kVisibleRect(0, 0, 1279, 719);
+  const gfx::Size kDesiredSize(1024, 600);
   const gfx::Size kNaturalSize(1280, 720);
   TestDeliversFrameWithVisibleRectWithEvenOriginAndSize(
       CreateTestFrame(kCodedSize, kVisibleRect, kNaturalSize,

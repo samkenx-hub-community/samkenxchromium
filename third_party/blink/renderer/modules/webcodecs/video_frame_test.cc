@@ -43,7 +43,7 @@ class VideoFrameTest : public testing::Test {
  public:
   void SetUp() override {
     test_context_provider_ = viz::TestContextProvider::Create();
-    InitializeSharedGpuContext(test_context_provider_.get());
+    InitializeSharedGpuContextGLES2(test_context_provider_.get());
   }
 
   void TearDown() override { SharedGpuContext::ResetForTesting(); }
@@ -345,11 +345,10 @@ TEST_F(VideoFrameTest, VideoFrameFromGPUImageBitmap) {
   auto resource_provider = CanvasResourceProvider::CreateSharedImageProvider(
       SkImageInfo::MakeN32Premul(100, 100), cc::PaintFlags::FilterQuality::kLow,
       CanvasResourceProvider::ShouldInitialize::kNo, context_provider_wrapper,
-      RasterMode::kGPU, true /*is_origin_top_left*/,
-      0u /*shared_image_usage_flags*/);
+      RasterMode::kGPU, /*shared_image_usage_flags=*/0u);
 
-  scoped_refptr<StaticBitmapImage> bitmap = resource_provider->Snapshot(
-      CanvasResourceProvider::FlushReason::kTesting);
+  scoped_refptr<StaticBitmapImage> bitmap =
+      resource_provider->Snapshot(FlushReason::kTesting);
   ASSERT_TRUE(bitmap->IsTextureBacked());
 
   auto* image_bitmap = MakeGarbageCollected<ImageBitmap>(bitmap);

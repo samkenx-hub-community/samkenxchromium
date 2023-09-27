@@ -9,10 +9,6 @@
 #include "base/strings/stringprintf.h"
 #include "base/strings/sys_string_conversions.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 namespace cronet {
 
 void StartCronet(int port) {
@@ -28,7 +24,7 @@ void StartCronet(int port) {
 
   NSString* rules = base::SysUTF8ToNSString(
       base::StringPrintf("MAP test.example.com 127.0.0.1:%d,"
-                         "MAP notfound.example.com ~NOTFOUND",
+                         "MAP notfound.example.com ^NOTFOUND",
                          port));
   [Cronet setHostResolverRulesForTesting:rules];
 }

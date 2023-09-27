@@ -8,7 +8,10 @@
 #import <Foundation/Foundation.h>
 #import "ios/chrome/browser/shared/ui/list_model/list_model.h"
 
-// The accessibility identifier of the password details table view.
+// TODO(crbug.com/1486512): Acronyms in Objective-C identifiers should be
+// written in all caps.
+
+// The accessibility identifier of the Password Manager table view.
 extern NSString* const kPasswordsTableViewId;
 extern NSString* const kPasswordsSearchBarId;
 extern NSString* const kPasswordsScrimViewId;
@@ -22,9 +25,19 @@ extern NSString* const kPasswordsAddPasswordCancelButtonId;
 // The accessibility identifier of the password issues table view.
 extern NSString* const kPasswordIssuesTableViewId;
 
+// The accessibility identifier of the "Dismissed Warnings" cell in the password
+// issues table view.
+extern NSString* const kDismissedWarningsCellId;
+
 // The accessibility identifier of the large "Add Password..." button when
 // displayed in the table.
 extern NSString* const kAddPasswordButtonId;
+
+// Username text field accessibility identifier for Password Details.
+extern NSString* const kUsernameTextfieldForPasswordDetailsId;
+
+// Password text field accessibility identifier for Password Details.
+extern NSString* const kPasswordTextfieldForPasswordDetailsId;
 
 // Delete button accessibility identifier for Password Details.
 extern NSString* const kDeleteButtonForPasswordDetailsId;
@@ -33,6 +46,21 @@ extern NSString* const kDeleteButtonForPasswordDetailsId;
 // only stored locally and not backed up to any account.
 extern NSString* const kLocalOnlyPasswordIconId;
 
+// Name of the image shown in the Password Manager widget promo that's presented
+// in the Password Manager.
+extern NSString* const kWidgetPromoImageName;
+
+// Name of the image shown in the Password Manager widget promo that's presented
+// in the Password Manager when the promo cell is disabled.
+extern NSString* const kWidgetPromoDisabledImageName;
+
+// Accessibility identifier for the Password Manager widget promo.
+extern NSString* const kWidgetPromoId;
+
+// Accessibility identifier for the Password Manager widget promo's close
+// button.
+extern NSString* const kWidgetPromoCloseButtonId;
+
 // Sections of the password settings
 typedef NS_ENUM(NSInteger, PasswordSectionIdentifier) {
   SectionIdentifierSavedPasswords = kSectionIdentifierEnumZero,
@@ -40,6 +68,7 @@ typedef NS_ENUM(NSInteger, PasswordSectionIdentifier) {
   SectionIdentifierPasswordCheck,
   SectionIdentifierAddPasswordButton,
   SectionIdentifierManageAccountHeader,
+  SectionIdentifierWidgetPromo,
 };
 
 // Enum with all possible UI states for the Password Manager's Password Checkup

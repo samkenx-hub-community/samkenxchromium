@@ -17,7 +17,7 @@
 #include "components/omnibox/browser/test_scheme_classifier.h"
 #include "components/optimization_guide/core/optimization_guide_decision.h"
 #include "components/optimization_guide/core/optimization_guide_features.h"
-#include "components/optimization_guide/core/test_new_optimization_guide_decider.h"
+#include "components/optimization_guide/core/test_optimization_guide_decider.h"
 #include "components/optimization_guide/proto/common_types.pb.h"
 #include "components/optimization_guide/proto/hints.pb.h"
 #include "components/optimization_guide/proto/salient_image_metadata.pb.h"
@@ -38,7 +38,7 @@ using testing::ElementsAre;
 namespace optimization_guide {
 namespace {
 
-class ImageServiceTestOptGuide : public TestNewOptimizationGuideDecider {
+class ImageServiceTestOptGuide : public TestOptimizationGuideDecider {
  public:
   void CanApplyOptimizationOnDemand(
       const std::vector<GURL>& urls,
@@ -75,11 +75,13 @@ class ImageServiceTest : public testing::Test {
   void SetUp() override {
     scoped_feature_list_.InitWithFeatures(
         {kImageService, kImageServiceSuggestPoweredImages,
-         kImageServiceOptimizationGuideSalientImages},
+         kImageServiceOptimizationGuideSalientImages,
+         kImageServiceObserveSyncDownloadStatus},
         {});
 
     template_url_service_ = std::make_unique<TemplateURLService>(nullptr, 0);
     remote_suggestions_service_ = std::make_unique<RemoteSuggestionsService>(
+        /*document_suggestions_service=*/nullptr,
         test_url_loader_factory_.GetSafeWeakWrapper());
     test_opt_guide_ =
         std::make_unique<optimization_guide::ImageServiceTestOptGuide>();
@@ -90,16 +92,18 @@ class ImageServiceTest : public testing::Test {
         std::make_unique<TestSchemeClassifier>());
   }
 
-  bool GetConsentToFetchImageAwaitResult(mojom::ClientId client_id) {
-    bool out_consent = false;
+  PageImageServiceConsentStatus GetConsentStatusToFetchImageAwaitResult(
+      mojom::ClientId client_id) {
+    PageImageServiceConsentStatus out_status;
     base::RunLoop loop;
     image_service_->GetConsentToFetchImage(
-        client_id, base::BindLambdaForTesting([&](bool result) {
-          out_consent = result;
+        client_id,
+        base::BindLambdaForTesting([&](PageImageServiceConsentStatus status) {
+          out_status = status;
           loop.Quit();
         }));
     loop.Run();
-    return out_consent;
+    return out_status;
   }
 
   ImageServiceTest(const ImageServiceTest&) = delete;
@@ -148,38 +152,51 @@ TEST_F(ImageServiceTest, DoesNotRegisterForNavigationRelatedMetadata) {
 }
 
 TEST_F(ImageServiceTest, GetConsentToFetchImage) {
-  test_sync_service_->GetUserSettings()->SetSelectedTypes(
-      /*sync_everything=*/false,
-      /*types=*/syncer::UserSelectableTypeSet());
+  test_sync_service_->SetDownloadStatusFor(
+      {syncer::ModelType::BOOKMARKS,
+       syncer::ModelType::HISTORY_DELETE_DIRECTIVES},
+      syncer::SyncService::ModelTypeDownloadStatus::kWaitingForUpdates);
   test_sync_service_->FireStateChanged();
 
-  EXPECT_FALSE(GetConsentToFetchImageAwaitResult(mojom::ClientId::Journeys));
-  EXPECT_FALSE(
-      GetConsentToFetchImageAwaitResult(mojom::ClientId::JourneysSidePanel));
-  EXPECT_FALSE(GetConsentToFetchImageAwaitResult(mojom::ClientId::NtpRealbox));
-  EXPECT_FALSE(GetConsentToFetchImageAwaitResult(mojom::ClientId::NtpQuests));
-  EXPECT_FALSE(GetConsentToFetchImageAwaitResult(mojom::ClientId::Bookmarks));
+  EXPECT_EQ(GetConsentStatusToFetchImageAwaitResult(mojom::ClientId::Journeys),
+            PageImageServiceConsentStatus::kTimedOut);
+  EXPECT_EQ(GetConsentStatusToFetchImageAwaitResult(
+                mojom::ClientId::JourneysSidePanel),
+            PageImageServiceConsentStatus::kTimedOut);
+  EXPECT_EQ(
+      GetConsentStatusToFetchImageAwaitResult(mojom::ClientId::NtpRealbox),
+      PageImageServiceConsentStatus::kFailure);
+  EXPECT_EQ(GetConsentStatusToFetchImageAwaitResult(mojom::ClientId::NtpQuests),
+            PageImageServiceConsentStatus::kTimedOut);
+  EXPECT_EQ(GetConsentStatusToFetchImageAwaitResult(mojom::ClientId::Bookmarks),
+            PageImageServiceConsentStatus::kTimedOut);
 
-  test_sync_service_->GetUserSettings()->SetSelectedTypes(
-      /*sync_everything=*/false,
-      /*types=*/{syncer::UserSelectableType::kHistory});
+  test_sync_service_->SetDownloadStatusFor(
+      {syncer::ModelType::HISTORY_DELETE_DIRECTIVES},
+      syncer::SyncService::ModelTypeDownloadStatus::kUpToDate);
   test_sync_service_->FireStateChanged();
 
-  EXPECT_TRUE(GetConsentToFetchImageAwaitResult(mojom::ClientId::Journeys));
-  EXPECT_TRUE(
-      GetConsentToFetchImageAwaitResult(mojom::ClientId::JourneysSidePanel));
-  EXPECT_FALSE(GetConsentToFetchImageAwaitResult(mojom::ClientId::NtpRealbox));
-  EXPECT_TRUE(GetConsentToFetchImageAwaitResult(mojom::ClientId::NtpQuests));
-  EXPECT_FALSE(GetConsentToFetchImageAwaitResult(mojom::ClientId::Bookmarks));
+  EXPECT_EQ(GetConsentStatusToFetchImageAwaitResult(mojom::ClientId::Journeys),
+            PageImageServiceConsentStatus::kSuccess);
+  EXPECT_EQ(GetConsentStatusToFetchImageAwaitResult(
+                mojom::ClientId::JourneysSidePanel),
+            PageImageServiceConsentStatus::kSuccess);
+  // NTP Realbox still false as it does not have an approved privacy model yet.
+  EXPECT_EQ(
+      GetConsentStatusToFetchImageAwaitResult(mojom::ClientId::NtpRealbox),
+      PageImageServiceConsentStatus::kFailure);
+  EXPECT_EQ(GetConsentStatusToFetchImageAwaitResult(mojom::ClientId::NtpQuests),
+            PageImageServiceConsentStatus::kSuccess);
+  EXPECT_EQ(GetConsentStatusToFetchImageAwaitResult(mojom::ClientId::Bookmarks),
+            PageImageServiceConsentStatus::kTimedOut);
 }
 
 TEST_F(ImageServiceTest, SyncInitialization) {
   // Put Sync into the initializing state.
-  test_sync_service_->SetTransportState(
-      syncer::SyncService::TransportState::INITIALIZING);
-  test_sync_service_->GetUserSettings()->SetSelectedTypes(
-      /*sync_everything=*/false,
-      /*types=*/{syncer::UserSelectableType::kHistory});
+  test_sync_service_->SetDownloadStatusFor(
+      {syncer::ModelType::BOOKMARKS,
+       syncer::ModelType::HISTORY_DELETE_DIRECTIVES},
+      syncer::SyncService::ModelTypeDownloadStatus::kWaitingForUpdates);
   test_sync_service_->FireStateChanged();
 
   mojom::Options options;
@@ -210,8 +227,10 @@ TEST_F(ImageServiceTest, SyncInitialization) {
   EXPECT_EQ(test_opt_guide_->requests_received_, 0U) << "Still throttled.";
 
   // Now set the test sync service to active.
-  test_sync_service_->SetTransportState(
-      syncer::SyncService::TransportState::ACTIVE);
+  test_sync_service_->SetDownloadStatusFor(
+      {syncer::ModelType::BOOKMARKS,
+       syncer::ModelType::HISTORY_DELETE_DIRECTIVES},
+      syncer::SyncService::ModelTypeDownloadStatus::kUpToDate);
   test_sync_service_->FireStateChanged();
   task_environment.FastForwardBy(kOptimizationGuideBatchingTimeout);
   EXPECT_EQ(test_opt_guide_->requests_received_, 1U)
@@ -432,6 +451,7 @@ class DisabledOptGuideImageServiceTest : public ImageServiceTest {
 
     template_url_service_ = std::make_unique<TemplateURLService>(nullptr, 0);
     remote_suggestions_service_ = std::make_unique<RemoteSuggestionsService>(
+        /*document_suggestions_service=*/nullptr,
         test_url_loader_factory_.GetSafeWeakWrapper());
     test_opt_guide_ =
         std::make_unique<optimization_guide::ImageServiceTestOptGuide>();

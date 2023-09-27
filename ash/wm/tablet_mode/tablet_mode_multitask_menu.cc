@@ -10,12 +10,14 @@
 #include "ash/public/cpp/shell_window_ids.h"
 #include "ash/public/cpp/window_properties.h"
 #include "ash/screen_util.h"
+#include "ash/shell.h"
 #include "ash/style/ash_color_id.h"
 #include "ash/style/system_shadow.h"
 #include "ash/wm/splitview/split_view_controller.h"
-#include "ash/wm/tablet_mode/tablet_mode_multitask_cue.h"
-#include "ash/wm/tablet_mode/tablet_mode_multitask_menu_event_handler.h"
+#include "ash/wm/tablet_mode/tablet_mode_multitask_cue_controller.h"
+#include "ash/wm/tablet_mode/tablet_mode_multitask_menu_controller.h"
 #include "ash/wm/window_state.h"
+#include "base/debug/crash_logging.h"
 #include "chromeos/constants/chromeos_features.h"
 #include "chromeos/ui/frame/multitask_menu/multitask_menu_metrics.h"
 #include "chromeos/ui/frame/multitask_menu/multitask_menu_view.h"
@@ -29,6 +31,7 @@
 #include "ui/views/background.h"
 #include "ui/views/highlight_border.h"
 #include "ui/views/layout/box_layout.h"
+#include "ui/views/widget/widget_delegate.h"
 
 namespace ash {
 
@@ -149,9 +152,9 @@ BEGIN_METADATA(TabletModeMultitaskMenuView, View)
 END_METADATA
 
 TabletModeMultitaskMenu::TabletModeMultitaskMenu(
-    TabletModeMultitaskMenuEventHandler* event_handler,
+    TabletModeMultitaskMenuController* controller,
     aura::Window* window)
-    : event_handler_(event_handler) {
+    : controller_(controller) {
   CHECK(window);
 
   views::Widget::InitParams params(views::Widget::InitParams::TYPE_POPUP);
@@ -166,6 +169,7 @@ TabletModeMultitaskMenu::TabletModeMultitaskMenu(
 
   widget_->Init(std::move(params));
   widget_->SetVisibilityChangedAnimationsEnabled(false);
+  widget_->widget_delegate()->SetEnableArrowKeyTraversal(true);
 
   // Clip the widget's root view so that the menu appears to be sliding out from
   // the top, even if the window above it is stacked below it, which is the case
@@ -209,6 +213,7 @@ TabletModeMultitaskMenu::TabletModeMultitaskMenu(
       0, -menu_size.height() - kVerticalPosition);
   menu_view_->layer()->SetTransform(initial_transform);
   menu_view_->shadow()->SetContentBounds(gfx::Rect(menu_size));
+  menu_view_->shadow()->ObserveColorProviderSource(widget_.get());
 
   // Showing the widget can change native focus (which would result in an
   // immediate closing of the menu). Only start observing after shown.
@@ -245,7 +250,7 @@ void TabletModeMultitaskMenu::Animate(bool show) {
                                0, -menu_view_->GetPreferredSize().height() -
                                       kVerticalPosition),
                     gfx::Tween::ACCEL_20_DECEL_100);
-  ui::Layer* cue_layer = event_handler_->multitask_cue()->cue_layer();
+  ui::Layer* cue_layer = controller_->multitask_cue_controller()->cue_layer();
   if (cue_layer) {
     animation_builder.GetCurrentSequence().SetTransform(
         cue_layer,
@@ -285,7 +290,8 @@ void TabletModeMultitaskMenu::BeginDrag(float initial_y, bool down) {
     initial_y_ = menu_view_->bounds().bottom();
     menu_view_->layer()->SetTransform(
         gfx::Transform::MakeTranslation(0, translation_y));
-    if (ui::Layer* cue_layer = event_handler_->multitask_cue()->cue_layer()) {
+    if (ui::Layer* cue_layer =
+            controller_->multitask_cue_controller()->cue_layer()) {
       cue_layer->SetTransform(gfx::Transform::MakeTranslation(0, initial_y));
     }
   } else {
@@ -296,15 +302,27 @@ void TabletModeMultitaskMenu::BeginDrag(float initial_y, bool down) {
 }
 
 void TabletModeMultitaskMenu::UpdateDrag(float current_y, bool down) {
-  const float translation_y = current_y - initial_y_;
   // Stop translating the menu if the drag moves out of bounds.
-  if ((down && translation_y >= 0.f) || (!down && current_y <= 0.f)) {
+  if (current_y <= 0.f ||
+      current_y >=
+          kVerticalPosition + menu_view_->GetPreferredSize().height()) {
     return;
   }
-  menu_view_->layer()->SetTransform(
-      gfx::Transform::MakeTranslation(0, translation_y));
 
-  if (auto* cue_layer = event_handler_->multitask_cue()->cue_layer()) {
+  ui::Layer* menu_layer = menu_view_->layer();
+  ui::LayerAnimator* animator = menu_layer->GetAnimator();
+  if (animator->IsAnimatingOnePropertyOf(
+          ui::LayerAnimationElement::TRANSFORM)) {
+    // Calling `SetTransform()` with the same target transform can end an
+    // ongoing animation and destroy `this`. Abort the animation (not stop
+    // which will call `AnimationBuilder::OnEnded()`).
+    animator->AbortAllAnimations();
+  }
+
+  const float translation_y = current_y - initial_y_;
+  menu_layer->SetTransform(gfx::Transform::MakeTranslation(0, translation_y));
+
+  if (auto* cue_layer = controller_->multitask_cue_controller()->cue_layer()) {
     cue_layer->SetTransform(gfx::Transform::MakeTranslation(
         0, menu_view_->GetPreferredSize().height() + kVerticalPosition +
                translation_y));
@@ -324,7 +342,7 @@ void TabletModeMultitaskMenu::EndDrag() {
 }
 
 void TabletModeMultitaskMenu::Reset() {
-  event_handler_->ResetMultitaskMenu();
+  controller_->ResetMultitaskMenu();
 }
 
 void TabletModeMultitaskMenu::OnNativeFocusChanged(

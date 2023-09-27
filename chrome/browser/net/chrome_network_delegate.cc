@@ -42,8 +42,10 @@ bool IsPathOnAllowlist(const base::FilePath& path,
 
 #if BUILDFLAG(IS_CHROMEOS)
 bool IsLacrosLogFile(const base::FilePath& path) {
-  return fnmatch("/home/chronos/user/lacros/lacros*.log", path.value().c_str(),
-                 FNM_NOESCAPE) == 0;
+  return (fnmatch("/home/chronos/user/lacros/lacros*.log", path.value().c_str(),
+                  FNM_NOESCAPE) == 0) ||
+         (fnmatch("/var/log/lacros/lacros*.log", path.value().c_str(),
+                  FNM_NOESCAPE) == 0);
 }
 
 // Returns true if access is allowed for |path| for a user with |profile_path).
@@ -76,6 +78,7 @@ bool IsAccessAllowedChromeOS(const base::FilePath& path,
       "/media",
       "/opt/oem",
       "/run/arc/sdcard/write/emulated/0",
+      "/run/imageloader",
       "/usr/share/chromeos-assets",
       "/var/log",
   };

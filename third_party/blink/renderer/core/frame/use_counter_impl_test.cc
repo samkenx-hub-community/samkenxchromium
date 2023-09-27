@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "base/test/metrics/histogram_tester.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/blink/public/common/scheme_registry.h"
 #include "third_party/blink/public/mojom/use_counter/metrics/css_property_id.mojom-blink.h"
@@ -17,7 +18,6 @@
 #include "third_party/blink/renderer/core/page/page.h"
 #include "third_party/blink/renderer/core/testing/dummy_page_holder.h"
 #include "third_party/blink/renderer/platform/instrumentation/use_counter.h"
-#include "third_party/blink/renderer/platform/testing/histogram_tester.h"
 #include "third_party/blink/renderer/platform/testing/runtime_enabled_features_test_helpers.h"
 #include "third_party/blink/renderer/platform/testing/url_test_helpers.h"
 #include "third_party/blink/renderer/platform/weborigin/kurl.h"
@@ -111,7 +111,7 @@ class UseCounterImplTest : public testing::Test {
   Document& GetDocument() { return dummy_->GetDocument(); }
 
   std::unique_ptr<DummyPageHolder> dummy_;
-  HistogramTester histogram_tester_;
+  base::HistogramTester histogram_tester_;
 
   void UpdateAllLifecyclePhases(Document& document) {
     document.View()->UpdateAllLifecyclePhasesForTest();
@@ -454,7 +454,7 @@ TEST_F(UseCounterImplTest, CSSSelectorHostContextInLiveProfile) {
     </div>
   )HTML");
 
-  Element* host = document.getElementById("host");
+  Element* host = document.getElementById(AtomicString("host"));
   ASSERT_TRUE(host);
   ShadowRoot& shadow_root =
       host->AttachShadowRootInternal(ShadowRootType::kOpen);
@@ -487,7 +487,7 @@ TEST_F(UseCounterImplTest, CSSSelectorHostContextInSnapshotProfile) {
     </div>
   )HTML");
 
-  Element* host = document.getElementById("host");
+  Element* host = document.getElementById(AtomicString("host"));
   ASSERT_TRUE(host);
   ShadowRoot& shadow_root =
       host->AttachShadowRootInternal(ShadowRootType::kOpen);
@@ -498,7 +498,8 @@ TEST_F(UseCounterImplTest, CSSSelectorHostContextInSnapshotProfile) {
   UpdateAllLifecyclePhases(document);
   EXPECT_FALSE(document.IsUseCounted(feature));
 
-  Element* span = shadow_root.QuerySelector(":host-context(#parent) span");
+  Element* span =
+      shadow_root.QuerySelector(AtomicString(":host-context(#parent) span"));
   EXPECT_TRUE(span);
   EXPECT_TRUE(document.IsUseCounted(feature));
 }

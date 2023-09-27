@@ -15,6 +15,7 @@
 #import "base/time/time.h"
 #import "components/feed/core/v2/public/common_enums.h"
 #import "components/feed/core/v2/public/ios/pref_names.h"
+#import "components/feed/feed_feature_list.h"
 #import "components/policy/policy_constants.h"
 #import "components/pref_registry/pref_registry_syncable.h"
 #import "components/prefs/ios/pref_observer_bridge.h"
@@ -25,6 +26,8 @@
 #import "components/search_engines/template_url_service.h"
 #import "components/signin/public/base/signin_metrics.h"
 #import "components/signin/public/identity_manager/objc/identity_manager_observer_bridge.h"
+#import "components/sync/base/features.h"
+#import "components/sync/service/sync_service.h"
 #import "ios/chrome/app/application_delegate/app_state.h"
 #import "ios/chrome/browser/discover_feed/discover_feed_observer_bridge.h"
 #import "ios/chrome/browser/discover_feed/discover_feed_service.h"
@@ -35,15 +38,16 @@
 #import "ios/chrome/browser/follow/followed_web_site.h"
 #import "ios/chrome/browser/follow/followed_web_site_state.h"
 #import "ios/chrome/browser/ntp/features.h"
+#import "ios/chrome/browser/ntp/new_tab_page_state.h"
 #import "ios/chrome/browser/ntp/new_tab_page_tab_helper.h"
 #import "ios/chrome/browser/search_engines/template_url_service_factory.h"
-#import "ios/chrome/browser/shared/coordinator/alert/action_sheet_coordinator.h"
 #import "ios/chrome/browser/shared/coordinator/layout_guide/layout_guide_util.h"
 #import "ios/chrome/browser/shared/coordinator/scene/scene_state.h"
 #import "ios/chrome/browser/shared/coordinator/scene/scene_state_browser_agent.h"
 #import "ios/chrome/browser/shared/model/application_context/application_context.h"
 #import "ios/chrome/browser/shared/model/browser/browser.h"
 #import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
+#import "ios/chrome/browser/shared/model/prefs/pref_backed_boolean.h"
 #import "ios/chrome/browser/shared/model/prefs/pref_names.h"
 #import "ios/chrome/browser/shared/model/web_state_list/web_state_list.h"
 #import "ios/chrome/browser/shared/public/commands/application_commands.h"
@@ -55,18 +59,22 @@
 #import "ios/chrome/browser/shared/public/commands/show_signin_command.h"
 #import "ios/chrome/browser/shared/public/commands/snackbar_commands.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
-#import "ios/chrome/browser/shared/ui/util/named_guide.h"
+#import "ios/chrome/browser/shared/ui/util/layout_guide_names.h"
 #import "ios/chrome/browser/shared/ui/util/util_swift.h"
 #import "ios/chrome/browser/signin/authentication_service.h"
 #import "ios/chrome/browser/signin/authentication_service_factory.h"
+#import "ios/chrome/browser/signin/authentication_service_observer_bridge.h"
 #import "ios/chrome/browser/signin/capabilities_types.h"
+#import "ios/chrome/browser/signin/chrome_account_manager_service.h"
 #import "ios/chrome/browser/signin/chrome_account_manager_service_factory.h"
 #import "ios/chrome/browser/signin/identity_manager_factory.h"
 #import "ios/chrome/browser/signin/system_identity_manager.h"
 #import "ios/chrome/browser/sync/sync_service_factory.h"
 #import "ios/chrome/browser/ui/authentication/enterprise/enterprise_utils.h"
+#import "ios/chrome/browser/ui/content_suggestions/content_suggestions_collection_utils.h"
 #import "ios/chrome/browser/ui/content_suggestions/content_suggestions_coordinator.h"
 #import "ios/chrome/browser/ui/content_suggestions/content_suggestions_feature.h"
+#import "ios/chrome/browser/ui/content_suggestions/content_suggestions_mediator.h"
 #import "ios/chrome/browser/ui/context_menu/link_preview/link_preview_coordinator.h"
 #import "ios/chrome/browser/ui/ntp/discover_feed_constants.h"
 #import "ios/chrome/browser/ui/ntp/discover_feed_preview_delegate.h"
@@ -74,19 +82,21 @@
 #import "ios/chrome/browser/ui/ntp/feed_delegate.h"
 #import "ios/chrome/browser/ui/ntp/feed_header_view_controller.h"
 #import "ios/chrome/browser/ui/ntp/feed_management/feed_management_coordinator.h"
-#import "ios/chrome/browser/ui/ntp/feed_management/feed_management_navigation_delegate.h"
-#import "ios/chrome/browser/ui/ntp/feed_menu_commands.h"
+#import "ios/chrome/browser/ui/ntp/feed_menu_coordinator.h"
 #import "ios/chrome/browser/ui/ntp/feed_promos/feed_sign_in_promo_coordinator.h"
+#import "ios/chrome/browser/ui/ntp/feed_promos/feed_sign_in_promo_coordinator_delegate.h"
 #import "ios/chrome/browser/ui/ntp/feed_sign_in_promo_delegate.h"
 #import "ios/chrome/browser/ui/ntp/feed_top_section/feed_top_section_coordinator.h"
 #import "ios/chrome/browser/ui/ntp/feed_wrapper_view_controller.h"
 #import "ios/chrome/browser/ui/ntp/incognito/incognito_view_controller.h"
+#import "ios/chrome/browser/ui/ntp/logo_vendor.h"
 #import "ios/chrome/browser/ui/ntp/metrics/feed_metrics_constants.h"
 #import "ios/chrome/browser/ui/ntp/metrics/feed_metrics_recorder.h"
 #import "ios/chrome/browser/ui/ntp/metrics/home_metrics.h"
 #import "ios/chrome/browser/ui/ntp/metrics/new_tab_page_metrics_recorder.h"
 #import "ios/chrome/browser/ui/ntp/new_tab_page_component_factory_protocol.h"
 #import "ios/chrome/browser/ui/ntp/new_tab_page_content_delegate.h"
+#import "ios/chrome/browser/ui/ntp/new_tab_page_controller_delegate.h"
 #import "ios/chrome/browser/ui/ntp/new_tab_page_coordinator+private.h"
 #import "ios/chrome/browser/ui/ntp/new_tab_page_delegate.h"
 #import "ios/chrome/browser/ui/ntp/new_tab_page_feature.h"
@@ -97,7 +107,6 @@
 #import "ios/chrome/browser/ui/ntp/new_tab_page_metrics_delegate.h"
 #import "ios/chrome/browser/ui/ntp/new_tab_page_view_controller.h"
 #import "ios/chrome/browser/ui/overscroll_actions/overscroll_actions_controller.h"
-#import "ios/chrome/browser/ui/settings/utils/pref_backed_boolean.h"
 #import "ios/chrome/browser/ui/toolbar/public/fakebox_focuser.h"
 #import "ios/chrome/browser/url_loading/url_loading_browser_agent.h"
 #import "ios/chrome/common/ui/util/constraints_ui_util.h"
@@ -109,19 +118,16 @@
 #import "ios/web/public/web_state_observer_bridge.h"
 #import "ui/base/l10n/l10n_util_mac.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 @interface NewTabPageCoordinator () <AppStateObserver,
+                                     AuthenticationServiceObserving,
                                      BooleanObserver,
                                      DiscoverFeedObserverBridgeDelegate,
                                      DiscoverFeedPreviewDelegate,
                                      FeedControlDelegate,
                                      FeedDelegate,
-                                     FeedManagementNavigationDelegate,
-                                     FeedMenuCommands,
+                                     FeedMenuCoordinatorDelegate,
                                      FeedSignInPromoDelegate,
+                                     FeedSignInPromoCoordinatorDelegate,
                                      FeedWrapperViewControllerDelegate,
                                      IdentityManagerObserverBridgeDelegate,
                                      NewTabPageContentDelegate,
@@ -143,6 +149,10 @@
 
   // Observes changes in the DiscoverFeed.
   std::unique_ptr<DiscoverFeedObserverBridge> _discoverFeedObserverBridge;
+
+  // Observer for auth service status changes.
+  std::unique_ptr<AuthenticationServiceObserverBridge>
+      _authServiceObserverBridge;
 }
 
 // Coordinator for the ContentSuggestions.
@@ -200,8 +210,8 @@
 // The view controller representing the NTP feed header.
 @property(nonatomic, strong) FeedHeaderViewController* feedHeaderViewController;
 
-// Alert coordinator for handling the feed header menu.
-@property(nonatomic, strong) ActionSheetCoordinator* alertCoordinator;
+// Coordinator for handling the feed menu.
+@property(nonatomic, strong) FeedMenuCoordinator* feedMenuCoordinator;
 
 // Authentication Service for the user's signed-in state.
 @property(nonatomic, assign) AuthenticationService* authService;
@@ -243,6 +253,9 @@
 
 // Recorder for new tab page metrics.
 @property(nonatomic, strong) NewTabPageMetricsRecorder* NTPMetricsRecorder;
+
+// Logo vendor to display the doodle on the NTP.
+@property(nonatomic, strong) id<LogoVendor> logoVendor;
 
 @end
 
@@ -298,8 +311,9 @@
   // NOTE: anything that executes below WILL NOT execute for OffTheRecord
   // browsers!
 
-  self.selectedFeed =
-      NewTabPageTabHelper::FromWebState(self.webState)->GetNextNTPFeedType();
+  self.selectedFeed = NewTabPageTabHelper::FromWebState(self.webState)
+                          ->GetNTPState()
+                          .selectedFeed;
 
   [self initializeServices];
   [self initializeNTPComponents];
@@ -371,15 +385,11 @@
 
   self.NTPMetricsRecorder = nil;
 
-  if (self.feedSignInPromoCoordinator) {
-    [self.feedSignInPromoCoordinator stop];
-    self.feedSignInPromoCoordinator = nil;
-  }
+  [self stopFeedSignInPromoCoordinator];
 
   [self.linkPreviewCoordinator stop];
   self.linkPreviewCoordinator = nil;
 
-  self.alertCoordinator = nil;
   self.authService = nil;
   self.templateURLService = nil;
   self.prefService = nil;
@@ -397,10 +407,14 @@
   [self.feedExpandedPref setObserver:nil];
   self.feedExpandedPref = nil;
 
+  [self.feedMenuCoordinator stop];
+  self.feedMenuCoordinator = nil;
+
   _prefChangeRegistrar.reset();
   _prefObserverBridge.reset();
   _discoverFeedObserverBridge.reset();
   _identityObserverBridge.reset();
+  _authServiceObserverBridge.reset();
 
   self.started = NO;
 }
@@ -508,12 +522,17 @@
 - (void)didNavigateToNTPInWebState:(web::WebState*)webState {
   CHECK(self.started);
   self.webState = webState;
+  [self restoreNTPState];
   [self updateNTPIsVisible:YES];
+  [self updateStartForVisibilityChange:YES];
+  [self.toolbarDelegate didNavigateToNTPOnActiveWebState];
 }
 
 - (void)didNavigateAwayFromNTP {
   [self cancelOmniboxEdit];
+  [self saveNTPState];
   [self updateNTPIsVisible:NO];
+  [self updateStartForVisibilityChange:NO];
   self.webState = nullptr;
 }
 
@@ -578,6 +597,11 @@
   // Start observing DiscoverFeedService.
   _discoverFeedObserverBridge = std::make_unique<DiscoverFeedObserverBridge>(
       self, self.discoverFeedService);
+
+  // Start observing Authentication service.
+  _authServiceObserverBridge =
+      std::make_unique<AuthenticationServiceObserverBridge>(self.authService,
+                                                            self);
 }
 
 // Creates all the NTP components.
@@ -585,6 +609,7 @@
   Browser* browser = self.browser;
   id<NewTabPageComponentFactoryProtocol> componentFactory =
       self.componentFactory;
+  self.logoVendor = ios::provider::CreateLogoVendor(browser, self.webState);
   self.NTPViewController = [componentFactory NTPViewController];
   self.headerViewController = [componentFactory headerViewController];
   self.NTPMediator =
@@ -617,38 +642,33 @@
 
     self.feedHeaderViewController = [self.componentFactory
         feedHeaderViewControllerWithFollowingDotVisible:followingDotVisible];
+    self.feedMenuCoordinator = [[FeedMenuCoordinator alloc]
+        initWithBaseViewController:self.NTPViewController
+                           browser:self.browser];
+    self.feedMenuCoordinator.delegate = self;
+    [self.feedMenuCoordinator start];
+    self.feedHeaderViewController.feedMenuHandler = HandlerForProtocol(
+        self.browser->GetCommandDispatcher(), FeedMenuCommands);
   }
 
   self.feedHeaderViewController.feedControlDelegate = self;
   self.feedHeaderViewController.ntpDelegate = self;
   self.feedHeaderViewController.feedMetricsRecorder = self.feedMetricsRecorder;
-  self.feedHeaderViewController.followingFeedSortType =
-      self.followingFeedSortType;
-  [self.feedHeaderViewController.menuButton
-             addTarget:self
-                action:@selector(openFeedMenu)
-      forControlEvents:UIControlEventTouchUpInside];
-
+  if (!IsFollowUIUpdateEnabled()) {
+    self.feedHeaderViewController.followingFeedSortType =
+        self.followingFeedSortType;
+  }
   self.NTPViewController.feedHeaderViewController =
       self.feedHeaderViewController;
 
   // Requests feeds here if the correct flags and prefs are enabled.
   if ([self shouldFeedBeVisible]) {
-    if ([self isFollowingFeedAvailable]) {
-      switch (self.selectedFeed) {
-        case FeedTypeDiscover:
-          self.feedViewController = [self.componentFactory
-                   discoverFeedForBrowser:self.browser
-              viewControllerConfiguration:[self
-                                              feedViewControllerConfiguration]];
-          break;
-        case FeedTypeFollowing:
-          self.feedViewController = [self.componentFactory
-                  followingFeedForBrowser:self.browser
-              viewControllerConfiguration:[self feedViewControllerConfiguration]
-                                 sortType:self.followingFeedSortType];
-          break;
-      }
+    if ([self isFollowingFeedAvailable] &&
+        self.selectedFeed == FeedTypeFollowing) {
+      self.feedViewController = [self.componentFactory
+              followingFeedForBrowser:self.browser
+          viewControllerConfiguration:[self feedViewControllerConfiguration]
+                             sortType:self.followingFeedSortType];
     } else {
       self.feedViewController = [self.componentFactory
                discoverFeedForBrowser:self.browser
@@ -658,7 +678,7 @@
 
   // Feed top section visibility is based on feed visibility, so this should
   // always be below the block that sets `feedViewController`.
-  if ([self isFeedTopSectionVisible]) {
+  if ([self isFeedVisible]) {
     self.feedTopSectionCoordinator = [self createFeedTopSectionCoordinator];
   }
 }
@@ -684,6 +704,7 @@
   self.headerViewController.toolbarDelegate = self.toolbarDelegate;
   self.headerViewController.baseViewController = self.baseViewController;
   self.headerViewController.NTPMetricsRecorder = self.NTPMetricsRecorder;
+  [self.headerViewController setLogoVendor:self.logoVendor];
 }
 
 // Configures `self.contentSuggestionsCoordiantor`.
@@ -699,12 +720,10 @@
 - (void)configureNTPMediator {
   NewTabPageMediator* NTPMediator = self.NTPMediator;
   DCHECK(NTPMediator);
-  NTPMediator.browser = self.browser;
   NTPMediator.feedControlDelegate = self;
+  NTPMediator.NTPContentDelegate = self;
   NTPMediator.headerConsumer = self.headerViewController;
   NTPMediator.consumer = self.NTPViewController;
-  NTPMediator.suggestionsMediator =
-      self.contentSuggestionsCoordinator.contentSuggestionsMediator;
   [NTPMediator setUp];
 }
 
@@ -723,14 +742,13 @@
   self.NTPViewController.contentSuggestionsViewController =
       self.contentSuggestionsCoordinator.viewController;
 
-  self.NTPViewController.panGestureHandler = self.panGestureHandler;
   self.NTPViewController.feedVisible = [self isFeedVisible];
 
   self.feedWrapperViewController = [self.componentFactory
       feedWrapperViewControllerWithDelegate:self
                          feedViewController:self.feedViewController];
 
-  if ([self isFeedTopSectionVisible]) {
+  if ([self isFeedVisible]) {
     self.NTPViewController.feedTopSectionViewController =
         self.feedTopSectionCoordinator.viewController;
   }
@@ -738,13 +756,14 @@
   self.NTPViewController.feedWrapperViewController =
       self.feedWrapperViewController;
   self.NTPViewController.overscrollDelegate = self;
-  self.NTPViewController.ntpContentDelegate = self;
+  self.NTPViewController.NTPContentDelegate = self;
 
   self.NTPViewController.headerViewController = self.headerViewController;
 
   [self configureMainViewControllerUsing:self.NTPViewController];
   self.NTPViewController.feedMetricsRecorder = self.feedMetricsRecorder;
   self.NTPViewController.bubblePresenter = self.bubblePresenter;
+  self.NTPViewController.mutator = self.NTPMediator;
 }
 
 // Configures the main ViewController managed by this Coordinator.
@@ -775,10 +794,6 @@
   }
 }
 
-- (id<ThumbStripSupporting>)thumbStripSupporting {
-  return self.NTPViewController;
-}
-
 #pragma mark - NewTabPageConfiguring
 
 - (void)selectFeedType:(FeedType)feedType {
@@ -793,7 +808,7 @@
 #pragma mark - NewTabPageHeaderCommands
 
 - (void)updateForHeaderSizeChange {
-  [self.NTPViewController updateHeightAboveFeedAndScrollToTopIfNeeded];
+  [self.NTPViewController updateHeightAboveFeed];
 }
 
 - (void)fakeboxTapped {
@@ -807,15 +822,18 @@
       self.browser->GetCommandDispatcher(), ApplicationCommands);
   BOOL isSignedIn =
       self.authService->HasPrimaryIdentity(signin::ConsentLevel::kSignin);
-  BOOL isSigninNotAllowed = self.authService->GetServiceStatus() !=
-                            AuthenticationService::ServiceStatus::SigninAllowed;
-  BOOL isSyncDisabled = IsSyncDisabledByPolicy(
-      SyncServiceFactory::GetForBrowserState(self.browser->GetBrowserState()));
-  if (isSignedIn || isSigninNotAllowed || isSyncDisabled) {
+  if (isSignedIn || ![self isSignInAllowed] ||
+      (![self isSyncAllowedByPolicy] &&
+       !base::FeatureList::IsEnabled(
+           syncer::kReplaceSyncPromosWithSignInPromos))) {
     [handler showSettingsFromViewController:self.baseViewController];
   } else {
+    AuthenticationOperation operation =
+        base::FeatureList::IsEnabled(syncer::kReplaceSyncPromosWithSignInPromos)
+            ? AuthenticationOperation::kSheetSigninAndHistorySync
+            : AuthenticationOperation::kSigninAndSync;
     ShowSigninCommand* const showSigninCommand = [[ShowSigninCommand alloc]
-        initWithOperation:AuthenticationOperationSigninAndSync
+        initWithOperation:operation
               accessPoint:signin_metrics::AccessPoint::
                               ACCESS_POINT_NTP_SIGNED_OUT_ICON];
     [handler showSignin:showSigninCommand
@@ -823,84 +841,31 @@
   }
 }
 
-#pragma mark - FeedMenuCommands
+#pragma mark - FeedMenuCoordinatorDelegate
 
-- (void)openFeedMenu {
-  [self.alertCoordinator stop];
-  self.alertCoordinator = nil;
-
-  // This button is in a container view that itself is in FeedHeaderVC's main
-  // view. In order to anchor the alert view correctly, we need to provide the
-  // button's frame as well as its superview which is the coordinate system
-  // for the frame.
-  UIButton* menuButton = self.feedHeaderViewController.menuButton;
-  self.alertCoordinator = [[ActionSheetCoordinator alloc]
-      initWithBaseViewController:self.NTPViewController
-                         browser:self.browser
-                           title:nil
-                         message:nil
-                            rect:menuButton.frame
-                            view:menuButton.superview];
-  __weak NewTabPageCoordinator* weakSelf = self;
-
-  // Item for toggling the feed on/off.
-  if ([self.feedExpandedPref value]) {
-    [self.alertCoordinator
-        addItemWithTitle:l10n_util::GetNSString(
-                             IDS_IOS_DISCOVER_FEED_MENU_TURN_OFF_ITEM)
-                  action:^{
-                    [weakSelf setFeedVisibleFromHeader:NO];
-                  }
-                   style:UIAlertActionStyleDestructive];
-  } else {
-    [self.alertCoordinator
-        addItemWithTitle:l10n_util::GetNSString(
-                             IDS_IOS_DISCOVER_FEED_MENU_TURN_ON_ITEM)
-                  action:^{
-                    [weakSelf setFeedVisibleFromHeader:YES];
-                  }
-                   style:UIAlertActionStyleDefault];
+- (void)didSelectFeedMenuItem:(FeedMenuItemType)item {
+  switch (item) {
+    case FeedMenuItemType::kCancel:
+      break;
+    case FeedMenuItemType::kTurnOff:
+      [self setFeedVisibleFromHeader:NO];
+      break;
+    case FeedMenuItemType::kTurnOn:
+      [self setFeedVisibleFromHeader:YES];
+      break;
+    case FeedMenuItemType::kManage:
+      [self handleFeedManageTapped];
+      break;
+    case FeedMenuItemType::kManageActivity:
+      [self.NTPMediator handleNavigateToActivity];
+      break;
+    case FeedMenuItemType::kManageInterests:
+      [self.NTPMediator handleNavigateToInterests];
+      break;
+    case FeedMenuItemType::kLearnMore:
+      [self.NTPMediator handleFeedLearnMoreTapped];
+      break;
   }
-
-  // Items for signed-in users.
-  if (self.authService->HasPrimaryIdentity(signin::ConsentLevel::kSignin)) {
-    if ([self isFollowingFeedAvailable]) {
-      [self.alertCoordinator
-          addItemWithTitle:l10n_util::GetNSString(
-                               IDS_IOS_DISCOVER_FEED_MENU_MANAGE_ITEM)
-                    action:^{
-                      [weakSelf handleFeedManageTapped];
-                    }
-                     style:UIAlertActionStyleDefault];
-    } else {
-      [self.alertCoordinator
-          addItemWithTitle:l10n_util::GetNSString(
-                               IDS_IOS_DISCOVER_FEED_MENU_MANAGE_ACTIVITY_ITEM)
-                    action:^{
-                      [weakSelf.NTPMediator handleFeedManageActivityTapped];
-                    }
-                     style:UIAlertActionStyleDefault];
-
-      [self.alertCoordinator
-          addItemWithTitle:l10n_util::GetNSString(
-                               IDS_IOS_DISCOVER_FEED_MENU_MANAGE_INTERESTS_ITEM)
-                    action:^{
-                      [weakSelf.NTPMediator handleFeedManageInterestsTapped];
-                    }
-                     style:UIAlertActionStyleDefault];
-    }
-  }
-
-  // Items for all users.
-  [self.alertCoordinator
-      addItemWithTitle:l10n_util::GetNSString(
-                           IDS_IOS_DISCOVER_FEED_MENU_LEARN_MORE_ITEM)
-                action:^{
-                  [weakSelf.NTPMediator handleFeedLearnMoreTapped];
-                }
-                 style:UIAlertActionStyleDefault];
-
-  [self.alertCoordinator start];
 }
 
 #pragma mark - DiscoverFeedPreviewDelegate
@@ -930,18 +895,6 @@
 #pragma mark - FeedControlDelegate
 
 - (FollowingFeedSortType)followingFeedSortType {
-  if (IsFollowingFeedDefaultSortTypeEnabled()) {
-    BOOL hasDefaultBeenChanged = self.prefService->GetBoolean(
-        prefs::kDefaultFollowingFeedSortTypeChanged);
-    if (hasDefaultBeenChanged) {
-      return (FollowingFeedSortType)self.prefService->GetInteger(
-          prefs::kNTPFollowingFeedSortType);
-    } else {
-      return IsDefaultFollowingFeedSortTypeGroupedByPublisher()
-                 ? FollowingFeedSortTypeByPublisher
-                 : FollowingFeedSortTypeByLatest;
-    }
-  }
   // TODO(crbug.com/1352935): Add a DCHECK to make sure the coordinator isn't
   // stopped when we check this. That would require us to use the NTPHelper to
   // get this information.
@@ -971,7 +924,7 @@
 
   // Scroll position resets when changing the feed, so we set it back to what it
   // was.
-  [self.NTPViewController setContentOffsetToTopOfFeed:scrollPosition];
+  [self.NTPViewController setContentOffsetToTopOfFeedOrLess:scrollPosition];
 }
 
 - (void)handleSortTypeForFollowingFeed:(FollowingFeedSortType)sortType {
@@ -995,7 +948,7 @@
 
   // Scroll position resets when changing the feed, so we set it back to what it
   // was.
-  [self.NTPViewController setContentOffsetToTopOfFeed:scrollPosition];
+  [self.NTPViewController setContentOffsetToTopOfFeedOrLess:scrollPosition];
 }
 
 - (BOOL)shouldFeedBeVisible {
@@ -1014,81 +967,105 @@
 #pragma mark - FeedDelegate
 
 - (void)contentSuggestionsWasUpdated {
-  [self.NTPViewController updateHeightAboveFeedAndScrollToTopIfNeeded];
-}
-
-#pragma mark - FeedManagementNavigationDelegate
-
-- (void)handleNavigateToActivity {
-  [self.NTPMediator handleFeedManageActivityTapped];
-}
-
-- (void)handleNavigateToInterests {
-  [self.NTPMediator handleFeedManageInterestsTapped];
-}
-
-- (void)handleNavigateToHidden {
-  [self.NTPMediator handleFeedManageHiddenTapped];
-}
-
-- (void)handleNavigateToFollowedURL:(const GURL&)url {
-  [self.NTPMediator handleVisitSiteFromFollowManagementList:url];
+  [self.NTPViewController updateHeightAboveFeed];
 }
 
 #pragma mark - FeedSignInPromoDelegate
 
 - (void)showSignInPromoUI {
-  ChromeAccountManagerService* accountManagerService =
-      ChromeAccountManagerServiceFactory::GetForBrowserState(
-          self.browser->GetBrowserState());
-
-  BOOL hasUserIdentities = accountManagerService->HasIdentities();
-
-  if ([self isSignInAllowed] &&
-      (IsConsistencyNewAccountInterfaceEnabled() || hasUserIdentities)) {
-    // Show Sign-In only flow, since Sync is not needed for this feature.
-    // TODO(crbug.com/1382615): Currently we show sign-in only UI when it's
-    // enabled, or when the user has one or more device-level user identities,
-    // and when sign-in is allowed. Remove the user identity check when sign-in
-    // only flow is fully launched.
-    const signin_metrics::AccessPoint access_point =
-        signin_metrics::AccessPoint::ACCESS_POINT_NTP_FEED_CARD_MENU_PROMO;
-    id<ApplicationCommands> handler = HandlerForProtocol(
-        self.browser->GetCommandDispatcher(), ApplicationCommands);
-    ShowSigninCommand* command = [[ShowSigninCommand alloc]
-        initWithOperation:AuthenticationOperationSigninOnly
-              accessPoint:access_point];
-    signin_metrics::RecordSigninUserActionForAccessPoint(access_point);
-    [handler showSignin:command baseViewController:self.NTPViewController];
-    [self.feedMetricsRecorder
-        recordShowSignInOnlyUIWithUserId:hasUserIdentities];
-    [self.feedMetricsRecorder recordShowSignInRelatedUIWithType:
-                                  feed::FeedSignInUI::kShowSignInOnlyFlow];
-  } else if ([self isSignInAllowed] && [self isSyncAllowed]) {
-    // Show a sign-in promo half sheet for feed BoC sign-in promo when the
-    // condition of showing sign-in only flow is not fulfilled. This UI will
-    // lead to sync flow,
-    // TODO(crbug.com/1382615): remove this else if block and
-    // FeedSignInPromoCoordinator class when sign-in only flow is fully
-    // launched.
-    self.feedSignInPromoCoordinator = [[FeedSignInPromoCoordinator alloc]
-        initWithBaseViewController:self.NTPViewController
-                           browser:self.browser];
-    [self.feedSignInPromoCoordinator start];
-    [self.feedMetricsRecorder recordShowSignInRelatedUIWithType:
-                                  feed::FeedSignInUI::kShowSyncHalfSheet];
-  } else {
-    // Show a snackbar message if sign-in or sync is disabled and the above UI
-    // shouldn't be shown.
+  // Both possible flows (sign-in only and sign-in + sync) involve sign-in. So
+  // they shouldn't be offered if sign-in is disallowed.
+  if (![self isSignInAllowed]) {
     [self showSignInDisableMessage];
     [self.feedMetricsRecorder recordShowSignInRelatedUIWithType:
                                   feed::FeedSignInUI::kShowSignInDisableToast];
+    return;
   }
+
+  // At this point, the class wants show a sign-in only flow, since the feed
+  // doesn't care about sync. But support for 0-account users in such flow is
+  // guarded by IsConsistencyNewAccountInterfaceEnabled(), currently being
+  // rolled out. So check.
+  BOOL hasUserIdentities =
+      ChromeAccountManagerServiceFactory::GetForBrowserState(
+          self.browser->GetBrowserState())
+          ->HasIdentities();
+  if (hasUserIdentities || IsConsistencyNewAccountInterfaceEnabled()) {
+    id<ApplicationCommands> handler = HandlerForProtocol(
+        self.browser->GetCommandDispatcher(), ApplicationCommands);
+    ShowSigninCommand* command = [[ShowSigninCommand alloc]
+        initWithOperation:AuthenticationOperation::kSigninOnly
+              accessPoint:signin_metrics::AccessPoint::
+                              ACCESS_POINT_NTP_FEED_CARD_MENU_PROMO];
+    [handler showSignin:command baseViewController:self.NTPViewController];
+    [self.feedMetricsRecorder recordShowSignInRelatedUIWithType:
+                                  feed::FeedSignInUI::kShowSignInOnlyFlow];
+    [self.feedMetricsRecorder
+        recordShowSignInOnlyUIWithUserId:hasUserIdentities];
+    signin_metrics::RecordSigninUserActionForAccessPoint(
+        signin_metrics::AccessPoint::ACCESS_POINT_NTP_FEED_CARD_MENU_PROMO);
+    return;
+  }
+
+  // If the sign-in only flow can't be shown, fall back to a sync flow. But not
+  // if sync is disallowed by policy.
+  if (![self isSyncAllowedByPolicy]) {
+    [self showSignInDisableMessage];
+    [self.feedMetricsRecorder recordShowSignInRelatedUIWithType:
+                                  feed::FeedSignInUI::kShowSignInDisableToast];
+    return;
+  }
+
+  // Show the sync flow.
+  self.feedSignInPromoCoordinator = [[FeedSignInPromoCoordinator alloc]
+      initWithBaseViewController:self.NTPViewController
+                         browser:self.browser];
+  self.feedSignInPromoCoordinator.delegate = self;
+  [self.feedSignInPromoCoordinator start];
+  [self.feedMetricsRecorder
+      recordShowSignInRelatedUIWithType:feed::FeedSignInUI::kShowSyncHalfSheet];
 }
 
 - (void)showSignInUI {
-  // Show a snackbar message if sign-in or sync is disabled.
-  if (![self isSignInAllowed] || ![self isSyncAllowed]) {
+  // Both possible flows (sign-in only and sign-in + sync) involve sign-in. So
+  // they shouldn't be offered if sign-in is disallowed.
+  if (![self isSignInAllowed]) {
+    [self showSignInDisableMessage];
+    [self.feedMetricsRecorder recordShowSyncnRelatedUIWithType:
+                                  feed::FeedSyncPromo::kShowDisableToast];
+    return;
+  }
+
+  // If kReplaceSyncPromosWithSignInPromos is enabled, show a sign-in only flow.
+  ChromeBrowserState* browserState = self.browser->GetBrowserState();
+  id<ApplicationCommands> handler = HandlerForProtocol(
+      self.browser->GetCommandDispatcher(), ApplicationCommands);
+  if (base::FeatureList::IsEnabled(
+          syncer::kReplaceSyncPromosWithSignInPromos)) {
+    // If there are 0 identities, kInstantSignin requires less taps.
+    auto operation =
+        ChromeAccountManagerServiceFactory::GetForBrowserState(browserState)
+                ->HasIdentities()
+            ? AuthenticationOperation::kSigninOnly
+            : AuthenticationOperation::kInstantSignin;
+    ShowSigninCommand* command = [[ShowSigninCommand alloc]
+        initWithOperation:operation
+              accessPoint:signin_metrics::AccessPoint::
+                              ACCESS_POINT_NTP_FEED_BOTTOM_PROMO];
+    [handler showSignin:command baseViewController:self.NTPViewController];
+    // TODO(crbug.com/1455963): Strictly speaking this should record a bucket
+    // other than kShowSyncFlow. But I don't think we care too much about this
+    // particular histogram, just rename the bucket after launch.
+    [self.feedMetricsRecorder
+        recordShowSyncnRelatedUIWithType:feed::FeedSyncPromo::kShowSyncFlow];
+    signin_metrics::RecordSigninUserActionForAccessPoint(
+        signin_metrics::AccessPoint::ACCESS_POINT_NTP_FEED_BOTTOM_PROMO);
+    return;
+  }
+
+  // kReplaceSyncPromosWithSignInPromos is disabled, the promo wants to offer
+  // the old sync flow. That shouldn't happen if sync is disallowed by policy.
+  if (![self isSyncAllowedByPolicy]) {
     [self showSignInDisableMessage];
     [self.feedMetricsRecorder recordShowSyncnRelatedUIWithType:
                                   feed::FeedSyncPromo::kShowDisableToast];
@@ -1096,17 +1073,15 @@
   }
 
   // Show sync flow.
-  const signin_metrics::AccessPoint access_point =
-      signin_metrics::AccessPoint::ACCESS_POINT_NTP_FEED_BOTTOM_PROMO;
-  id<ApplicationCommands> handler = HandlerForProtocol(
-      self.browser->GetCommandDispatcher(), ApplicationCommands);
   ShowSigninCommand* command = [[ShowSigninCommand alloc]
-      initWithOperation:AuthenticationOperationSigninAndSync
-            accessPoint:access_point];
-  signin_metrics::RecordSigninUserActionForAccessPoint(access_point);
+      initWithOperation:AuthenticationOperation::kSigninAndSync
+            accessPoint:signin_metrics::AccessPoint::
+                            ACCESS_POINT_NTP_FEED_BOTTOM_PROMO];
   [handler showSignin:command baseViewController:self.NTPViewController];
   [self.feedMetricsRecorder
       recordShowSyncnRelatedUIWithType:feed::FeedSyncPromo::kShowSyncFlow];
+  signin_metrics::RecordSigninUserActionForAccessPoint(
+      signin_metrics::AccessPoint::ACCESS_POINT_NTP_FEED_BOTTOM_PROMO);
 }
 
 #pragma mark - FeedWrapperViewControllerDelegate
@@ -1120,6 +1095,11 @@
 - (BOOL)isContentHeaderSticky {
   return [self isFollowingFeedAvailable] && [self isFeedHeaderVisible] &&
          !IsStickyHeaderDisabledForFollowingFeed();
+}
+
+- (BOOL)isRecentTabTileVisible {
+  return [self.contentSuggestionsCoordinator.contentSuggestionsMediator
+              mostRecentTabStartSurfaceTileIsShowing];
 }
 
 - (void)signinPromoHasChangedVisibility:(BOOL)visible {
@@ -1142,6 +1122,28 @@
   id<FakeboxFocuser> fakeboxFocuserHandler =
       HandlerForProtocol(self.browser->GetCommandDispatcher(), FakeboxFocuser);
   [fakeboxFocuserHandler fakeboxFocused];
+}
+
+- (void)refreshNTPContent {
+  [self.contentSuggestionsCoordinator
+          .contentSuggestionsMediator refreshMostVisitedTiles];
+  self.discoverFeedService->RefreshFeed(
+      FeedRefreshTrigger::kForegroundFeedVisibleOther);
+}
+
+- (void)updateForSelectedFeed:(FeedType)selectedFeed {
+  [self selectFeedType:selectedFeed];
+  if (!IsFollowUIUpdateEnabled()) {
+    // Reassign the sort type in case it changed in another tab.
+    self.feedHeaderViewController.followingFeedSortType =
+        self.followingFeedSortType;
+  }
+  // Update the header so that it's synced with the currently selected
+  // feed, which could have been changed when a new web state was
+  // inserted.
+  [self.feedHeaderViewController updateForSelectedFeed];
+  self.feedMetricsRecorder.feedControlDelegate = self;
+  self.feedMetricsRecorder.followDelegate = self;
 }
 
 #pragma mark - NewTabPageDelegate
@@ -1188,6 +1190,23 @@
 
 - (void)handleFeedTopSectionClosed {
   [self.NTPViewController updateScrollPositionForFeedTopSectionClosed];
+}
+
+- (BOOL)isSignInAllowed {
+  AuthenticationService::ServiceStatus statusService =
+      self.authService->GetServiceStatus();
+  switch (statusService) {
+    case AuthenticationService::ServiceStatus::SigninDisabledByPolicy:
+    case AuthenticationService::ServiceStatus::SigninDisabledByInternal:
+    case AuthenticationService::ServiceStatus::SigninDisabledByUser: {
+      return NO;
+    }
+    case AuthenticationService::ServiceStatus::SigninForcedByPolicy:
+    case AuthenticationService::ServiceStatus::SigninAllowed: {
+      break;
+    }
+  }
+  return YES;
 }
 
 #pragma mark - NewTabPageFollowDelegate
@@ -1240,13 +1259,6 @@
 - (void)setUpListItemOpened {
   RecordHomeAction(IOSHomeActionType::kSetUpList, [self isStartSurface]);
 }
-
-#pragma mark - LogoAnimationControllerOwnerOwner
-
-- (id<LogoAnimationControllerOwner>)logoAnimationControllerOwner {
-  return [self.headerViewController logoAnimationControllerOwner];
-}
-
 #pragma mark - OverscrollActionsControllerDelegate
 
 - (void)overscrollActionNewTab:(OverscrollActionsController*)controller {
@@ -1279,8 +1291,7 @@
 
 - (UIView*)toolbarSnapshotViewForOverscrollActionsController:
     (OverscrollActionsController*)controller {
-  return [[self.headerViewController toolBarView]
-      snapshotViewAfterScreenUpdates:NO];
+  return nil;
 }
 
 - (UIView*)headerViewForOverscrollActionsController:
@@ -1363,6 +1374,24 @@
   }
 }
 
+#pragma mark - AuthenticationServiceObserving
+
+- (void)onServiceStatusChanged {
+  switch (self.authService->GetServiceStatus()) {
+    case AuthenticationService::ServiceStatus::SigninForcedByPolicy:
+    case AuthenticationService::ServiceStatus::SigninAllowed:
+      break;
+    case AuthenticationService::ServiceStatus::SigninDisabledByUser:
+    case AuthenticationService::ServiceStatus::SigninDisabledByPolicy:
+    case AuthenticationService::ServiceStatus::SigninDisabledByInternal:
+      // If sign-in becomes disabled, the sign-in promo must be disabled too.
+      // TODO(crbug.com/1479446): The sign-in promo should just be hidden
+      // instead of resetting the hierarchy.
+      [self updateNTPForFeed];
+      [self setContentOffsetToTop];
+  }
+}
+
 #pragma mark - PrefObserverDelegate
 
 - (void)onPreferenceChanged:(const std::string&)preferenceName {
@@ -1397,6 +1426,12 @@
 }
 
 #pragma mark - Private
+
+- (void)stopFeedSignInPromoCoordinator {
+  [self.feedSignInPromoCoordinator stop];
+  self.feedSignInPromoCoordinator.delegate = nil;
+  self.feedSignInPromoCoordinator = nil;
+}
 
 // Updates the feed visibility or content based on the supervision state
 // of the account defined in `value`.
@@ -1459,7 +1494,7 @@
     self.feedHeaderViewController = nil;
   }
 
-  if ([self isFeedTopSectionVisible]) {
+  if ([self isFeedVisible]) {
     self.NTPViewController.feedTopSectionViewController =
         self.feedTopSectionCoordinator.viewController;
   }
@@ -1496,16 +1531,6 @@
 // Returns `YES` if the feed is currently visible on the NTP.
 - (BOOL)isFeedVisible {
   return [self shouldFeedBeVisible] && self.feedViewController;
-}
-
-// Whether the feed top section, which contains all content between the feed
-// header and the feed, is currently visible.
-// TODO(crbug.com/1331010): The feed top section may include content that is not
-// the signin promo, which may need to be visible when the user is signed in.
-- (BOOL)isFeedTopSectionVisible {
-  return IsDiscoverFeedTopSyncPromoEnabled() && [self isFeedVisible] &&
-         self.authService &&
-         !self.authService->HasPrimaryIdentity(signin::ConsentLevel::kSignin);
 }
 
 // Creates, configures and returns a feed view controller configuration.
@@ -1573,6 +1598,7 @@
   return feedTopSectionCoordinator;
 }
 
+// Handles the feed management button being tapped.
 - (void)handleFeedManageTapped {
   [self.feedMetricsRecorder recordHeaderMenuManageTapped];
   [self.feedManagementCoordinator stop];
@@ -1581,7 +1607,7 @@
   self.feedManagementCoordinator = [[FeedManagementCoordinator alloc]
       initWithBaseViewController:self.NTPViewController
                          browser:self.browser];
-  self.feedManagementCoordinator.navigationDelegate = self;
+  self.feedManagementCoordinator.navigationDelegate = self.NTPMediator;
   self.feedManagementCoordinator.feedMetricsRecorder = self.feedMetricsRecorder;
   [self.feedManagementCoordinator start];
 }
@@ -1601,8 +1627,8 @@
   }
 
   _webState = webState;
-  self.NTPMediator.webState = _webState;
   self.contentSuggestionsCoordinator.webState = _webState;
+  [self.logoVendor setWebState:_webState];
 }
 
 // Called when the NTP changes visibility, either when the user navigates to
@@ -1618,24 +1644,6 @@
 
   if (!self.browser->GetBrowserState()->IsOffTheRecord()) {
     if (visible) {
-      if ([self isFollowingFeedAvailable]) {
-        NewTabPageTabHelper* helper =
-            NewTabPageTabHelper::FromWebState(self.webState);
-        self.shouldScrollIntoFeed = helper->GetNextNTPScrolledToFeed();
-        [self selectFeedType:helper->GetNextNTPFeedType()];
-        helper->SetNextNTPFeedType(NewTabPageTabHelper::DefaultFeedType());
-
-        self.NTPViewController.shouldScrollIntoFeed = self.shouldScrollIntoFeed;
-        // Reassign the sort type in case it changed in another tab.
-        self.feedHeaderViewController.followingFeedSortType =
-            self.followingFeedSortType;
-        // Update the header so that it's synced with the currently selected
-        // feed, which could have been changed when a new web state was
-        // inserted.
-        [self.feedHeaderViewController updateForSelectedFeed];
-        self.feedMetricsRecorder.feedControlDelegate = self;
-        self.feedMetricsRecorder.followDelegate = self;
-      }
       self.didAppearTime = base::TimeTicks::Now();
       if ([self isFeedHeaderVisible]) {
         if ([self.feedExpandedPref value]) {
@@ -1660,7 +1668,6 @@
         self.didAppearTime = base::TimeTicks();
       }
     }
-    [self updateStartForVisibilityChange:visible];
     // Check if feed is visible before reporting NTP visibility as the feed
     // needs to be visible in order to use for metrics.
     // TODO(crbug.com/1373650) Move isFeedVisible check to the metrics recorder
@@ -1670,32 +1677,15 @@
   }
 }
 
-- (BOOL)isSignInAllowed {
-  AuthenticationService::ServiceStatus statusService =
-      self.authService->GetServiceStatus();
-  switch (statusService) {
-    case AuthenticationService::ServiceStatus::SigninDisabledByPolicy:
-    case AuthenticationService::ServiceStatus::SigninDisabledByInternal:
-    case AuthenticationService::ServiceStatus::SigninDisabledByUser: {
-      return NO;
-    }
-    case AuthenticationService::ServiceStatus::SigninForcedByPolicy:
-    case AuthenticationService::ServiceStatus::SigninAllowed: {
-      break;
-    }
-  }
-  return YES;
+// Returns whether the user policies allow them to sync.
+- (BOOL)isSyncAllowedByPolicy {
+  return !SyncServiceFactory::GetForBrowserState(
+              self.browser->GetBrowserState())
+              ->HasDisableReason(
+                  syncer::SyncService::DISABLE_REASON_ENTERPRISE_POLICY);
 }
 
-- (BOOL)isSyncAllowed {
-  if (self.prefService->FindPreference(policy::key::kSyncDisabled) &&
-      self.prefService->GetBoolean(policy::key::kSyncDisabled)) {
-    return NO;
-  }
-
-  return YES;
-}
-
+// Shows sign-in disabled snackbar message.
 - (void)showSignInDisableMessage {
   id<SnackbarCommands> handler =
       static_cast<id<SnackbarCommands>>(self.browser->GetCommandDispatcher());
@@ -1705,6 +1695,25 @@
               IDS_IOS_NTP_FEED_SIGNIN_PROMO_DISABLE_SNACKBAR_MESSAGE)];
 
   [handler showSnackbarMessage:message];
+}
+
+// Saves the state of the NTP associated with `self.webState`.
+- (void)saveNTPState {
+  [self.NTPMediator saveNTPStateForWebState:self.webState];
+}
+
+// Restores the saved state of the NTP associated with `self.webState` if
+// necessary.
+- (void)restoreNTPState {
+  [self.NTPMediator restoreNTPStateForWebState:self.webState];
+}
+
+#pragma mark - FeedSignInPromoCoordinatorDelegate
+
+- (void)feedSignInPromoCoordinatorWantsToBeStopped:
+    (FeedSignInPromoCoordinator*)coordinator {
+  CHECK_EQ(coordinator, self.feedSignInPromoCoordinator);
+  [self stopFeedSignInPromoCoordinator];
 }
 
 @end

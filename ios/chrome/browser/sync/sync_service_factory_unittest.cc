@@ -4,24 +4,19 @@
 
 #include "ios/chrome/browser/sync/sync_service_factory.h"
 
-#include <stddef.h>
-
-#include <vector>
-
 #include "base/command_line.h"
 #include "base/feature_list.h"
 #include "base/task/thread_pool/thread_pool_instance.h"
-#include "components/browser_sync/browser_sync_switches.h"
+#include "components/supervised_user/core/common/buildflags.h"
 #include "components/sync/base/command_line_switches.h"
 #include "components/sync/base/features.h"
 #include "components/sync/base/model_type.h"
-#include "components/sync/base/pref_names.h"
 #include "components/sync/service/data_type_controller.h"
 #include "components/sync/service/sync_service_impl.h"
 #include "ios/chrome/browser/favicon/favicon_service_factory.h"
 #include "ios/chrome/browser/history/history_service_factory.h"
 #include "ios/chrome/browser/shared/model/browser_state/test_chrome_browser_state.h"
-#include "ios/chrome/browser/webdata_services/web_data_service_factory.h"
+#include "ios/chrome/browser/webdata_services/model/web_data_service_factory.h"
 #include "ios/web/public/test/web_task_environment.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "testing/platform_test.h"
@@ -53,7 +48,7 @@ class SyncServiceFactoryTest : public PlatformTest {
  protected:
   // Returns the collection of default datatypes.
   syncer::ModelTypeSet DefaultDatatypes() {
-    static_assert(48 == syncer::GetNumModelTypes(),
+    static_assert(49 == syncer::GetNumModelTypes(),
                   "When adding a new type, you probably want to add it here as "
                   "well (assuming it is already enabled).");
 
@@ -63,17 +58,17 @@ class SyncServiceFactoryTest : public PlatformTest {
     // is null for testing and hence no controller gets instantiated.
     datatypes.Put(syncer::AUTOFILL);
     datatypes.Put(syncer::AUTOFILL_PROFILE);
+    if (base::FeatureList::IsEnabled(
+            syncer::kSyncAutofillWalletCredentialData)) {
+      datatypes.Put(syncer::AUTOFILL_WALLET_CREDENTIAL);
+    }
     datatypes.Put(syncer::AUTOFILL_WALLET_DATA);
     datatypes.Put(syncer::AUTOFILL_WALLET_METADATA);
     datatypes.Put(syncer::AUTOFILL_WALLET_OFFER);
     datatypes.Put(syncer::BOOKMARKS);
-    if (base::FeatureList::IsEnabled(syncer::kSyncEnableContactInfoDataType)) {
-      datatypes.Put(syncer::CONTACT_INFO);
-    }
+    datatypes.Put(syncer::CONTACT_INFO);
     datatypes.Put(syncer::DEVICE_INFO);
-    if (base::FeatureList::IsEnabled(syncer::kSyncEnableHistoryDataType)) {
-      datatypes.Put(syncer::HISTORY);
-    }
+    datatypes.Put(syncer::HISTORY);
     datatypes.Put(syncer::HISTORY_DELETE_DIRECTIVES);
     datatypes.Put(syncer::PREFERENCES);
     datatypes.Put(syncer::PRIORITY_PREFERENCES);
@@ -83,8 +78,12 @@ class SyncServiceFactoryTest : public PlatformTest {
     }
     // TODO(crbug.com/919489) Add SECURITY_EVENTS data type once it is enabled.
     datatypes.Put(syncer::SESSIONS);
+
+#if BUILDFLAG(ENABLE_SUPERVISED_USERS)
+    datatypes.Put(syncer::SUPERVISED_USER_SETTINGS);
+#endif  // BUILDFLAG(ENABLE_SUPERVISED_USERS)
+
     datatypes.Put(syncer::PROXY_TABS);
-    datatypes.Put(syncer::TYPED_URLS);
     datatypes.Put(syncer::USER_EVENTS);
     datatypes.Put(syncer::USER_CONSENTS);
     datatypes.Put(syncer::SEND_TAB_TO_SELF);

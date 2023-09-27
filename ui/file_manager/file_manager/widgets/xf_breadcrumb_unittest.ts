@@ -3,12 +3,13 @@
 // found in the LICENSE file.
 
 import {assert} from 'chrome://resources/js/assert_ts.js';
+import {getTrustedHTML} from 'chrome://resources/js/static_types.js';
 import {assertEquals, assertFalse, assertGT, assertNotEquals, assertTrue} from 'chrome://webui-test/chromeos/chai_assert.js';
 
 import {hasOverflowEllipsis} from '../common/js/dom_utils.js';
 import {waitUntil} from '../common/js/test_error_reporting.js';
 
-import {BreadcrumbClickedEvent, XfBreadcrumb} from './xf_breadcrumb.js';
+import {type BreadcrumbClickedEvent, XfBreadcrumb} from './xf_breadcrumb.js';
 
 /**
  * Creates new <xf-breadcrumb> element for each test. Asserts it has no initial
@@ -16,7 +17,9 @@ import {BreadcrumbClickedEvent, XfBreadcrumb} from './xf_breadcrumb.js';
  */
 export function setUp() {
   document.body.setAttribute('theme', 'refresh23');
-  document.body.innerHTML = '<xf-breadcrumb></xf-breadcrumb>';
+  document.body.innerHTML = getTrustedHTML`
+    <xf-breadcrumb></xf-breadcrumb>
+  `;
   const breadcrumb = document.querySelector('xf-breadcrumb');
   assertEquals('', breadcrumb!.path);
 }

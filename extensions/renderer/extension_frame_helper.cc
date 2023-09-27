@@ -18,7 +18,6 @@
 #include "extensions/common/extension_features.h"
 #include "extensions/common/extension_messages.h"
 #include "extensions/common/manifest_handlers/background_info.h"
-#include "extensions/renderer/api/automation/automation_api_helper.h"
 #include "extensions/renderer/api/messaging/native_renderer_messaging_service.h"
 #include "extensions/renderer/console.h"
 #include "extensions/renderer/dispatcher.h"
@@ -27,6 +26,7 @@
 #include "extensions/renderer/script_context_set.h"
 #include "third_party/blink/public/common/associated_interfaces/associated_interface_provider.h"
 #include "third_party/blink/public/common/associated_interfaces/associated_interface_registry.h"
+#include "third_party/blink/public/platform/scheduler/web_agent_group_scheduler.h"
 #include "third_party/blink/public/platform/web_isolated_world_info.h"
 #include "third_party/blink/public/platform/web_security_origin.h"
 #include "third_party/blink/public/web/web_console_message.h"
@@ -134,9 +134,14 @@ ExtensionFrameHelper::ExtensionFrameHelper(content::RenderFrame* render_frame,
       content::RenderFrameObserverTracker<ExtensionFrameHelper>(render_frame),
       extension_dispatcher_(extension_dispatcher) {
   g_frame_helpers.Get().insert(this);
-  if (render_frame->GetWebFrame()->IsOutermostMainFrame()) {
-    // Manages its own lifetime.
-    new AutomationApiHelper(render_frame);
+  if (render_frame->GetWebFrame()
+          ->GetDocumentLoader()
+          ->HasLoadedNonInitialEmptyDocument()) {
+    // With RenderDocument, cross-document navigations create a new RenderFrame
+    // (and thus, a new ExtensionFrameHelper). However, the frame tree node
+    // itself may have already navigated and loaded documents, so set
+    // `has_started_first_navigation_` to true in that case.
+    has_started_first_navigation_ = true;
   }
 
   render_frame->GetAssociatedInterfaceRegistry()
@@ -184,8 +189,9 @@ v8::Local<v8::Array> ExtensionFrameHelper::GetV8MainFrames(
     if (!web_frame->IsOutermostMainFrame())
       continue;
 
-    if (!blink::WebFrame::ScriptCanAccess(web_frame))
+    if (!blink::WebFrame::ScriptCanAccess(context->GetIsolate(), web_frame)) {
       continue;
+    }
 
     v8::Local<v8::Context> frame_context = web_frame->MainWorldScriptContext();
     if (!frame_context.IsEmpty()) {
@@ -221,16 +227,13 @@ v8::Local<v8::Value> ExtensionFrameHelper::GetV8BackgroundPageMainFrame(
     v8::Isolate* isolate,
     const std::string& extension_id) {
   content::RenderFrame* main_frame = GetBackgroundPageFrame(extension_id);
-
-  v8::Local<v8::Value> background_page;
   blink::WebLocalFrame* web_frame =
       main_frame ? main_frame->GetWebFrame() : nullptr;
-  if (web_frame && blink::WebFrame::ScriptCanAccess(web_frame))
-    background_page = web_frame->MainWorldScriptContext()->Global();
-  else
-    background_page = v8::Undefined(isolate);
-
-  return background_page;
+  if (web_frame && blink::WebFrame::ScriptCanAccess(isolate, web_frame)) {
+    return web_frame->MainWorldScriptContext()->Global();
+  } else {
+    return v8::Undefined(isolate);
+  }
 }
 
 // static
@@ -325,13 +328,13 @@ mojom::LocalFrameHost* ExtensionFrameHelper::GetLocalFrameHost() {
 
 void ExtensionFrameHelper::ReadyToCommitNavigation(
     blink::WebDocumentLoader* document_loader) {
+  blink::WebLocalFrame* web_frame = render_frame()->GetWebFrame();
   // New window created by chrome.app.window.create() must not start parsing the
   // document immediately. The chrome.app.window.create() callback (if any)
   // needs to be called prior to the new window's 'load' event. The parser will
   // be resumed when it happens. It doesn't apply to sandboxed pages.
   if (view_type_ == mojom::ViewType::kAppWindow &&
-      render_frame()->GetWebFrame()->IsOutermostMainFrame() &&
-      !has_started_first_navigation_ &&
+      web_frame->IsOutermostMainFrame() && !has_started_first_navigation_ &&
       GURL(document_loader->GetUrl()).SchemeIs(kExtensionScheme) &&
       !ScriptContext::IsSandboxedPage(document_loader->GetUrl())) {
     document_loader->BlockParser();
@@ -345,9 +348,8 @@ void ExtensionFrameHelper::ReadyToCommitNavigation(
   base::AutoReset<bool> auto_reset(&is_initializing_main_world_script_context_,
                                    true);
   delayed_main_world_script_initialization_ = false;
-  v8::HandleScope handle_scope(v8::Isolate::GetCurrent());
-  v8::Local<v8::Context> context =
-      render_frame()->GetWebFrame()->MainWorldScriptContext();
+  v8::HandleScope handle_scope(web_frame->GetAgentGroupScheduler()->Isolate());
+  v8::Local<v8::Context> context = web_frame->MainWorldScriptContext();
   v8::Context::Scope context_scope(context);
   // Normally we would use Document's URL for all kinds of checks, e.g. whether
   // to inject a content script. However, when committing a navigation, we
@@ -358,9 +360,9 @@ void ExtensionFrameHelper::ReadyToCommitNavigation(
   // correct URL (or maybe WebDocumentLoader) through the callchain, but there
   // are many callers which will have to pass nullptr.
   ScriptContext::ScopedFrameDocumentLoader scoped_document_loader(
-      render_frame()->GetWebFrame(), document_loader);
-  extension_dispatcher_->DidCreateScriptContext(
-      render_frame()->GetWebFrame(), context, blink::kMainDOMWorldId);
+      web_frame, document_loader);
+  extension_dispatcher_->DidCreateScriptContext(web_frame, context,
+                                                blink::kMainDOMWorldId);
   // TODO(devlin): Add constants for main world id, no extension group.
 }
 
@@ -386,7 +388,7 @@ void ExtensionFrameHelper::DidCreateScriptContext(
     // second time here.
     if (is_initializing_main_world_script_context_)
       return;
-    if (render_frame()->IsBrowserSideNavigationPending()) {
+    if (render_frame()->IsRequestingNavigation()) {
       // Defer initializing the extensions script context now because it depends
       // on having the URL of the provisional load which isn't available at this
       // point.
@@ -536,9 +538,9 @@ void ExtensionFrameHelper::AppWindowClosed(bool send_onclosed) {
   if (!send_onclosed)
     return;
 
-  v8::HandleScope scope(v8::Isolate::GetCurrent());
-  v8::Local<v8::Context> v8_context =
-      render_frame()->GetWebFrame()->MainWorldScriptContext();
+  blink::WebLocalFrame* web_frame = render_frame()->GetWebFrame();
+  v8::HandleScope scope(web_frame->GetAgentGroupScheduler()->Isolate());
+  v8::Local<v8::Context> v8_context = web_frame->MainWorldScriptContext();
   ScriptContext* script_context =
       ScriptContextSet::GetContextByV8Context(v8_context);
   if (!script_context)

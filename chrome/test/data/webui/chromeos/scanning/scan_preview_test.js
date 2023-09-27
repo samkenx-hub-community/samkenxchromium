@@ -48,6 +48,9 @@ class FakeAccessibilityFeatures {
 }
 
 suite('scanPreviewTest', function() {
+  const testSvgPath =
+      'chrome://webui-test/chromeos/scanning/fake_scanned_image.svg';
+
   /** @type {?ScanPreviewElement} */
   let scanPreview = null;
 
@@ -105,7 +108,7 @@ suite('scanPreviewTest', function() {
     scanPreview = /** @type {!ScanPreviewElement} */ (
         document.createElement('scan-preview'));
     assertTrue(!!scanPreview);
-    ScanningBrowserProxyImpl.instance_ = new TestScanningBrowserProxy();
+    ScanningBrowserProxyImpl.setInstance(new TestScanningBrowserProxy());
 
     // Setup mock for matchMedia.
     mockController = new MockController();
@@ -118,15 +121,20 @@ suite('scanPreviewTest', function() {
     document.body.appendChild(scanPreview);
 
     helpOrProgress =
-        /** @type {!HTMLElement} */ (scanPreview.$$('#helpOrProgress'));
+        /** @type {!HTMLElement} */ (
+            scanPreview.shadowRoot.querySelector('#helpOrProgress'));
     helperText =
-        /** @type {!HTMLElement} */ (scanPreview.$$('#helperText'));
+        /** @type {!HTMLElement} */ (
+            scanPreview.shadowRoot.querySelector('#helperText'));
     scanProgress =
-        /** @type {!HTMLElement} */ (scanPreview.$$('#scanProgress'));
+        /** @type {!HTMLElement} */ (
+            scanPreview.shadowRoot.querySelector('#scanProgress'));
     scannedImages =
-        /** @type {!HTMLElement} */ (scanPreview.$$('#scannedImages'));
+        /** @type {!HTMLElement} */ (
+            scanPreview.shadowRoot.querySelector('#scannedImages'));
     cancelingProgress =
-        /** @type {!HTMLElement} */ (scanPreview.$$('#cancelingProgress'));
+        /** @type {!HTMLElement} */ (
+            scanPreview.shadowRoot.querySelector('#cancelingProgress'));
   });
 
   teardown(() => {
@@ -155,7 +163,7 @@ suite('scanPreviewTest', function() {
   }
 
   test('initializeScanPreview', () => {
-    assertTrue(!!scanPreview.$$('.preview'));
+    assertTrue(!!scanPreview.shadowRoot.querySelector('.preview'));
   });
 
   // Test that the progress text updates when the page number increases.
@@ -164,11 +172,13 @@ suite('scanPreviewTest', function() {
     scanPreview.pageNumber = 1;
     assertEquals(
         scanPreview.i18n('scanPreviewProgressText', 1),
-        scanPreview.$$('#progressText').textContent.trim());
+        scanPreview.shadowRoot.querySelector('#progressText')
+            .textContent.trim());
     scanPreview.pageNumber = 2;
     assertEquals(
         scanPreview.i18n('scanPreviewProgressText', 2),
-        scanPreview.$$('#progressText').textContent.trim());
+        scanPreview.shadowRoot.querySelector('#progressText')
+            .textContent.trim());
   });
 
   // Tests that the correct element is showing in the preview pane depending on
@@ -237,17 +247,19 @@ suite('scanPreviewTest', function() {
     scanPreview.objectUrls = ['image'];
     scanPreview.appState = AppState.DONE;
     return flushTasks().then(() => {
-      assertTrue(scanPreview.$$('action-toolbar').hidden);
+      assertTrue(scanPreview.shadowRoot.querySelector('action-toolbar').hidden);
       scanPreview.appState = AppState.MULTI_PAGE_NEXT_ACTION;
       flush();
-      assertFalse(scanPreview.$$('action-toolbar').hidden);
+      assertFalse(
+          scanPreview.shadowRoot.querySelector('action-toolbar').hidden);
     });
   });
 
   // Tests that the toolbar will get repositioned after subsequent scans.
   test('positionActionToolbarOnSubsequentScans', () => {
     const scannedImagesDiv =
-        /** @type {!HTMLElement} */ (scanPreview.$$('#scannedImages'));
+        /** @type {!HTMLElement} */ (
+            scanPreview.shadowRoot.querySelector('#scannedImages'));
     scanPreview.objectUrls = [];
     scanPreview.isMultiPageScan = true;
     scanPreview.appState = AppState.MULTI_PAGE_SCANNING;
@@ -259,7 +271,7 @@ suite('scanPreviewTest', function() {
           assertEquals(
               '', scanPreview.style.getPropertyValue('--action-toolbar-left'));
 
-          scanPreview.objectUrls = ['svg/ready_to_scan.svg'];
+          scanPreview.objectUrls = [testSvgPath];
           scanPreview.appState = AppState.MULTI_PAGE_NEXT_ACTION;
           return waitAfterNextRender(scannedImagesDiv);
         })
@@ -274,16 +286,17 @@ suite('scanPreviewTest', function() {
           // new scan.
           scanPreview.style.setProperty('--action-toolbar-top', '');
           scanPreview.style.setProperty('--action-toolbar-left', '');
+          scanPreview.objectUrls = [];
+          scanPreview.appState = AppState.MULTI_PAGE_SCANNING;
+          return waitAfterNextRender(scannedImagesDiv);
+        })
+        .then(() => {
           assertEquals(
               '', scanPreview.style.getPropertyValue('--action-toolbar-top'));
           assertEquals(
               '', scanPreview.style.getPropertyValue('--action-toolbar-left'));
-          scanPreview.objectUrls = [];
-          scanPreview.appState = AppState.MULTI_PAGE_SCANNING;
-          return flushTasks();
-        })
-        .then(() => {
-          scanPreview.objectUrls = ['svg/ready_to_scan.svg'];
+
+          scanPreview.objectUrls = [testSvgPath];
           scanPreview.appState = AppState.MULTI_PAGE_NEXT_ACTION;
           return waitAfterNextRender(scannedImagesDiv);
         })
@@ -304,29 +317,36 @@ suite('scanPreviewTest', function() {
     scanPreview.addEventListener('remove-page', (e) => {
       pageIndexFromEvent = e.detail;
     });
-    scanPreview.objectUrls = ['svg/ready_to_scan.svg'];
+    scanPreview.objectUrls = [testSvgPath];
     return flushTasks()
         .then(() => {
-          assertFalse(scanPreview.$$('#scanPreviewDialog').open);
-          scanPreview.$$('action-toolbar')
+          assertFalse(
+              scanPreview.shadowRoot.querySelector('#scanPreviewDialog').open);
+          scanPreview.shadowRoot.querySelector('action-toolbar')
               .dispatchEvent(new CustomEvent(
                   'show-remove-page-dialog', {detail: pageIndexToRemove}));
           return flushTasks();
         })
         .then(() => {
-          assertTrue(scanPreview.$$('#scanPreviewDialog').open);
+          assertTrue(
+              scanPreview.shadowRoot.querySelector('#scanPreviewDialog').open);
           assertEquals(
               'Remove page?',
-              scanPreview.$$('#dialogTitle').textContent.trim());
+              scanPreview.shadowRoot.querySelector('#dialogTitle')
+                  .textContent.trim());
           assertEquals(
-              'Remove', scanPreview.$$('#actionButton').textContent.trim());
+              'Remove',
+              scanPreview.shadowRoot.querySelector('#actionButton')
+                  .textContent.trim());
           assertEquals(
               loadTimeData.getStringF(
                   'removePageConfirmationText', pageIndexToRemove + 1),
-              scanPreview.$$('#dialogConfirmationText').textContent.trim());
+              scanPreview.shadowRoot.querySelector('#dialogConfirmationText')
+                  .textContent.trim());
 
-          scanPreview.$$('#actionButton').click();
-          assertFalse(scanPreview.$$('#scanPreviewDialog').open);
+          scanPreview.shadowRoot.querySelector('#actionButton').click();
+          assertFalse(
+              scanPreview.shadowRoot.querySelector('#scanPreviewDialog').open);
           assertEquals(pageIndexToRemove, pageIndexFromEvent);
         });
   });
@@ -334,18 +354,21 @@ suite('scanPreviewTest', function() {
   // Tests that clicking the cancel button closes the remove page dialog.
   test('cancelRemovePageDialog', () => {
     scanPreview.objectUrls = ['image'];
-    assertFalse(scanPreview.$$('#scanPreviewDialog').open);
+    assertFalse(
+        scanPreview.shadowRoot.querySelector('#scanPreviewDialog').open);
     return flushTasks()
         .then(() => {
-          scanPreview.$$('action-toolbar')
+          scanPreview.shadowRoot.querySelector('action-toolbar')
               .dispatchEvent(new CustomEvent('show-remove-page-dialog'));
           return flushTasks();
         })
         .then(() => {
-          assertTrue(scanPreview.$$('#scanPreviewDialog').open);
+          assertTrue(
+              scanPreview.shadowRoot.querySelector('#scanPreviewDialog').open);
 
-          scanPreview.$$('#cancelButton').click();
-          assertFalse(scanPreview.$$('#scanPreviewDialog').open);
+          scanPreview.shadowRoot.querySelector('#cancelButton').click();
+          assertFalse(
+              scanPreview.shadowRoot.querySelector('#scanPreviewDialog').open);
         });
   });
 
@@ -353,22 +376,26 @@ suite('scanPreviewTest', function() {
   test('rescanPageDialog', () => {
     const pageIndex = 6;
     scanPreview.objectUrls = ['image1', 'image2'];
-    assertFalse(scanPreview.$$('#scanPreviewDialog').open);
+    assertFalse(
+        scanPreview.shadowRoot.querySelector('#scanPreviewDialog').open);
     return flushTasks()
         .then(() => {
-          scanPreview.$$('action-toolbar')
+          scanPreview.shadowRoot.querySelector('action-toolbar')
               .dispatchEvent(new CustomEvent(
                   'show-rescan-page-dialog', {detail: pageIndex}));
           return flushTasks();
         })
         .then(() => {
-          assertTrue(scanPreview.$$('#scanPreviewDialog').open);
+          assertTrue(
+              scanPreview.shadowRoot.querySelector('#scanPreviewDialog').open);
           assertEquals(
               'Rescan page ' + (pageIndex + 1) + '?',
-              scanPreview.$$('#dialogTitle').textContent.trim());
+              scanPreview.shadowRoot.querySelector('#dialogTitle')
+                  .textContent.trim());
           assertEquals(
               loadTimeData.getStringF('rescanPageConfirmationText', pageIndex),
-              scanPreview.$$('#dialogConfirmationText').textContent.trim());
+              scanPreview.shadowRoot.querySelector('#dialogConfirmationText')
+                  .textContent.trim());
         });
   });
 
@@ -376,13 +403,14 @@ suite('scanPreviewTest', function() {
   // repositioning of the action toolbar.
   test('resizingWindowRepositionsActionToolbar', () => {
     const scannedImagesDiv =
-        /** @type {!HTMLElement} */ (scanPreview.$$('#scannedImages'));
+        /** @type {!HTMLElement} */ (
+            scanPreview.shadowRoot.querySelector('#scannedImages'));
     scanPreview.objectUrls = ['image'];
     scanPreview.isMultiPageScan = true;
     scanPreview.appState = AppState.MULTI_PAGE_SCANNING;
     return flushTasks()
         .then(() => {
-          scanPreview.objectUrls = ['svg/ready_to_scan.svg'];
+          scanPreview.objectUrls = [testSvgPath];
           scanPreview.appState = AppState.MULTI_PAGE_NEXT_ACTION;
           return waitAfterNextRender(scannedImagesDiv);
         })
@@ -414,7 +442,7 @@ suite('scanPreviewTest', function() {
           return flushTasks();
         })
         .then(() => {
-          scanPreview.objectUrls = ['svg/ready_to_scan.svg'];
+          scanPreview.objectUrls = [testSvgPath];
           scanPreview.appState = AppState.DONE;
 
           // Reset the CSS variables and simulate starting the window being
@@ -443,7 +471,8 @@ suite('scanPreviewTest', function() {
           scanPreview.appState = AppState.MULTI_PAGE_NEXT_ACTION;
           flush();
           const actionToolbar =
-              /** @type {!HTMLElement} */ (scanPreview.$$('action-toolbar'));
+              /** @type {!HTMLElement} */ (
+                  scanPreview.shadowRoot.querySelector('action-toolbar'));
           assertEquals(
               'hidden',
               getComputedStyle(actionToolbar).getPropertyValue('visibility'));
@@ -453,7 +482,8 @@ suite('scanPreviewTest', function() {
         })
         .then(() => {
           const actionToolbar =
-              /** @type {!HTMLElement} */ (scanPreview.$$('action-toolbar'));
+              /** @type {!HTMLElement} */ (
+                  scanPreview.shadowRoot.querySelector('action-toolbar'));
           assertEquals(
               'visible',
               getComputedStyle(actionToolbar).getPropertyValue('visibility'));
@@ -467,8 +497,8 @@ suite('scanPreviewTest', function() {
     const srcBase = 'chrome://scanning/';
     const lightModeSvg = `${srcBase}svg/ready_to_scan.svg`;
     const darkModeSvg = `${srcBase}svg/ready_to_scan_dark.svg`;
-    const getReadyToScanSvg = () =>
-        (/** @type {!HTMLImageElement} */ (scanPreview.$$('#readyToScanImg')));
+    const getReadyToScanSvg = () => (/** @type {!HTMLImageElement} */ (
+        scanPreview.shadowRoot.querySelector('#readyToScanImg')));
 
     // Mock media query state for light mode.
     await setFakePrefersColorSchemeDark(false);
@@ -479,22 +509,22 @@ suite('scanPreviewTest', function() {
     assertEquals(darkModeSvg, getReadyToScanSvg().src);
   });
 
-  // Verify "loading scanners" dynamic SVG use when dynamic colors enabled.
-  test('jellyColors_LoadingScannersSvg', async () => {
+  // Verify "ready to scan" dynamic SVG use when dynamic colors enabled.
+  test('jellyColors_ReadyToScanSvg', async () => {
     await setJellyEnabled(true);
     const dynamicSvg = `svg/illo_ready_to_scan.svg#illo_ready_to_scan`;
 
-    const getLoadingScannersSvgValue = () =>
+    const getSvgValue = () =>
         (/** @type {!SVGUseElement} */ (
              scanPreview.shadowRoot.querySelector('#readyToScanSvg > use'))
              .href.baseVal);
 
-    // Setup UI to display no scanners div.
+    // Mock media query state for light mode.
     await setFakePrefersColorSchemeDark(false);
-    assertEquals(dynamicSvg, getLoadingScannersSvgValue());
+    assertEquals(dynamicSvg, getSvgValue());
 
     // Mock media query state for dark mode.
     await setFakePrefersColorSchemeDark(true);
-    assertEquals(dynamicSvg, getLoadingScannersSvgValue());
+    assertEquals(dynamicSvg, getSvgValue());
   });
 });

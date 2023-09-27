@@ -8,6 +8,7 @@ import android.net.Uri;
 
 import androidx.annotation.NonNull;
 
+import org.chromium.android_webview.common.Lifetime;
 import org.chromium.base.annotations.CalledByNative;
 import org.chromium.base.annotations.JNINamespace;
 import org.chromium.content_public.browser.MessagePayload;
@@ -17,9 +18,10 @@ import org.chromium.content_public.browser.MessagePort;
  * Holds the {@link WebMessageListener} instance so that C++ could interact with the {@link
  * WebMessageListener}.
  */
+@Lifetime.Temporary
 @JNINamespace("android_webview")
 public class WebMessageListenerHolder {
-    private WebMessageListener mListener;
+    private final WebMessageListener mListener;
 
     public WebMessageListenerHolder(@NonNull WebMessageListener listener) {
         mListener = listener;
@@ -28,7 +30,10 @@ public class WebMessageListenerHolder {
     @CalledByNative
     public void onPostMessage(MessagePayload payload, String sourceOrigin, boolean isMainFrame,
             MessagePort[] ports, JsReplyProxy replyProxy) {
-        mListener.onPostMessage(payload, Uri.parse(sourceOrigin), isMainFrame, replyProxy, ports);
+        AwThreadUtils.postToCurrentLooper(() -> {
+            mListener.onPostMessage(
+                    payload, Uri.parse(sourceOrigin), isMainFrame, replyProxy, ports);
+        });
     }
 
     public WebMessageListener getListener() {

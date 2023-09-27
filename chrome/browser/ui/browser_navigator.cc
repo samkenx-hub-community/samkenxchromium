@@ -9,7 +9,6 @@
 #include <string>
 #include <utility>
 
-#include "base/command_line.h"
 #include "base/memory/raw_ptr.h"
 #include "base/notreached.h"
 #include "base/strings/utf_string_conversions.h"
@@ -30,7 +29,6 @@
 #include "chrome/browser/task_manager/web_contents_tags.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_finder.h"
-#include "chrome/browser/ui/browser_list.h"
 #include "chrome/browser/ui/browser_navigator_params.h"
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/location_bar/location_bar.h"
@@ -40,6 +38,7 @@
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_user_gesture_details.h"
 #include "chrome/browser/ui/web_applications/app_browser_controller.h"
+#include "chrome/browser/ui/web_applications/web_app_tabbed_utils.h"
 #include "chrome/browser/web_applications/web_app_helpers.h"
 #include "chrome/common/url_constants.h"
 #include "components/captive_portal/core/buildflags.h"
@@ -183,7 +182,7 @@ std::pair<Browser*, int> GetBrowserAndTabForDisposition(
   Profile* profile = params.initiating_profile;
 
   if (params.open_pwa_window_if_possible) {
-    absl::optional<web_app::AppId> app_id =
+    absl::optional<webapps::AppId> app_id =
         web_app::FindInstalledAppWithUrlInScope(profile, params.url,
                                                 /*window_only=*/true);
     if (!app_id && params.force_open_pwa_window) {
@@ -272,11 +271,6 @@ std::pair<Browser*, int> GetBrowserAndTabForDisposition(
       return {GetOrCreateBrowser(profile, params.user_gesture), -1};
     case WindowOpenDisposition::NEW_PICTURE_IN_PICTURE:
 #if !BUILDFLAG(IS_ANDROID)
-      // Picture in picture windows may not be opened by other picture in
-      // picture windows.
-      if (params.browser->is_type_picture_in_picture())
-        return {nullptr, -1};
-
       {
         Browser::CreateParams browser_params(Browser::TYPE_PICTURE_IN_PICTURE,
                                              profile, params.user_gesture);
@@ -288,23 +282,26 @@ std::pair<Browser*, int> GetBrowserAndTabForDisposition(
           return {nullptr, -1};
         }
 
+        pip_options->initial_aspect_ratio =
+            pip_options->initial_aspect_ratio > 0.0
+                ? pip_options->initial_aspect_ratio
+                : 1.0;
+        browser_params.pip_options = pip_options;
+
         const BrowserWindow* const browser_window = params.browser->window();
         const gfx::NativeWindow native_window =
             browser_window ? browser_window->GetNativeWindow()
-                           : gfx::kNullNativeWindow;
+                           : gfx::NativeWindow();
         const display::Screen* const screen = display::Screen::GetScreen();
         const display::Display display =
             browser_window ? screen->GetDisplayNearestWindow(native_window)
                            : screen->GetDisplayForNewWindows();
 
-        browser_params.initial_bounds = PictureInPictureWindowManager::
-            CalculateInitialPictureInPictureWindowBounds(*pip_options, display);
+        browser_params.initial_bounds =
+            PictureInPictureWindowManager::GetInstance()
+                ->CalculateInitialPictureInPictureWindowBounds(*pip_options,
+                                                               display);
 
-        browser_params.initial_aspect_ratio =
-            pip_options->initial_aspect_ratio > 0.0
-                ? pip_options->initial_aspect_ratio
-                : 1.0;
-        browser_params.lock_aspect_ratio = pip_options->lock_aspect_ratio;
         browser_params.omit_from_session_restore = true;
 
         return {Browser::Create(browser_params), -1};
@@ -640,19 +637,51 @@ base::WeakPtr<content::NavigationHandle> Navigate(NavigateParams* params) {
     params->disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
   }
 
+  // Middle clicking a link to the home tab in a tabbed web app should open the
+  // link in the home tab.
+  if (web_app::IsHomeTabUrl(source_browser, params->url)) {
+    source_browser->tab_strip_model()->ActivateTabAt(0);
+    // If the navigation URL is the same as the current home tab URL, skip the
+    // navigation.
+    if (source_browser->tab_strip_model()
+            ->GetActiveWebContents()
+            ->GetLastCommittedURL() == params->url) {
+      return nullptr;
+    }
+    params->disposition = WindowOpenDisposition::CURRENT_TAB;
+  }
+
   // Picture-in-picture browser windows must have a source contents in order for
   // the window to function correctly. If we have no source contents to work
   // with (e.g. if an extension popup attempts to open a PiP window), we should
   // cancel the navigation.
-  if (!params->source_contents &&
-      params->disposition == WindowOpenDisposition::NEW_PICTURE_IN_PICTURE) {
-    return nullptr;
+  //
+  // If it does have source contents, only allow the navigation if the scheme of
+  // the URL in the omnibox is either https:// or file://, otherwise the omnibox
+  // displayed in the PiP window may be misleading in certain scenarios (see
+  // https://crbug.com/1460025)
+  if (params->disposition == WindowOpenDisposition::NEW_PICTURE_IN_PICTURE) {
+    const GURL& url = params->source_contents
+                          ? params->source_contents->GetLastCommittedURL()
+                          : GURL();
+    if (!url.SchemeIs(url::kHttpsScheme) && !url.SchemeIsFile()) {
+      return nullptr;
+    }
   }
 
-  // If no source WebContents was specified, we use the selected one from
-  // the target browser. This must happen first, before
-  // GetBrowserAndTabForDisposition() has a chance to replace |params->browser|
-  // with another one.
+#if BUILDFLAG(IS_CHROMEOS_LACROS)
+  const GURL& source_url =
+      params->source_contents ? params->source_contents->GetURL() : GURL();
+  if (lacros_url_handling::IsNavigationInterceptable(*params, source_url) &&
+      lacros_url_handling::MaybeInterceptNavigation(params->url)) {
+    return nullptr;
+  }
+#endif
+
+  // If no source WebContents was specified, we use the selected one from the
+  // target browser. This must happen before GetBrowserAndTabForDisposition()
+  // has a chance to replace |params->browser| with another one, but after the
+  // above check that relies on the original source_contents value.
   if (!params->source_contents && params->browser) {
     params->source_contents =
         params->browser->tab_strip_model()->GetActiveWebContents();
@@ -664,6 +693,28 @@ base::WeakPtr<content::NavigationHandle> Navigate(NavigateParams* params) {
     DCHECK_EQ(params->disposition, WindowOpenDisposition::SINGLETON_TAB);
     contents_to_navigate_or_insert = params->switch_to_singleton_tab;
   }
+
+#if !BUILDFLAG(IS_ANDROID)
+  // If this is a Picture in Picture window, then notify the pip manager about
+  // it. This enables the opener and pip window to stay connected, so that (for
+  // example), the pip window does not outlive the opener.
+  //
+  // We do this before creating the browser window, so that the browser can talk
+  // to the PictureInPictureWindowManager.  Otherwise, the manager has no idea
+  // that there's a pip window.
+  if (params->disposition == WindowOpenDisposition::NEW_PICTURE_IN_PICTURE) {
+    // Picture in picture windows may not be opened by other picture in
+    // picture windows, or without an opener.
+    if (!params->browser || params->browser->is_type_picture_in_picture()) {
+      params->browser = nullptr;
+      return nullptr;
+    }
+
+    PictureInPictureWindowManager::GetInstance()->EnterDocumentPictureInPicture(
+        params->source_contents, contents_to_navigate_or_insert);
+  }
+#endif  // !BUILDFLAG(IS_ANDROID)
+
   int singleton_index;
   std::tie(params->browser, singleton_index) =
       GetBrowserAndTabForDisposition(*params);
@@ -679,7 +730,7 @@ base::WeakPtr<content::NavigationHandle> Navigate(NavigateParams* params) {
     // preserve. Fallback to the behavior used for singletons: overwrite the
     // current tab if it's the NTP, otherwise open a new tab.
     params->disposition = WindowOpenDisposition::SINGLETON_TAB;
-    ShowSingletonTabOverwritingNTP(params->browser, params);
+    ShowSingletonTabOverwritingNTP(params);
     return nullptr;
   }
   if (params->force_open_pwa_window) {
@@ -709,14 +760,8 @@ base::WeakPtr<content::NavigationHandle> Navigate(NavigateParams* params) {
   }
 #endif
 #if BUILDFLAG(IS_CHROMEOS_LACROS)
-  const GURL& source_url =
-      params->source_contents ? params->source_contents->GetURL() : GURL();
-  if (lacros_url_handling::IsNavigationInterceptable(*params, source_url) &&
-      lacros_url_handling::MaybeInterceptNavigation(params->url)) {
-    return nullptr;
-  }
-  // If Lacros comes here with an internal os:// redirect scheme to Ash, and Ash
-  // does not accept the URL, we convert it into a blocked url instead.
+  // If Lacros gets here with an internal os:// redirect scheme to Ash, Ash
+  // did not accept the URL. Convert it into a blocked URL instead.
   if (crosapi::gurl_os_handler_utils::IsAshOsUrl(params->url)) {
     params->url = GURL(content::kBlockedURL);
   }
@@ -878,16 +923,6 @@ base::WeakPtr<content::NavigationHandle> Navigate(NavigateParams* params) {
         params->source_contents->Close();
     }
   }
-
-#if !BUILDFLAG(IS_ANDROID)
-  // If this is a Picture in Picture window, then notify the pip manager about
-  // it. This enables the opener and pip window to stay connected, so that (for
-  // example), the pip window does not outlive the opener.
-  if (params->disposition == WindowOpenDisposition::NEW_PICTURE_IN_PICTURE) {
-    PictureInPictureWindowManager::GetInstance()->EnterDocumentPictureInPicture(
-        params->source_contents, contents_to_navigate_or_insert);
-  }
-#endif  // !BUILDFLAG(IS_ANDROID)
 
   params->navigated_or_inserted_contents = contents_to_navigate_or_insert;
   return navigation_handle;

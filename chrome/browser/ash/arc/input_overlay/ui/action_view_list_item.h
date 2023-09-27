@@ -5,13 +5,9 @@
 #ifndef CHROME_BROWSER_ASH_ARC_INPUT_OVERLAY_UI_ACTION_VIEW_LIST_ITEM_H_
 #define CHROME_BROWSER_ASH_ARC_INPUT_OVERLAY_UI_ACTION_VIEW_LIST_ITEM_H_
 
-#include "base/memory/raw_ptr.h"
-#include "ui/views/view.h"
+#include "chrome/browser/ash/arc/input_overlay/ui/action_edit_view.h"
 
 namespace arc::input_overlay {
-
-class Action;
-class DisplayOverlayController;
 
 // ActionViewListItem shows in EditingList and is associated with each of
 // Action.
@@ -19,22 +15,23 @@ class DisplayOverlayController;
 // | |Name tag|        |keys| |
 // ----------------------------
 
-class ActionViewListItem : public views::View {
+class ActionViewListItem : public ActionEditView {
  public:
   ActionViewListItem(DisplayOverlayController* controller, Action* action);
   ActionViewListItem(const ActionViewListItem&) = delete;
   ActionViewListItem& operator=(const ActionViewListItem&) = delete;
   ~ActionViewListItem() override;
 
+  // ActionEditView:
+  void OnActionNameUpdated() override;
+
+  void ShowEduNudgeForEditingTip();
+
  private:
-  void Init();
+  friend class EditLabelTest;
 
-  // Set list item of different types.
-  void SetActionTapListItem(views::View* container);
-  void SetActionMoveListItem(views::View* container);
-
-  raw_ptr<DisplayOverlayController> controller_;
-  raw_ptr<Action> action_;
+  // ActionEditView:
+  void ClickCallback() override;
 };
 
 }  // namespace arc::input_overlay

@@ -38,28 +38,19 @@ enum QuickStartDecoderError {
   kEmptyMessage = 0,
   kUnableToReadAsJSON = 1,
   kMessageDoesNotMatchSchema = 2,
+  kUnexpectedMessageType = 3,
+  kUnknownPayload = 4,
+  kUnableToReadAsBase64 = 5,
 };
 
 struct WifiCredentials {
   string ssid;
   WifiSecurityType security_type;
   bool is_hidden;
-  string password;
+  string? password;
 };
 
-struct GetAssertionResponse {
-  enum GetAssertionStatus {
-    kSuccess = 0,
-    kCtapResponseError = 1,
-    kCborDecoderError = 2,
-    kMessagePayloadParseError = 3,
-    kUnknownError = 4,
-  };
-
-  GetAssertionStatus status;
-
-  uint8 ctap_device_response_code;
-  int64 cbor_decoder_error;
+struct FidoAssertionResponse {
   string email;
   string credential_id;
 
@@ -69,4 +60,17 @@ struct GetAssertionResponse {
   // browser process.
   array<uint8> auth_data;
   array<uint8> signature;
+};
+
+struct NotifySourceOfUpdateResponse {
+  bool ack_received;
+};
+
+union QuickStartMessage {
+  BootstrapConfigurations bootstrap_configurations;
+  WifiCredentials wifi_credentials;
+  NotifySourceOfUpdateResponse notify_source_of_update_response;
+  FidoAssertionResponse fido_assertion_response;
+  UserVerificationRequested user_verification_requested;
+  UserVerificationResponse user_verification_response;
 };

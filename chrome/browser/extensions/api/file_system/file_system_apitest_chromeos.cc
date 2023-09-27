@@ -22,6 +22,7 @@
 #include "chrome/browser/extensions/api/file_system/consent_provider_impl.h"
 #include "chrome/browser/extensions/component_loader.h"
 #include "chrome/common/chrome_paths.h"
+#include "chromeos/components/kiosk/kiosk_test_utils.h"
 #include "components/user_manager/scoped_user_manager.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/test_utils.h"
@@ -104,7 +105,7 @@ class ScopedAddListenerObserver : public EventRouter::Observer {
   }
 
  private:
-  const std::string extension_id_;
+  const ExtensionId extension_id_;
   base::OnceClosure callback_;
   const raw_ptr<EventRouter, ExperimentalAsh> event_router_;
 };
@@ -189,7 +190,7 @@ class FileSystemApiTestForDrive : public PlatformAppBrowserTest {
   base::ScopedTempDir drivefs_root_;
   base::FilePath drivefs_mount_point_;
   std::unique_ptr<drive::FakeDriveFsHelper> fake_drivefs_helper_;
-  raw_ptr<drive::DriveIntegrationService, ExperimentalAsh>
+  raw_ptr<drive::DriveIntegrationService, DanglingUntriaged | ExperimentalAsh>
       integration_service_ = nullptr;
   drive::DriveIntegrationServiceFactory::FactoryCallback
       create_drive_integration_service_;
@@ -200,8 +201,6 @@ class FileSystemApiTestForDrive : public PlatformAppBrowserTest {
 // This class contains chrome.filesystem.requestFileSystem API tests.
 class FileSystemApiTestForRequestFileSystem : public PlatformAppBrowserTest {
  public:
-  FileSystemApiTestForRequestFileSystem() : fake_user_manager_(nullptr) {}
-
   bool SetUpUserDataDirectory() override {
     return drive::SetUpUserDataDirectoryForDriveFsTest();
   }
@@ -229,8 +228,7 @@ class FileSystemApiTestForRequestFileSystem : public PlatformAppBrowserTest {
 
   void TearDownOnMainThread() override {
     PlatformAppBrowserTest::TearDownOnMainThread();
-    user_manager_enabler_.reset();
-    fake_user_manager_ = nullptr;
+    user_manager_.Reset();
   }
 
   // Simulates mounting a removable volume.
@@ -245,8 +243,8 @@ class FileSystemApiTestForRequestFileSystem : public PlatformAppBrowserTest {
 
  protected:
   base::ScopedTempDir temp_dir_;
-  raw_ptr<ash::FakeChromeUserManager, ExperimentalAsh> fake_user_manager_;
-  std::unique_ptr<user_manager::ScopedUserManager> user_manager_enabler_;
+  user_manager::TypedScopedUserManager<ash::FakeChromeUserManager>
+      user_manager_;
 
   // Creates a testing file system in a testing directory.
   void CreateTestingFileSystem(const std::string& mount_point_name,
@@ -269,14 +267,8 @@ class FileSystemApiTestForRequestFileSystem : public PlatformAppBrowserTest {
 
   // Simulates entering the kiosk session.
   void EnterKioskSession() {
-    fake_user_manager_ = new ash::FakeChromeUserManager();
-    user_manager_enabler_ = std::make_unique<user_manager::ScopedUserManager>(
-        base::WrapUnique(fake_user_manager_.get()));
-
-    const AccountId kiosk_app_account_id =
-        AccountId::FromUserEmail("kiosk@foobar.com");
-    fake_user_manager_->AddKioskAppUser(kiosk_app_account_id);
-    fake_user_manager_->LoginUser(kiosk_app_account_id);
+    user_manager_.Reset(std::make_unique<ash::FakeChromeUserManager>());
+    chromeos::SetUpFakeKioskSession();
   }
 
  private:
@@ -310,8 +302,10 @@ IN_PROC_BROWSER_TEST_F(FileSystemApiTestForDrive,
                        FileSystemApiOpenExistingFileTest) {
   base::FilePath test_file =
       GetDriveMountPoint().AppendASCII("root/open_existing.txt");
-  FileSystemChooseEntryFunction::SkipPickerAndAlwaysSelectPathForTest picker(
-      test_file);
+  const FileSystemChooseEntryFunction::TestOptions test_options{
+      .path_to_be_picked = &test_file};
+  auto reset_options =
+      FileSystemChooseEntryFunction::SetOptionsForTesting(test_options);
   ASSERT_TRUE(RunExtensionTest("api_test/file_system/open_existing",
                                {.launch_as_platform_app = true}))
       << message_;
@@ -321,8 +315,10 @@ IN_PROC_BROWSER_TEST_F(FileSystemApiTestForDrive,
                        FileSystemApiOpenExistingFileWithWriteTest) {
   base::FilePath test_file =
       GetDriveMountPoint().AppendASCII("root/open_existing.txt");
-  FileSystemChooseEntryFunction::SkipPickerAndAlwaysSelectPathForTest picker(
-      test_file);
+  const FileSystemChooseEntryFunction::TestOptions test_options{
+      .path_to_be_picked = &test_file};
+  auto reset_options =
+      FileSystemChooseEntryFunction::SetOptionsForTesting(test_options);
   ASSERT_TRUE(RunExtensionTest("api_test/file_system/open_existing_with_write",
                                {.launch_as_platform_app = true}))
       << message_;
@@ -334,7 +330,10 @@ IN_PROC_BROWSER_TEST_F(FileSystemApiTestForDrive,
       GetDriveMountPoint().AppendASCII("root/open_existing.txt");
   ASSERT_TRUE(base::PathService::OverrideAndCreateIfNeeded(
       chrome::DIR_USER_DOCUMENTS, test_file.DirName(), true, false));
-  FileSystemChooseEntryFunction::SkipPickerAndSelectSuggestedPathForTest picker;
+  const FileSystemChooseEntryFunction::TestOptions test_options{
+      .use_suggested_path = true};
+  auto reset_options =
+      FileSystemChooseEntryFunction::SetOptionsForTesting(test_options);
   ASSERT_TRUE(
       RunExtensionTest("api_test/file_system/open_multiple_with_suggested_name",
                        {.launch_as_platform_app = true}))
@@ -350,8 +349,10 @@ IN_PROC_BROWSER_TEST_F(FileSystemApiTestForDrive,
   std::vector<base::FilePath> test_files;
   test_files.push_back(test_file1);
   test_files.push_back(test_file2);
-  FileSystemChooseEntryFunction::SkipPickerAndAlwaysSelectPathsForTest picker(
-      test_files);
+  const FileSystemChooseEntryFunction::TestOptions test_options{
+      .paths_to_be_picked = &test_files};
+  auto reset_options =
+      FileSystemChooseEntryFunction::SetOptionsForTesting(test_options);
   ASSERT_TRUE(RunExtensionTest("api_test/file_system/open_multiple_existing",
                                {.launch_as_platform_app = true}))
       << message_;
@@ -361,8 +362,10 @@ IN_PROC_BROWSER_TEST_F(FileSystemApiTestForDrive,
                        FileSystemApiOpenDirectoryTest) {
   base::FilePath test_directory =
       GetDriveMountPoint().AppendASCII("root/subdir");
-  FileSystemChooseEntryFunction::SkipPickerAndAlwaysSelectPathForTest picker(
-      test_directory);
+  const FileSystemChooseEntryFunction::TestOptions test_options{
+      .path_to_be_picked = &test_directory};
+  auto reset_options =
+      FileSystemChooseEntryFunction::SetOptionsForTesting(test_options);
   ASSERT_TRUE(RunExtensionTest("api_test/file_system/open_directory",
                                {.launch_as_platform_app = true}))
       << message_;
@@ -372,8 +375,10 @@ IN_PROC_BROWSER_TEST_F(FileSystemApiTestForDrive,
                        FileSystemApiOpenDirectoryWithWriteTest) {
   base::FilePath test_directory =
       GetDriveMountPoint().AppendASCII("root/subdir");
-  FileSystemChooseEntryFunction::SkipPickerAndAlwaysSelectPathForTest picker(
-      test_directory);
+  const FileSystemChooseEntryFunction::TestOptions test_options{
+      .path_to_be_picked = &test_directory};
+  auto reset_options =
+      FileSystemChooseEntryFunction::SetOptionsForTesting(test_options);
   ASSERT_TRUE(RunExtensionTest("api_test/file_system/open_directory_with_write",
                                {.launch_as_platform_app = true}))
       << message_;
@@ -383,8 +388,10 @@ IN_PROC_BROWSER_TEST_F(FileSystemApiTestForDrive,
                        FileSystemApiOpenDirectoryWithoutPermissionTest) {
   base::FilePath test_directory =
       GetDriveMountPoint().AppendASCII("root/subdir");
-  FileSystemChooseEntryFunction::SkipPickerAndAlwaysSelectPathForTest picker(
-      test_directory);
+  const FileSystemChooseEntryFunction::TestOptions test_options{
+      .path_to_be_picked = &test_directory};
+  auto reset_options =
+      FileSystemChooseEntryFunction::SetOptionsForTesting(test_options);
   ASSERT_TRUE(
       RunExtensionTest("api_test/file_system/open_directory_without_permission",
                        {.launch_as_platform_app = true}))
@@ -395,8 +402,10 @@ IN_PROC_BROWSER_TEST_F(FileSystemApiTestForDrive,
                        FileSystemApiOpenDirectoryWithOnlyWritePermissionTest) {
   base::FilePath test_directory =
       GetDriveMountPoint().AppendASCII("root/subdir");
-  FileSystemChooseEntryFunction::SkipPickerAndAlwaysSelectPathForTest picker(
-      test_directory);
+  const FileSystemChooseEntryFunction::TestOptions test_options{
+      .path_to_be_picked = &test_directory};
+  auto reset_options =
+      FileSystemChooseEntryFunction::SetOptionsForTesting(test_options);
   ASSERT_TRUE(
       RunExtensionTest("api_test/file_system/open_directory_with_only_write",
                        {.launch_as_platform_app = true}))
@@ -407,8 +416,10 @@ IN_PROC_BROWSER_TEST_F(FileSystemApiTestForDrive,
                        FileSystemApiSaveNewFileTest) {
   base::FilePath test_file =
       GetDriveMountPoint().AppendASCII("root/save_new.txt");
-  FileSystemChooseEntryFunction::SkipPickerAndAlwaysSelectPathForTest picker(
-      test_file);
+  const FileSystemChooseEntryFunction::TestOptions test_options{
+      .path_to_be_picked = &test_file};
+  auto reset_options =
+      FileSystemChooseEntryFunction::SetOptionsForTesting(test_options);
   ASSERT_TRUE(RunExtensionTest("api_test/file_system/save_new",
                                {.launch_as_platform_app = true}))
       << message_;
@@ -418,8 +429,10 @@ IN_PROC_BROWSER_TEST_F(FileSystemApiTestForDrive,
                        FileSystemApiSaveExistingFileTest) {
   base::FilePath test_file =
       GetDriveMountPoint().AppendASCII("root/save_existing.txt");
-  FileSystemChooseEntryFunction::SkipPickerAndAlwaysSelectPathForTest picker(
-      test_file);
+  const FileSystemChooseEntryFunction::TestOptions test_options{
+      .path_to_be_picked = &test_file};
+  auto reset_options =
+      FileSystemChooseEntryFunction::SetOptionsForTesting(test_options);
   ASSERT_TRUE(RunExtensionTest("api_test/file_system/save_existing",
                                {.launch_as_platform_app = true}))
       << message_;
@@ -429,8 +442,10 @@ IN_PROC_BROWSER_TEST_F(FileSystemApiTestForDrive,
                        FileSystemApiSaveNewFileWithWriteTest) {
   base::FilePath test_file =
       GetDriveMountPoint().AppendASCII("root/save_new.txt");
-  FileSystemChooseEntryFunction::SkipPickerAndAlwaysSelectPathForTest picker(
-      test_file);
+  const FileSystemChooseEntryFunction::TestOptions test_options{
+      .path_to_be_picked = &test_file};
+  auto reset_options =
+      FileSystemChooseEntryFunction::SetOptionsForTesting(test_options);
   ASSERT_TRUE(RunExtensionTest("api_test/file_system/save_new_with_write",
                                {.launch_as_platform_app = true}))
       << message_;
@@ -440,8 +455,10 @@ IN_PROC_BROWSER_TEST_F(FileSystemApiTestForDrive,
                        FileSystemApiSaveExistingFileWithWriteTest) {
   base::FilePath test_file =
       GetDriveMountPoint().AppendASCII("root/save_existing.txt");
-  FileSystemChooseEntryFunction::SkipPickerAndAlwaysSelectPathForTest picker(
-      test_file);
+  const FileSystemChooseEntryFunction::TestOptions test_options{
+      .path_to_be_picked = &test_file};
+  auto reset_options =
+      FileSystemChooseEntryFunction::SetOptionsForTesting(test_options);
   ASSERT_TRUE(RunExtensionTest("api_test/file_system/save_existing_with_write",
                                {.launch_as_platform_app = true}))
       << message_;

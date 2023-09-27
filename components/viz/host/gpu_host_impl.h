@@ -25,7 +25,8 @@
 #include "components/discardable_memory/public/mojom/discardable_shared_memory_manager.mojom.h"
 #include "components/viz/common/buildflags.h"
 #include "components/viz/host/viz_host_export.h"
-#include "gpu/command_buffer/common/activity_flags.h"
+#include "gpu/command_buffer/common/shared_image_capabilities.h"
+#include "gpu/command_buffer/common/shm_count.h"
 #include "gpu/config/gpu_domain_guilt.h"
 #include "gpu/ipc/common/gpu_disk_cache_type.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
@@ -147,6 +148,7 @@ class VIZ_HOST_EXPORT GpuHostImpl : public mojom::GpuHost
       base::OnceCallback<void(mojo::ScopedMessagePipeHandle,
                               const gpu::GPUInfo&,
                               const gpu::GpuFeatureInfo&,
+                              const gpu::SharedImageCapabilities&,
                               EstablishChannelStatus)>;
 
   GpuHostImpl(Delegate* delegate,
@@ -232,11 +234,13 @@ class VIZ_HOST_EXPORT GpuHostImpl : public mojom::GpuHost
                   const std::string& data);
   void OnDiskCacheHandleDestoyed(const gpu::GpuDiskCacheHandle& handle);
 
-  void OnChannelEstablished(int client_id,
-                            bool sync,
-                            mojo::ScopedMessagePipeHandle channel_handle,
-                            const gpu::GPUInfo& gpu_info,
-                            const gpu::GpuFeatureInfo& gpu_feature_info);
+  void OnChannelEstablished(
+      int client_id,
+      bool sync,
+      mojo::ScopedMessagePipeHandle channel_handle,
+      const gpu::GPUInfo& gpu_info,
+      const gpu::GpuFeatureInfo& gpu_feature_info,
+      const gpu::SharedImageCapabilities& shared_image_capabilities);
   void MaybeShutdownGpuProcess();
 
   // mojom::GpuHost:
@@ -289,7 +293,7 @@ class VIZ_HOST_EXPORT GpuHostImpl : public mojom::GpuHost
       info_collection_gpu_service_remote_;
 #endif
   mojo::Receiver<mojom::GpuHost> gpu_host_receiver_{this};
-  gpu::GpuProcessHostActivityFlags activity_flags_;
+  gpu::GpuProcessHostShmCount use_shader_cache_shm_count_;
 
 #if BUILDFLAG(USE_VIZ_DEBUGGER)
   mojo::Receiver<mojom::VizDebugOutput> viz_debug_output_{this};

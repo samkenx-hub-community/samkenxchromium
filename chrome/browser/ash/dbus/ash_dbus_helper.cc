@@ -62,6 +62,7 @@
 #include "chromeos/ash/components/dbus/runtime_probe/runtime_probe_client.h"
 #include "chromeos/ash/components/dbus/seneschal/seneschal_client.h"
 #include "chromeos/ash/components/dbus/session_manager/session_manager_client.h"
+#include "chromeos/ash/components/dbus/shill/modem_3gpp_client.h"
 #include "chromeos/ash/components/dbus/shill/shill_clients.h"
 #include "chromeos/ash/components/dbus/smbprovider/smb_provider_client.h"
 #include "chromeos/ash/components/dbus/spaced/spaced_client.h"
@@ -71,7 +72,6 @@
 #include "chromeos/ash/components/dbus/typecd/typecd_client.h"
 #include "chromeos/ash/components/dbus/update_engine/update_engine_client.h"
 #include "chromeos/ash/components/dbus/upstart/upstart_client.h"
-#include "chromeos/ash/components/dbus/userdataauth/arc_quota_client.h"
 #include "chromeos/ash/components/dbus/userdataauth/cryptohome_misc_client.h"
 #include "chromeos/ash/components/dbus/userdataauth/cryptohome_pkcs11_client.h"
 #include "chromeos/ash/components/dbus/userdataauth/install_attributes_client.h"
@@ -114,7 +114,19 @@ void OverrideStubPathsIfNeeded() {
   }
 }
 
+DBusHelperObserverForTest* g_dbus_helper_observer = nullptr;
+
 }  // namespace
+
+DBusHelperObserverForTest::~DBusHelperObserverForTest() = default;  // IN-TEST
+
+// static
+void DBusHelperObserverForTest::Set(DBusHelperObserverForTest* observer) {
+  // Only allow set `g_dbus_helper_observer` when it is null or resets it.
+  DCHECK(!g_dbus_helper_observer || !observer);
+
+  g_dbus_helper_observer = observer;
+}
 
 void InitializeDBus() {
   using chromeos::InitializeDBusClient;
@@ -140,7 +152,6 @@ void InitializeDBus() {
   InitializeDBusClient<ArcKeyMintClient>(bus);
   InitializeDBusClient<ArcMidisClient>(bus);
   InitializeDBusClient<ArcObbMounterClient>(bus);
-  InitializeDBusClient<ArcQuotaClient>(bus);
   InitializeDBusClient<ArcVmDataMigratorClient>(bus);
   InitializeDBusClient<AttestationClient>(bus);
   InitializeDBusClient<BiodClient>(bus);  // For device::Fingerprint.
@@ -205,6 +216,10 @@ void InitializeDBus() {
   // g_browser_process initializes BrowserPolicyConnector.
   DeviceSettingsService::Initialize();
   InstallAttributes::Initialize();
+
+  if (g_dbus_helper_observer) {
+    g_dbus_helper_observer->PostInitializeDBus();
+  }
 }
 
 void InitializeFeatureListDependentDBus() {
@@ -236,20 +251,30 @@ void InitializeFeatureListDependentDBus() {
   if (shimless_rma::IsShimlessRmaAllowed()) {
     InitializeDBusClient<RmadClient>(bus);
   }
-  if (features::IsRgbKeyboardEnabled()) {
-    InitializeDBusClient<RgbkbdClient>(bus);
-  }
+  InitializeDBusClient<RgbkbdClient>(bus);
   InitializeDBusClient<WilcoDtcSupportdClient>(bus);
 
   if (features::IsSnoopingProtectionEnabled() ||
       features::IsQuickDimEnabled()) {
     InitializeDBusClient<HumanPresenceDBusClient>(bus);
   }
+
+  if (features::IsCellularCarrierLockEnabled()) {
+    InitializeDBusClient<Modem3gppClient>(bus);
+  }
 }
 
 void ShutdownDBus() {
+  if (g_dbus_helper_observer) {
+    g_dbus_helper_observer->PreShutdownDBus();
+  }
+
   // Feature list-dependent D-Bus clients are shut down first because we try to
   // shut down in reverse order of initialization (in case of dependencies).
+  if (features::IsCellularCarrierLockEnabled()) {
+    Modem3gppClient::Shutdown();
+  }
+
   if (features::IsSnoopingProtectionEnabled() ||
       features::IsQuickDimEnabled()) {
     HumanPresenceDBusClient::Shutdown();
@@ -284,9 +309,7 @@ void ShutdownDBus() {
   SeneschalClient::Shutdown();
   RuntimeProbeClient::Shutdown();
   ResourcedClient::Shutdown();
-  if (features::IsRgbKeyboardEnabled()) {
-    RgbkbdClient::Shutdown();
-  }
+  RgbkbdClient::Shutdown();
   if (shimless_rma::IsShimlessRmaAllowed()) {
     RmadClient::Shutdown();
   }
@@ -329,7 +352,6 @@ void ShutdownDBus() {
   BiodClient::Shutdown();
   AttestationClient::Shutdown();
   ArcVmDataMigratorClient::Shutdown();
-  ArcQuotaClient::Shutdown();
   ArcObbMounterClient::Shutdown();
   ArcMidisClient::Shutdown();
   ArcKeyMintClient::Shutdown();

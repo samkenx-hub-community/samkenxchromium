@@ -13,20 +13,22 @@
 #include "components/autofill/core/browser/test_autofill_client.h"
 #include "components/autofill/core/browser/test_personal_data_manager.h"
 #include "components/autofill/core/common/autofill_features.h"
+#include "components/autofill/core/common/autofill_test_utils.h"
 #include "components/autofill/core/common/form_data.h"
 #include "components/strings/grit/components_strings.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/base/l10n/l10n_util.h"
 
-using testing::_;
-using testing::Field;
-using testing::Truly;
-using testing::UnorderedElementsAre;
-
 namespace autofill {
 
 namespace {
+
+using test::CreateTestFormField;
+using ::testing::_;
+using ::testing::Field;
+using ::testing::Truly;
+using ::testing::UnorderedElementsAre;
 
 class MockSuggestionsHandler
     : public MerchantPromoCodeManager::SuggestionsHandler {
@@ -39,7 +41,7 @@ class MockSuggestionsHandler
   MOCK_METHOD(void,
               OnSuggestionsReturned,
               (FieldGlobalId field_id,
-               AutoselectFirstSuggestion autoselect_first_suggestion,
+               AutofillSuggestionTriggerSource trigger_source,
                const std::vector<Suggestion>& suggestions),
               (override));
 
@@ -61,8 +63,8 @@ class MerchantPromoCodeManagerTest : public testing::Test {
     merchant_promo_code_manager_ = std::make_unique<MerchantPromoCodeManager>();
     merchant_promo_code_manager_->Init(personal_data_manager_.get(),
                                        /*is_off_the_record=*/false);
-    test::CreateTestFormField(/*label=*/"", "Some Field Name", "SomePrefix",
-                              "Some Type", &test_field_);
+    test_field_ = CreateTestFormField(/*label=*/"", "Some Field Name",
+                                      "SomePrefix", "Some Type");
   }
 
   // Sets up the TestPersonalDataManager with a promo code offer for the given
@@ -101,7 +103,8 @@ class MerchantPromoCodeManagerTest : public testing::Test {
 TEST_F(MerchantPromoCodeManagerTest, ShowsPromoCodeSuggestions) {
   base::HistogramTester histogram_tester;
   auto suggestions_handler = std::make_unique<MockSuggestionsHandler>();
-  AutoselectFirstSuggestion autoselect_first_suggestion(false);
+  const auto trigger_source =
+      AutofillSuggestionTriggerSource::kFormControlElementClicked;
   std::string last_committed_origin_url = "https://www.example.com";
   FormData form_data;
   form_data.main_frame_origin =
@@ -121,10 +124,10 @@ TEST_F(MerchantPromoCodeManagerTest, ShowsPromoCodeSuggestions) {
   EXPECT_CALL(
       *suggestions_handler.get(),
       OnSuggestionsReturned(
-          _, autoselect_first_suggestion,
+          _, trigger_source,
           UnorderedElementsAre(
               Field(&Suggestion::main_text, promo_code_suggestion.main_text),
-              Field(&Suggestion::frontend_id, PopupItemId::kSeparator),
+              Field(&Suggestion::popup_item_id, PopupItemId::kSeparator),
               Field(&Suggestion::main_text, footer_suggestion.main_text))))
       .Times(3);
 
@@ -133,24 +136,23 @@ TEST_F(MerchantPromoCodeManagerTest, ShowsPromoCodeSuggestions) {
   // merchant site will be displayed instead of requesting Autocomplete
   // suggestions.
   EXPECT_TRUE(merchant_promo_code_manager_->OnGetSingleFieldSuggestions(
-      autoselect_first_suggestion, test_field_, autofill_client_,
+      trigger_source, test_field_, autofill_client_,
       suggestions_handler->GetWeakPtr(),
       /*context=*/context));
 
   // Trigger offers suggestions popup again to be able to test that we do not
   // log metrics twice for the same field.
   EXPECT_TRUE(merchant_promo_code_manager_->OnGetSingleFieldSuggestions(
-      autoselect_first_suggestion, test_field_, autofill_client_,
+      trigger_source, test_field_, autofill_client_,
       suggestions_handler->GetWeakPtr(),
       /*context=*/context));
 
   // Trigger offers suggestions popup again to be able to test that we log
   // metrics more than once if it is a different field.
-  FormFieldData other_field;
-  test::CreateTestFormField(/*label=*/"", "Some Other Name", "SomePrefix",
-                            "Some Type", &other_field);
+  FormFieldData other_field = CreateTestFormField(
+      /*label=*/"", "Some Other Name", "SomePrefix", "Some Type");
   EXPECT_TRUE(merchant_promo_code_manager_->OnGetSingleFieldSuggestions(
-      autoselect_first_suggestion, other_field, autofill_client_,
+      trigger_source, other_field, autofill_client_,
       suggestions_handler->GetWeakPtr(),
       /*context=*/context));
 
@@ -183,8 +185,8 @@ TEST_F(MerchantPromoCodeManagerTest,
 
   // Simulate request for suggestions.
   EXPECT_FALSE(merchant_promo_code_manager_->OnGetSingleFieldSuggestions(
-      AutoselectFirstSuggestion(false), test_field_, autofill_client_,
-      suggestions_handler->GetWeakPtr(),
+      AutofillSuggestionTriggerSource::kFormControlElementClicked, test_field_,
+      autofill_client_, suggestions_handler->GetWeakPtr(),
       /*context=*/SuggestionsContext()));
 
   // Ensure that no metrics were logged.
@@ -228,8 +230,8 @@ TEST_F(MerchantPromoCodeManagerTest,
 
   // Simulate request for suggestions.
   EXPECT_FALSE(merchant_promo_code_manager_->OnGetSingleFieldSuggestions(
-      AutoselectFirstSuggestion(false), test_field_, autofill_client_,
-      suggestions_handler->GetWeakPtr(),
+      AutofillSuggestionTriggerSource::kFormControlElementClicked, test_field_,
+      autofill_client_, suggestions_handler->GetWeakPtr(),
       /*context=*/context));
 
   // Ensure that no metrics were logged.
@@ -271,8 +273,8 @@ TEST_F(MerchantPromoCodeManagerTest,
 
   // Simulate request for suggestions.
   EXPECT_FALSE(merchant_promo_code_manager_->OnGetSingleFieldSuggestions(
-      AutoselectFirstSuggestion(false), test_field_, autofill_client_,
-      suggestions_handler->GetWeakPtr(),
+      AutofillSuggestionTriggerSource::kFormControlElementClicked, test_field_,
+      autofill_client_, suggestions_handler->GetWeakPtr(),
       /*context=*/context));
 
   // Ensure that no metrics were logged.
@@ -314,8 +316,8 @@ TEST_F(MerchantPromoCodeManagerTest, NoPromoCodeOffers) {
 
   // Simulate request for suggestions.
   EXPECT_FALSE(merchant_promo_code_manager_->OnGetSingleFieldSuggestions(
-      AutoselectFirstSuggestion(false), test_field_, autofill_client_,
-      suggestions_handler->GetWeakPtr(),
+      AutofillSuggestionTriggerSource::kFormControlElementClicked, test_field_,
+      autofill_client_, suggestions_handler->GetWeakPtr(),
       /*context=*/context));
 
   // Ensure that no metrics were logged.
@@ -361,8 +363,8 @@ TEST_F(MerchantPromoCodeManagerTest, AutofillWalletImportDisabled) {
 
   // Simulate request for suggestions.
   EXPECT_FALSE(merchant_promo_code_manager_->OnGetSingleFieldSuggestions(
-      AutoselectFirstSuggestion(false), test_field_, autofill_client_,
-      suggestions_handler->GetWeakPtr(),
+      AutofillSuggestionTriggerSource::kFormControlElementClicked, test_field_,
+      autofill_client_, suggestions_handler->GetWeakPtr(),
       /*context=*/context));
 
   // Ensure that no metrics were logged.
@@ -408,8 +410,8 @@ TEST_F(MerchantPromoCodeManagerTest, AutofillCreditCardDisabled) {
 
   // Simulate request for suggestions.
   EXPECT_FALSE(merchant_promo_code_manager_->OnGetSingleFieldSuggestions(
-      AutoselectFirstSuggestion(false), test_field_, autofill_client_,
-      suggestions_handler->GetWeakPtr(),
+      AutofillSuggestionTriggerSource::kFormControlElementClicked, test_field_,
+      autofill_client_, suggestions_handler->GetWeakPtr(),
       /*context=*/context));
 
   // Ensure that no metrics were logged.
@@ -448,7 +450,8 @@ TEST_F(MerchantPromoCodeManagerTest, NoQueryHandler) {
 
   // Simulate request for suggestions, but with an empty handler.
   EXPECT_TRUE(merchant_promo_code_manager_->OnGetSingleFieldSuggestions(
-      AutoselectFirstSuggestion(false), test_field_, autofill_client_,
+      AutofillSuggestionTriggerSource::kFormControlElementClicked, test_field_,
+      autofill_client_,
       /*handler=*/nullptr,
       /*context=*/context));
 
@@ -499,8 +502,8 @@ TEST_F(MerchantPromoCodeManagerTest, PrefixMatched) {
 
   // Simulate request for suggestions.
   EXPECT_TRUE(merchant_promo_code_manager_->OnGetSingleFieldSuggestions(
-      AutoselectFirstSuggestion(false), test_field_, autofill_client_,
-      suggestions_handler->GetWeakPtr(),
+      AutofillSuggestionTriggerSource::kFormControlElementClicked, test_field_,
+      autofill_client_, suggestions_handler->GetWeakPtr(),
       /*context=*/context));
 
   // No metrics should be logged because no suggestions were shown.
@@ -528,7 +531,8 @@ TEST_F(MerchantPromoCodeManagerTest,
   base::HistogramTester histogram_tester;
   auto suggestions_handler = std::make_unique<MockSuggestionsHandler>();
   std::u16string test_promo_code = u"test_promo_code";
-  AutoselectFirstSuggestion autoselect_first_suggestion(false);
+  const auto trigger_source =
+      AutofillSuggestionTriggerSource::kFormControlElementClicked;
   std::string last_committed_origin_url = "https://www.example.com";
   FormData form_data;
   form_data.main_frame_origin =
@@ -540,7 +544,7 @@ TEST_F(MerchantPromoCodeManagerTest,
   SetUpPromoCodeOffer(last_committed_origin_url,
                       GURL("https://offer-details-url.com/"));
 
-  // Check that non promo code frontend id's do not log as offer suggestion
+  // Check that non promo code popup item id's do not log as offer suggestion
   // selected.
   merchant_promo_code_manager_->OnSingleFieldSuggestionSelected(
       test_promo_code, PopupItemId::kAutocompleteEntry);
@@ -550,7 +554,7 @@ TEST_F(MerchantPromoCodeManagerTest,
 
   // Simulate showing the promo code offers suggestions popup.
   EXPECT_TRUE(merchant_promo_code_manager_->OnGetSingleFieldSuggestions(
-      autoselect_first_suggestion, test_field_, autofill_client_,
+      trigger_source, test_field_, autofill_client_,
       suggestions_handler->GetWeakPtr(),
       /*context=*/context));
 
@@ -569,7 +573,7 @@ TEST_F(MerchantPromoCodeManagerTest,
 
   // Simulate showing the promo code offers suggestions popup.
   EXPECT_TRUE(merchant_promo_code_manager_->OnGetSingleFieldSuggestions(
-      autoselect_first_suggestion, test_field_, autofill_client_,
+      trigger_source, test_field_, autofill_client_,
       suggestions_handler->GetWeakPtr(),
       /*context=*/context));
 
@@ -593,7 +597,8 @@ TEST_F(MerchantPromoCodeManagerTest,
   base::HistogramTester histogram_tester;
   auto suggestions_handler = std::make_unique<MockSuggestionsHandler>();
   std::u16string test_promo_code = u"test_promo_code";
-  AutoselectFirstSuggestion autoselect_first_suggestion(false);
+  const auto trigger_source =
+      AutofillSuggestionTriggerSource::kFormControlElementClicked;
   std::string last_committed_origin_url = "https://www.example.com";
   FormData form_data;
   form_data.main_frame_origin =
@@ -605,7 +610,7 @@ TEST_F(MerchantPromoCodeManagerTest,
   SetUpPromoCodeOffer(last_committed_origin_url,
                       GURL("https://offer-details-url.com/"));
 
-  // Check that non promo code footer frontend id's do not log as offer
+  // Check that non promo code footer popup item id's do not log as offer
   // suggestions footer selected.
   merchant_promo_code_manager_->OnSingleFieldSuggestionSelected(
       test_promo_code, PopupItemId::kAutocompleteEntry);
@@ -617,7 +622,7 @@ TEST_F(MerchantPromoCodeManagerTest,
 
   // Simulate showing the promo code offers suggestions popup.
   EXPECT_TRUE(merchant_promo_code_manager_->OnGetSingleFieldSuggestions(
-      autoselect_first_suggestion, test_field_, autofill_client_,
+      trigger_source, test_field_, autofill_client_,
       suggestions_handler->GetWeakPtr(),
       /*context=*/context));
 
@@ -639,7 +644,7 @@ TEST_F(MerchantPromoCodeManagerTest,
 
   // Simulate showing the promo code offers suggestions popup.
   EXPECT_TRUE(merchant_promo_code_manager_->OnGetSingleFieldSuggestions(
-      autoselect_first_suggestion, test_field_, autofill_client_,
+      trigger_source, test_field_, autofill_client_,
       suggestions_handler->GetWeakPtr(),
       /*context=*/context));
 

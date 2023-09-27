@@ -5,6 +5,7 @@
 #ifndef COMPONENTS_SYNC_TEST_TEST_SYNC_SERVICE_H_
 #define COMPONENTS_SYNC_TEST_TEST_SYNC_SERVICE_H_
 
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -14,10 +15,15 @@
 #include "components/signin/public/identity_manager/account_info.h"
 #include "components/sync/engine/cycle/sync_cycle_snapshot.h"
 #include "components/sync/engine/sync_status.h"
+#include "components/sync/service/local_data_description.h"
 #include "components/sync/service/sync_service.h"
 #include "components/sync/test/test_sync_user_settings.h"
 #include "google_apis/gaia/google_service_auth_error.h"
 #include "url/gurl.h"
+
+#if BUILDFLAG(IS_ANDROID)
+#include "base/android/scoped_java_ref.h"
+#endif
 
 namespace syncer {
 
@@ -63,11 +69,21 @@ class TestSyncService : public SyncService {
   void SetTrustedVaultKeyRequiredForPreferredDataTypes(bool required);
   void SetTrustedVaultRecoverabilityDegraded(bool degraded);
   void SetIsUsingExplicitPassphrase(bool enabled);
+  void SetDownloadStatusFor(const ModelTypeSet& types,
+                            ModelTypeDownloadStatus download_status);
+  void SetTypesWithUnsyncedData(const ModelTypeSet& types);
+  void SetLocalDataDescriptions(
+      const std::map<ModelType, LocalDataDescription>& local_data_descriptions);
 
   void FireStateChanged();
+  void FirePaymentsIntegrationEnabledChanged();
   void FireSyncCycleCompleted();
 
   // SyncService implementation.
+#if BUILDFLAG(IS_ANDROID)
+  base::android::ScopedJavaLocalRef<jobject> GetJavaObject() override;
+#endif  // BUILDFLAG(IS_ANDROID)
+
   void SetSyncFeatureRequested() override;
   TestSyncUserSettings* GetUserSettings() override;
   const TestSyncUserSettings* GetUserSettings() const override;
@@ -117,15 +133,13 @@ class TestSyncService : public SyncService {
       base::OnceCallback<void(base::Value::List)> callback) override;
   ModelTypeDownloadStatus GetDownloadStatusFor(ModelType type) const override;
   void SetInvalidationsForSessionsEnabled(bool enabled) override;
-  void AddTrustedVaultDecryptionKeysFromWeb(
-      const std::string& gaia_id,
-      const std::vector<std::vector<uint8_t>>& keys,
-      int last_key_version) override;
-  void AddTrustedVaultRecoveryMethodFromWeb(
-      const std::string& gaia_id,
-      const std::vector<uint8_t>& public_key,
-      int method_type_hint,
-      base::OnceClosure callback) override;
+  void GetTypesWithUnsyncedData(
+      base::OnceCallback<void(ModelTypeSet)> cb) const override;
+  void GetLocalDataDescriptions(
+      ModelTypeSet types,
+      base::OnceCallback<void(std::map<ModelType, LocalDataDescription>)>
+          callback) override;
+  void TriggerLocalDataMigration(ModelTypeSet types) override;
 
   // KeyedService implementation.
   void Shutdown() override;
@@ -148,6 +162,8 @@ class TestSyncService : public SyncService {
 
   ModelTypeSet failed_data_types_;
 
+  std::map<ModelType, ModelTypeDownloadStatus> download_statuses_;
+
   bool detailed_sync_status_engine_available_ = false;
   SyncStatus detailed_sync_status_;
 
@@ -156,6 +172,10 @@ class TestSyncService : public SyncService {
   base::ObserverList<SyncServiceObserver>::Unchecked observers_;
 
   GURL sync_service_url_;
+
+  ModelTypeSet unsynced_types_;
+
+  std::map<ModelType, LocalDataDescription> local_data_descriptions_;
 };
 
 }  // namespace syncer

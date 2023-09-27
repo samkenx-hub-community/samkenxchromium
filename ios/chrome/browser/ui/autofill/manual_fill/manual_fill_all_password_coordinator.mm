@@ -18,15 +18,12 @@
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/chrome/browser/shared/public/commands/open_new_tab_command.h"
 #import "ios/chrome/browser/shared/ui/table_view/table_view_navigation_controller.h"
-#import "ios/chrome/browser/sync/sync_setup_service_factory.h"
+#import "ios/chrome/browser/sync/sync_service_factory.h"
+#import "ios/chrome/browser/ui/autofill/manual_fill/manual_fill_all_password_coordinator_delegate.h"
 #import "ios/chrome/browser/ui/autofill/manual_fill/manual_fill_injection_handler.h"
 #import "ios/chrome/browser/ui/autofill/manual_fill/manual_fill_password_mediator.h"
 #import "ios/chrome/browser/ui/autofill/manual_fill/password_list_navigator.h"
 #import "ios/chrome/browser/ui/autofill/manual_fill/password_view_controller.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 @interface ManualFillAllPasswordCoordinator () <
     ManualFillPasswordMediatorDelegate,
@@ -61,8 +58,8 @@
           self.browser->GetBrowserState());
   web::WebState* webState =
       self.browser->GetWebStateList()->GetActiveWebState();
-  SyncSetupService* syncService = SyncSetupServiceFactory::GetForBrowserState(
-      self.browser->GetBrowserState());
+  syncer::SyncService* syncService =
+      SyncServiceFactory::GetForBrowserState(self.browser->GetBrowserState());
   self.passwordMediator = [[ManualFillPasswordMediator alloc]
       initWithProfilePasswordStore:profilePasswordStore
               accountPasswordStore:accountPasswordStore
@@ -112,23 +109,28 @@
 
 - (void)manualFillPasswordMediatorWillInjectContent:
     (ManualFillPasswordMediator*)mediator {
-  [self stop];  // The job is done.
+  [self.manualFillAllPasswordCoordinatorDelegate
+      manualFillAllPasswordCoordinatorWantsToBeDismissed:self];  // The job is
+                                                                 // done.
 }
 
 #pragma mark - PasswordViewControllerDelegate
 
 - (void)passwordViewControllerDidTapDoneButton:
     (PasswordViewController*)passwordViewController {
-  [self stop];  // The job is done.
+  [self.manualFillAllPasswordCoordinatorDelegate
+      manualFillAllPasswordCoordinatorWantsToBeDismissed:self];  // The job is
+                                                                 // done.
 }
 
 - (void)didTapLinkURL:(CrURL*)URL {
-  [self stop];
   // Dismiss `passwordViewController` and open header link in a new tab.
   OpenNewTabCommand* command =
       [OpenNewTabCommand commandWithURLFromChrome:URL.gurl];
   id<ApplicationCommands> handler = HandlerForProtocol(
       self.browser->GetCommandDispatcher(), ApplicationCommands);
+  [self.manualFillAllPasswordCoordinatorDelegate
+      manualFillAllPasswordCoordinatorWantsToBeDismissed:self];
   [handler openURLInNewTab:command];
 }
 

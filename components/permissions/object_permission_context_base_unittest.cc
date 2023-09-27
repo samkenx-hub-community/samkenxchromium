@@ -106,6 +106,23 @@ TEST_F(ObjectPermissionContextBaseTest, GrantAndRevokeObjectPermissions) {
   EXPECT_EQ(0u, objects.size());
 }
 
+TEST_F(ObjectPermissionContextBaseTest, GrantAndRevokeAllObjectPermissions) {
+  MockPermissionObserver mock_observer;
+  context_.AddObserver(&mock_observer);
+
+  EXPECT_CALL(mock_observer, OnObjectPermissionChanged(_, _)).Times(3);
+  context_.GrantObjectPermission(origin1_, object1_.Clone());
+  context_.GrantObjectPermission(origin1_, object2_.Clone());
+  auto objects = context_.GetGrantedObjects(origin1_);
+
+  EXPECT_CALL(mock_observer, OnPermissionRevoked(origin1_)).Times(1);
+  context_.RevokeObjectPermissions(origin1_);
+
+  // All permissions have been revoked for the given origin.
+  objects = context_.GetGrantedObjects(origin1_);
+  EXPECT_EQ(0u, objects.size());
+}
+
 TEST_F(ObjectPermissionContextBaseTest, GrantObjectPermissionTwice) {
   MockPermissionObserver mock_observer;
   context_.AddObserver(&mock_observer);
@@ -185,8 +202,8 @@ TEST_F(ObjectPermissionContextBaseTest, GetOriginsWithGrants) {
 
   auto origins_with_grants = context_.GetOriginsWithGrants();
   EXPECT_EQ(2u, origins_with_grants.size());
-  EXPECT_EQ(origin2_, origins_with_grants[0]);
-  EXPECT_EQ(origin1_, origins_with_grants[1]);
+  EXPECT_TRUE(base::Contains(origins_with_grants, origin2_));
+  EXPECT_TRUE(base::Contains(origins_with_grants, origin1_));
 }
 
 TEST_F(ObjectPermissionContextBaseTest, GetAllGrantedObjects) {

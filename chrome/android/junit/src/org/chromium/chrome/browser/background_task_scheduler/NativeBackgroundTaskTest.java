@@ -16,6 +16,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
+import android.app.Notification;
 import android.content.Context;
 
 import org.junit.After;
@@ -149,6 +150,9 @@ public class NativeBackgroundTaskTest {
             mWasCalled = true;
             mCallbackLatch.countDown();
         }
+
+        @Override
+        public void setNotification(int notificationId, Notification notification) {}
 
         boolean wasCalled() {
             return mWasCalled;
@@ -350,7 +354,6 @@ public class NativeBackgroundTaskTest {
         verifyStartupCalls(0, 0);
         assertTrue(mTask.wasOnStartTaskWithNativeCalled());
         assertFalse(mCallback.wasCalled());
-        verify(mExternalUmaMock).reportNativeTaskStarted(TaskIds.TEST, false);
     }
 
     @Test
@@ -365,8 +368,7 @@ public class NativeBackgroundTaskTest {
         verifyStartupCalls(1, 1);
         assertTrue(mTask.wasOnStartTaskWithNativeCalled());
         assertFalse(mCallback.wasCalled());
-        verify(mExternalUmaMock).reportNativeTaskStarted(TaskIds.TEST, false);
-        verify(mExternalUmaMock).reportTaskStartedNative(TaskIds.TEST, false);
+        verify(mExternalUmaMock).reportTaskStartedNative(TaskIds.TEST);
     }
 
     @Test
@@ -382,9 +384,7 @@ public class NativeBackgroundTaskTest {
         assertFalse(mTask.wasOnStartTaskWithNativeCalled());
         assertTrue(mCallback.wasCalled());
         assertTrue(mCallback.needsRescheduling());
-        verify(mExternalUmaMock).reportNativeTaskStarted(TaskIds.TEST, false);
-        verify(mExternalUmaMock).reportTaskStartedNative(TaskIds.TEST, false);
-        verify(mExternalUmaMock).reportNativeTaskFinished(TaskIds.TEST, false);
+        verify(mExternalUmaMock).reportTaskStartedNative(TaskIds.TEST);
     }
 
     @Test
@@ -400,9 +400,7 @@ public class NativeBackgroundTaskTest {
         assertFalse(mTask.wasOnStartTaskWithNativeCalled());
         assertTrue(mCallback.wasCalled());
         assertTrue(mCallback.needsRescheduling());
-        verify(mExternalUmaMock).reportNativeTaskStarted(TaskIds.TEST, false);
-        verify(mExternalUmaMock).reportTaskStartedNative(TaskIds.TEST, false);
-        verify(mExternalUmaMock).reportNativeTaskFinished(TaskIds.TEST, false);
+        verify(mExternalUmaMock).reportTaskStartedNative(TaskIds.TEST);
     }
 
     @Test
@@ -415,9 +413,7 @@ public class NativeBackgroundTaskTest {
         assertTrue(mTask.onStopTask(ContextUtils.getApplicationContext(), getTaskParameters()));
         assertTrue(mTask.wasOnStopTaskBeforeNativeLoadedCalled());
         assertFalse(mTask.wasOnStopTaskWithNativeCalled());
-        verify(mExternalUmaMock).reportNativeTaskStarted(TaskIds.TEST, false);
-        verify(mExternalUmaMock).reportTaskStartedNative(TaskIds.TEST, false);
-        verify(mExternalUmaMock).reportNativeTaskFinished(TaskIds.TEST, false);
+        verify(mExternalUmaMock).reportTaskStartedNative(TaskIds.TEST);
     }
 
     @Test
@@ -430,9 +426,7 @@ public class NativeBackgroundTaskTest {
         assertFalse(mTask.onStopTask(ContextUtils.getApplicationContext(), getTaskParameters()));
         assertTrue(mTask.wasOnStopTaskBeforeNativeLoadedCalled());
         assertFalse(mTask.wasOnStopTaskWithNativeCalled());
-        verify(mExternalUmaMock).reportNativeTaskStarted(TaskIds.TEST, false);
-        verify(mExternalUmaMock).reportTaskStartedNative(TaskIds.TEST, false);
-        verify(mExternalUmaMock).reportNativeTaskFinished(TaskIds.TEST, false);
+        verify(mExternalUmaMock).reportTaskStartedNative(TaskIds.TEST);
     }
 
     @Test
@@ -445,8 +439,6 @@ public class NativeBackgroundTaskTest {
         assertTrue(mTask.onStopTask(ContextUtils.getApplicationContext(), getTaskParameters()));
         assertFalse(mTask.wasOnStopTaskBeforeNativeLoadedCalled());
         assertTrue(mTask.wasOnStopTaskWithNativeCalled());
-        verify(mExternalUmaMock).reportNativeTaskStarted(TaskIds.TEST, false);
-        verify(mExternalUmaMock).reportNativeTaskFinished(TaskIds.TEST, false);
     }
 
     @Test
@@ -459,7 +451,5 @@ public class NativeBackgroundTaskTest {
         assertFalse(mTask.onStopTask(ContextUtils.getApplicationContext(), getTaskParameters()));
         assertFalse(mTask.wasOnStopTaskBeforeNativeLoadedCalled());
         assertTrue(mTask.wasOnStopTaskWithNativeCalled());
-        verify(mExternalUmaMock).reportNativeTaskStarted(TaskIds.TEST, false);
-        verify(mExternalUmaMock).reportNativeTaskFinished(TaskIds.TEST, false);
     }
 }

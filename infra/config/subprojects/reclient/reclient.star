@@ -18,7 +18,10 @@ luci.bucket(
         ),
         acl.entry(
             roles = acl.BUILDBUCKET_TRIGGERER,
-            groups = "project-chromium-ci-schedulers",
+            groups = [
+                "project-chromium-ci-schedulers",
+                "mdb/foundry-x-team",
+            ],
         ),
         acl.entry(
             roles = acl.BUILDBUCKET_OWNER,
@@ -67,6 +70,9 @@ def fyi_reclient_staging_builder(
     reclient_bootstrap_env.update({
         # TODO(b/258210757) remove once long term breakpad plans are dertermined
         "GOMA_COMPILER_PROXY_ENABLE_CRASH_DUMP": "true",
+        "GOMA_DEPS_CACHE_TABLE_THRESHOLD": "40000",
+        "RBE_fast_log_collection": "true",
+        "RBE_use_unified_uploads": "true",
     })
 
     reclient_rewrapper_env = kwargs.pop("reclient_rewrapper_env", {})
@@ -186,6 +192,31 @@ fyi_reclient_test_builder(
     console_view_category = "linux",
     reclient_bootstrap_env = {
         "GLOG_use_unified_uploads": "true",
+    },
+)
+
+fyi_reclient_test_builder(
+    name = "Linux Builder reclient test (casng)",
+    # Trigger manually when testing is needed.
+    schedule = "triggered",
+    triggered_by = [],
+    builder_spec = builder_config.copy_from(
+        "ci/Linux Builder",
+        lambda spec: structs.evolve(
+            spec,
+            gclient_config = structs.extend(
+                spec.gclient_config,
+                apply_configs = [
+                    "reclient_test",
+                ],
+            ),
+            build_gs_bucket = "chromium-fyi-archive",
+        ),
+    ),
+    os = os.LINUX_DEFAULT,
+    console_view_category = "linux",
+    reclient_bootstrap_env = {
+        "RBE_use_casng": "true",
     },
 )
 
@@ -441,29 +472,10 @@ ci.builder(
     ),
     execution_timeout = 6 * time.hour,
     reclient_bootstrap_env = {
-        "RBE_ip_reset_min_delay": "-1s",
-        "RBE_clang_depscan_archive": "true",
-    },
-    reclient_cache_silo = "Comparison Linux remote links - cache siloed",
-    reclient_instance = reclient.instance.TEST_TRUSTED,
-    reclient_jobs = reclient.jobs.DEFAULT,
-)
-
-ci.builder(
-    name = "Comparison Linux (reclient vs reclient remote links)(small)",
-    executable = "recipe:reclient_reclient_comparison",
-    os = os.LINUX_DEFAULT,
-    console_view_entry = consoles.console_view_entry(
-        category = "linux",
-        short_name = "cmp",
-    ),
-    execution_timeout = 6 * time.hour,
-    reclient_bootstrap_env = {
-        "RBE_ip_reset_min_delay": "-1s",
-        "RBE_clang_depscan_archive": "true",
-        "RBE_use_unified_uploads": "false",
-        "RBE_experimental_sysroot_do_not_upload": "true",
         "GOMA_DEPS_CACHE_TABLE_THRESHOLD": "40000",
+        "RBE_ip_reset_min_delay": "-1s",
+        "RBE_clang_depscan_archive": "true",
+        "RBE_fast_log_collection": "true",
     },
     reclient_cache_silo = "Comparison Linux remote links - cache siloed",
     reclient_instance = reclient.instance.TEST_TRUSTED,
@@ -486,6 +498,10 @@ ci.builder(
         short_name = "detcross",
     ),
     execution_timeout = 12 * time.hour,
+    reclient_bootstrap_env = {
+        "GOMA_DEPS_CACHE_TABLE_THRESHOLD": "40000",
+        "RBE_fast_log_collection": "true",
+    },
     reclient_instance = reclient.instance.DEFAULT_UNTRUSTED,
     service_account = "chromium-cq-staging-builder@chops-service-accounts.iam.gserviceaccount.com",
 )
@@ -514,11 +530,19 @@ ci.builder(
         short_name = "compcross",
     ),
     execution_timeout = 12 * time.hour,
+    reclient_bootstrap_env = {
+        "GOMA_DEPS_CACHE_TABLE_THRESHOLD": "40000",
+        "RBE_fast_log_collection": "true",
+    },
     reclient_disable_bq_upload = True,
     reclient_ensure_verified = True,
     reclient_instance = reclient.instance.DEFAULT_UNTRUSTED,
     reclient_jobs = None,
-    reclient_rewrapper_env = {"RBE_compare": "true"},
+    reclient_rewrapper_env = {
+        "RBE_compare": "true",
+        "RBE_num_local_reruns": "1",
+        "RBE_num_remote_reruns": "1",
+    },
     service_account = "chromium-cq-staging-builder@chops-service-accounts.iam.gserviceaccount.com",
 )
 
@@ -544,11 +568,17 @@ ci.builder(
         short_name = "compwd",
     ),
     execution_timeout = 14 * time.hour,
+    reclient_bootstrap_env = {
+        "GOMA_DEPS_CACHE_TABLE_THRESHOLD": "40000",
+        "RBE_fast_log_collection": "true",
+    },
     reclient_ensure_verified = True,
     reclient_instance = reclient.instance.TEST_TRUSTED,
     reclient_jobs = None,
     reclient_rewrapper_env = {
         "RBE_compare": "true",
+        "RBE_num_local_reruns": "1",
+        "RBE_num_remote_reruns": "1",
         "RBE_compression_threshold": "4000000",
         "RBE_canonicalize_working_dir": "true",
         "RBE_cache_silo": "Linux Builder (canonical wd) (reclient compare)",

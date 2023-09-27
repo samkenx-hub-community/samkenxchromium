@@ -5,6 +5,8 @@
 #ifndef COMPONENTS_SYNC_SERVICE_SYNC_CLIENT_H_
 #define COMPONENTS_SYNC_SERVICE_SYNC_CLIENT_H_
 
+#include <map>
+
 #include "base/files/file_path.h"
 #include "base/memory/ref_counted.h"
 #include "components/sync/base/extensions_activity.h"
@@ -13,21 +15,21 @@
 
 class PrefService;
 
-namespace invalidation {
-class InvalidationService;
-}  // namespace invalidation
-
 namespace signin {
 class IdentityManager;
 }
 
+namespace trusted_vault {
+class TrustedVaultClient;
+}
+
 namespace syncer {
 
+struct LocalDataDescription;
 class SyncApiComponentFactory;
 class SyncInvalidationsService;
 class SyncService;
 class SyncTypePreferenceProvider;
-class TrustedVaultClient;
 
 // Interface for clients of the Sync API to plumb through necessary dependent
 // components. This interface is purely for abstracting dependencies, and
@@ -55,9 +57,8 @@ class SyncClient {
   virtual DataTypeController::TypeVector CreateDataTypeControllers(
       SyncService* sync_service) = 0;
 
-  virtual invalidation::InvalidationService* GetInvalidationService() = 0;
   virtual SyncInvalidationsService* GetSyncInvalidationsService() = 0;
-  virtual TrustedVaultClient* GetTrustedVaultClient() = 0;
+  virtual trusted_vault::TrustedVaultClient* GetTrustedVaultClient() = 0;
   virtual scoped_refptr<ExtensionsActivity> GetExtensionsActivity() = 0;
 
   // Returns the current SyncApiComponentFactory instance.
@@ -71,6 +72,27 @@ class SyncClient {
   // TODO(crbug.com/1137346): Replace this mechanism with a more universal one,
   // e.g. using SyncServiceObserver.
   virtual void OnLocalSyncTransportDataCleared() = 0;
+
+  // Queries the count and description/preview of existing local data for
+  // `types` data types. This is an asynchronous method which returns the result
+  // via the callback `callback` once the information for all the data types in
+  // `types` is available.
+  // Note: Only data types that are enabled and support this functionality are
+  // part of the response.
+  // TODO(crbug.com/1451508): Mark as pure virtual once all implementations have
+  // overridden this.
+  virtual void GetLocalDataDescriptions(
+      ModelTypeSet types,
+      base::OnceCallback<void(std::map<ModelType, LocalDataDescription>)>
+          callback);
+
+  // Requests the client to move all local data to account for `types` data
+  // types. This is an asynchronous method which moves the local data for all
+  // `types` to the account store locally. Upload to the server will happen as
+  // part of the regular commit process, and is NOT part of this method.
+  // TODO(crbug.com/1451508): Mark as pure virtual once all implementations have
+  // overridden this.
+  virtual void TriggerLocalDataMigration(ModelTypeSet types);
 };
 
 }  // namespace syncer

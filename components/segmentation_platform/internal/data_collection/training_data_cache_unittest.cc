@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -92,8 +92,9 @@ TEST_F(TrainingDataCacheTest, GetTrainingDataFromDB) {
   training_data.set_request_id(kRequestId.GetUnsafeValue());
 
   // Store a training data request to the DB.
-  test_segment_info_db_->SaveTrainingData(kSegmentId, training_data,
-                                          base::DoNothing());
+  test_segment_info_db_->SaveTrainingData(
+      kSegmentId, proto::ModelSource::SERVER_MODEL_SOURCE, training_data,
+      base::DoNothing());
 
   // DB will return and delete the corresponding training data.
   VerifyGetInputsAndDelete(kSegmentId, kRequestId, training_data);

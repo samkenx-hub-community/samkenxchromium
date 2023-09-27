@@ -5,17 +5,40 @@
 #ifndef COMPONENTS_PRIVACY_SANDBOX_PRIVACY_SANDBOX_SETTINGS_H_
 #define COMPONENTS_PRIVACY_SANDBOX_PRIVACY_SANDBOX_SETTINGS_H_
 
+#include "components/browsing_topics/common/common_types.h"
 #include "components/keyed_service/core/keyed_service.h"
-#include "components/privacy_sandbox/canonical_topic.h"
-#include "components/privacy_sandbox/privacy_sandbox_attestations/privacy_sandbox_attestations.h"
+#include "content/public/browser/interest_group_api_operation.h"
+
+#include "base/time/time.h"
 
 class GURL;
+
+namespace content {
+class RenderFrameHost;
+}
 
 namespace url {
 class Origin;
 }
 
 namespace privacy_sandbox {
+
+class CanonicalTopic;
+
+// When a new enum value is added:
+// 1. Update kMaxValue to match it.
+// 2. Update `PrivacySandboxAttestationsGatedAPIProto` in
+//    `privacy_sandbox_attestations.proto`.
+// 3. Update `AllowAPI` in `privacy_sandbox_attestations_parser.cc`.
+enum class PrivacySandboxAttestationsGatedAPI {
+  kTopics,
+  kProtectedAudience,
+  kPrivateAggregation,
+  kAttributionReporting,
+  kSharedStorage,
+
+  kMaxValue = kSharedStorage,
+};
 
 // A service which acts as a intermediary between Privacy Sandbox APIs and the
 // preferences and content settings which define when they are allowed to be
@@ -62,6 +85,16 @@ class PrivacySandboxSettings : public KeyedService {
     // Whether the profile is subject to being given notice of restrictions to
     // the standard set of Privacy Sandbox APIs.
     virtual bool IsSubjectToM1NoticeRestricted() const = 0;
+
+    // Whether the profile is eligible for 3PCD experiment. The eligibility
+    // applies for both mode A and mode B experiments.
+    virtual bool IsCookieDeprecationExperimentEligible() const = 0;
+
+    // Whether the profile is currently eligible for 3PCD experiment. The
+    // eligibility applies for both mode A and mode B experiments. Unlike
+    // `IsCookieDeprecationExperimentEligible` this method returns the real time
+    // eligibility.
+    virtual bool IsCookieDeprecationExperimentCurrentlyEligible() const = 0;
   };
 
   // Returns whether the Topics API is allowed at all. If false, Topics API
@@ -73,13 +106,20 @@ class PrivacySandboxSettings : public KeyedService {
   // Determines whether the Topics API is allowable in a particular context.
   // |top_frame_origin| is used to check for content settings which could both
   // affect 1P and 3P contexts.
-  virtual bool IsTopicsAllowedForContext(const url::Origin& top_frame_origin,
-                                         const GURL& url) const = 0;
+  // If provided, `console_frame` is used to log errors to the console upon
+  // attestation failure.
+  virtual bool IsTopicsAllowedForContext(
+      const url::Origin& top_frame_origin,
+      const GURL& url,
+      content::RenderFrameHost* console_frame = nullptr) const = 0;
 
   // Returns whether |topic| can be either considered as a top topic for the
   // current epoch, or provided to a website as a previous / current epochs
   // site assigned topic.
   virtual bool IsTopicAllowed(const CanonicalTopic& topic) = 0;
+
+  // Returns whether |topic| is prioritized by Finch settings.
+  virtual bool IsTopicPrioritized(const CanonicalTopic& topic) = 0;
 
   // Sets |topic| to |allowed|. Whether a topic is allowed or not is made
   // available through IsTopicAllowed().
@@ -108,17 +148,23 @@ class PrivacySandboxSettings : public KeyedService {
   // context. Should be called at both source and trigger registration. At each
   // of these points |top_frame_origin| is the same as either the source origin
   // or the destination origin respectively.
+  // If provided, `console_frame` is used to log errors to the console upon
+  // attestation failure.
   virtual bool IsAttributionReportingAllowed(
       const url::Origin& top_frame_origin,
-      const url::Origin& reporting_origin) const = 0;
+      const url::Origin& reporting_origin,
+      content::RenderFrameHost* console_frame = nullptr) const = 0;
 
   // Called before sending the associated attribution report to
   // |reporting_origin|. Re-checks that |reporting_origin| is allowable as a 3P
   // on both |source_origin| and |destination_origin|.
+  // If provided, `console_frame` is used to log errors to the console upon
+  // attestation failure.
   virtual bool MaySendAttributionReport(
       const url::Origin& source_origin,
       const url::Origin& destination_origin,
-      const url::Origin& reporting_origin) const = 0;
+      const url::Origin& reporting_origin,
+      content::RenderFrameHost* console_frame = nullptr) const = 0;
 
   // Sets the ability for |top_frame_etld_plus1| to join the profile to interest
   // groups to |allowed|. This information is stored in preferences, and is made
@@ -134,23 +180,35 @@ class PrivacySandboxSettings : public KeyedService {
   virtual void ClearFledgeJoiningAllowedSettings(base::Time start_time,
                                                  base::Time end_time) = 0;
 
-  // Determines whether the user may be joined to FLEDGE interest groups on, or
-  // by, |top_frame_origin|. This is an additional check that must be
-  // combined with the more generic IsFledgeAllowed().
-  virtual bool IsFledgeJoiningAllowed(
-      const url::Origin& top_frame_origin) const = 0;
-
   // Determine whether |auction_party| can register an interest group, or sell
   // buy in an auction, on |top_frame_origin|.
-  virtual bool IsFledgeAllowed(const url::Origin& top_frame_origin,
-                               const url::Origin& auction_party) const = 0;
+  // If provided, `console_frame` is used to log errors to the console upon
+  // attestation failure.
+  virtual bool IsFledgeAllowed(
+      const url::Origin& top_frame_origin,
+      const url::Origin& auction_party,
+      content::InterestGroupApiOperation interest_group_api_operation,
+      content::RenderFrameHost* console_frame = nullptr) const = 0;
+
+  // Determine whether |destination_origin| is allowed to receive events
+  // (reportEvent(), automatic beacons) reported by an API like Protected
+  // Audience or Shared Storage. This does not check if the API itself is
+  // allowed by the calling context, since the corresponding registerAdBeacon
+  // and selectUrl caller sites were also checked for attestation.
+  virtual bool IsEventReportingDestinationAttested(
+      const url::Origin& destination_origin,
+      privacy_sandbox::PrivacySandboxAttestationsGatedAPI invoking_api)
+      const = 0;
 
   // Determines whether Shared Storage is allowable in a particular context.
   // `top_frame_origin` can be the same as `accessing_origin` in the case of a
   // top-level document calling Shared Storage.
+  // If provided, `console_frame` is used to log errors to the console upon
+  // attestation failure.
   virtual bool IsSharedStorageAllowed(
       const url::Origin& top_frame_origin,
-      const url::Origin& accessing_origin) const = 0;
+      const url::Origin& accessing_origin,
+      content::RenderFrameHost* console_frame = nullptr) const = 0;
 
   // Controls whether Shared Storage SelectURL is allowable for
   // `accessing_origin` in the context of `top_frame_origin`. Does not override
@@ -168,6 +226,32 @@ class PrivacySandboxSettings : public KeyedService {
   virtual bool IsPrivateAggregationAllowed(
       const url::Origin& top_frame_origin,
       const url::Origin& reporting_origin) const = 0;
+
+  // Determines whether the Private Aggregation API's debug mode is allowable in
+  // a particular context. Note that if IsPrivateAggregationAllowed() is false,
+  // this will always be false too. `top_frame_origin` is the associated
+  // top-frame origin of the calling context. Applicable to all uses of Private
+  // Aggregation.
+  virtual bool IsPrivateAggregationDebugModeAllowed(
+      const url::Origin& top_frame_origin,
+      const url::Origin& reporting_origin) const = 0;
+
+  // Returns whether the profile is currently eligible for 3PCD experiments.
+  // This consults the delegate for the real time eligibility of the profile.
+  // The eligibility applies for both mode A and mode B experiments.
+  virtual bool IsCookieDeprecationExperimentCurrentlyEligible() const = 0;
+
+  // Determines whether cookie deprecation label is allowable. This consults
+  // whether the profile is eligible for 3PCD experiments. If true, the more
+  // specific function, IsCookieDeprecationLabelAllowed(), should be consulted
+  // for the relevant context.
+  virtual bool IsCookieDeprecationLabelAllowed() const = 0;
+
+  // Determines whether cookie deprecation label is allowable for
+  // `context_origin` in the context of `top_frame_origin`.
+  virtual bool IsCookieDeprecationLabelAllowedForContext(
+      const url::Origin& top_frame_origin,
+      const url::Origin& context_origin) const = 0;
 
   // Returns whether the profile has the Privacy Sandbox enabled. This consults
   // the main preference, as well as the delegate to check whether the sandbox
@@ -224,13 +308,8 @@ class PrivacySandboxSettings : public KeyedService {
   // Overrides the internal delegate for test purposes.
   virtual void SetDelegateForTesting(std::unique_ptr<Delegate> delegate) = 0;
 
-  // Overrides the privacy sandbox attestations map for testing.
-  virtual void SetPrivacySandboxAttestationsMapForTesting(
-      const PrivacySandboxAttestationsMap& attestations_map) = 0;
-
-  virtual void AddPrivacySandboxAttestationOverride(const GURL& url) = 0;
-  virtual const std::vector<net::SchemefulSite>
-  GetAttestationOverridesForTesting() const = 0;
+  // Source of truth for whether related websites are enabled.
+  virtual bool AreRelatedWebsiteSetsEnabled() const = 0;
 };
 
 }  // namespace privacy_sandbox

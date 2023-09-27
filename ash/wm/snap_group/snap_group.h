@@ -26,9 +26,10 @@ class SnapGroup : public aura::WindowObserver {
   aura::Window* window1() const { return window1_; }
   aura::Window* window2() const { return window2_; }
 
+  // Returns the topmost window in the snap group.
+  aura::Window* GetTopMostWindowInGroup() const;
+
   // Minimizes the windows in the snap group.
-  // TODO(b/279059840): Implement the restore functinalities. Combine the
-  // minimize and restore in one function.
   void MinimizeWindows();
 
   // aura::WindowObserver:

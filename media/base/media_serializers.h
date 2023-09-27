@@ -16,7 +16,6 @@
 #include "media/base/media_serializers_base.h"
 #include "media/base/renderer.h"
 #include "media/base/status.h"
-#include "media/base/text_track_config.h"
 #include "media/base/video_decoder_config.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "ui/gfx/geometry/size.h"
@@ -283,12 +282,14 @@ template <>
 struct MediaSerializer<gfx::HDRMetadata> {
   static base::Value Serialize(const gfx::HDRMetadata& value) {
     // TODO(tmathmeyer) serialize more fields here potentially.
+    gfx::HdrMetadataSmpteSt2086 smpte_st_2086 =
+        value.smpte_st_2086.value_or(gfx::HdrMetadataSmpteSt2086());
     base::Value::Dict result;
     FIELD_SERIALIZE(
         "luminance range",
-        base::StringPrintf("%.2f => %.2f", value.smpte_st_2086.luminance_min,
-                           value.smpte_st_2086.luminance_max));
-    const auto& primaries = value.smpte_st_2086.primaries;
+        base::StringPrintf("%.2f => %.2f", smpte_st_2086.luminance_min,
+                           smpte_st_2086.luminance_max));
+    const auto& primaries = smpte_st_2086.primaries;
     FIELD_SERIALIZE(
         "primaries",
         base::StringPrintf(
@@ -356,41 +357,6 @@ struct MediaSerializer<VideoDecoderConfig> {
     FIELD_SERIALIZE("color space", value.color_space_info());
     FIELD_SERIALIZE("hdr metadata", value.hdr_metadata());
     return base::Value(std::move(result));
-  }
-};
-
-// Class (complex)
-template <>
-struct MediaSerializer<TextTrackConfig> {
-  static base::Value Serialize(const TextTrackConfig& value) {
-    base::Value::Dict result;
-    FIELD_SERIALIZE("kind", value.kind());
-    FIELD_SERIALIZE("language", value.language());
-    if (value.label().length()) {
-      FIELD_SERIALIZE("label", value.label());
-    }
-    return base::Value(std::move(result));
-  }
-};
-
-// enum (simple)
-template <>
-struct MediaSerializer<TextKind> {
-  static base::Value Serialize(const TextKind value) {
-    switch (value) {
-      case kTextSubtitles:
-        return base::Value("Subtitles");
-      case kTextCaptions:
-        return base::Value("Captions");
-      case kTextDescriptions:
-        return base::Value("Descriptions");
-      case kTextMetadata:
-        return base::Value("Metadata");
-      case kTextChapters:
-        return base::Value("Chapters");
-      case kTextNone:
-        return base::Value("None");
-    }
   }
 };
 

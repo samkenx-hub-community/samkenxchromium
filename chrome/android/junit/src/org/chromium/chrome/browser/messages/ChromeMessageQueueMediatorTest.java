@@ -28,6 +28,7 @@ import org.robolectric.annotation.Config;
 import org.robolectric.annotation.LooperMode;
 
 import org.chromium.base.Callback;
+import org.chromium.base.UserDataHost;
 import org.chromium.base.supplier.ObservableSupplier;
 import org.chromium.base.supplier.ObservableSupplierImpl;
 import org.chromium.base.supplier.OneshotSupplierImpl;
@@ -43,7 +44,11 @@ import org.chromium.chrome.browser.layouts.LayoutStateProvider.LayoutStateObserv
 import org.chromium.chrome.browser.layouts.LayoutType;
 import org.chromium.chrome.browser.lifecycle.ActivityLifecycleDispatcher;
 import org.chromium.chrome.browser.lifecycle.PauseResumeWithNativeObserver;
+import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.test.util.browser.Features;
+import org.chromium.chrome.test.util.browser.Features.EnableFeatures;
+import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
+import org.chromium.components.browser_ui.bottomsheet.BottomSheetObserver;
 import org.chromium.components.messages.ManagedMessageDispatcher;
 import org.chromium.ui.modaldialog.ModalDialogManager;
 import org.chromium.ui.modaldialog.ModalDialogManager.ModalDialogManagerObserver;
@@ -83,7 +88,13 @@ public class ChromeMessageQueueMediatorTest {
     private ActivityTabProvider mActivityTabProvider;
 
     @Mock
+    private Tab mTab;
+
+    @Mock
     private ActivityLifecycleDispatcher mActivityLifecycleDispatcher;
+
+    @Mock
+    private BottomSheetController mBottomSheetController;
 
     @Mock
     private Handler mQueueHandler;
@@ -104,7 +115,7 @@ public class ChromeMessageQueueMediatorTest {
         mMediator = new ChromeMessageQueueMediator(mBrowserControlsManager,
                 mMessageContainerCoordinator, mActivityTabProvider,
                 layoutStateProviderOneShotSupplier, modalDialogManagerSupplier,
-                mActivityLifecycleDispatcher, mMessageDispatcher);
+                mBottomSheetController, mActivityLifecycleDispatcher, mMessageDispatcher);
         layoutStateProviderOneShotSupplier.set(mLayoutStateProvider);
         modalDialogManagerSupplier.set(mModalDialogManager);
         mMediator.setQueueHandlerForTesting(mQueueHandler);
@@ -159,7 +170,7 @@ public class ChromeMessageQueueMediatorTest {
      * Test the runnable by #onStartShow is reset correctly.
      */
     @Test
-    @Features.EnableFeatures({ChromeFeatureList.SUPPRESS_TOOLBAR_CAPTURES})
+    @EnableFeatures({ChromeFeatureList.SUPPRESS_TOOLBAR_CAPTURES})
     public void testResetOnStartShowRunnable() {
         when(mBrowserControlsManager.getBrowserControlHiddenRatio()).thenReturn(0.5f);
         OneshotSupplierImpl<LayoutStateProvider> layoutStateProviderOneShotSupplier =
@@ -189,7 +200,7 @@ public class ChromeMessageQueueMediatorTest {
         mMediator = new ChromeMessageQueueMediator(mBrowserControlsManager,
                 mMessageContainerCoordinator, mActivityTabProvider,
                 layoutStateProviderOneShotSupplier, modalDialogManagerSupplier,
-                mActivityLifecycleDispatcher, mMessageDispatcher);
+                mBottomSheetController, mActivityLifecycleDispatcher, mMessageDispatcher);
         ChromeMessageQueueMediator.BrowserControlsObserver observer =
                 observerArgumentCaptor.getValue();
         Assert.assertFalse(mMediator.isReadyForShowing());
@@ -209,7 +220,7 @@ public class ChromeMessageQueueMediatorTest {
      * Test whether #IsReadyForShowing returns correct value.
      */
     @Test
-    @Features.EnableFeatures({ChromeFeatureList.SUPPRESS_TOOLBAR_CAPTURES})
+    @EnableFeatures({ChromeFeatureList.SUPPRESS_TOOLBAR_CAPTURES})
     public void testIsReadyForShowing() {
         final ArgumentCaptor<ChromeMessageQueueMediator.BrowserControlsObserver>
                 observerArgumentCaptor = ArgumentCaptor.forClass(
@@ -224,6 +235,11 @@ public class ChromeMessageQueueMediatorTest {
         Assert.assertFalse(mMediator.isReadyForShowing());
         visibilitySupplier.set(true);
         when(mBrowserControlsManager.getBrowserControlHiddenRatio()).thenReturn(0f);
+
+        when(mActivityTabProvider.get()).thenReturn(mTab);
+        when(mTab.isDestroyed()).thenReturn(false);
+        // Mock TabBrowserControlsConstraintsHelper to avoid NPE.
+        when(mTab.getUserDataHost()).thenReturn(new UserDataHost());
 
         mMediator.onRequestShowing(() -> {});
         Assert.assertTrue(mMediator.isReadyForShowing());
@@ -293,7 +309,7 @@ public class ChromeMessageQueueMediatorTest {
         mMediator = new ChromeMessageQueueMediator(mBrowserControlsManager,
                 mMessageContainerCoordinator, mActivityTabProvider,
                 layoutStateProviderOneShotSupplier, modalDialogManagerSupplier,
-                mActivityLifecycleDispatcher, mMessageDispatcher);
+                mBottomSheetController, mActivityLifecycleDispatcher, mMessageDispatcher);
         layoutStateProviderOneShotSupplier.set(mLayoutStateProvider);
         // To offer a null value, we have to offer a value other than null first.
         modalDialogManagerSupplier.set(mModalDialogManager);
@@ -312,7 +328,7 @@ public class ChromeMessageQueueMediatorTest {
         mMediator = new ChromeMessageQueueMediator(mBrowserControlsManager,
                 mMessageContainerCoordinator, mActivityTabProvider,
                 layoutStateProviderOneShotSupplier, modalDialogManagerSupplier,
-                mActivityLifecycleDispatcher, mMessageDispatcher);
+                mBottomSheetController, mActivityLifecycleDispatcher, mMessageDispatcher);
         layoutStateProviderOneShotSupplier.set(mLayoutStateProvider);
         modalDialogManagerSupplier.set(mModalDialogManager);
         mMediator.onAnimationStart();
@@ -322,6 +338,7 @@ public class ChromeMessageQueueMediatorTest {
         mMediator.onAnimationEnd();
         verify(mMessageContainerCoordinator, times(1)).onAnimationEnd();
     }
+
     /**
      * Test the queue can be suspended and resumed correctly on omnibox focus events.
      */
@@ -341,5 +358,49 @@ public class ChromeMessageQueueMediatorTest {
         verify(mMessageDispatcher).resume(EXPECTED_TOKEN);
         Assert.assertEquals("mUrlFocusToken should be invalidated.", TokenHolder.INVALID_TOKEN,
                 mMediator.getUrlFocusTokenForTesting());
+    }
+
+    /**
+     * Test the queue can be suspended and resumed correctly when bottom sheet is open/closed.
+     */
+    @Test
+    public void testBottomSheetChange() {
+        final ArgumentCaptor<BottomSheetObserver> observerArgumentCaptor =
+                ArgumentCaptor.forClass(BottomSheetObserver.class);
+        doNothing().when(mBottomSheetController).addObserver(observerArgumentCaptor.capture());
+        initMediator();
+        var bottomSheetObserver = observerArgumentCaptor.getValue();
+        bottomSheetObserver.onSheetOpened(BottomSheetController.StateChangeReason.NONE);
+        verify(mMessageDispatcher).suspend();
+        bottomSheetObserver.onSheetClosed(BottomSheetController.StateChangeReason.BACK_PRESS);
+        verify(mMessageDispatcher).resume(EXPECTED_TOKEN);
+    }
+
+    /**
+     * Test the queue can be suspended and resumed correctly when tab is un/available.
+     */
+    @Test
+    public void testNoValidTab() {
+        ArgumentCaptor<Callback<Tab>> captor = ArgumentCaptor.forClass(Callback.class);
+        initMediator();
+        verify(mActivityTabProvider).addObserver(captor.capture());
+        captor.getValue().onResult(null);
+        verify(mMessageDispatcher).suspend();
+
+        captor.getValue().onResult(mTab);
+        verify(mMessageDispatcher).resume(EXPECTED_TOKEN);
+    }
+
+    /**
+     * Test when tab is destroyed before {@link ChromeMessageQueueMediator#destroy()}.
+     */
+    @Test
+    public void testTabDestroyed() {
+        initMediator();
+        when(mActivityTabProvider.get()).thenReturn(mTab);
+        when(mTab.isDestroyed()).thenReturn(true);
+
+        // Expect no error.
+        mMediator.areBrowserControlsReady();
     }
 }

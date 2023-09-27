@@ -34,7 +34,6 @@ Extended attributes are named in UpperCamelCase, and are conventionally written 
 There are a few rules in naming extended attributes:
 
 Names should be aligned with the Web IDL spec as much as possible.
-Extended attributes for custom bindings are prefixed by "Custom".
 Lastly, please do not confuse "_extended_ attributes", which go inside `[...]` and modify various IDL elements, and "attributes", which are of the form `attribute foo` and are interface members.
 
 ## Special cases
@@ -100,8 +99,6 @@ class may implement the required static method.
 
 Extended attributes on members of an interface mixin work as normal.
 
-* `[LegacyTreatAsPartialInterface]` is part of an ongoing change, as interface mixins used to be treated internally as partial interfaces.
-
 * `[ImplementedAs]` is only necessary for these legacy files: otherwise the class (C++) implementing (IDL) interface mixins does not need to be specified, as this is handled in Blink C++.
 
 * `[RuntimeEnabled]` behaves as for partial interfaces.
@@ -143,9 +140,6 @@ Summary: `[CEReactions]` indicates that
 are triggered for this method or attribute.
 
 Usage: `[CEReactions]` takes no arguments.
-
-`[CEReacionts]` doesn't work with `[Custom]`. Custom binding code should use
-`blink::CEReactionsScope` if the method or the attribute has `[CEReactions]`.
 
 Note that `blink::CEReactionsScope` must be constructed after `blink::ExceptionState`.
 
@@ -432,8 +426,6 @@ interface DOMWindow {
 };
 ```
 
-`[Replaceable]` is _incompatible_ with `[Custom]` and `[Custom=Setter]` (because replaceable attributes have a single interface-level setter callback, rather than individual attribute-level callbacks); if you need custom binding for a replaceable attribute, remove `[Replaceable]` and `readonly`.
-
 Intuitively, "replaceable" means that you can set a new value to the attribute without overwriting the original value. If you delete the new value, then the original value still remains.
 
 Specifically, a writable attribute, without `[Replaceable]`, behaves as follows:
@@ -675,26 +667,6 @@ String Example::str(ExecutionContext* context);
 String Example::func(ExecutionContext* context, bool a, bool b);
 ```
 
-_(rare CallWith values)_
-
-#### [CallWith=ThisValue] _(m)_
-
-`[CallWith=ThisValue]` is used in only one place (location.idl).
-
-IDL example:
-
-```webidl
-interface Example {
-    [CallWith=ThisValue] boolean func(boolean a, boolean b);
-};
-```
-
-C++ Blink function signature:
-
-```c++
-bool Example::func(ScriptValue thisValue, bool a, bool b);
-```
-
 *** note
 `[CallWith=...]` arguments are added at the _head_ of `XXX::Create(...)'s` arguments, and ` [RaisesException]`'s `ExceptionState` argument is added at the _tail_ of `XXX::Create(...)`'s arguments.
 ***
@@ -793,7 +765,7 @@ Usage: `[Measure]` can be specified on interfaces, methods, attributes, and cons
 
 (_deprecated_) When specified on an interface usage of the constructor will be measured. This behavior could be changed in the future. Specify `[Measure]` on constructor operations instead.
 
-The generated feature name must be added to `WebFeature` (in [blink/public/mojom/web_feature/web_feature.mojom](https://source.chromium.org/chromium/chromium/src/+/master:third_party/blink/public/mojom/web_feature/web_feature.mojom)).
+The generated feature name must be added to `WebFeature` (in [blink/public/mojom/use_counter/metrics/web_feature.mojom](https://source.chromium.org/chromium/chromium/src/+/master:third_party/blink/public/mojom/use_counter/metrics/web_feature.mojom)).
 
 ```webidl
 [Measure] attribute Node interestingAttribute;
@@ -810,7 +782,7 @@ Usage: `[MeasureAs]` can be specified on interfaces, methods, attributes, and co
 
 (_deprecated_) Specifying `[MeasureAs]` on interfaces is deprecated. Specify `[MeasureAs]` on constructor operations instead.
 
-The value must match one of the enumeration values in `WebFeature` (in [blink/public/mojom/web_feature/web_feature.mojom](https://source.chromium.org/chromium/chromium/src/+/master:third_party/blink/public/mojom/web_feature/web_feature.mojom)).
+The value must match one of the enumeration values in `WebFeature` (in [blink/public/mojom/use_counter/metrics/web_feature.mojom](https://source.chromium.org/chromium/chromium/src/+/master:third_party/blink/public/mojom/use_counter/metrics/web_feature.mojom)).
 
 ```webidl
 [MeasureAs=AttributeWeAreInterestedIn] attribute Node interestingAttribute;
@@ -1049,7 +1021,7 @@ When specified, caches the resulting object and returns it in later calls so tha
 
 ## Rare Blink-specific IDL Extended Attributes
 
-These extended attributes are rarely used, generally only in one or two places. These are often replacements for `[Custom]` bindings, and may be candidates for deprecation and removal.
+These extended attributes are rarely used, generally only in one or two places, and may be candidates for deprecation and removal.
 
 ### [CachedAccessor]
 
@@ -1216,7 +1188,7 @@ Usage: Applies to arguments of methods. See modules/webgl/WebGLRenderingContextB
 ### [IsolatedContext]
 
 Summary: Interfaces and interface members with a `IsolatedContext` extended attribute are exposed only inside isolated contexts.
-This attribute is primarily intended for Isolated Apps (see [explainer](https://github.com/reillyeon/isolated-web-apps)) with an option for the embedder to include their own additional scenarios.
+This attribute is primarily intended for Isolated Web Apps (see [explainer](https://github.com/WICG/isolated-web-apps)) with an option for the embedder to include their own additional scenarios.
 
 Note that it's likely for these requirements to shift over time: <https://crbug.com/1206150>.
 
@@ -1301,10 +1273,6 @@ the [IsCodeLike] attribute to a type, its instances will be treated as
 
 Standard: [TC39 Dynamic Code Brand Checks](https://github.com/tc39/proposal-dynamic-code-brand-checks)
 
-### [LegacyTreatAsPartialInterface]
-
-Summary: `[LegacyTreatAsPartialInterface]` on an interface mixin means that the mixin is treated as a partial interface, meaning members are accessed via static member functions in a separate class, rather than as instance methods on the instance object `*impl` or class methods on the C++ class implementing the (main) interface. This is legacy from original implementation of mixins, and is being removed ([Bug 360435](https://crbug.com/360435), nbarth@).
-
 ## Discouraged Blink-specific IDL Extended Attributes
 
 These extended attributes are _discouraged_ - they are not deprecated, but they should be avoided and removed if possible.
@@ -1314,112 +1282,6 @@ These extended attributes are _discouraged_ - they are not deprecated, but they 
 Summary: The byte length of buffer source types is currently restricted to be under 2 GB (exactly speaking, it must be less than the max size of a direct mapped memory of PartitionAlloc, which is a little less than 2 GB).  This extended attribute removes this limitation.
 
 Consult with the bindings team before you use this extended attribute.
-
-### [Custom]
-
-Summary: They allow you to write bindings code manually as you like: full bindings for methods and attributes, certain functions for interfaces.
-
-Custom bindings are _strongly discouraged_. They are likely to be buggy, a source of security holes, and represent a significant maintenance burden. Before using `[Custom]`, you should doubly consider if you really need custom bindings. You are recommended to modify code generators and add specialized extended attributes or special cases if necessary to avoid using `[Custom]`.
-
-Usage: `[Custom]` can be specified on methods or attributes. `[Custom=Getter]` and `[Custom=Setter]` can be specified on attributes. `[Custom=A|B]` can be specified on interfaces, with various values (see below).
-
-On read only attributes (that are not `[Replaceable]`), `[Custom]` is equivalent to `[Custom=Getter]` (since there is no setter) and `[Custom=Getter]` is preferred.
-
-The bindings generator largely _ignores_ the specified type information of `[Custom]` members (signature of methods and type of attributes), but they must be valid types. It is best if the signature exactly matches the spec, but if one of the types is an interface that is not implemented, you can use object as the type instead, to indicate "unspecified object type".
-
-`[Replaceable]` is _incompatible_ with `[Custom]` and `[Custom=Setter]` (because replaceable attributes have a single interface-level setter callback, rather than individual attribute-level callbacks); if you need custom binding for a replaceable attribute, remove `[Replaceable]` and readonly.
-
-```webidl
-[Custom] void func();
-[Custom] attribute DOMString str1;
-[Custom=Getter] readonly attribute DOMString str2;
-[Custom=Setter] attribute DOMString str3;
-```
-
-Before explaining the details, let us clarify the relationship of these IDL attributes.
-
-* `[Custom]` on a method indicates that you can write V8 custom bindings for the method.
-* `[Custom=Getter]` or `[Custom=Setter]` on an attribute means custom bindings for the attribute getter or setter.
-* `[Custom]` on an attribute means custom bindings for both the getter and the setter
-
-Methods:
-
-```webidl
-interface XXX {
-    [Custom] void func();
-};
-```
-
-You can write custom bindings in third_party/blink/renderer/bindings/{core,modules}/v8/custom/v8_xxx_custom.cc:
-
-```c++
-void V8XXX::FuncMethodCustom(const v8::FunctionCallbackInfo<v8::Value>& info) {
-  ...;
-}
-```
-
-Attribute getter:
-
-```webidl
-interface XXX {
-    [Custom=Getter] attribute DOMString str;
-};
-```
-
-You can write custom bindings in Source/bindings/v8/custom/V8XXXCustom.cpp:
-
-```c++
-void V8XXX::StrAttributeGetterCustom(const v8::PropertyCallbackInfo<v8::Value>& info) {
-  ...;
-}
-```
-
-Attribute setter:
-
-```webidl
-interface XXX {
-    [Custom=Setter] attribute DOMString str;
-};
-```
-
-You can write custom bindings in Source/bindings/v8/custom/V8XXXCustom.cpp:
-
-```c++
-void V8XXX::StrAttributeSetterCustom(v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<v8::Value>& info) {
-  ...;
-}
-```
-
-`[Custom]` may also be specified on special operations:
-
-```webidl
-interface XXX {  // anonymous special operations
-    [Custom] getter Node (unsigned long index);
-    [Custom] setter Node (unsigned long index, Node value);
-    [Custom] deleter boolean (unsigned long index);
-
-    [Custom] getter Node (DOMString name);
-    [Custom] setter Node (DOMString name, Node value);
-    [Custom] deleter boolean (DOMString name);
-}
-interface YYY {  // special operations with identifiers
-    [Custom] getter Node item(unsigned long index);
-    [Custom] getter Node namedItem(DOMString name);
-}
-```
-
-`[Custom]` may also be specified on callback functions:
-
-```webidl
-[Custom] callback SomeCallback = void ();
-interface XXX {
-    void func(SomeCallback callback);
-};
-```
-
-When`[Custom]` is specified on a callback function, the code generator doesn't
-generate bindings for the callback function. The binding layer uses a
-`ScriptValue` instead.
 
 ### [TargetOfExposed]
 
@@ -1435,7 +1297,7 @@ These extended attributes are _deprecated_, or are under discussion for deprecat
 
 Summary: `[PermissiveDictionaryConversion]` relaxes the rules about what types of values may be passed for an argument of dictionary type.
 
-Ordinarily when passing in a value for a dictionary argument, the value must be either undefined, null, or an object. In other words, passing a boolean value like true or false must raise TypeError. The PermissiveDictionaryConversion extended attribute ignores non-object types, treating them the same as undefined and null. In order to effect this change, this extended attribute must be specified both on the dictionary type as well as the arguments of methods where it is passed. It exists only to eliminate certain custom bindings.
+Ordinarily when passing in a value for a dictionary argument, the value must be either undefined, null, or an object. In other words, passing a boolean value like true or false must raise TypeError. The PermissiveDictionaryConversion extended attribute ignores non-object types, treating them the same as undefined and null. In order to effect this change, this extended attribute must be specified both on the dictionary type as well as the arguments of methods where it is passed.
 
 Usage: applies to dictionaries and arguments of methods. Takes no arguments itself.
 

@@ -41,11 +41,14 @@
 #include "chromeos/ash/components/network/proxy/ui_proxy_config_service.h"
 #include "chromeos/ash/components/network/system_token_cert_db_storage.h"
 #include "chromeos/ash/components/network/technology_state_controller.h"
+#include "chromeos/ash/services/network_config/public/cpp/cros_network_config_test_helper.h"
 #include "chromeos/ash/services/network_config/public/cpp/cros_network_config_test_observer.h"
 #include "chromeos/ash/services/network_config/test_apn_data.h"
 #include "chromeos/ash/services/network_config/test_network_configuration_observer.h"
 #include "chromeos/components/onc/onc_utils.h"
+#include "chromeos/services/network_config/public/mojom/cros_network_config.mojom-forward.h"
 #include "chromeos/services/network_config/public/mojom/cros_network_config.mojom-shared.h"
+#include "chromeos/services/network_config/public/mojom/network_types.mojom-shared.h"
 #include "components/captive_portal/core/captive_portal_detector.h"
 #include "components/onc/onc_constants.h"
 #include "components/onc/onc_pref_names.h"
@@ -72,6 +75,7 @@ constexpr char kCellularGuid[] = "cellular_guid";
 constexpr char kCellularDevicePath[] = "/device/stub_cellular_device";
 constexpr char kCellularTestIccid[] = "1234567890";
 constexpr char kCellularTestImei[] = "1234567890";
+constexpr char kCellularTestSerial[] = "ABCD";
 
 constexpr char kCellularTestApn1[] = "TEST.APN1";
 constexpr char kCellularTestApnName1[] = "Test Apn 1";
@@ -266,8 +270,26 @@ class CrosNetworkConfigTest : public testing::Test {
     PrefProxyConfigTrackerImpl::RegisterPrefs(local_state_.registry());
 
     helper_->InitializePrefs(&user_prefs_, &local_state_);
-
     NetworkHandler* network_handler = NetworkHandler::Get();
+    cros_network_config_test_helper_ =
+        std::make_unique<CrosNetworkConfigTestHelper>(true);
+    SetupNetworkConfig(network_handler);
+  }
+
+  CrosNetworkConfigTest(const CrosNetworkConfigTest&) = delete;
+  CrosNetworkConfigTest& operator=(const CrosNetworkConfigTest&) = delete;
+
+  ~CrosNetworkConfigTest() override {
+    cros_network_config_test_helper_.reset();
+    cros_network_config_.reset();
+    helper_.reset();
+    NetworkCertLoader::Shutdown();
+    scoped_user_manager_.reset();
+    SystemTokenCertDbStorage::Shutdown();
+    LoginState::Shutdown();
+  }
+
+  void SetupNetworkConfig(NetworkHandler* network_handler) {
     cros_network_config_ = std::make_unique<CrosNetworkConfig>(
         network_handler->network_state_handler(),
         network_handler->network_device_handler(),
@@ -280,18 +302,6 @@ class CrosNetworkConfigTest : public testing::Test {
         network_handler->technology_state_controller());
     SetupPolicy();
     SetupNetworks();
-  }
-
-  CrosNetworkConfigTest(const CrosNetworkConfigTest&) = delete;
-  CrosNetworkConfigTest& operator=(const CrosNetworkConfigTest&) = delete;
-
-  ~CrosNetworkConfigTest() override {
-    cros_network_config_.reset();
-    helper_.reset();
-    NetworkCertLoader::Shutdown();
-    scoped_user_manager_.reset();
-    SystemTokenCertDbStorage::Shutdown();
-    LoginState::Shutdown();
   }
 
   void SetupPolicy() {
@@ -1059,6 +1069,47 @@ class CrosNetworkConfigTest : public testing::Test {
         ApnTypes::kDefaultAndAttach, count.num_disable_type_default_and_attach);
   }
 
+  void AssertCellularAllowTextMessages(
+      const std::string& guid,
+      absl::optional<bool> expected_active_value,
+      absl::optional<bool> expected_policy_value,
+      ::chromeos::network_config::mojom::PolicySource policy_source) {
+    mojom::ManagedPropertiesPtr properties = GetManagedProperties(guid);
+
+    ASSERT_TRUE(properties);
+    ASSERT_EQ(guid, properties->guid);
+    ASSERT_TRUE(properties->type_properties->is_cellular());
+    // If there isn't an expected policy or actual value, that means the
+    // property is undefined.
+    if (!expected_active_value.has_value() &&
+        !expected_policy_value.has_value()) {
+      EXPECT_FALSE(
+          properties->type_properties->get_cellular()->allow_text_messages);
+      return;
+    }
+
+    ASSERT_TRUE(
+        properties->type_properties->get_cellular()->allow_text_messages);
+    EXPECT_EQ(policy_source, properties->type_properties->get_cellular()
+                                 ->allow_text_messages->policy_source);
+
+    if (expected_policy_value.has_value()) {
+      EXPECT_EQ(*expected_policy_value,
+                properties->type_properties->get_cellular()
+                    ->allow_text_messages->policy_value);
+    }
+
+    if (expected_active_value.has_value()) {
+      EXPECT_EQ(*expected_active_value,
+                properties->type_properties->get_cellular()
+                    ->allow_text_messages->active_value);
+    }
+  }
+
+  void SetSerialNumber(const std::string& serial_number) {
+    cros_network_config_test_helper_->SetSerialNumber(serial_number);
+  }
+
   NetworkHandlerTestHelper* helper() { return helper_.get(); }
   CrosNetworkConfigTestObserver* observer() { return observer_.get(); }
   CrosNetworkConfig* cros_network_config() {
@@ -1081,6 +1132,7 @@ class CrosNetworkConfigTest : public testing::Test {
 
  protected:
   sync_preferences::TestingPrefServiceSyncable user_prefs_;
+  base::test::ScopedFeatureList feature_list;
 
  private:
   base::test::SingleThreadTaskEnvironment task_environment_;
@@ -1089,6 +1141,7 @@ class CrosNetworkConfigTest : public testing::Test {
   TestingPrefServiceSimple local_state_;
   std::unique_ptr<user_manager::ScopedUserManager> scoped_user_manager_;
   std::unique_ptr<CrosNetworkConfig> cros_network_config_;
+  std::unique_ptr<CrosNetworkConfigTestHelper> cros_network_config_test_helper_;
   std::unique_ptr<CrosNetworkConfigTestObserver> observer_;
   std::string wifi1_path_;
   std::string vpn_path_;
@@ -1306,6 +1359,7 @@ TEST_F(CrosNetworkConfigTest, ESimAndPSimSlotInfo) {
   helper()->hermes_manager_test()->AddEuicc(
       dbus::ObjectPath(kTestEuiccPath2), kTestEid2, /*is_active=*/true,
       /*esim_1_physical_slot=*/esim_2_physical_slot);
+  base::RunLoop().RunUntilIdle();
 
   // Add pSIM and eSIM slot info to Shill.
   base::Value::List ordered_sim_slot_info_list;
@@ -1415,6 +1469,7 @@ TEST_F(CrosNetworkConfigTest, GetDeviceStateList) {
   EXPECT_EQ(shill::kSIMLockPin, cellular->sim_lock_status->lock_type);
   EXPECT_EQ(3, cellular->sim_lock_status->retries_left);
   EXPECT_EQ(kCellularTestImei, cellular->imei);
+  EXPECT_EQ(absl::nullopt, cellular->serial);
 
   mojom::DeviceStateProperties* vpn = devices[3].get();
   EXPECT_EQ(mojom::NetworkType::kVPN, vpn->type);
@@ -1428,6 +1483,46 @@ TEST_F(CrosNetworkConfigTest, GetDeviceStateList) {
   ASSERT_EQ(4u, devices.size());
   EXPECT_EQ(mojom::NetworkType::kWiFi, devices[0]->type);
   EXPECT_EQ(mojom::DeviceStateType::kDisabled, devices[0]->device_state);
+}
+
+TEST_F(CrosNetworkConfigTest, GetDeviceStateListSerial) {
+  feature_list.InitAndEnableFeature(features::kCellularCarrierLock);
+  SetSerialNumber(kCellularTestSerial);
+  NetworkHandler* network_handler = NetworkHandler::Get();
+  SetupNetworkConfig(network_handler);
+
+  std::vector<mojom::DeviceStatePropertiesPtr> devices = GetDeviceStateList();
+  ASSERT_EQ(4u, devices.size());
+  mojom::DeviceStateProperties* cellular = devices[2].get();
+  EXPECT_EQ(mojom::NetworkType::kCellular, cellular->type);
+  EXPECT_EQ(mojom::DeviceStateType::kEnabled, cellular->device_state);
+  EXPECT_FALSE(cellular->sim_absent);
+  ASSERT_TRUE(cellular->sim_lock_status);
+  EXPECT_TRUE(cellular->sim_lock_status->lock_enabled);
+  EXPECT_EQ(shill::kSIMLockPin, cellular->sim_lock_status->lock_type);
+  EXPECT_EQ(3, cellular->sim_lock_status->retries_left);
+  EXPECT_EQ(kCellularTestImei, cellular->imei);
+  EXPECT_EQ(kCellularTestSerial, cellular->serial);
+}
+
+TEST_F(CrosNetworkConfigTest, GetDeviceStateListSerialFeatureDisable) {
+  feature_list.InitAndDisableFeature(features::kCellularCarrierLock);
+  SetSerialNumber(kCellularTestSerial);
+  NetworkHandler* network_handler = NetworkHandler::Get();
+  SetupNetworkConfig(network_handler);
+
+  std::vector<mojom::DeviceStatePropertiesPtr> devices = GetDeviceStateList();
+  ASSERT_EQ(4u, devices.size());
+  mojom::DeviceStateProperties* cellular = devices[2].get();
+  EXPECT_EQ(mojom::NetworkType::kCellular, cellular->type);
+  EXPECT_EQ(mojom::DeviceStateType::kEnabled, cellular->device_state);
+  EXPECT_FALSE(cellular->sim_absent);
+  ASSERT_TRUE(cellular->sim_lock_status);
+  EXPECT_TRUE(cellular->sim_lock_status->lock_enabled);
+  EXPECT_EQ(shill::kSIMLockPin, cellular->sim_lock_status->lock_type);
+  EXPECT_EQ(3, cellular->sim_lock_status->retries_left);
+  EXPECT_EQ(kCellularTestImei, cellular->imei);
+  EXPECT_EQ(absl::nullopt, cellular->serial);
 }
 
 // Tests that no VPN device state is returned by GetDeviceStateList if no VPN
@@ -3039,6 +3134,153 @@ TEST_F(CrosNetworkConfigTest, AllowRoaming) {
       properties->type_properties->get_cellular()->allow_roaming->active_value);
 }
 
+TEST_F(CrosNetworkConfigTest,
+       AllowTextMessagesWithSuppressTextMessagesFlagEnabled) {
+  base::test::ScopedFeatureList scoped_feature_list;
+  scoped_feature_list.InitAndEnableFeature(features::kSuppressTextMessages);
+
+  // When never set, allow_text_messages will be true.
+  AssertCellularAllowTextMessages(kCellularGuid, /*expected_active_value=*/true,
+                                  /*expected_policy_value=*/absl::nullopt,
+                                  mojom::PolicySource::kNone);
+
+  // When text message state is set to false, the value will be updated to
+  // false.
+  auto config = mojom::ConfigProperties::New();
+  auto cellular_config = mojom::CellularConfigProperties::New();
+  auto new_text_message_state = mojom::TextMessagesAllowState::New();
+
+  new_text_message_state->allow_text_messages = false;
+  cellular_config->text_message_allow_state = std::move(new_text_message_state);
+  config->type_config = mojom::NetworkTypeConfigProperties::NewCellular(
+      std::move(cellular_config));
+  ASSERT_TRUE(SetProperties(kCellularGuid, std::move(config)));
+  AssertCellularAllowTextMessages(
+      kCellularGuid, /*expected_active_value=*/false,
+      /*expected_policy_value=*/absl::nullopt, mojom::PolicySource::kNone);
+
+  // When text message state is undefined, this will not update the last saved
+  // value of false.
+  config = mojom::ConfigProperties::New();
+  config->type_config = mojom::NetworkTypeConfigProperties::NewCellular(
+      mojom::CellularConfigProperties::New());
+  ASSERT_TRUE(SetProperties(kCellularGuid, std::move(config)));
+  AssertCellularAllowTextMessages(
+      kCellularGuid, /*expected_active_value=*/false,
+      /*expected_policy_value=*/absl::nullopt, mojom::PolicySource::kNone);
+
+  // When text message state is set to true, the value will be updated to true.
+  config = mojom::ConfigProperties::New();
+  cellular_config = mojom::CellularConfigProperties::New();
+  new_text_message_state = mojom::TextMessagesAllowState::New();
+
+  new_text_message_state->allow_text_messages = true;
+  cellular_config->text_message_allow_state = std::move(new_text_message_state);
+  config->type_config = mojom::NetworkTypeConfigProperties::NewCellular(
+      std::move(cellular_config));
+
+  ASSERT_TRUE(SetProperties(kCellularGuid, std::move(config)));
+  AssertCellularAllowTextMessages(kCellularGuid, /*expected_active_value=*/true,
+                                  /*expected_policy_value=*/absl::nullopt,
+                                  mojom::PolicySource::kNone);
+
+  // When text message state is undefined, this will not update the last saved
+  // value of true.
+  config = mojom::ConfigProperties::New();
+  config->type_config = mojom::NetworkTypeConfigProperties::NewCellular(
+      mojom::CellularConfigProperties::New());
+  ASSERT_TRUE(SetProperties(kCellularGuid, std::move(config)));
+  AssertCellularAllowTextMessages(kCellularGuid, /*expected_active_value=*/true,
+                                  /*expected_policy_value=*/absl::nullopt,
+                                  mojom::PolicySource::kNone);
+}
+
+TEST_F(CrosNetworkConfigTest,
+       AllowTextMessagesPolicyValueWithSuppressTextMessagesFlagEnabled) {
+  base::test::ScopedFeatureList scoped_feature_list;
+  scoped_feature_list.InitAndEnableFeature(features::kSuppressTextMessages);
+
+  base::Value::Dict global_config;
+
+  // When the policy is explicitly Suppress, the managed boolean policy value
+  // should return false and the policy source should be device enforced.
+  global_config.Set(::onc::global_network_config::kAllowTextMessages,
+                    ::onc::cellular::kTextMessagesSuppress);
+
+  managed_network_configuration_handler()->SetPolicy(
+      ::onc::ONC_SOURCE_DEVICE_POLICY, /*userhash=*/std::string(),
+      /*network_configs_onc=*/base::Value::List(), global_config);
+  base::RunLoop().RunUntilIdle();
+
+  AssertCellularAllowTextMessages(kCellularGuid,
+                                  /*expected_active_value=*/false,
+                                  /*expected_policy_value=*/false,
+                                  mojom::PolicySource::kDevicePolicyEnforced);
+
+  // When the policy is explicitly Allow, the managed boolean policy value
+  // should return true and the policy source should be device enforced.
+  global_config.Set(::onc::global_network_config::kAllowTextMessages,
+                    ::onc::cellular::kTextMessagesAllow);
+  managed_network_configuration_handler()->SetPolicy(
+      ::onc::ONC_SOURCE_DEVICE_POLICY, /*userhash=*/std::string(),
+      /*network_configs_onc=*/base::Value::List(), global_config);
+  base::RunLoop().RunUntilIdle();
+
+  AssertCellularAllowTextMessages(kCellularGuid,
+                                  /*expected_active_value=*/true,
+                                  /*expected_policy_value=*/true,
+                                  mojom::PolicySource::kDevicePolicyEnforced);
+
+  // When the policy is explicitly Unset, we default to the user set value.
+  global_config.Set(::onc::global_network_config::kAllowTextMessages,
+                    ::onc::cellular::kTextMessagesUnset);
+  managed_network_configuration_handler()->SetPolicy(
+      ::onc::ONC_SOURCE_DEVICE_POLICY, /*userhash=*/std::string(),
+      /*network_configs_onc=*/base::Value::List(), global_config);
+  base::RunLoop().RunUntilIdle();
+
+  AssertCellularAllowTextMessages(kCellularGuid,
+                                  /*expected_active_value=*/true,
+                                  /*expected_policy_value=*/absl::nullopt,
+                                  mojom::PolicySource::kNone);
+
+  // When global network configuration is not set, we treat it as unset.
+  managed_network_configuration_handler()->SetPolicy(
+      ::onc::ONC_SOURCE_DEVICE_POLICY, /*userhash=*/std::string(),
+      /*network_configs_onc=*/base::Value::List(),
+      /*global_network_config=*/base::Value::Dict());
+  base::RunLoop().RunUntilIdle();
+
+  AssertCellularAllowTextMessages(kCellularGuid,
+                                  /*expected_active_value=*/true,
+                                  /*expected_policy_value=*/absl::nullopt,
+                                  mojom::PolicySource::kNone);
+}
+
+TEST_F(CrosNetworkConfigTest,
+       AllowTextMessagesWithSuppressTextMessagesFlagDisabled) {
+  base::test::ScopedFeatureList scoped_feature_list;
+  scoped_feature_list.InitAndDisableFeature(features::kSuppressTextMessages);
+
+  // When never set, this will return undefined.
+  AssertCellularAllowTextMessages(kCellularGuid,
+                                  /*expected_active_value=*/absl::nullopt,
+                                  /*expected_policy_value=*/absl::nullopt,
+                                  mojom::PolicySource::kNone);
+
+  // When set to any value, will still return undefined.
+  auto config = mojom::ConfigProperties::New();
+  auto cellular_config = mojom::CellularConfigProperties::New();
+  auto new_text_message_state = mojom::TextMessagesAllowState::New();
+
+  new_text_message_state->allow_text_messages = true;
+  cellular_config->text_message_allow_state = std::move(new_text_message_state);
+  AssertCellularAllowTextMessages(kCellularGuid,
+                                  /*expected_active_value=*/absl::nullopt,
+                                  /*expected_policy_value=*/absl::nullopt,
+                                  mojom::PolicySource::kNone);
+}
+
 TEST_F(CrosNetworkConfigTest, ConfigureNetwork) {
   // Note: shared = false requires a UserManager instance.
   bool shared = true;
@@ -3383,8 +3625,9 @@ TEST_F(CrosNetworkConfigTest, GetGlobalPolicy) {
   EXPECT_FALSE(policy->allow_only_policy_cellular_networks);
   EXPECT_TRUE(policy->allow_only_policy_networks_to_autoconnect);
   EXPECT_FALSE(policy->allow_only_policy_wifi_networks_to_connect);
-  EXPECT_EQ(false,
-            policy->allow_only_policy_wifi_networks_to_connect_if_available);
+  EXPECT_FALSE(policy->allow_only_policy_wifi_networks_to_connect_if_available);
+  EXPECT_FALSE(policy->dns_queries_monitored);
+  EXPECT_FALSE(policy->report_xdr_events_enabled);
   ASSERT_EQ(2u, policy->blocked_hex_ssids.size());
   EXPECT_EQ("blocked_ssid1", policy->blocked_hex_ssids[0]);
   EXPECT_EQ("blocked_ssid2", policy->blocked_hex_ssids[1]);
@@ -3396,6 +3639,7 @@ TEST_F(CrosNetworkConfigTest, GlobalPolicyApplied) {
 
   base::Value::Dict global_config;
   global_config.Set(::onc::global_network_config::kAllowCellularSimLock, false);
+  global_config.Set(::onc::global_network_config::kAllowCellularHotspot, false);
   global_config.Set(
       ::onc::global_network_config::kAllowOnlyPolicyCellularNetworks, true);
   global_config.Set(::onc::global_network_config::kAllowOnlyPolicyWiFiToConnect,
@@ -3407,10 +3651,13 @@ TEST_F(CrosNetworkConfigTest, GlobalPolicyApplied) {
   mojom::GlobalPolicyPtr policy = GetGlobalPolicy();
   ASSERT_TRUE(policy);
   EXPECT_FALSE(policy->allow_cellular_sim_lock);
+  EXPECT_FALSE(policy->allow_cellular_hotspot);
   EXPECT_TRUE(policy->allow_only_policy_cellular_networks);
   EXPECT_FALSE(policy->allow_only_policy_networks_to_autoconnect);
   EXPECT_FALSE(policy->allow_only_policy_wifi_networks_to_connect);
   EXPECT_FALSE(policy->allow_only_policy_wifi_networks_to_connect_if_available);
+  EXPECT_FALSE(policy->dns_queries_monitored);
+  EXPECT_FALSE(policy->report_xdr_events_enabled);
   EXPECT_EQ(1, observer()->GetPolicyAppliedCount(/*userhash=*/std::string()));
 }
 
@@ -3628,6 +3875,22 @@ TEST_F(CrosNetworkConfigTest, ESimManagedPropertiesNameComesFromHermes) {
   std::string esim_guid = std::string("esim_guid") + kTestIccid;
   mojom::ManagedPropertiesPtr properties = GetManagedProperties(esim_guid);
   EXPECT_EQ(kTestProfileNickname, properties->name->active_value);
+}
+
+// Tests that the Passpoint identifier of a Wi-Fi network is reflected to its
+// network state.
+TEST_F(CrosNetworkConfigTest, NetworkStateHasPasspointId) {
+  const char kWifiGuid[] = "wifi_pp_guid";
+  const char kPasspointId[] = "passpoint_id";
+  helper()->ConfigureService(base::StringPrintf(
+      R"({"GUID": "%s", "Type": "wifi", "State": "idle",
+          "Strength": 90, "AutoConnect": true, "Connectable": true,
+          "Passpoint.ID": "%s"})",
+      kWifiGuid, kPasspointId));
+  mojom::NetworkStatePropertiesPtr network = GetNetworkState(kWifiGuid);
+  ASSERT_TRUE(network);
+  EXPECT_EQ(mojom::NetworkType::kWiFi, network->type);
+  EXPECT_EQ(kPasspointId, network->type_state->get_wifi()->passpoint_id);
 }
 
 TEST_F(CrosNetworkConfigTest, GetAlwaysOnVpn) {

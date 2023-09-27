@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -59,7 +59,8 @@ enum class QsFeatureCatalogName {
   kShelfParty_DEPRECATED = 15,
   kAutozoom = 16,
   kHotspot = 17,
-  kMaxValue = kHotspot
+  kFocusMode = 18,
+  kMaxValue = kFocusMode
 };
 
 // A catalog that registers all the sliders on the Quick Settings page (also

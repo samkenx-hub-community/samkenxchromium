@@ -8,13 +8,13 @@
 #include <vector>
 
 #include "ash/public/cpp/night_light_controller.h"
-#include "base/memory/raw_ptr.h"
-#include "base/memory/weak_ptr.h"
 #include "base/values.h"
 #include "chrome/browser/ash/system/pointer_device_observer.h"
+#include "chrome/browser/ui/webui/ash/settings/pages/printing/printing_section.h"
 #include "chrome/browser/ui/webui/settings/ash/os_settings_section.h"
+#include "chrome/browser/ui/webui/settings/ash/power_section.h"
+#include "chrome/browser/ui/webui/settings/ash/storage_section.h"
 #include "chromeos/crosapi/mojom/cros_display_config.mojom.h"
-#include "chromeos/dbus/power/power_manager_client.h"
 #include "mojo/public/cpp/bindings/associated_receiver.h"
 #include "mojo/public/cpp/bindings/remote.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
@@ -35,26 +35,26 @@ class DeviceSection : public OsSettingsSection,
                       public system::PointerDeviceObserver::Observer,
                       public ui::InputDeviceEventObserver,
                       public NightLightController::Observer,
-                      public crosapi::mojom::CrosDisplayConfigObserver,
-                      public chromeos::PowerManagerClient::Observer {
+                      public crosapi::mojom::CrosDisplayConfigObserver {
  public:
   DeviceSection(Profile* profile,
                 SearchTagRegistry* search_tag_registry,
+                CupsPrintersManager* printers_manager,
                 PrefService* pref_service);
   ~DeviceSection() override;
 
- private:
   // OsSettingsSection:
   void AddLoadTimeData(content::WebUIDataSource* html_source) override;
   void AddHandlers(content::WebUI* web_ui) override;
   int GetSectionNameMessageId() const override;
   chromeos::settings::mojom::Section GetSection() const override;
   mojom::SearchResultIcon GetSectionIcon() const override;
-  std::string GetSectionPath() const override;
+  const char* GetSectionPath() const override;
   bool LogMetric(chromeos::settings::mojom::Setting setting,
                  base::Value& value) const override;
   void RegisterHierarchy(HierarchyGenerator* generator) const override;
 
+ private:
   // system::PointerDeviceObserver::Observer:
   void TouchpadExists(bool exists) override;
   void HapticTouchpadExists(bool exists) override;
@@ -67,14 +67,8 @@ class DeviceSection : public OsSettingsSection,
   // NightLightController::Observer:
   void OnNightLightEnabledChanged(bool enabled) override;
 
-  // mojom::CrosDisplayConfigObserver
+  // mojom::CrosDisplayConfigObserver:
   void OnDisplayConfigChanged() override;
-
-  // chromeos::PowerManagerClient::Observer:
-  void PowerChanged(const power_manager::PowerSupplyProperties& proto) override;
-
-  void OnGotSwitchStates(
-      absl::optional<chromeos::PowerManagerClient::SwitchStates> result);
 
   void UpdateStylusSearchTags();
 
@@ -85,15 +79,20 @@ class DeviceSection : public OsSettingsSection,
       crosapi::mojom::DisplayLayoutInfoPtr display_layout_info);
 
   void AddDevicePointersStrings(content::WebUIDataSource* html_source);
+  void AddDeviceGraphicsTabletStrings(
+      content::WebUIDataSource* html_source) const;
+  void AddCustomizeButtonsPageStrings(
+      content::WebUIDataSource* html_source) const;
   void AddDeviceDisplayStrings(content::WebUIDataSource* html_source) const;
 
-  raw_ptr<PrefService, ExperimentalAsh> pref_service_;
   system::PointerDeviceObserver pointer_device_observer_;
   mojo::Remote<crosapi::mojom::CrosDisplayConfigController>
       cros_display_config_;
+  absl::optional<PowerSection> power_subsection_;
+  absl::optional<PrintingSection> printing_subsection_;
+  absl::optional<StorageSection> storage_subsection_;
   mojo::AssociatedReceiver<crosapi::mojom::CrosDisplayConfigObserver>
       cros_display_config_observer_receiver_{this};
-  base::WeakPtrFactory<DeviceSection> weak_ptr_factory_{this};
 };
 
 }  // namespace ash::settings

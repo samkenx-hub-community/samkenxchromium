@@ -26,26 +26,26 @@ namespace file_system_provider {
 
 // Request type, passed to RequestManager::CreateRequest. For logging purposes.
 enum class RequestType {
-  kAbort,
-  kAddWatcher,
-  kCloseFile,
-  kConfigure,
-  kCopyEntry,
-  kCreateDirectory,
-  kCreateFile,
-  kDeleteEntry,
-  kExecuteAction,
-  kGetActions,
-  kGetMetadata,
-  kMount,
-  kMoveEntry,
-  kOpenFile,
-  kReadDirectory,
-  kReadFile,
-  kRemoveWatcher,
-  kTruncate,
-  kUnmount,
-  kWriteFile,
+  kAbort = 0,
+  kAddWatcher = 1,
+  kCloseFile = 2,
+  kConfigure = 3,
+  kCopyEntry = 4,
+  kCreateDirectory = 5,
+  kCreateFile = 6,
+  kDeleteEntry = 7,
+  kExecuteAction = 8,
+  kGetActions = 9,
+  kGetMetadata = 10,
+  kMount = 11,
+  kMoveEntry = 12,
+  kOpenFile = 13,
+  kReadDirectory = 14,
+  kReadFile = 15,
+  kRemoveWatcher = 16,
+  kTruncate = 17,
+  kUnmount = 18,
+  kWriteFile = 19,
 };
 
 // These values are persisted to logs. Entries should not be renumbered and
@@ -204,7 +204,8 @@ class RequestManager {
 
   raw_ptr<Profile> profile_;  // Not owned.
   std::map<int, std::unique_ptr<Request>> requests_;
-  raw_ptr<NotificationManagerInterface> notification_manager_;  // Not owned.
+  raw_ptr<NotificationManagerInterface, DanglingUntriaged>
+      notification_manager_;  // Not owned.
   int next_id_;
   base::TimeDelta timeout_;
   base::ObserverList<Observer>::Unchecked observers_;

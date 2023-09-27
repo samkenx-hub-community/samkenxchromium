@@ -56,22 +56,21 @@ WaylandZAuraOutputManager::WaylandZAuraOutputManager(
     : obj_(output_manager), connection_(connection) {
   DCHECK(obj_);
   DCHECK(connection_);
-
-  static constexpr zaura_output_manager_listener zaura_output_manager_listener =
-      {&OnDone,
-       &OnDisplayId,
-       &OnLogicalPosition,
-       &OnLogicalSize,
-       &OnPhysicalSize,
-       &OnInsets,
-       &OnDeviceScaleFactor,
-       &OnLogicalTransform,
-       &OnPanelTransform,
-       &OnName,
-       &OnDescription,
-       &OnActivated,
-       &OnOverscanInsets};
-  zaura_output_manager_add_listener(obj_.get(), &zaura_output_manager_listener,
+  static constexpr zaura_output_manager_listener kAuraOutputManagerListener = {
+      .done = &OnDone,
+      .display_id = &OnDisplayId,
+      .logical_position = &OnLogicalPosition,
+      .logical_size = &OnLogicalSize,
+      .physical_size = &OnPhysicalSize,
+      .insets = &OnInsets,
+      .device_scale_factor = &OnDeviceScaleFactor,
+      .logical_transform = &OnLogicalTransform,
+      .panel_transform = &OnPanelTransform,
+      .name = &OnName,
+      .description = &OnDescription,
+      .activated = &OnActivated,
+      .overscan_insets = &OnOverscanInsets};
+  zaura_output_manager_add_listener(obj_.get(), &kAuraOutputManagerListener,
                                     this);
 }
 
@@ -87,6 +86,22 @@ void WaylandZAuraOutputManager::RemoveOutputMetrics(
     WaylandOutput::Id output_id) {
   pending_output_metrics_map_.erase(output_id);
   output_metrics_map_.erase(output_id);
+}
+
+void WaylandZAuraOutputManager::DumpState(std::ostream& out) const {
+  out << "AuraOutputManager:" << std::endl;
+  int i = 0;
+  for (const auto& pair : pending_output_metrics_map_) {
+    out << "  pending output metrics[" << i++ << "]:";
+    pair.second.DumpState(out);
+    out << std::endl;
+  }
+  i = 0;
+  for (const auto& pair : output_metrics_map_) {
+    out << "  output metrics[" << i++ << "]:";
+    pair.second.DumpState(out);
+    out << std::endl;
+  }
 }
 
 WaylandOutput::Id WaylandZAuraOutputManager::GetId(wl_output* output) const {

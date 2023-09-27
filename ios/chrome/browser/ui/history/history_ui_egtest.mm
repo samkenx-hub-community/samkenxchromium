@@ -32,10 +32,6 @@
 #import "net/test/embedded_test_server/http_request.h"
 #import "net/test/embedded_test_server/http_response.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 using chrome_test_util::ButtonWithAccessibilityLabelId;
 using chrome_test_util::HistoryEntry;
 using chrome_test_util::NavigationBarDoneButton;
@@ -262,7 +258,7 @@ std::unique_ptr<net::test_server::HttpResponse> StandardResponse(
       [NSString stringWithFormat:@"%s", _URL1.path().c_str()];
 
   [[EarlGrey selectElementWithMatcher:SearchIconButton()]
-      performAction:grey_typeText(searchString)];
+      performAction:grey_replaceText(searchString)];
 
   // Verify that scrim is not visible.
   [[EarlGrey selectElementWithMatcher:grey_accessibilityID(
@@ -311,19 +307,11 @@ std::unique_ptr<net::test_server::HttpResponse> StandardResponse(
 
   // Add a typed URL and wait for it to show up on the server.
   [ChromeEarlGrey addHistoryServiceTypedURL:mockURL];
-  if ([ChromeEarlGrey isSyncHistoryDataTypeEnabled]) {
     NSArray<NSURL*>* URLs = @[
       net::NSURLWithGURL(mockURL),
     ];
     [ChromeEarlGrey waitForSyncServerHistoryURLs:URLs
                                          timeout:kSyncOperationTimeout];
-  } else {
-    [ChromeEarlGrey triggerSyncCycleForType:syncer::TYPED_URLS];
-    [ChromeEarlGrey waitForSyncServerEntitiesWithType:syncer::TYPED_URLS
-                                                 name:mockURL.spec()
-                                                count:1
-                                              timeout:kSyncOperationTimeout];
-  }
 
   [self loadTestURLs];
   [self openHistoryPanel];
@@ -339,7 +327,7 @@ std::unique_ptr<net::test_server::HttpResponse> StandardResponse(
   NSString* searchString = base::SysUTF8ToNSString(mockURL.spec().c_str());
 
   [[EarlGrey selectElementWithMatcher:SearchIconButton()]
-      performAction:grey_typeText(searchString)];
+      performAction:grey_replaceText(searchString)];
 
   // Verify that scrim is not visible.
   [[EarlGrey selectElementWithMatcher:grey_accessibilityID(
@@ -779,7 +767,7 @@ std::unique_ptr<net::test_server::HttpResponse> StandardResponse(
   NSString* searchString =
       [NSString stringWithFormat:@"%s", _URL1.path().c_str()];
   [[EarlGrey selectElementWithMatcher:SearchIconButton()]
-      performAction:grey_typeText(searchString)];
+      performAction:grey_replaceText(searchString)];
 
   // Swipe TableView down.
   [[EarlGrey selectElementWithMatcher:grey_accessibilityID(

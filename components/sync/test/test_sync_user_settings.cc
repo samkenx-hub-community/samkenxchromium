@@ -6,9 +6,9 @@
 
 #include "build/chromeos_buildflags.h"
 #include "components/sync/base/passphrase_enums.h"
-#include "components/sync/base/sync_prefs.h"
 #include "components/sync/base/user_selectable_type.h"
 #include "components/sync/engine/nigori/nigori.h"
+#include "components/sync/service/sync_prefs.h"
 #include "components/sync/service/sync_service.h"
 #include "components/sync/service/sync_user_settings_impl.h"
 #include "components/sync/test/test_sync_service.h"
@@ -49,10 +49,12 @@ bool TestSyncUserSettings::IsInitialSyncFeatureSetupComplete() const {
   return initial_sync_feature_setup_complete_;
 }
 
+#if !BUILDFLAG(IS_CHROMEOS_ASH)
 void TestSyncUserSettings::SetInitialSyncFeatureSetupComplete(
     SyncFirstSetupCompleteSource source) {
   SetInitialSyncFeatureSetupComplete();
 }
+#endif  // !BUILDFLAG(IS_CHROMEOS_ASH)
 
 bool TestSyncUserSettings::IsSyncEverythingEnabled() const {
   return sync_everything_enabled_;
@@ -69,6 +71,8 @@ void TestSyncUserSettings::SetSelectedTypes(bool sync_everything,
   } else {
     selected_types_ = types;
   }
+
+  service_->FirePaymentsIntegrationEnabledChanged();
 }
 
 void TestSyncUserSettings::SetSelectedType(UserSelectableType type,
@@ -78,7 +82,12 @@ void TestSyncUserSettings::SetSelectedType(UserSelectableType type,
   } else {
     selected_types_.Remove(type);
   }
+
+  service_->FirePaymentsIntegrationEnabledChanged();
 }
+
+void TestSyncUserSettings::KeepAccountSettingsPrefsOnlyForUsers(
+    const std::vector<signin::GaiaIdHash>& available_gaia_ids) {}
 
 #if BUILDFLAG(IS_IOS)
 void TestSyncUserSettings::SetBookmarksAndReadingListAccountStorageOptIn(
@@ -92,6 +101,11 @@ UserSelectableTypeSet TestSyncUserSettings::GetSelectedTypes() const {
 bool TestSyncUserSettings::IsTypeManagedByPolicy(
     UserSelectableType type) const {
   return managed_types_.Has(type);
+}
+
+bool TestSyncUserSettings::IsTypeManagedByCustodian(
+    UserSelectableType type) const {
+  return false;
 }
 
 ModelTypeSet TestSyncUserSettings::GetPreferredDataTypes() const {
@@ -220,7 +234,7 @@ base::Time TestSyncUserSettings::GetExplicitPassphraseTime() const {
   return base::Time();
 }
 
-PassphraseType TestSyncUserSettings::GetPassphraseType() const {
+absl::optional<PassphraseType> TestSyncUserSettings::GetPassphraseType() const {
   return IsUsingExplicitPassphrase() ? PassphraseType::kCustomPassphrase
                                      : PassphraseType::kImplicitPassphrase;
 }

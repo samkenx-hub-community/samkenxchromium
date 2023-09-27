@@ -16,17 +16,14 @@ import androidx.annotation.VisibleForTesting;
 import org.chromium.base.ApiCompatibilityUtils;
 import org.chromium.base.IntentUtils;
 import org.chromium.base.Log;
+import org.chromium.base.ResettersForTesting;
 import org.chromium.base.TraceEvent;
 import org.chromium.base.UnownedUserData;
 import org.chromium.base.UnownedUserDataHost;
 import org.chromium.base.UnownedUserDataKey;
 import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.chrome.R;
-import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.settings.SettingsLauncherImpl;
-import org.chromium.chrome.browser.signin.services.IdentityServicesProvider;
-import org.chromium.chrome.browser.sync.SyncService;
-import org.chromium.chrome.browser.sync.SyncService.SyncStateChangedListener;
 import org.chromium.chrome.browser.sync.TrustedVaultClient;
 import org.chromium.chrome.browser.sync.settings.ManageSyncSettings;
 import org.chromium.chrome.browser.sync.settings.SyncSettingsUtils;
@@ -38,9 +35,12 @@ import org.chromium.components.messages.MessageDispatcher;
 import org.chromium.components.messages.MessageDispatcherProvider;
 import org.chromium.components.messages.MessageIdentifier;
 import org.chromium.components.messages.PrimaryActionClickBehavior;
+import org.chromium.components.prefs.PrefService;
 import org.chromium.components.signin.AccountManagerFacadeProvider;
 import org.chromium.components.signin.base.CoreAccountInfo;
 import org.chromium.components.signin.identitymanager.ConsentLevel;
+import org.chromium.components.signin.identitymanager.IdentityManager;
+import org.chromium.components.sync.SyncService;
 import org.chromium.components.sync.TrustedVaultUserActionTriggerForUMA;
 import org.chromium.ui.base.WindowAndroid;
 import org.chromium.ui.modelutil.PropertyModel;
@@ -54,7 +54,7 @@ import java.lang.annotation.RetentionPolicy;
  * practice however, because the time limit imposed between 2 displays is global, only one instance
  * in the whole application will exist at a time.
  */
-public class SyncErrorMessage implements SyncStateChangedListener, UnownedUserData {
+public class SyncErrorMessage implements SyncService.SyncStateChangedListener, UnownedUserData {
     @VisibleForTesting
     @IntDef({MessageType.NOT_SHOWN, MessageType.AUTH_ERROR, MessageType.PASSPHRASE_REQUIRED,
             MessageType.SYNC_SETUP_INCOMPLETE, MessageType.CLIENT_OUT_OF_DATE,
@@ -88,6 +88,8 @@ public class SyncErrorMessage implements SyncStateChangedListener, UnownedUserDa
 
     private final @MessageType int mType;
     private final Activity mActivity;
+    private final IdentityManager mIdentityManager;
+    private final SyncService mSyncService;
     private final MessageDispatcher mMessageDispatcher;
     private final PropertyModel mModel;
     private static MessageDispatcher sMessageDispatcherForTesting;
@@ -106,14 +108,18 @@ public class SyncErrorMessage implements SyncStateChangedListener, UnownedUserDa
      * d) there is a valid {@link MessageDispatcher} in this window.
      *
      * @param windowAndroid The {@link WindowAndroid} to show and dismiss message UIs.
+     * @param identityManager The {@link IdentityManager}.
+     * @param syncService The {@link SyncService}.
      */
-    public static void maybeShowMessageUi(WindowAndroid windowAndroid) {
+    public static void maybeShowMessageUi(WindowAndroid windowAndroid,
+            IdentityManager identityManager, SyncService syncService, PrefService prefService) {
         try (TraceEvent t = TraceEvent.scoped("SyncErrorMessage.maybeShowMessageUi")) {
-            if (getMessageType(SyncSettingsUtils.getSyncError()) == MessageType.NOT_SHOWN) {
+            if (getMessageType(SyncSettingsUtils.getSyncError(syncService))
+                    == MessageType.NOT_SHOWN) {
                 return;
             }
 
-            if (!SyncErrorMessageImpressionTracker.canShowNow()) {
+            if (!SyncErrorMessageImpressionTracker.canShowNow(prefService)) {
                 return;
             }
 
@@ -129,14 +135,16 @@ public class SyncErrorMessage implements SyncStateChangedListener, UnownedUserDa
                 // Show message next time when the previous message has disappeared.
                 return;
             }
-            SYNC_ERROR_MESSAGE_KEY.attachToHost(
-                    host, new SyncErrorMessage(dispatcher, windowAndroid.getActivity().get()));
+            SYNC_ERROR_MESSAGE_KEY.attachToHost(host,
+                    new SyncErrorMessage(dispatcher, windowAndroid.getActivity().get(),
+                            identityManager, syncService));
         }
     }
 
-    private SyncErrorMessage(MessageDispatcher dispatcher, Activity activity) {
+    private SyncErrorMessage(MessageDispatcher dispatcher, Activity activity,
+            IdentityManager identityManager, SyncService syncService) {
         @SyncError
-        int error = SyncSettingsUtils.getSyncError();
+        int error = SyncSettingsUtils.getSyncError(syncService);
         String errorMessage = error == SyncError.SYNC_SETUP_INCOMPLETE
                 ? activity.getString(R.string.sync_settings_not_confirmed_title)
                 : SyncSettingsUtils.getSyncErrorHint(activity, error);
@@ -163,7 +171,9 @@ public class SyncErrorMessage implements SyncStateChangedListener, UnownedUserDa
         mMessageDispatcher.enqueueWindowScopedMessage(mModel, false);
         mType = getMessageType(error);
         mActivity = activity;
-        SyncService.get().addSyncStateChangedListener(this);
+        mIdentityManager = identityManager;
+        mSyncService = syncService;
+        mSyncService.addSyncStateChangedListener(this);
         SyncErrorMessageImpressionTracker.updateLastShownTime();
         recordHistogram(Action.SHOWN);
     }
@@ -171,7 +181,7 @@ public class SyncErrorMessage implements SyncStateChangedListener, UnownedUserDa
     @Override
     public void syncStateChanged() {
         // If the error disappeared or changed type in the meantime, dismiss the UI.
-        if (mType != getMessageType(SyncSettingsUtils.getSyncError())) {
+        if (mType != getMessageType(SyncSettingsUtils.getSyncError(mSyncService))) {
             mMessageDispatcher.dismissMessage(mModel, DismissReason.UNKNOWN);
             assert !SYNC_ERROR_MESSAGE_KEY.isAttachedToAnyHost(this)
                 : "Message UI should have been dismissed";
@@ -214,7 +224,7 @@ public class SyncErrorMessage implements SyncStateChangedListener, UnownedUserDa
             // (TAB_SWITCHED).
             SyncErrorMessageImpressionTracker.resetLastShownTime();
         }
-        SyncService.get().removeSyncStateChangedListener(this);
+        mSyncService.removeSyncStateChangedListener(this);
         SYNC_ERROR_MESSAGE_KEY.detachFromAllHosts(this);
 
         // This metric should be recorded only on explicit dismissal.
@@ -272,7 +282,7 @@ public class SyncErrorMessage implements SyncStateChangedListener, UnownedUserDa
         }
     }
 
-    private static void openTrustedVaultKeyRetrievalActivity() {
+    private void openTrustedVaultKeyRetrievalActivity() {
         CoreAccountInfo primaryAccountInfo = getSyncConsentedAccountInfo();
         if (primaryAccountInfo == null) {
             return;
@@ -293,7 +303,7 @@ public class SyncErrorMessage implements SyncStateChangedListener, UnownedUserDa
                                         exception));
     }
 
-    private static void openTrustedVaultRecoverabilityDegradedActivity() {
+    private void openTrustedVaultRecoverabilityDegradedActivity() {
         CoreAccountInfo primaryAccountInfo = getSyncConsentedAccountInfo();
         if (primaryAccountInfo == null) {
             return;
@@ -321,26 +331,23 @@ public class SyncErrorMessage implements SyncStateChangedListener, UnownedUserDa
                 ManageSyncSettings.createArguments(false));
     }
 
-    private static void startUpdateCredentialsFlow(Activity activity) {
-        Profile profile = Profile.getLastUsedRegularProfile();
+    private void startUpdateCredentialsFlow(Activity activity) {
         final CoreAccountInfo primaryAccountInfo =
-                IdentityServicesProvider.get().getIdentityManager(profile).getPrimaryAccountInfo(
-                        ConsentLevel.SYNC);
+                mIdentityManager.getPrimaryAccountInfo(ConsentLevel.SYNC);
         assert primaryAccountInfo != null;
         AccountManagerFacadeProvider.getInstance().updateCredentials(
                 CoreAccountInfo.getAndroidAccountFrom(primaryAccountInfo), activity, null);
     }
 
-    private static CoreAccountInfo getSyncConsentedAccountInfo() {
-        if (!SyncService.get().hasSyncConsent()) {
+    private CoreAccountInfo getSyncConsentedAccountInfo() {
+        if (!mSyncService.hasSyncConsent()) {
             return null;
         }
-        return SyncService.get().getAccountInfo();
+        return mSyncService.getAccountInfo();
     }
 
     @VisibleForTesting
-    @MessageType
-    public static int getMessageType(@SyncError int error) {
+    public static @MessageType int getMessageType(@SyncError int error) {
         switch (error) {
             case SyncError.AUTH_ERROR:
                 return MessageType.AUTH_ERROR;
@@ -363,12 +370,11 @@ public class SyncErrorMessage implements SyncStateChangedListener, UnownedUserDa
         }
     }
 
-    @VisibleForTesting
     public static void setMessageDispatcherForTesting(MessageDispatcher dispatcherForTesting) {
         sMessageDispatcherForTesting = dispatcherForTesting;
+        ResettersForTesting.register(() -> sMessageDispatcherForTesting = null);
     }
 
-    @VisibleForTesting
     public static UnownedUserDataKey<SyncErrorMessage> getKeyForTesting() {
         return SYNC_ERROR_MESSAGE_KEY;
     }

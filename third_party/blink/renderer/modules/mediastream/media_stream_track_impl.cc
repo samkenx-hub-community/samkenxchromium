@@ -169,13 +169,13 @@ CreateWebAudioSourceFromMediaStreamTrack(MediaStreamComponent* component,
                                                         context_sample_rate);
 }
 
-void ConnectToSource(MediaStreamComponent* component) {
-  DCHECK(component);
-  DCHECK(component->Source());
+void DidCloneMediaStreamTrack(MediaStreamComponent* clone) {
+  DCHECK(clone);
+  DCHECK(clone->Source());
 
-  if (component->GetSourceType() == MediaStreamSource::kTypeAudio) {
-    MediaStreamAudioSource::From(component->Source())
-        ->ConnectToInitializedTrack(component);
+  if (clone->GetSourceType() == MediaStreamSource::kTypeAudio) {
+    MediaStreamAudioSource::From(clone->Source())
+        ->ConnectToInitializedTrack(clone);
   }
 }
 
@@ -231,18 +231,6 @@ MediaStreamTrack* MediaStreamTrackImpl::Create(ExecutionContext* context,
   }
 }
 
-MediaStreamTrackImpl* MediaStreamTrackImpl::CreateCloningComponent(
-    ExecutionContext* execution_context,
-    MediaStreamComponent* component) {
-  MediaStreamTrackImpl* track = MakeGarbageCollected<MediaStreamTrackImpl>(
-      execution_context, component->Clone(), component->GetReadyState(),
-      base::DoNothing());
-
-  ConnectToSource(track->Component());
-
-  return track;
-}
-
 MediaStreamTrackImpl::MediaStreamTrackImpl(ExecutionContext* context,
                                            MediaStreamComponent* component)
     : MediaStreamTrackImpl(context,
@@ -262,7 +250,8 @@ MediaStreamTrackImpl::MediaStreamTrackImpl(
     ExecutionContext* context,
     MediaStreamComponent* component,
     MediaStreamSource::ReadyState ready_state,
-    base::OnceClosure callback)
+    base::OnceClosure callback,
+    bool is_clone)
     : ready_state_(ready_state),
       component_(component),
       execution_context_(context) {
@@ -442,7 +431,7 @@ MediaStreamTrack* MediaStreamTrackImpl::clone(
   MediaStreamTrackImpl* cloned_track =
       MakeGarbageCollected<MediaStreamTrackImpl>(
           execution_context, Component()->Clone(), ready_state_,
-          base::DoNothing());
+          base::DoNothing(), /*is_clone=*/true);
 
   // Copy state.
   CloneInternal(cloned_track);
@@ -674,6 +663,28 @@ MediaTrackSettings* MediaStreamTrackImpl::getSettings() const {
   }
 
   return settings;
+}
+
+MediaStreamTrackVideoStats* MediaStreamTrackImpl::stats(
+    ExceptionState& exception_state) {
+  switch (component_->GetSourceType()) {
+    case MediaStreamSource::kTypeAudio:
+      exception_state.ThrowDOMException(
+          DOMExceptionCode::kNotSupportedError,
+          "MediaStreamTrack.stats is not supported on audio tracks.");
+      return nullptr;
+    case MediaStreamSource::kTypeVideo:
+      if (!video_stats_) {
+        video_stats_ = MakeGarbageCollected<MediaStreamTrackVideoStats>(this);
+      }
+      return video_stats_;
+  }
+}
+
+MediaStreamTrackPlatform::VideoFrameStats
+MediaStreamTrackImpl::GetVideoFrameStats() const {
+  CHECK_EQ(component_->GetSourceType(), MediaStreamSource::kTypeVideo);
+  return component_->GetPlatformTrack()->GetVideoFrameStats();
 }
 
 CaptureHandle* MediaStreamTrackImpl::getCaptureHandle() const {
@@ -997,14 +1008,15 @@ void MediaStreamTrackImpl::Trace(Visitor* visitor) const {
   visitor->Trace(image_capture_);
   visitor->Trace(execution_context_);
   visitor->Trace(observers_);
-  EventTargetWithInlineData::Trace(visitor);
+  visitor->Trace(video_stats_);
+  EventTarget::Trace(visitor);
   MediaStreamTrack::Trace(visitor);
 }
 
 void MediaStreamTrackImpl::CloneInternal(MediaStreamTrackImpl* cloned_track) {
   DCHECK(cloned_track);
 
-  ConnectToSource(cloned_track->Component());
+  DidCloneMediaStreamTrack(cloned_track->Component());
 
   cloned_track->SetInitialConstraints(constraints_);
 
@@ -1030,8 +1042,7 @@ void MediaStreamTrackImpl::EnsureFeatureHandleForScheduler() {
   feature_handle_for_scheduler_ =
       window->GetFrame()->GetFrameScheduler()->RegisterFeature(
           SchedulingPolicy::Feature::kWebRTC,
-          {SchedulingPolicy::DisableAggressiveThrottling(),
-           SchedulingPolicy::DisableAlignWakeUps()});
+          {SchedulingPolicy::DisableAggressiveThrottling()});
 }
 
 void MediaStreamTrackImpl::AddObserver(MediaStreamTrack::Observer* observer) {

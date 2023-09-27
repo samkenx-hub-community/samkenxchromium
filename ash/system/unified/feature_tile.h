@@ -10,6 +10,7 @@
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "ui/base/metadata/metadata_header_macros.h"
+#include "ui/color/color_id.h"
 #include "ui/views/controls/button/button.h"
 
 namespace gfx {
@@ -101,6 +102,16 @@ class ASH_EXPORT FeatureTile : public views::Button {
   // Sets the vector icon.
   void SetVectorIcon(const gfx::VectorIcon& icon);
 
+  // Sets the button's background color or toggled color with color ID when the
+  // button wants to have a different background color from the default one.
+  void SetBackgroundColorId(ui::ColorId background_color_id);
+  void SetBackgroundToggledColorId(ui::ColorId background_toggled_color_id);
+
+  // Sets the button's foreground color or toggled color with color ID when the
+  // button wants to have a different foreground color from the default one.
+  void SetForegroundColorId(ui::ColorId foreground_color_id);
+  void SetForegroundToggledColorId(ui::ColorId foreground_toggled_color_id);
+
   // Sets the tile icon from an ImageSkia.
   void SetImage(gfx::ImageSkia image);
 
@@ -110,11 +121,19 @@ class ASH_EXPORT FeatureTile : public views::Button {
   // Sets the text of `label_`.
   void SetLabel(const std::u16string& label);
 
+  // Returns the maximum width for `sub_label_`.
+  int GetSubLabelMaxWidth() const;
+
   // Sets the text of the `sub_label_`.
   void SetSubLabel(const std::u16string& sub_label);
 
   // Sets visibility of `sub_label_`.
   void SetSubLabelVisibility(bool visible);
+
+  // views::View:
+  void GetAccessibleNodeData(ui::AXNodeData* node_data) override;
+  void AddLayerToRegion(ui::Layer* layer, views::LayerRegion region) override;
+  void RemoveLayerFromRegions(ui::Layer* layer) override;
 
   bool is_icon_clickable() const { return is_icon_clickable_; }
   views::ImageButton* icon_button() { return icon_button_; }
@@ -126,10 +145,6 @@ class ASH_EXPORT FeatureTile : public views::Button {
   friend class BluetoothFeaturePodControllerTest;
   friend class HotspotFeaturePodControllerTest;
   friend class NotificationCounterViewTest;
-
-  // views::View:
-  void AddLayerToRegion(ui::Layer* layer, views::LayerRegion region) override;
-  void RemoveLayerFromRegions(ui::Layer* layer) override;
 
   // Returns the color id to use for the `icon_button_` and `drill_in_arrow_`
   // based on the tile's enabled and toggled state.
@@ -144,12 +159,22 @@ class ASH_EXPORT FeatureTile : public views::Button {
   // Updates the color of `drill_in_arrow_` for better visibility.
   void UpdateDrillInArrowColor();
 
+  // Updates `label_` attributes depending on whether a sub-label will be
+  // visible.
+  void SetCompactTileLabelPreferences(bool has_sub_label);
+
   // Ensures the ink drop is painted above the button's background.
   raw_ptr<views::InkDropContainerView, ExperimentalAsh> ink_drop_container_ =
       nullptr;
 
   // The vector icon for the tile, if one is set.
   raw_ptr<const gfx::VectorIcon, ExperimentalAsh> vector_icon_ = nullptr;
+
+  // Customized value for the tile's background color and foreground color.
+  absl::optional<ui::ColorId> background_color_;
+  absl::optional<ui::ColorId> background_toggled_color_;
+  absl::optional<ui::ColorId> foreground_color_;
+  absl::optional<ui::ColorId> foreground_toggled_color_;
 
   // Owned by views hierarchy.
   raw_ptr<views::ImageButton, ExperimentalAsh> icon_button_ = nullptr;

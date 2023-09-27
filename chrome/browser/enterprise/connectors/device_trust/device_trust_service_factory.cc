@@ -45,7 +45,8 @@
 #endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
-#include "chrome/browser/enterprise/connectors/device_trust/attestation/ash/ash_attestation_service.h"
+#include "chrome/browser/enterprise/connectors/device_trust/ash/ash_attestation_policy_observer.h"
+#include "chrome/browser/enterprise/connectors/device_trust/attestation/ash/ash_attestation_service_impl.h"
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 
 namespace {
@@ -84,18 +85,16 @@ DeviceTrustServiceFactory* DeviceTrustServiceFactory::GetInstance() {
 
 // static
 DeviceTrustService* DeviceTrustServiceFactory::GetForProfile(Profile* profile) {
-#if BUILDFLAG(IS_CHROMEOS_ASH)
   // This blocks the factory from associating nullptr with the current context
-  // before enrollment. Management checks will be removed completely when the
-  // BYOD case is implemented.
+  // before enrollment.
   // Checking for a testing profile is needed to block unit tests without a
   // proper setup from checking the management service as this can lead to
-  // crashes
-  if (profile->AsTestingProfile() || !IsProfileManaged(profile))
+  // crashes.
+  if (profile->AsTestingProfile() || !IsProfileManaged(profile)) {
     // Return nullptr since the current management configuration isn't
     // supported.
     return nullptr;
-#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
+  }
   return static_cast<DeviceTrustService*>(
       GetInstance()->GetServiceForBrowserContext(profile, true));
 }
@@ -122,14 +121,16 @@ bool DeviceTrustServiceFactory::ServiceIsNULLWhileTesting() const {
 
 DeviceTrustServiceFactory::~DeviceTrustServiceFactory() = default;
 
-KeyedService* DeviceTrustServiceFactory::BuildServiceInstanceFor(
+std::unique_ptr<KeyedService>
+DeviceTrustServiceFactory::BuildServiceInstanceForBrowserContext(
     content::BrowserContext* context) const {
   auto* profile = Profile::FromBrowserContext(context);
 
-  if (!IsProfileManaged(profile))
+  if (!IsProfileManaged(profile)) {
     // Return nullptr since the current management configuration isn't
     // supported.
     return nullptr;
+  }
 
   auto* dt_connector_service =
       DeviceTrustConnectorServiceFactory::GetForProfile(profile);
@@ -143,8 +144,13 @@ KeyedService* DeviceTrustServiceFactory::BuildServiceInstanceFor(
   }
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
+  std::unique_ptr<AshAttestationServiceImpl> ash_attestation_service =
+      std::make_unique<AshAttestationServiceImpl>(profile);
+  dt_connector_service->AddObserver(
+      std::make_unique<AshAttestationPolicyObserver>(
+          ash_attestation_service->GetWeakPtr()));
   std::unique_ptr<AttestationService> attestation_service =
-      std::make_unique<AshAttestationService>(profile);
+      std::move(ash_attestation_service);
 #else
   DeviceTrustKeyManager* key_manager = nullptr;
   policy::CloudPolicyStore* browser_cloud_policy_store = nullptr;
@@ -197,9 +203,9 @@ KeyedService* DeviceTrustServiceFactory::BuildServiceInstanceFor(
 
   // Only return an actual instance if all of the service's dependencies can be
   // resolved (meaning that the current management configuration is supported).
-  return new DeviceTrustService(std::move(attestation_service),
-                                std::move(signals_service),
-                                dt_connector_service);
+  return std::make_unique<DeviceTrustService>(std::move(attestation_service),
+                                              std::move(signals_service),
+                                              dt_connector_service);
 }
 
 }  // namespace enterprise_connectors

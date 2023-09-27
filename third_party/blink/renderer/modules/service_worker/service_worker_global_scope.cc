@@ -86,6 +86,7 @@
 #include "third_party/blink/renderer/core/script/classic_script.h"
 #include "third_party/blink/renderer/core/trustedtypes/trusted_script_url.h"
 #include "third_party/blink/renderer/core/workers/global_scope_creation_params.h"
+#include "third_party/blink/renderer/core/workers/worker_backing_thread.h"
 #include "third_party/blink/renderer/core/workers/worker_classic_script_loader.h"
 #include "third_party/blink/renderer/core/workers/worker_clients.h"
 #include "third_party/blink/renderer/core/workers/worker_reporting_proxy.h"
@@ -98,6 +99,7 @@
 #include "third_party/blink/renderer/modules/cookie_store/cookie_change_event.h"
 #include "third_party/blink/renderer/modules/cookie_store/extendable_cookie_change_event.h"
 #include "third_party/blink/renderer/modules/event_target_modules.h"
+#include "third_party/blink/renderer/modules/hid/hid.h"
 #include "third_party/blink/renderer/modules/notifications/notification.h"
 #include "third_party/blink/renderer/modules/notifications/notification_event.h"
 #include "third_party/blink/renderer/modules/payments/abort_payment_event.h"
@@ -128,6 +130,7 @@
 #include "third_party/blink/renderer/modules/service_worker/service_worker_window_client.h"
 #include "third_party/blink/renderer/modules/service_worker/wait_until_observer.h"
 #include "third_party/blink/renderer/modules/service_worker/web_service_worker_fetch_context_impl.h"
+#include "third_party/blink/renderer/modules/webusb/usb.h"
 #include "third_party/blink/renderer/platform/bindings/script_state.h"
 #include "third_party/blink/renderer/platform/bindings/source_location.h"
 #include "third_party/blink/renderer/platform/bindings/v8_binding.h"
@@ -150,6 +153,10 @@ namespace {
 
 constexpr char kServiceWorkerGlobalScopeTraceScope[] =
     "ServiceWorkerGlobalScope";
+
+// The default timeout for offline events in a service worker. The  value is
+// the same as the update interval value in the event queue.
+constexpr int kDefaultTimeoutSecondsForOfflineEvent = 10;
 
 void DidSkipWaiting(ScriptPromiseResolver* resolver, bool success) {
   if (!resolver->GetExecutionContext() ||
@@ -384,6 +391,14 @@ ServiceWorkerGlobalScope::GetInstalledScriptsManager() {
   return installed_scripts_manager_.get();
 }
 
+void ServiceWorkerGlobalScope::GetAssociatedInterface(
+    const String& name,
+    mojo::PendingAssociatedReceiver<mojom::blink::AssociatedInterface>
+        receiver) {
+  mojo::ScopedInterfaceEndpointHandle handle = receiver.PassHandle();
+  associated_inteface_registy_.TryBindInterface(name.Utf8(), &handle);
+}
+
 void ServiceWorkerGlobalScope::DidEvaluateScript() {
   DCHECK(!did_evaluate_script_);
   did_evaluate_script_ = true;
@@ -396,6 +411,11 @@ void ServiceWorkerGlobalScope::DidEvaluateScript() {
   base::UmaHistogramCounts1000("ServiceWorker.NumberOfRegisteredFetchHandlers",
                                number_of_fetch_handlers);
   event_queue_->Start();
+}
+
+AssociatedInterfaceRegistry&
+ServiceWorkerGlobalScope::GetAssociatedInterfaceRegistry() {
+  return associated_inteface_registy_;
 }
 
 void ServiceWorkerGlobalScope::DidReceiveResponseForClassicScript(
@@ -781,6 +801,8 @@ void ServiceWorkerGlobalScope::Trace(Visitor* visitor) const {
   visitor->Trace(fetch_response_callbacks_);
   visitor->Trace(pending_preload_fetch_events_);
   visitor->Trace(controller_receivers_);
+  visitor->Trace(remote_associated_interfaces_);
+  visitor->Trace(associated_interfaces_receiver_);
   WorkerGlobalScope::Trace(visitor);
 }
 
@@ -1560,8 +1582,9 @@ void ServiceWorkerGlobalScope::StartFetchEvent(
 void ServiceWorkerGlobalScope::SetFetchHandlerExistence(
     FetchHandlerExistence fetch_handler_existence) {
   DCHECK(IsContextThread());
-  if (fetch_handler_existence == FetchHandlerExistence::EXISTS)
-    GetThread()->GetIsolate()->IsolateInForegroundNotification();
+  if (fetch_handler_existence == FetchHandlerExistence::EXISTS) {
+    GetThread()->GetWorkerBackingThread().SetForegrounded();
+  }
 }
 
 void ServiceWorkerGlobalScope::DispatchFetchEventForSubresource(
@@ -1584,7 +1607,7 @@ void ServiceWorkerGlobalScope::DispatchFetchEventForSubresource(
               GetThread()->GetTaskRunner(TaskType::kNetworking));
   fetch_response_callbacks_.Set(event_id, WrapDisallowNew(std::move(remote)));
 
-  if (params->did_start_race_network_request) {
+  if (params->race_network_request_loader_factory) {
     UseCounter::Count(
         this,
         // If the runtime flag is enabled, that means the feature is enabled via
@@ -1637,6 +1660,10 @@ void ServiceWorkerGlobalScope::Clone(
 void ServiceWorkerGlobalScope::InitializeGlobalScope(
     mojo::PendingAssociatedRemote<mojom::blink::ServiceWorkerHost>
         service_worker_host,
+    mojo::PendingAssociatedRemote<mojom::blink::AssociatedInterfaceProvider>
+        associated_interfaces_from_browser,
+    mojo::PendingAssociatedReceiver<mojom::blink::AssociatedInterfaceProvider>
+        associated_interfaces_to_browser,
     mojom::blink::ServiceWorkerRegistrationObjectInfoPtr registration_info,
     mojom::blink::ServiceWorkerObjectInfoPtr service_worker_info,
     mojom::blink::FetchHandlerExistence fetch_hander_existence,
@@ -1651,6 +1678,13 @@ void ServiceWorkerGlobalScope::InitializeGlobalScope(
   DCHECK(!service_worker_host_.is_bound());
   service_worker_host_.Bind(std::move(service_worker_host),
                             GetTaskRunner(TaskType::kInternalDefault));
+
+  remote_associated_interfaces_.Bind(
+      std::move(associated_interfaces_from_browser),
+      GetTaskRunner(TaskType::kInternalDefault));
+  associated_interfaces_receiver_.Bind(
+      std::move(associated_interfaces_to_browser),
+      GetTaskRunner(TaskType::kInternalDefault));
 
   // Set ServiceWorkerGlobalScope#registration.
   DCHECK_NE(registration_info->registration_id,
@@ -1975,11 +2009,6 @@ void ServiceWorkerGlobalScope::DispatchFetchEventForMainResource(
     DispatchFetchEventForMainResourceCallback callback) {
   DCHECK(IsContextThread());
 
-  // The timeout for offline events in a service worker. The default value is
-  // the same as the update interval value in the event queue.
-  static const base::FeatureParam<int> kCustomTimeoutForOfflineEvent{
-      &features::kCheckOfflineCapability, "timeout_second", 10};
-
   const int event_id = event_queue_->NextEventId();
   fetch_event_callbacks_.Set(event_id, std::move(callback));
 
@@ -1998,7 +2027,7 @@ void ServiceWorkerGlobalScope::DispatchFetchEventForMainResource(
                       /*corp_checker=*/nullptr, absl::nullopt),
         WTF::BindOnce(&ServiceWorkerGlobalScope::AbortCallbackForFetchEvent,
                       WrapWeakPersistent(this)),
-        base::Seconds(kCustomTimeoutForOfflineEvent.Get()));
+        base::Seconds(kDefaultTimeoutSecondsForOfflineEvent));
   } else {
     event_queue_->EnqueueNormal(
         event_id,
@@ -2646,6 +2675,27 @@ bool ServiceWorkerGlobalScope::IsInFencedFrame() const {
          mojom::blink::AncestorFrameType::kFencedFrame;
 }
 
+void ServiceWorkerGlobalScope::NotifyWebSocketActivity() {
+  CHECK(IsContextThread());
+  CHECK(event_queue_);
+
+  ScriptState* script_state = ScriptController()->GetScriptState();
+  CHECK(script_state);
+  v8::Isolate* isolate = script_state->GetIsolate();
+  v8::HandleScope handle_scope(isolate);
+
+  v8::Local<v8::Context> v8_context = script_state->GetContext();
+
+  bool notify = To<ServiceWorkerGlobalScopeProxy>(ReportingProxy())
+                    .ShouldNotifyServiceWorkerOnWebSocketActivity(v8_context);
+
+  if (notify) {
+    // TODO(crbug/1399324): refactor with RAII pattern.
+    event_queue_->ResetIdleTimeout();
+    event_queue_->CheckEventQueue();
+  }
+}
+
 mojom::blink::ServiceWorkerFetchHandlerType
 ServiceWorkerGlobalScope::FetchHandlerType() {
   EventListenerVector* elv = GetEventListeners(event_type_names::kFetch);
@@ -2659,10 +2709,10 @@ ServiceWorkerGlobalScope::FetchHandlerType() {
 
   // TODO(crbug.com/1349613): revisit the way to implement this.
   // The following code returns kEmptyFetchHandler if all handlers are nop.
-  for (RegisteredEventListener& e : *elv) {
+  for (RegisteredEventListener* e : *elv) {
     EventTarget* et = EventTarget::Create(script_state);
     v8::Local<v8::Value> v =
-        To<JSBasedEventListener>(e.Callback())->GetListenerObject(*et);
+        To<JSBasedEventListener>(e->Callback())->GetListenerObject(*et);
     if (v.IsEmpty() || !v->IsFunction() ||
         !v.As<v8::Function>()->Experimental_IsNopFunction()) {
       return mojom::blink::ServiceWorkerFetchHandlerType::kNotSkippable;
@@ -2675,6 +2725,24 @@ ServiceWorkerGlobalScope::FetchHandlerType() {
       "No-op fetch handler may bring overhead during navigation. "
       "Consider removing the handler if possible."));
   return mojom::blink::ServiceWorkerFetchHandlerType::kEmptyFetchHandler;
+}
+
+bool ServiceWorkerGlobalScope::HasHidEventHandlers() {
+  HID* hid = Supplement<NavigatorBase>::From<HID>(*navigator());
+  return hid ? hid->HasEventListeners() : false;
+}
+
+bool ServiceWorkerGlobalScope::HasUsbEventHandlers() {
+  USB* usb = Supplement<NavigatorBase>::From<USB>(*navigator());
+  return usb ? usb->HasEventListeners() : false;
+}
+
+void ServiceWorkerGlobalScope::GetRemoteAssociatedInterface(
+    const String& name,
+    mojo::ScopedInterfaceEndpointHandle handle) {
+  remote_associated_interfaces_->GetAssociatedInterface(
+      name, mojo::PendingAssociatedReceiver<mojom::blink::AssociatedInterface>(
+                std::move(handle)));
 }
 
 bool ServiceWorkerGlobalScope::SetAttributeEventListener(

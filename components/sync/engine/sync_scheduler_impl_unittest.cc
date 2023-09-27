@@ -59,32 +59,30 @@ namespace {
 
 void SimulatePollSuccess(ModelTypeSet requested_types, SyncCycle* cycle) {
   cycle->mutable_status_controller()->set_last_download_updates_result(
-      SyncerError(SyncerError::SYNCER_OK));
+      SyncerError::Success());
 }
 
 void SimulatePollFailed(ModelTypeSet requested_types, SyncCycle* cycle) {
   cycle->mutable_status_controller()->set_last_download_updates_result(
-      SyncerError(SyncerError::SERVER_RETURN_TRANSIENT_ERROR));
+      SyncerError::ProtocolError(TRANSIENT_ERROR));
 }
 
 ACTION_P(SimulateThrottled, throttle) {
   SyncCycle* cycle = arg0;
   cycle->mutable_status_controller()->set_last_download_updates_result(
-      SyncerError(SyncerError::SERVER_RETURN_THROTTLED));
+      SyncerError::ProtocolError(THROTTLED));
   cycle->delegate()->OnThrottled(throttle);
 }
 
 ACTION_P2(SimulateTypeThrottled, type, throttle) {
   SyncCycle* cycle = arg0;
-  cycle->mutable_status_controller()->set_commit_result(
-      SyncerError(SyncerError::SYNCER_OK));
+  cycle->mutable_status_controller()->set_commit_result(SyncerError::Success());
   cycle->delegate()->OnTypesThrottled({type}, throttle);
 }
 
 ACTION_P(SimulatePartialFailure, type) {
   SyncCycle* cycle = arg0;
-  cycle->mutable_status_controller()->set_commit_result(
-      SyncerError(SyncerError::SYNCER_OK));
+  cycle->mutable_status_controller()->set_commit_result(SyncerError::Success());
   cycle->delegate()->OnTypesBackedOff({type});
 }
 
@@ -98,7 +96,7 @@ ACTION_P(SimulatePollIntervalUpdate, new_poll) {
 ACTION_P(SimulateGuRetryDelayCommand, delay) {
   SyncCycle* cycle = arg0;
   cycle->mutable_status_controller()->set_last_download_updates_result(
-      SyncerError(SyncerError::SYNCER_OK));
+      SyncerError::Success());
   cycle->delegate()->OnReceivedGuRetryDelay(delay);
 }
 
@@ -107,7 +105,7 @@ void SimulateGetEncryptionKeyFailed(ModelTypeSet requsted_types,
                                     SyncCycle* cycle) {
   cycle->mutable_status_controller()->set_last_get_key_failed(true);
   cycle->mutable_status_controller()->set_last_download_updates_result(
-      SyncerError(SyncerError::SYNCER_OK));
+      SyncerError::Success());
 }
 
 void SimulateConfigureSuccess(ModelTypeSet requsted_types,
@@ -115,7 +113,7 @@ void SimulateConfigureSuccess(ModelTypeSet requsted_types,
                               SyncCycle* cycle) {
   cycle->mutable_status_controller()->set_last_get_key_failed(false);
   cycle->mutable_status_controller()->set_last_download_updates_result(
-      SyncerError(SyncerError::SYNCER_OK));
+      SyncerError::Success());
 }
 
 void SimulateConfigureFailed(ModelTypeSet requsted_types,
@@ -123,7 +121,7 @@ void SimulateConfigureFailed(ModelTypeSet requsted_types,
                              SyncCycle* cycle) {
   cycle->mutable_status_controller()->set_last_get_key_failed(false);
   cycle->mutable_status_controller()->set_last_download_updates_result(
-      SyncerError(SyncerError::SERVER_RETURN_TRANSIENT_ERROR));
+      SyncerError::ProtocolError(TRANSIENT_ERROR));
 }
 
 void SimulateConfigureConnectionFailure(
@@ -132,23 +130,22 @@ void SimulateConfigureConnectionFailure(
     SyncCycle* cycle) {
   cycle->mutable_status_controller()->set_last_get_key_failed(false);
   cycle->mutable_status_controller()->set_last_download_updates_result(
-      SyncerError::NetworkConnectionUnavailable(net::ERR_FAILED));
+      SyncerError::NetworkError(net::ERR_FAILED));
 }
 
 void SimulateNormalSuccess(ModelTypeSet requested_types,
                            NudgeTracker* nudge_tracker,
                            SyncCycle* cycle) {
-  cycle->mutable_status_controller()->set_commit_result(
-      SyncerError(SyncerError::SYNCER_OK));
+  cycle->mutable_status_controller()->set_commit_result(SyncerError::Success());
   cycle->mutable_status_controller()->set_last_download_updates_result(
-      SyncerError(SyncerError::SYNCER_OK));
+      SyncerError::Success());
 }
 
 void SimulateDownloadUpdatesFailed(ModelTypeSet requested_types,
                                    NudgeTracker* nudge_tracker,
                                    SyncCycle* cycle) {
   cycle->mutable_status_controller()->set_last_download_updates_result(
-      SyncerError(SyncerError::SERVER_RETURN_TRANSIENT_ERROR));
+      SyncerError::ProtocolError(TRANSIENT_ERROR));
 }
 
 void SimulateCommitFailed(ModelTypeSet requested_types,
@@ -156,16 +153,16 @@ void SimulateCommitFailed(ModelTypeSet requested_types,
                           SyncCycle* cycle) {
   cycle->mutable_status_controller()->set_last_get_key_failed(false);
   cycle->mutable_status_controller()->set_last_download_updates_result(
-      SyncerError(SyncerError::SYNCER_OK));
+      SyncerError::Success());
   cycle->mutable_status_controller()->set_commit_result(
-      SyncerError(SyncerError::SERVER_RETURN_TRANSIENT_ERROR));
+      SyncerError::ProtocolError(TRANSIENT_ERROR));
 }
 
 void SimulateConnectionFailure(ModelTypeSet requested_types,
                                NudgeTracker* nudge_tracker,
                                SyncCycle* cycle) {
   cycle->mutable_status_controller()->set_last_download_updates_result(
-      SyncerError::NetworkConnectionUnavailable(net::ERR_FAILED));
+      SyncerError::NetworkError(net::ERR_FAILED));
 }
 
 class MockSyncer : public Syncer {
@@ -265,8 +262,8 @@ class SyncSchedulerImplTest : public testing::Test {
     context_ = std::make_unique<SyncCycleContext>(
         connection_.get(), extensions_activity_.get(),
         std::vector<SyncEngineEventListener*>(), nullptr,
-        model_type_registry_.get(), "fake_invalidator_client_id",
-        "fake_cache_guid", "fake_birthday", "fake_bag_of_chips",
+        model_type_registry_.get(), "fake_cache_guid", "fake_birthday",
+        "fake_bag_of_chips",
         /*poll_interval=*/base::Minutes(30));
     context_->set_notifications_enabled(true);
     context_->set_account_name("Test");

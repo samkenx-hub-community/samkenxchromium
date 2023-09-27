@@ -13,7 +13,10 @@
 #include "ash/root_window_controller.h"
 #include "ash/shell.h"
 #include "ash/test/pixel/ash_pixel_differ.h"
+#include "ash/webui/personalization_app/mojom/personalization_app.mojom-shared.h"
 #include "base/strings/strcat.h"
+#include "base/test/scoped_feature_list.h"
+#include "chromeos/constants/chromeos_features.h"
 #include "services/media_session/public/cpp/media_metadata.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
@@ -26,7 +29,8 @@ namespace {
 
 using TestParams = std::tuple<absl::optional<media_session::MediaMetadata>,
                               /*dark_mode=*/bool,
-                              /*rtl=*/bool>;
+                              /*rtl=*/bool,
+                              /*jelly=*/bool>;
 
 std::array<absl::optional<media_session::MediaMetadata>, 3>
 GetMediaMedataVariations() {
@@ -49,6 +53,10 @@ bool IsRtl(const TestParams& param) {
   return std::get<2>(param);
 }
 
+bool IsJellyEnabled(const TestParams& param) {
+  return std::get<3>(param);
+}
+
 const absl::optional<media_session::MediaMetadata>& GetMediaMetadata(
     const TestParams& param) {
   return std::get<absl::optional<media_session::MediaMetadata>>(param);
@@ -65,9 +73,14 @@ std::string GetName(const testing::TestParamInfo<TestParams>& param_info) {
   } else {
     metadata_description_text = "Longmedia";
   }
-  return base::StrCat({metadata_description_text,
-                       IsDarkMode(param_info.param) ? "Dark" : "Light",
-                       IsRtl(param_info.param) ? "Rtl" : "Ltr"});
+  std::vector<std::string> attributes = {
+      metadata_description_text,
+      IsDarkMode(param_info.param) ? "Dark" : "Light",
+      IsRtl(param_info.param) ? "Rtl" : "Ltr"};
+  if (!IsJellyEnabled(param_info.param)) {
+    attributes.push_back("PreJelly");
+  }
+  return base::StrCat(attributes);
 }
 
 }  // namespace
@@ -84,8 +97,10 @@ class AmbientSlideshowPixelTest
   }
 
   void SetUp() override {
+    scoped_features_.InitWithFeatureState(chromeos::features::kJelly,
+                                          IsJellyEnabled(GetParam()));
     AmbientAshTestBase::SetUp();
-    SetAmbientTheme(AmbientTheme::kSlideshow);
+    SetAmbientTheme(personalization_app::mojom::AmbientTheme::kSlideshow);
     GetSessionControllerClient()->set_show_lock_screen_views(true);
     DarkLightModeController::Get()->SetDarkModeEnabledForTest(
         IsDarkMode(GetParam()));
@@ -105,12 +120,16 @@ class AmbientSlideshowPixelTest
     CloseAmbientScreen();
     AmbientAshTestBase::TearDown();
   }
+
+ private:
+  base::test::ScopedFeatureList scoped_features_;
 };
 
 INSTANTIATE_TEST_SUITE_P(
     All,
     AmbientSlideshowPixelTest,
     testing::Combine(::testing::ValuesIn(GetMediaMedataVariations()),
+                     testing::Bool(),
                      testing::Bool(),
                      testing::Bool()),
     &GetName);
@@ -127,8 +146,11 @@ TEST_P(AmbientSlideshowPixelTest, ShowMediaStringView) {
         media_session::mojom::MediaPlaybackState::kPlaying);
   }
 
+  // Revision 1 is with Jelly enabled. Revision 0 is with Jelly disabled to
+  // guard against regressions until the flag is fully launched.
   EXPECT_TRUE(GetPixelDiffer()->CompareUiComponentsOnPrimaryScreen(
-      "AmbientSlideshow", /*revision_number=*/0,
+      "AmbientSlideshow",
+      /*revision_number=*/IsJellyEnabled(GetParam()) ? 1 : 0,
       ash::Shell::GetPrimaryRootWindow()));
 }
 

@@ -6,6 +6,7 @@ import {addEntries, ENTRIES, getCaller, pending, repeatUntil, RootPath, sendTest
 import {testcase} from '../testcase.js';
 
 import {openNewWindow, remoteCall, setupAndWaitUntilReady} from './background.js';
+import {DirectoryTreePageObject} from './page_objects/directory_tree.js';
 import {DOWNLOADS_FAKE_TASKS} from './tasks.js';
 import {BASIC_DRIVE_ENTRY_SET, BASIC_FAKE_ENTRY_SET, BASIC_LOCAL_ENTRY_SET} from './test_data.js';
 
@@ -65,19 +66,13 @@ testcase.toolbarDeleteButtonKeepFocus = async () => {
       await setupAndWaitUntilReady(RootPath.DOWNLOADS, [ENTRIES.hello], []);
 
   // USB delete never uses trash and always shows the delete dialog.
-  const USB_VOLUME_QUERY = '#directory-tree [volume-type-icon="removable"]';
 
   // Mount a USB volume.
   await sendTestMessage({name: 'mountFakeUsb'});
 
-  // Wait for the USB volume to mount.
-  await remoteCall.waitForElement(appId, USB_VOLUME_QUERY);
-
-  // Click to open the USB volume.
-  chrome.test.assertTrue(
-      !!await remoteCall.callRemoteTestUtil(
-          'fakeMouseClick', appId, [USB_VOLUME_QUERY]),
-      'fakeMouseClick failed');
+  // Wait for the USB volume to mount and click to open the USB volume.
+  const directoryTree = await DirectoryTreePageObject.create(appId, remoteCall);
+  await directoryTree.selectItemByType('removable');
 
   // Check: the USB files should appear in the file list.
   const files = TestEntryInfo.getExpectedRows(BASIC_FAKE_ENTRY_SET);
@@ -161,9 +156,8 @@ testcase.toolbarRefreshButtonWithSelection = async () => {
   await addEntries(['documents_provider'], BASIC_LOCAL_ENTRY_SET);
 
   // Wait for the DocumentsProvider volume to mount.
-  const documentsProviderVolumeQuery =
-      '[volume-type-icon="documents_provider"]';
-  await remoteCall.waitAndClickElement(appId, documentsProviderVolumeQuery);
+  const directoryTree = await DirectoryTreePageObject.create(appId, remoteCall);
+  await directoryTree.selectItemByType('documents_provider');
   await remoteCall.waitUntilCurrentDirectoryIsChanged(
       appId, '/DocumentsProvider');
 
@@ -187,8 +181,8 @@ testcase.toolbarRefreshButtonHiddenInRecents = async () => {
       await setupAndWaitUntilReady(RootPath.DOWNLOADS, [ENTRIES.beautiful], []);
 
   // Navigate to Recent.
-  await remoteCall.waitAndClickElement(
-      appId, '#directory-tree [entry-label="Recent"]');
+  const directoryTree = await DirectoryTreePageObject.create(appId, remoteCall);
+  await directoryTree.selectItemByLabel('Recent');
   await remoteCall.waitUntilCurrentDirectoryIsChanged(appId, '/Recent');
 
   // Check that the button should be hidden.
@@ -206,9 +200,8 @@ testcase.toolbarRefreshButtonShownForNonWatchableVolume = async () => {
   await addEntries(['documents_provider'], BASIC_LOCAL_ENTRY_SET);
 
   // Wait for the DocumentsProvider volume to mount.
-  const documentsProviderVolumeQuery =
-      '[volume-type-icon="documents_provider"]';
-  await remoteCall.waitAndClickElement(appId, documentsProviderVolumeQuery);
+  const directoryTree = await DirectoryTreePageObject.create(appId, remoteCall);
+  await directoryTree.selectItemByType('documents_provider');
   await remoteCall.waitUntilCurrentDirectoryIsChanged(
       appId, '/DocumentsProvider');
 
@@ -427,7 +420,6 @@ testcase.toolbarCloudIconShouldNotShowWhenBulkPinningDisabled = async () => {
   const appId =
       await setupAndWaitUntilReady(RootPath.DRIVE, [], [ENTRIES.hello]);
   await remoteCall.waitForElement(appId, '#cloud-button[hidden]');
-  await remoteCall.waitForElement(appId, '#offline-folder-indicator[hidden]');
 };
 
 /**
@@ -443,7 +435,6 @@ testcase
   const appId =
       await setupAndWaitUntilReady(RootPath.DRIVE, [], [ENTRIES.hello]);
   await remoteCall.waitForElement(appId, '#cloud-button[hidden]');
-  await remoteCall.waitForElement(appId, '#offline-folder-indicator[hidden]');
 };
 
 /**
@@ -454,7 +445,6 @@ testcase.toolbarCloudIconShouldShowForInProgress = async () => {
   const appId =
       await setupAndWaitUntilReady(RootPath.DRIVE, [], [ENTRIES.hello]);
   await remoteCall.waitForElement(appId, '#cloud-button[hidden]');
-  await remoteCall.waitForElement(appId, '#offline-folder-indicator[hidden]');
 
   // Mock the free space returned by spaced to be 4 GB, the test files
   // initialized on the Drive root are 92 KB so well below the 1GB space
@@ -465,8 +455,6 @@ testcase.toolbarCloudIconShouldShowForInProgress = async () => {
   // hidden.
   await sendTestMessage({name: 'setBulkPinningEnabledPref', enabled: true});
   await remoteCall.waitForElementLost(appId, '#cloud-button[hidden]');
-  await remoteCall.waitForElementLost(
-      appId, '#offline-folder-indicator[hidden]');
   await remoteCall.waitForElement(
       appId, '#cloud-button > xf-icon[type="cloud_sync"]');
 };
@@ -479,7 +467,6 @@ testcase.toolbarCloudIconShowsWhenNotEnoughDiskSpaceIsReturned = async () => {
   const appId =
       await setupAndWaitUntilReady(RootPath.DRIVE, [], [ENTRIES.hello]);
   await remoteCall.waitForElement(appId, '#cloud-button[hidden]');
-  await remoteCall.waitForElement(appId, '#offline-folder-indicator[hidden]');
 
   // Mock the free space available as 100 MB, this will trigger the
   // `NotEnoughSpace` stage for bulk pinning.
@@ -491,7 +478,6 @@ testcase.toolbarCloudIconShowsWhenNotEnoughDiskSpaceIsReturned = async () => {
   await remoteCall.waitForElementLost(appId, '#cloud-button[hidden]');
   await remoteCall.waitForElement(
       appId, '#cloud-button > xf-icon[type="cloud_error"]');
-  await remoteCall.waitForElement(appId, '#offline-folder-indicator[hidden]');
 };
 
 
@@ -503,7 +489,6 @@ testcase.toolbarCloudIconShouldNotShowWhenCannotGetFreeSpace = async () => {
   const appId =
       await setupAndWaitUntilReady(RootPath.DRIVE, [], [ENTRIES.hello]);
   await remoteCall.waitForElement(appId, '#cloud-button[hidden]');
-  await remoteCall.waitForElement(appId, '#offline-folder-indicator[hidden]');
 
   // Mock the free space returned by spaced to be 4 GB.
   await remoteCall.setSpacedFreeSpace(4n << 30n);
@@ -511,8 +496,6 @@ testcase.toolbarCloudIconShouldNotShowWhenCannotGetFreeSpace = async () => {
   // Enable the bulk pinning preference and assert the cloud button is shown.
   await sendTestMessage({name: 'setBulkPinningEnabledPref', enabled: true});
   await remoteCall.waitForElementLost(appId, '#cloud-button[hidden]');
-  await remoteCall.waitForElementLost(
-      appId, '#offline-folder-indicator[hidden]');
 
   // Mock the free space available as -1 which indicates an error returned
   // during the free space retrieval.
@@ -522,7 +505,6 @@ testcase.toolbarCloudIconShouldNotShowWhenCannotGetFreeSpace = async () => {
   // currently is done on a 60s poll).
   await sendTestMessage({name: 'forcePinManagerSpaceCheck'});
   await remoteCall.waitForElement(appId, '#cloud-button[hidden]');
-  await remoteCall.waitForElement(appId, '#offline-folder-indicator[hidden]');
 };
 
 /**
@@ -533,7 +515,6 @@ testcase.toolbarCloudIconWhenPressedShouldOpenCloudPanel = async () => {
   const appId =
       await setupAndWaitUntilReady(RootPath.DRIVE, [], [ENTRIES.hello]);
   await remoteCall.waitForElement(appId, '#cloud-button[hidden]');
-  await remoteCall.waitForElement(appId, '#offline-folder-indicator[hidden]');
 
   // Mock the free space returned by spaced to be 4 GB.
   await remoteCall.setSpacedFreeSpace(4n << 30n);
@@ -542,8 +523,6 @@ testcase.toolbarCloudIconWhenPressedShouldOpenCloudPanel = async () => {
   // hidden.
   await sendTestMessage({name: 'setBulkPinningEnabledPref', enabled: true});
   await remoteCall.waitForElementLost(appId, '#cloud-button[hidden]');
-  await remoteCall.waitForElementLost(
-      appId, '#offline-folder-indicator[hidden]');
 
   // Ensure at first the cloud panel is not shown.
   const styles = await remoteCall.waitForElementStyles(
@@ -566,7 +545,6 @@ testcase.toolbarCloudIconShouldNotShowWhenPrefDisabled = async () => {
   const appId =
       await setupAndWaitUntilReady(RootPath.DRIVE, [], BASIC_DRIVE_ENTRY_SET);
   await remoteCall.waitForElement(appId, '#cloud-button[hidden]');
-  await remoteCall.waitForElement(appId, '#offline-folder-indicator[hidden]');
 
   // Force the bulk pinning preference off.
   await sendTestMessage({name: 'setBulkPinningEnabledPref', enabled: false});
@@ -586,9 +564,8 @@ testcase.toolbarCloudIconShouldNotShowWhenPrefDisabled = async () => {
   await sendTestMessage({name: 'forceBulkPinningCalculateRequiredSpace'});
 
   // Assert the stage is `PAUSED` and the cloud button is still hidden.
-  await remoteCall.waitForBulkPinningStage('Paused');
+  await remoteCall.waitForBulkPinningStage('PausedOffline');
   await remoteCall.waitForElement(appId, '#cloud-button[hidden]');
-  await remoteCall.waitForElement(appId, '#offline-folder-indicator[hidden]');
 };
 
 /**
@@ -599,22 +576,20 @@ testcase.toolbarCloudIconShouldShowWhenPausedState = async () => {
   const appId =
       await setupAndWaitUntilReady(RootPath.DRIVE, [], BASIC_DRIVE_ENTRY_SET);
   await remoteCall.waitForElement(appId, '#cloud-button[hidden]');
-  await remoteCall.waitForElement(appId, '#offline-folder-indicator[hidden]');
 
   // Force the bulk pinning preference on.
   await remoteCall.setSpacedFreeSpace(4n << 30n);
   await sendTestMessage({name: 'setBulkPinningEnabledPref', enabled: true});
 
   // Set the bulk pinning manager to enter offline mode. This will surface a
-  // `PAUSED` state which has a UI representation iff the pref is enabled.
+  // `PAUSED_OFFLINE` state which has a UI representation iff the pref is
+  // enabled.
   await sendTestMessage({name: 'setBulkPinningOnline', enabled: false});
 
-  // Assert the stage is `PAUSED`, the cloud button is visible and the icon is
-  // the offline icon.
-  await remoteCall.waitForBulkPinningStage('Paused');
+  // Assert the stage is `PAUSED_OFFLINE`, the cloud button is visible and the
+  // icon is the offline icon.
+  await remoteCall.waitForBulkPinningStage('PausedOffline');
   await remoteCall.waitForElement(appId, '#cloud-button:not([hidden])');
-  await remoteCall.waitForElement(
-      appId, '#offline-folder-indicator:not([hidden])');
   await remoteCall.waitForElement(
       appId, '#cloud-button > xf-icon[type="bulk_pinning_offline"]');
 };
@@ -656,8 +631,6 @@ testcase.toolbarCloudIconShouldShowOnStartupEvenIfSyncing = async () => {
   const appId = await openNewWindow(RootPath.DRIVE, /*appState=*/ {});
   await remoteCall.waitForElement(appId, '#detail-table');
   await remoteCall.waitForElement(appId, '#cloud-button:not([hidden])');
-  await remoteCall.waitForElement(
-      appId, '#offline-folder-indicator:not([hidden])');
 
   // The underlying pin manager has a 60s timer to get free disk space. When
   // this happens it emits a progress event and updates the UI. However, once
@@ -666,4 +639,28 @@ testcase.toolbarCloudIconShouldShowOnStartupEvenIfSyncing = async () => {
   // to ensure its done prior to the 60s free disk space check.
   await remoteCall.waitForCloudPanelState(
       appId, /*items=*/ 1, /*percentage=*/ 100);
+};
+
+/**
+ * Tests that the cloud icon should show if bulk pinning is paused due to being
+ * on a metered network.
+ */
+testcase.toolbarCloudIconShouldShowWhenOnMeteredNetwork = async () => {
+  const appId =
+      await setupAndWaitUntilReady(RootPath.DRIVE, [], [ENTRIES.hello]);
+  await remoteCall.waitForElement(appId, '#cloud-button[hidden]');
+
+  // Force the bulk pinning preference on.
+  await remoteCall.setSpacedFreeSpace(4n << 30n);
+  await sendTestMessage({name: 'setBulkPinningEnabledPref', enabled: true});
+
+  // Update the drive connection status to return metered and then disable the
+  // sync on metered property.
+  await sendTestMessage({name: 'setSyncOnMeteredNetwork', enabled: false});
+  await sendTestMessage({name: 'setDriveConnectionStatus', status: 'metered'});
+
+  // Assert the cloud icon should have the paused subicon.
+  await remoteCall.waitForElement(appId, '#cloud-button:not([hidden])');
+  await remoteCall.waitForElement(
+      appId, '#cloud-button > xf-icon[type="cloud_paused"]');
 };

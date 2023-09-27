@@ -13,13 +13,13 @@
 #include "content/browser/reduce_accept_language/reduce_accept_language_throttle.h"
 #include "content/browser/renderer_host/frame_tree_node.h"
 #include "content/browser/webid/webid_utils.h"
+#include "content/common/features.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/client_hints_controller_delegate.h"
 #include "content/public/browser/content_browser_client.h"
 #include "content/public/browser/origin_trials_controller_delegate.h"
 #include "content/public/browser/reduce_accept_language_controller_delegate.h"
 #include "content/public/common/content_client.h"
-#include "content/public/common/content_features.h"
 #include "content/public/common/web_identity.h"
 #include "net/base/load_flags.h"
 #include "net/http/http_request_headers.h"
@@ -118,4 +118,22 @@ CreateContentBrowserURLLoaderThrottles(
   return throttles;
 }
 
+std::vector<std::unique_ptr<blink::URLLoaderThrottle>>
+CreateContentBrowserURLLoaderThrottlesForKeepAlive(
+    const network::ResourceRequest& request,
+    BrowserContext* browser_context,
+    const base::RepeatingCallback<WebContents*()>& wc_getter,
+    int frame_tree_node_id) {
+  std::vector<std::unique_ptr<blink::URLLoaderThrottle>> throttles =
+      GetContentClient()->browser()->CreateURLLoaderThrottlesForKeepAlive(
+          request, browser_context, wc_getter, frame_tree_node_id);
+  variations::OmniboxURLLoaderThrottle::AppendThrottleIfNeeded(&throttles);
+  // TODO(crbug.com/1094303): Consider whether we want to use the WebContents to
+  // determine the value for variations::Owner. Alternatively, this is the
+  // browser side, and we might be fine with Owner::kUnknown.
+  variations::VariationsURLLoaderThrottle::AppendThrottleIfNeeded(
+      browser_context->GetVariationsClient(), &throttles);
+
+  return throttles;
+}
 }  // namespace content

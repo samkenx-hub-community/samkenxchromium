@@ -6,14 +6,20 @@
 
 #include "base/metrics/histogram_functions.h"
 #include "chrome/browser/ash/borealis/borealis_installer.h"
+#include "chrome/browser/ash/borealis/borealis_types.mojom.h"
 
 namespace borealis {
+
+using borealis::mojom::InstallResult;
 
 const char kBorealisInstallNumAttemptsHistogram[] =
     "Borealis.Install.NumAttempts";
 const char kBorealisInstallResultHistogram[] = "Borealis.Install.Result";
 const char kBorealisInstallOverallTimeHistogram[] =
     "Borealis.Install.OverallTime";
+// Same as Borealis.Install.OverallTime, but with more appropriate bucket sizes.
+const char kBorealisInstallOverallTimeHistogram2[] =
+    "Borealis.Install.OverallTime2";
 const char kBorealisShutdownNumAttemptsHistogram[] =
     "Borealis.Shutdown.NumAttempts";
 const char kBorealisShutdownResultHistogram[] = "Borealis.Shutdown.Result";
@@ -23,6 +29,9 @@ const char kBorealisStartupNumAttemptsHistogram[] =
 const char kBorealisStartupResultHistogram[] = "Borealis.Startup.Result";
 const char kBorealisStartupOverallTimeHistogram[] =
     "Borealis.Startup.OverallTime";
+// Same as Borealis.Startup.OverallTime, but with more appropriate bucket sizes.
+const char kBorealisStartupOverallTimeHistogram2[] =
+    "Borealis.Startup.OverallTime2";
 const char kBorealisUninstallNumAttemptsHistogram[] =
     "Borealis.Uninstall.NumAttempts";
 const char kBorealisUninstallResultHistogram[] = "Borealis.Uninstall.Result";
@@ -31,14 +40,15 @@ void RecordBorealisInstallNumAttemptsHistogram() {
   base::UmaHistogramBoolean(kBorealisInstallNumAttemptsHistogram, true);
 }
 
-void RecordBorealisInstallResultHistogram(
-    BorealisInstallResult install_result) {
+void RecordBorealisInstallResultHistogram(InstallResult install_result) {
   base::UmaHistogramEnumeration(kBorealisInstallResultHistogram,
                                 install_result);
 }
 
 void RecordBorealisInstallOverallTimeHistogram(base::TimeDelta install_time) {
   base::UmaHistogramTimes(kBorealisInstallOverallTimeHistogram, install_time);
+  base::UmaHistogramLongTimes(kBorealisInstallOverallTimeHistogram2,
+                              install_time);
 }
 
 void RecordBorealisUninstallNumAttemptsHistogram() {
@@ -63,6 +73,8 @@ void RecordBorealisStartupResultHistogram(
 
 void RecordBorealisStartupOverallTimeHistogram(base::TimeDelta startup_time) {
   base::UmaHistogramTimes(kBorealisStartupOverallTimeHistogram, startup_time);
+  base::UmaHistogramMediumTimes(kBorealisStartupOverallTimeHistogram2,
+                                startup_time);
 }
 
 void RecordBorealisShutdownNumAttemptsHistogram() {

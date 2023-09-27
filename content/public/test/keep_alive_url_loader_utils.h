@@ -54,12 +54,19 @@ class KeepAliveURLLoadersTestObserver {
   // Waits for `KeepAliveURLLoader::OnReceiveRedirectProcessed()` to be called
   // `total` times.
   void WaitForTotalOnReceiveRedirectProcessed(size_t total);
+  // Waits for `KeepAliveURLLoader::OnReceiveResponse()` to be called `total`
+  // times.
+  void WaitForTotalOnReceiveResponse(size_t total);
   // Waits for `KeepAliveURLLoader::OnReceiveResponseForwarded()` to be called
   // `total` times.
   void WaitForTotalOnReceiveResponseForwarded(size_t total);
   // Waits for `KeepAliveURLLoader::OnReceiveResponseProcessed()` to be called
   // `total` times.
   void WaitForTotalOnReceiveResponseProcessed(size_t total);
+  // Waits for `KeepAliveURLLoader::OnComplete()` to be called
+  // `error_codes.size()` times, and the error codes from all previous calls to
+  // that method should match `error_codes`.
+  void WaitForTotalOnComplete(const std::vector<int>& error_codes);
   // Waits for `KeepAliveURLLoader::OnCompleteForwarded()` to be called
   // `error_codes.size()` times, and the error codes from all previous calls to
   // that method should match `error_codes`.
@@ -68,6 +75,12 @@ class KeepAliveURLLoadersTestObserver {
   // `error_codes.size()` times, and the error codes from all previous calls to
   // that method should match `error_codes`.
   void WaitForTotalOnCompleteProcessed(const std::vector<int>& error_codes);
+  // Waits for `KeepAliveURLLoader::PauseReadingBodyFromNetProcessed()` to be
+  // called `total` times.
+  void WaitForTotalPauseReadingBodyFromNetProcessed(size_t total);
+  // Waits for `KeepAliveURLLoader::ResumeReadingBodyFromNetProcessed()` to be
+  // called `total` times.
+  void WaitForTotalResumeReadingBodyFromNetProcessed(size_t total);
 
  private:
   std::unique_ptr<KeepAliveURLLoadersTestObserverImpl> impl_;

@@ -28,7 +28,6 @@
 
 namespace blink {
 
-class LayoutBlock;
 class NGConstraintSpaceBuilder;
 
 enum NGFragmentationType {
@@ -165,11 +164,6 @@ class CORE_EXPORT NGConstraintSpace final {
     if (HasRareData())
       delete rare_data_;
   }
-
-  // Creates NGConstraintSpace representing LayoutObject's containing block.
-  // This should live on NGBlockNode or another layout bridge and probably take
-  // a root NGConstraintSpace.
-  static NGConstraintSpace CreateFromLayoutObject(const LayoutBlock&);
 
   const NGExclusionSpace& ExclusionSpace() const { return exclusion_space_; }
 
@@ -527,10 +521,6 @@ class CORE_EXPORT NGConstraintSpace final {
   // set within |NGBlockLayoutAlgorithm| for the conditions when this applies.
   bool IsRestrictedBlockSizeTableCellChild() const {
     return bitfields_.is_restricted_block_size_table_cell_child;
-  }
-
-  bool IsInFlexIntrinsicSizing() const {
-    return bitfields_.is_in_flex_intrinsic_sizing;
   }
 
   bool IsPaintedAtomically() const { return bitfields_.is_painted_atomically; }
@@ -1566,7 +1556,6 @@ class CORE_EXPORT NGConstraintSpace final {
           is_initial_block_size_indefinite(false),
           is_table_cell_child(false),
           is_restricted_block_size_table_cell_child(false),
-          is_in_flex_intrinsic_sizing(false),
           percentage_inline_storage(kSameAsAvailable),
           percentage_block_storage(kSameAsAvailable),
           replaced_percentage_block_storage(kSameAsAvailable) {}
@@ -1625,7 +1614,6 @@ class CORE_EXPORT NGConstraintSpace final {
     unsigned is_initial_block_size_indefinite : 1;
     unsigned is_table_cell_child : 1;
     unsigned is_restricted_block_size_table_cell_child : 1;
-    unsigned is_in_flex_intrinsic_sizing : 1;
 
     unsigned percentage_inline_storage : 2;           // NGPercentageStorage
     unsigned percentage_block_storage : 2;            // NGPercentageStorage

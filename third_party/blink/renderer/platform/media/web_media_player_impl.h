@@ -35,7 +35,6 @@
 #include "media/base/renderer_factory_selector.h"
 #include "media/base/routing_token_callback.h"
 #include "media/base/simple_watch_timer.h"
-#include "media/base/text_track.h"
 #include "media/filters/demuxer_manager.h"
 #include "media/mojo/mojom/media_metrics_provider.mojom.h"
 #include "media/mojo/mojom/playback_events_recorder.mojom.h"
@@ -247,6 +246,7 @@ class PLATFORM_EXPORT WebMediaPlayerImpl
   void SuspendForFrameClosed() override;
 
   bool HasAvailableVideoFrame() const override;
+  bool HasReadableVideoFrame() const override;
 
   scoped_refptr<WebAudioSourceProviderImpl> GetAudioSourceProvider() override;
 
@@ -398,8 +398,6 @@ class PLATFORM_EXPORT WebMediaPlayerImpl
       media::BufferingState state,
       media::BufferingStateChangeReason reason) override;
   void OnDurationChange() override;
-  void OnAddTextTrack(const media::TextTrackConfig& config,
-                      media::AddTextTrackDoneCB done_cb) override;
   void OnWaiting(media::WaitingReason reason) override;
   void OnAudioConfigChange(const media::AudioDecoderConfig& config) override;
   void OnVideoConfigChange(const media::VideoDecoderConfig& config) override;
@@ -422,6 +420,7 @@ class PLATFORM_EXPORT WebMediaPlayerImpl
   void RestartForHls() override;
   bool IsSecurityOriginCryptographic() const override;
   void UpdateLoadedUrl(const GURL& url) override;
+  void DemuxerRequestsSeek(base::TimeDelta seek_time) override;
 
 #if BUILDFLAG(ENABLE_FFMPEG)
   void AddAudioTrack(const std::string& id,
@@ -663,7 +662,7 @@ class PLATFORM_EXPORT WebMediaPlayerImpl
   base::TimeDelta GetCurrentTimeInternal() const;
 
   // Called by the compositor the very first time a frame is received.
-  void OnFirstFrame(base::TimeTicks frame_time);
+  void OnFirstFrame(base::TimeTicks frame_time, bool is_frame_readable);
 
   // Records the encryption scheme used by the stream |stream_name|. This is
   // only recorded when metadata is available.
@@ -717,6 +716,9 @@ class PLATFORM_EXPORT WebMediaPlayerImpl
                                          media::Pipeline::StartType start_type,
                                          bool is_streaming,
                                          bool is_static);
+
+  // Notifies the `client_` and the `delegate_` about metadata change.
+  void DidMediaMetadataChange();
 
   WebLocalFrame* const frame_;
 
@@ -1070,6 +1072,9 @@ class PLATFORM_EXPORT WebMediaPlayerImpl
   // True if we have not yet rendered a first frame, but one is needed. Set back
   // to false as soon as |has_first_frame_| is set to true.
   bool needs_first_frame_ = false;
+
+  // Whether the rendered frame is readable, e.g. can be converted to image.
+  bool is_frame_readable_ = false;
 
   // True if StartPipeline() completed a lazy load startup.
   bool did_lazy_load_ = false;

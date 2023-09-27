@@ -324,7 +324,7 @@ void LayerTreeImpl::UpdateScrollbarGeometries() {
     }
 
     for (auto* scrollbar : ScrollbarsFor(scrolling_element_id)) {
-      if (scrollbar->orientation() == ScrollbarOrientation::HORIZONTAL) {
+      if (scrollbar->orientation() == ScrollbarOrientation::kHorizontal) {
         scrollbar->SetCurrentPos(current_offset.x());
         scrollbar->SetClipLayerLength(bounds_size.width());
         scrollbar->SetScrollLayerLength(scrolling_size.width());
@@ -892,14 +892,16 @@ void LayerTreeImpl::HandleTickmarksVisibilityChange() {
     return;
 
   for (ScrollbarLayerImplBase* scrollbar : controller->Scrollbars()) {
-    if (scrollbar->orientation() != ScrollbarOrientation::VERTICAL)
+    if (scrollbar->orientation() != ScrollbarOrientation::kVertical) {
       continue;
+    }
 
     // Android Overlay Scrollbar don't have FindInPage Tickmarks.
     if (scrollbar->GetScrollbarAnimator() != LayerTreeSettings::AURA_OVERLAY)
-      DCHECK(!scrollbar->HasFindInPageTickmarks());
+      DCHECK(!scrollbar->has_find_in_page_tickmarks());
 
-    controller->UpdateTickmarksVisibility(scrollbar->HasFindInPageTickmarks());
+    controller->UpdateTickmarksVisibility(
+        scrollbar->has_find_in_page_tickmarks());
   }
 }
 
@@ -1409,7 +1411,6 @@ void LayerTreeImpl::SetDeviceScaleFactor(float device_scale_factor) {
   set_needs_update_draw_properties();
   if (IsActiveTree())
     host_impl_->SetViewportDamage(GetDeviceViewport());
-  host_impl_->SetNeedUpdateGpuRasterizationStatus();
 }
 
 void LayerTreeImpl::SetLocalSurfaceIdFromParent(
@@ -1604,77 +1605,68 @@ bool LayerTreeImpl::UpdateDrawProperties(
     draw_property_utils::CalculateDrawProperties(
         this, &render_surface_list_, output_update_layer_list_for_testing);
 
-    if (const char* client_name = GetClientNameForMetrics()) {
+    if (settings().single_thread_proxy_scheduler) {
       // This metric is only recorded for the Browser.
-      if (settings().single_thread_proxy_scheduler) {
-        UMA_HISTOGRAM_COUNTS_1M(
-            base::StringPrintf(
-                "Compositing.%s.LayerTreeImpl.CalculateDrawPropertiesUs",
-                client_name),
-            timer.Elapsed().InMicroseconds());
-      }
+      UMA_HISTOGRAM_COUNTS_1M(
+          "Compositing.Browser.LayerTreeImpl.CalculateDrawPropertiesUs",
+          timer.Elapsed().InMicroseconds());
+    } else {
+      // This metric is only recorded for the Renderer.
       UMA_HISTOGRAM_COUNTS_100(
-          base::StringPrintf("Compositing.%s.NumRenderSurfaces", client_name),
+          "Compositing.Renderer.NumRenderSurfaces",
           base::saturated_cast<int>(render_surface_list_.size()));
     }
   }
 
-  if (settings().enable_occlusion) {
-    TRACE_EVENT2("cc,benchmark",
-                 "LayerTreeImpl::UpdateDrawProperties::Occlusion", "IsActive",
-                 IsActiveTree(), "SourceFrameNumber", source_frame_number_);
-    OcclusionTracker occlusion_tracker(RootRenderSurface()->content_rect());
-    occlusion_tracker.set_minimum_tracking_size(
-        settings().minimum_occlusion_tracking_size);
+  TRACE_EVENT2("cc,benchmark", "LayerTreeImpl::UpdateDrawProperties::Occlusion",
+               "IsActive", IsActiveTree(), "SourceFrameNumber",
+               source_frame_number_);
+  OcclusionTracker occlusion_tracker(RootRenderSurface()->content_rect());
+  occlusion_tracker.set_minimum_tracking_size(
+      settings().minimum_occlusion_tracking_size);
 
-    for (EffectTreeLayerListIterator it(this);
-         it.state() != EffectTreeLayerListIterator::State::END; ++it) {
-      occlusion_tracker.EnterLayer(it);
+  for (EffectTreeLayerListIterator it(this);
+       it.state() != EffectTreeLayerListIterator::State::kEnd; ++it) {
+    occlusion_tracker.EnterLayer(it);
 
-      if (it.state() == EffectTreeLayerListIterator::State::LAYER) {
-        LayerImpl* layer = it.current_layer();
-        layer->draw_properties().occlusion_in_content_space =
-            occlusion_tracker.GetCurrentOcclusionForLayer(
-                layer->DrawTransform());
-      }
-
-      // TODO(khushalsagar) : Skip computing occlusion for shared elements. See
-      // crbug.com/1258058.
-      if (it.state() ==
-          EffectTreeLayerListIterator::State::CONTRIBUTING_SURFACE) {
-        const RenderSurfaceImpl* occlusion_surface =
-            occlusion_tracker.OcclusionSurfaceForContributingSurface();
-        gfx::Transform draw_transform;
-        RenderSurfaceImpl* render_surface = it.current_render_surface();
-        if (occlusion_surface) {
-          // We are calculating transform between two render surfaces. So, we
-          // need to apply the surface contents scale at target and remove the
-          // surface contents scale at source.
-          property_trees()->GetToTarget(render_surface->TransformTreeIndex(),
-                                        occlusion_surface->EffectTreeIndex(),
-                                        &draw_transform);
-          const EffectNode* effect_node = property_trees()->effect_tree().Node(
-              render_surface->EffectTreeIndex());
-          draw_property_utils::ConcatInverseSurfaceContentsScale(
-              effect_node, &draw_transform);
-        }
-
-        Occlusion occlusion =
-            occlusion_tracker.GetCurrentOcclusionForContributingSurface(
-                draw_transform);
-        render_surface->set_occlusion_in_content_space(occlusion);
-      }
-
-      occlusion_tracker.LeaveLayer(it);
+    if (it.state() == EffectTreeLayerListIterator::State::kLayer) {
+      LayerImpl* layer = it.current_layer();
+      layer->draw_properties().occlusion_in_content_space =
+          occlusion_tracker.GetCurrentOcclusionForLayer(layer->DrawTransform());
     }
 
-    unoccluded_screen_space_region_ =
-        occlusion_tracker.ComputeVisibleRegionInScreen(this);
-  } else {
-    // No occlusion, entire root content rect is unoccluded.
-    unoccluded_screen_space_region_ =
-        Region(RootRenderSurface()->content_rect());
+    // TODO(khushalsagar) : Skip computing occlusion for shared elements. See
+    // crbug.com/1258058.
+    if (it.state() ==
+        EffectTreeLayerListIterator::State::kContributingSurface) {
+      const RenderSurfaceImpl* occlusion_surface =
+          occlusion_tracker.OcclusionSurfaceForContributingSurface();
+      gfx::Transform draw_transform;
+      RenderSurfaceImpl* render_surface = it.current_render_surface();
+      if (occlusion_surface) {
+        // We are calculating transform between two render surfaces. So, we
+        // need to apply the surface contents scale at target and remove the
+        // surface contents scale at source.
+        property_trees()->GetToTarget(render_surface->TransformTreeIndex(),
+                                      occlusion_surface->EffectTreeIndex(),
+                                      &draw_transform);
+        const EffectNode* effect_node = property_trees()->effect_tree().Node(
+            render_surface->EffectTreeIndex());
+        draw_property_utils::ConcatInverseSurfaceContentsScale(effect_node,
+                                                               &draw_transform);
+      }
+
+      Occlusion occlusion =
+          occlusion_tracker.GetCurrentOcclusionForContributingSurface(
+              draw_transform);
+      render_surface->set_occlusion_in_content_space(occlusion);
+    }
+
+    occlusion_tracker.LeaveLayer(it);
   }
+
+  unoccluded_screen_space_region_ =
+      occlusion_tracker.ComputeVisibleRegionInScreen(this);
 
   // Resourceless draw do not need tiles and should not affect existing tile
   // priorities.
@@ -1848,7 +1840,7 @@ const LayerTreeDebugState& LayerTreeImpl::debug_state() const {
   return host_impl_->debug_state();
 }
 
-viz::ContextProvider* LayerTreeImpl::context_provider() const {
+viz::RasterContextProvider* LayerTreeImpl::context_provider() const {
   return host_impl_->layer_tree_frame_sink()->context_provider();
 }
 
@@ -1969,10 +1961,6 @@ void LayerTreeImpl::DidAnimateScrollOffset() {
 
 bool LayerTreeImpl::use_gpu_rasterization() const {
   return host_impl_->use_gpu_rasterization();
-}
-
-GpuRasterizationStatus LayerTreeImpl::GetGpuRasterizationStatus() const {
-  return host_impl_->gpu_rasterization_status();
 }
 
 bool LayerTreeImpl::create_low_res_tiling() const {
@@ -2176,7 +2164,7 @@ void LayerTreeImpl::RegisterScrollbar(ScrollbarLayerImplBase* scrollbar_layer) {
 
   auto* scrollbar_ids = &element_id_to_scrollbar_layer_ids_[scroll_element_id];
   int* scrollbar_layer_id =
-      scrollbar_layer->orientation() == ScrollbarOrientation::HORIZONTAL
+      scrollbar_layer->orientation() == ScrollbarOrientation::kHorizontal
           ? &scrollbar_ids->horizontal
           : &scrollbar_ids->vertical;
 
@@ -2192,7 +2180,7 @@ void LayerTreeImpl::RegisterScrollbar(ScrollbarLayerImplBase* scrollbar_layer) {
     // The scrollbar_ids could have been erased above so get it again.
     scrollbar_ids = &element_id_to_scrollbar_layer_ids_[scroll_element_id];
     scrollbar_layer_id =
-        scrollbar_layer->orientation() == ScrollbarOrientation::HORIZONTAL
+        scrollbar_layer->orientation() == ScrollbarOrientation::kHorizontal
             ? &scrollbar_ids->horizontal
             : &scrollbar_ids->vertical;
   }
@@ -2207,6 +2195,11 @@ void LayerTreeImpl::RegisterScrollbar(ScrollbarLayerImplBase* scrollbar_layer) {
   if (IsActiveTree() && scrollbar_layer->is_overlay_scrollbar() &&
       scrollbar_layer->GetScrollbarAnimator() !=
           LayerTreeSettings::NO_ANIMATOR) {
+    // Fluent overlay scrollbars are invisible until the DidRequestShow gets
+    // called.
+    if (scrollbar_layer->IsFluentOverlayScrollbarEnabled()) {
+      scrollbar_layer->SetOverlayScrollbarLayerOpacityAnimated(0.f);
+    }
     host_impl_->RegisterScrollbarAnimationController(
         scroll_element_id, scrollbar_layer->Opacity());
   }
@@ -2222,10 +2215,11 @@ void LayerTreeImpl::UnregisterScrollbar(
     return;
 
   auto& scrollbar_ids = element_id_to_scrollbar_layer_ids_[scroll_element_id];
-  if (scrollbar_layer->orientation() == ScrollbarOrientation::HORIZONTAL)
+  if (scrollbar_layer->orientation() == ScrollbarOrientation::kHorizontal) {
     scrollbar_ids.horizontal = Layer::INVALID_ID;
-  else
+  } else {
     scrollbar_ids.vertical = Layer::INVALID_ID;
+  }
 
   if (scrollbar_ids.horizontal == Layer::INVALID_ID &&
       scrollbar_ids.vertical == Layer::INVALID_ID) {
@@ -2538,7 +2532,7 @@ LayerTreeImpl::FindLayersHitByPointInNonFastScrollableRegion(
 }
 
 std::vector<const LayerImpl*>
-LayerTreeImpl::FindAllLayersUpToAndIncludingFirstScrollable(
+LayerTreeImpl::FindLayersUpToFirstScrollableOrOpaqueToHitTest(
     const gfx::PointF& screen_space_point) {
   std::vector<const LayerImpl*> layers;
   if (layer_list_.empty())
@@ -2593,8 +2587,9 @@ LayerTreeImpl::FindAllLayersUpToAndIncludingFirstScrollable(
           std::pair<const LayerImpl*, float>(layer, distance_to_intersection));
     } else {
       layers.push_back(layer);
-      if (layer->IsScrollerOrScrollbar())
+      if (layer->IsScrollerOrScrollbar() || layer->OpaqueToHitTest()) {
         break;
+      }
     }
   }
 
@@ -2621,8 +2616,9 @@ LayerTreeImpl::FindAllLayersUpToAndIncludingFirstScrollable(
       const LayerImpl* layer = pair.first;
 
       result.push_back(layer);
-      if (layer->IsScrollerOrScrollbar())
+      if (layer->IsScrollerOrScrollbar() || layer->OpaqueToHitTest()) {
         return result;
+      }
     }
     // Append 2D layers if none of the 3D layers were scrollable.
     result.insert(result.end(), layers.begin(), layers.end());

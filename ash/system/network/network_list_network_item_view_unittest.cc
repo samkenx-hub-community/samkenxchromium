@@ -181,7 +181,7 @@ class NetworkListNetworkItemViewTest
   std::unique_ptr<FakeNetworkDetailedNetworkView>
       fake_network_detailed_network_view_;
   CrosNetworkConfigTestHelper network_config_helper_;
-  raw_ptr<NetworkListNetworkItemView, ExperimentalAsh>
+  raw_ptr<NetworkListNetworkItemView, DanglingUntriaged | ExperimentalAsh>
       network_list_network_item_view_;
 };
 
@@ -303,6 +303,39 @@ TEST_P(NetworkListNetworkItemViewTest, HasCorrectCellularSublabel) {
   UpdateViewForNetwork(cellular_network);
   EXPECT_EQ(l10n_util::GetStringUTF16(
                 IDS_ASH_STATUS_TRAY_NETWORK_STATUS_SIGN_IN_TO_UNLOCK),
+            network_list_network_item_view()->sub_text_label()->GetText());
+}
+
+TEST_P(NetworkListNetworkItemViewTest, HasCorrectCarrierLockSublabel) {
+  base::test::ScopedFeatureList scoped_feature_list;
+  scoped_feature_list.InitAndEnableFeature(features::kCellularCarrierLock);
+  EXPECT_FALSE(network_list_network_item_view()->sub_text_label());
+  NetworkStatePropertiesPtr cellular_network =
+      CreateStandaloneNetworkProperties(kCellularName, NetworkType::kCellular,
+                                        ConnectionStateType::kConnected);
+  // Label for carrier locked cellular network.
+  cellular_network->type_state->get_cellular()->sim_locked = true;
+  cellular_network->type_state->get_cellular()->sim_lock_type = "network-pin";
+  UpdateViewForNetwork(cellular_network);
+  EXPECT_EQ(l10n_util::GetStringUTF16(
+                IDS_ASH_STATUS_TRAY_NETWORK_STATUS_CARRIER_LOCKED),
+            network_list_network_item_view()->sub_text_label()->GetText());
+}
+
+TEST_P(NetworkListNetworkItemViewTest,
+       HasCorrectCarrierLockSublabelFeatureDisable) {
+  base::test::ScopedFeatureList scoped_feature_list;
+  scoped_feature_list.InitAndDisableFeature(features::kCellularCarrierLock);
+  EXPECT_FALSE(network_list_network_item_view()->sub_text_label());
+  NetworkStatePropertiesPtr cellular_network =
+      CreateStandaloneNetworkProperties(kCellularName, NetworkType::kCellular,
+                                        ConnectionStateType::kConnected);
+  // When feature is disabled, existing string should be displayed
+  cellular_network->type_state->get_cellular()->sim_locked = true;
+  cellular_network->type_state->get_cellular()->sim_lock_type = "network-pin";
+  UpdateViewForNetwork(cellular_network);
+  EXPECT_EQ(l10n_util::GetStringUTF16(
+                IDS_ASH_STATUS_TRAY_NETWORK_STATUS_CLICK_TO_UNLOCK),
             network_list_network_item_view()->sub_text_label()->GetText());
 }
 

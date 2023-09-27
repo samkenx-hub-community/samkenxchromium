@@ -40,11 +40,6 @@ void RecordDownloadOpen(ChromeDownloadOpenMethod open_method,
                                 download::DownloadContent::MAX);
 }
 
-void RecordDownloadOpenButtonPressed(bool is_download_completed) {
-  base::UmaHistogramBoolean("Download.OpenButtonPressed.IsDownloadCompleted",
-                            is_download_completed);
-}
-
 void RecordDatabaseAvailability(bool is_available) {
   base::UmaHistogramBoolean("Download.Database.IsAvailable", is_available);
 }
@@ -100,12 +95,6 @@ void RecordDownloadPromptStatus(DownloadPromptStatus status) {
                                 DownloadPromptStatus::MAX_VALUE);
 }
 #endif  // BUILDFLAG(IS_ANDROID)
-
-#if BUILDFLAG(IS_CHROMEOS)
-void RecordDownloadNotificationSuppressed() {
-  base::UmaHistogramBoolean("Download.Notification.Suppressed", true);
-}
-#endif  // BUILDFLAG(IS_CHROMEOS)
 
 DownloadShelfContextMenuAction DownloadCommandToShelfAction(
     DownloadCommands::Command download_command,
@@ -169,6 +158,9 @@ DownloadShelfContextMenuAction DownloadCommandToShelfAction(
     // never be logged.
     case DownloadCommands::Command::REVIEW:
     case DownloadCommands::Command::RETRY:
+    case DownloadCommands::Command::CANCEL_DEEP_SCAN:
+    case DownloadCommands::Command::LEARN_MORE_DOWNLOAD_BLOCKED:
+    case DownloadCommands::Command::OPEN_SAFE_BROWSING_SETTING:
       NOTREACHED();
       return DownloadShelfContextMenuAction::kNotReached;
   }

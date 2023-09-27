@@ -10,11 +10,9 @@
 #include <vector>
 
 #include "base/functional/callback.h"
-#include "base/memory/scoped_refptr.h"
 #include "base/types/strong_alias.h"
 #include "build/build_config.h"
 #include "components/autofill/core/common/language_code.h"
-#include "components/autofill/core/common/mojom/autofill_types.mojom.h"
 #include "components/autofill/core/common/password_generation_util.h"
 #include "components/autofill/core/common/unique_ids.h"
 #include "components/password_manager/core/browser/credentials_filter.h"
@@ -23,21 +21,14 @@
 #include "components/password_manager/core/browser/leak_detection_dialog_utils.h"
 #include "components/password_manager/core/browser/manage_passwords_referrer.h"
 #include "components/password_manager/core/browser/password_manager.h"
-#include "components/password_manager/core/browser/password_manager_metrics_util.h"
-#include "components/password_manager/core/browser/password_reuse_detector.h"
 #include "components/password_manager/core/browser/password_store_backend_error.h"
 #include "components/password_manager/core/browser/webauthn_credentials_delegate.h"
 #include "components/profile_metrics/browser_profile_type.h"
 #include "components/safe_browsing/buildflags.h"
 #include "components/sync/service/sync_service.h"
 #include "net/cert/cert_status_flags.h"
-#include "services/metrics/public/cpp/ukm_recorder.h"
 
 class PrefService;
-
-#if BUILDFLAG(IS_ANDROID)
-class WebAuthnCredManDelegate;
-#endif  // BUILDFLAG(IS_ANDROID)
 
 namespace autofill {
 class AutofillDownloadManager;
@@ -79,6 +70,12 @@ namespace version_info {
 enum class Channel;
 }
 
+namespace webauthn {
+#if BUILDFLAG(IS_ANDROID)
+class WebAuthnCredManDelegate;
+#endif  // BUILDFLAG(IS_ANDROID)
+}  // namespace webauthn
+
 namespace password_manager {
 
 class FieldInfoManager;
@@ -106,6 +103,17 @@ enum class SyncState {
 };
 
 enum class ErrorMessageFlowType { kSaveFlow, kFillFlow };
+
+#if BUILDFLAG(IS_ANDROID)
+struct SubmissionReadinessParams {
+  autofill::FormData form;
+  uint64_t username_field_index;
+  uint64_t password_field_index;
+  // TODO(crbug/1462532): Remove this param after
+  // PasswordSuggestionBottomSheetV2 is launched.
+  autofill::mojom::SubmissionReadinessState submission_readiness;
+};
+#endif  // BUILDFLAG(IS_ANDROID)
 
 // An abstraction of operations that depend on the embedders (e.g. Chrome)
 // environment. PasswordManagerClient is instantiated once per WebContents.
@@ -205,13 +213,13 @@ class PasswordManagerClient {
   // TouchToFill).
   virtual void ShowKeyboardReplacingSurface(
       PasswordManagerDriver* driver,
-      autofill::mojom::SubmissionReadinessState submission_readiness,
+      const SubmissionReadinessParams& submission_readiness_params,
       bool is_webauthn_form);
 #endif
 
   // Returns a pointer to a DeviceAuthenticator. Might be null if
   // BiometricAuthentication is not available for a given platform.
-  virtual scoped_refptr<device_reauth::DeviceAuthenticator>
+  virtual std::unique_ptr<device_reauth::DeviceAuthenticator>
   GetDeviceAuthenticator();
 
   // Informs the embedder that the user has requested to generate a
@@ -439,6 +447,9 @@ class PasswordManagerClient {
   // Returns the identity manager for profile.
   virtual signin::IdentityManager* GetIdentityManager() = 0;
 
+  // Returns the field info manager for profile.
+  virtual password_manager::FieldInfoManager* GetFieldInfoManager() const;
+
   // Returns a pointer to the URLLoaderFactory owned by the storage partition of
   // the current profile.
   virtual scoped_refptr<network::SharedURLLoaderFactory>
@@ -465,17 +476,14 @@ class PasswordManagerClient {
   // Returns true if the current page is to the new tab page.
   virtual bool IsNewTabPage() const = 0;
 
-  // Returns a FieldInfoManager associated with the current profile.
-  virtual FieldInfoManager* GetFieldInfoManager() const = 0;
-
   // Returns the WebAuthnCredentialsDelegate for the given driver, if available.
   virtual WebAuthnCredentialsDelegate* GetWebAuthnCredentialsDelegateForDriver(
       PasswordManagerDriver* driver);
 
 #if BUILDFLAG(IS_ANDROID)
   // Returns the WebAuthnCredManDelegate for the driver.
-  virtual WebAuthnCredManDelegate* GetWebAuthnCredManDelegateForDriver(
-      PasswordManagerDriver* driver);
+  virtual webauthn::WebAuthnCredManDelegate*
+  GetWebAuthnCredManDelegateForDriver(PasswordManagerDriver* driver);
 #endif  // BUILDFLAG(IS_ANDROID)
 
   // Returns the Chrome channel for the installation.

@@ -17,7 +17,7 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/common/extensions/api/autofill_private.h"
 #include "chrome/common/pref_names.h"
-#include "chrome/grit/chromium_strings.h"
+#include "chrome/grit/branded_strings.h"
 #include "components/autofill/core/browser/autofill_type.h"
 #include "components/autofill/core/browser/data_model/autofill_profile.h"
 #include "components/autofill/core/browser/data_model/credit_card.h"
@@ -25,6 +25,7 @@
 #include "components/autofill/core/browser/field_types.h"
 #include "components/autofill/core/browser/geo/autofill_country.h"
 #include "components/autofill/core/browser/ui/country_combobox_model.h"
+#include "components/autofill/core/browser/webdata/autofill_table.h"
 #include "components/autofill/core/common/autofill_payments_features.h"
 #include "components/autofill/core/common/autofill_prefs.h"
 #include "components/prefs/pref_service.h"
@@ -93,26 +94,17 @@ autofill_private::AddressEntry ProfileToAddressEntry(
 
   // Add all address fields to the entry.
   address.guid = profile.guid();
-  address.full_names = GetList(profile, autofill::NAME_FULL);
-  address.honorific =
-      GetStringFromProfile(profile, autofill::NAME_HONORIFIC_PREFIX);
-  address.company_name = GetStringFromProfile(profile, autofill::COMPANY_NAME);
-  address.address_lines =
-      GetStringFromProfile(profile, autofill::ADDRESS_HOME_STREET_ADDRESS);
-  address.address_level1 =
-      GetStringFromProfile(profile, autofill::ADDRESS_HOME_STATE);
-  address.address_level2 =
-      GetStringFromProfile(profile, autofill::ADDRESS_HOME_CITY);
-  address.address_level3 =
-      GetStringFromProfile(profile, autofill::ADDRESS_HOME_DEPENDENT_LOCALITY);
-  address.postal_code =
-      GetStringFromProfile(profile, autofill::ADDRESS_HOME_ZIP);
-  address.sorting_code =
-      GetStringFromProfile(profile, autofill::ADDRESS_HOME_SORTING_CODE);
-  address.country_code =
-      GetStringFromProfile(profile, autofill::ADDRESS_HOME_COUNTRY);
-  address.phone_numbers = GetList(profile, autofill::PHONE_HOME_WHOLE_NUMBER);
-  address.email_addresses = GetList(profile, autofill::EMAIL_ADDRESS);
+
+  base::ranges::transform(
+      autofill::AutofillTable::GetStoredTypesForAutofillProfile(),
+      back_inserter(address.fields), [&profile](auto field_type) {
+        autofill_private::AddressField field;
+        field.type = autofill_private::ParseServerFieldType(
+            FieldTypeToStringPiece(field_type));
+        field.value = GetStringFromProfile(profile, field_type);
+        return field;
+      });
+
   address.language_code = profile.language_code();
 
   // Parse |label| so that it can be used to create address metadata.
@@ -200,9 +192,10 @@ autofill_private::CreditCardEntry CreditCardToCreditCardEntry(
   autofill_private::CreditCardEntry card;
 
   // Add all credit card fields to the entry.
-  card.guid = credit_card.record_type() == autofill::CreditCard::LOCAL_CARD
-                  ? credit_card.guid()
-                  : credit_card.server_id();
+  card.guid =
+      credit_card.record_type() == autofill::CreditCard::RecordType::kLocalCard
+          ? credit_card.guid()
+          : credit_card.server_id();
   card.name = base::UTF16ToUTF8(
       credit_card.GetRawInfo(autofill::CREDIT_CARD_NAME_FULL));
   card.card_number =
@@ -232,9 +225,9 @@ autofill_private::CreditCardEntry CreditCardToCreditCardEntry(
   card.metadata->summary_label = base::UTF16ToUTF8(label_pieces.first);
   card.metadata->summary_sublabel = base::UTF16ToUTF8(label_pieces.second);
   card.metadata->is_local =
-      credit_card.record_type() == autofill::CreditCard::LOCAL_CARD;
-  card.metadata->is_cached =
-      credit_card.record_type() == autofill::CreditCard::FULL_SERVER_CARD;
+      credit_card.record_type() == autofill::CreditCard::RecordType::kLocalCard;
+  card.metadata->is_cached = credit_card.record_type() ==
+                             autofill::CreditCard::RecordType::kFullServerCard;
   // IsValid() checks if both card number and expiration date are valid.
   // IsServerCard() checks whether there is a duplicated server card in
   // |personal_data|.
@@ -242,19 +235,19 @@ autofill_private::CreditCardEntry CreditCardToCreditCardEntry(
       credit_card.IsValid() && !personal_data.IsServerCard(&credit_card);
   card.metadata->is_virtual_card_enrollment_eligible =
       credit_card.virtual_card_enrollment_state() ==
-          autofill::CreditCard::VirtualCardEnrollmentState::ENROLLED ||
+          autofill::CreditCard::VirtualCardEnrollmentState::kEnrolled ||
       credit_card.virtual_card_enrollment_state() ==
           autofill::CreditCard::VirtualCardEnrollmentState::
-              UNENROLLED_AND_ELIGIBLE;
+              kUnenrolledAndEligible;
   card.metadata->is_virtual_card_enrolled =
       credit_card.virtual_card_enrollment_state() ==
-      autofill::CreditCard::VirtualCardEnrollmentState::ENROLLED;
+      autofill::CreditCard::VirtualCardEnrollmentState::kEnrolled;
 
   return card;
 }
 
 autofill_private::IbanEntry IbanToIbanEntry(
-    const autofill::IBAN& iban,
+    const autofill::Iban& iban,
     const autofill::PersonalDataManager& personal_data) {
   autofill_private::IbanEntry iban_entry;
 
@@ -326,8 +319,9 @@ CreditCardEntryList GenerateCreditCardList(
 IbanEntryList GenerateIbanList(
     const autofill::PersonalDataManager& personal_data) {
   IbanEntryList list;
-  for (const autofill::IBAN* iban : personal_data.GetLocalIBANs())
+  for (const autofill::Iban* iban : personal_data.GetLocalIbans()) {
     list.push_back(IbanToIbanEntry(*iban, personal_data));
+  }
 
   return list;
 }
@@ -343,21 +337,10 @@ absl::optional<api::autofill_private::AccountInfo> GetAccountInfo(
   api::autofill_private::AccountInfo api_account;
   api_account.email = account->email;
   api_account.is_sync_enabled_for_autofill_profiles =
-      personal_data.IsSyncEnabledFor(syncer::UserSelectableType::kAutofill);
+      personal_data.IsSyncFeatureEnabledForAutofill();
   api_account.is_eligible_for_address_account_storage =
       personal_data.IsEligibleForAddressAccountStorage();
   return std::move(api_account);
-}
-
-void AuthenticateUser(
-    scoped_refptr<device_reauth::DeviceAuthenticator> device_authenticator,
-    const std::u16string& prompt_message,
-    CallbackAfterSuccessfulUserAuth callback) {
-#if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
-  CHECK(device_authenticator);
-  device_authenticator->AuthenticateWithMessage(prompt_message,
-                                                std::move(callback));
-#endif
 }
 
 }  // namespace extensions::autofill_util

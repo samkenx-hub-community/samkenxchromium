@@ -17,6 +17,7 @@
 #include "ash/system/model/clock_model.h"
 #include "ash/system/model/system_tray_model.h"
 #include "ash/system/time/calendar_utils.h"
+#include "ash/system/time/time_view_utils.h"
 #include "ash/system/tray/tray_constants.h"
 #include "ash/system/tray/tray_popup_utils.h"
 #include "ash/system/tray/tray_utils.h"
@@ -26,6 +27,7 @@
 #include "base/i18n/time_formatting.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
+#include "chromeos/constants/chromeos_features.h"
 #include "third_party/icu/source/i18n/unicode/datefmt.h"
 #include "third_party/icu/source/i18n/unicode/dtptngen.h"
 #include "third_party/icu/source/i18n/unicode/smpdtfmt.h"
@@ -33,6 +35,7 @@
 #include "ui/accessibility/ax_node_data.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
+#include "ui/chromeos/styles/cros_tokens_color_mappings.h"
 #include "ui/color/color_id.h"
 #include "ui/events/event.h"
 #include "ui/events/types/event_type.h"
@@ -50,10 +53,6 @@
 
 namespace ash {
 namespace {
-
-// Amount of slop to add into the timer to make sure we're into the next minute
-// when the timer goes off.
-const int kTimerSlopSeconds = 1;
 
 // Padding between the left edge of the shelf and the left edge of the vertical
 // clock.
@@ -77,7 +76,7 @@ const int kVerticalClockMinutesTopOffset = -2;
 std::u16string FormatDate(const base::Time& time) {
   // Use 'short' month format (e.g., "Oct") followed by non-padded day of
   // month (e.g., "2", "10").
-  return base::TimeFormatWithPattern(time, "LLLd");
+  return base::LocalizedTimeFormatWithPattern(time, "LLLd");
 }
 
 // Returns the time to show by the time view.
@@ -108,12 +107,20 @@ VerticalDateView::VerticalDateView()
   UpdateText();
   text_label_->SetBorder(views::CreateEmptyBorder(
       gfx::Insets::TLBR(kVerticalDateVerticalPadding, 0, 0, 0)));
+  UpdateIconAndLabelColorId(cros_tokens::kCrosSysOnSurface);
 }
 
 VerticalDateView::~VerticalDateView() = default;
 
 void VerticalDateView::OnThemeChanged() {
   views::View::OnThemeChanged();
+
+  // For Jelly: color ids are already set and theme change will be handled
+  // automatically.
+  if (chromeos::features::IsJellyEnabled()) {
+    return;
+  }
+
   text_label_->SetEnabledColor(AshColorProvider::Get()->GetContentLayerColor(
       AshColorProvider::ContentLayerType::kTextColorPrimary));
   icon_->SetImage(gfx::CreateVectorIcon(
@@ -130,6 +137,16 @@ void VerticalDateView::UpdateText() {
     return;
   text_label_->SetText(new_text);
   text_label_->SetTooltipText(base::TimeFormatFriendlyDate(time_to_show));
+}
+
+void VerticalDateView::UpdateIconAndLabelColorId(ui::ColorId color_id) {
+  if (!chromeos::features::IsJellyEnabled()) {
+    return;
+  }
+
+  text_label_->SetEnabledColorId(color_id);
+  icon_->SetImage(
+      ui::ImageModel::FromVectorIcon(kCalendarBackgroundIcon, color_id));
 }
 
 TimeView::TimeView(ClockLayout clock_layout, ClockModel* model, Type type)
@@ -251,6 +268,12 @@ void TimeView::SetTextShadowValues(const gfx::ShadowValues& shadows) {
       return;
     case kDate:
       horizontal_label_date_->SetShadows(shadows);
+  }
+}
+
+void TimeView::SetDateViewColorId(ui::ColorId color_id) {
+  if (chromeos::features::IsJellyEnabled() && date_view_) {
+    date_view_->UpdateIconAndLabelColorId(color_id);
   }
 }
 
@@ -426,25 +449,9 @@ void TimeView::SetupLabel(views::Label* label) {
 }
 
 void TimeView::SetTimer(const base::Time& now) {
-  // Try to set the timer to go off at the next change of the minute. We don't
-  // want to have the timer go off more than necessary since that will cause
-  // the CPU to wake up and consume power.
-  base::Time::Exploded exploded;
-  now.LocalExplode(&exploded);
-
-  // Often this will be called at minute boundaries, and we'll actually want
-  // 60 seconds from now.
-  int seconds_left = 60 - exploded.second;
-  if (seconds_left == 0)
-    seconds_left = 60;
-
-  // Make sure that the timer fires on the next minute. Without this, if it is
-  // called just a teeny bit early, then it will skip the next minute.
-  seconds_left += kTimerSlopSeconds;
-
   timer_.Stop();
-  timer_.Start(FROM_HERE, base::Seconds(seconds_left), this,
-               &TimeView::UpdateText);
+  timer_.Start(FROM_HERE, time_view_utils::GetTimeRemainingToNextMinute(now),
+               this, &TimeView::UpdateText);
 }
 
 BEGIN_METADATA(TimeView, ActionableView)

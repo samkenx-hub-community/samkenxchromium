@@ -49,7 +49,7 @@ suite('<settings-cursor-and-touchpad-page>', () => {
     deviceBrowserProxy.hasPointingStick = false;
     DevicePageBrowserProxyImpl.setInstanceForTesting(deviceBrowserProxy);
 
-    document.body.innerHTML = '';
+    document.body.innerHTML = window.trustedTypes!.emptyHTML;
     Router.getInstance().navigateTo(routes.A11Y_CURSOR_AND_TOUCHPAD);
   });
 
@@ -112,7 +112,7 @@ suite('<settings-cursor-and-touchpad-page>', () => {
         const popStateEventPromise = eventToPromise('popstate', window);
         router.navigateToPreviousRoute();
         await popStateEventPromise;
-        await waitBeforeNextRender(page);
+        await waitAfterNextRender(page);
 
         assertEquals(routes.A11Y_CURSOR_AND_TOUCHPAD, router.currentRoute);
         assertEquals(
@@ -372,5 +372,49 @@ suite('<settings-cursor-and-touchpad-page>', () => {
         flush();
         assertTrue(cursorHighlightToggle.checked);
         assertTrue(page.prefs.settings.a11y.cursor_highlight.value);
+      });
+
+  test(
+      'face tracking feature does not show if the feature flag is disabled',
+      async () => {
+        loadTimeData.overrideValues({
+          isAccessibilityGameFaceIntegrationEnabled: false,
+        });
+
+        await initPage();
+        const faceTrackingToggle =
+            page.shadowRoot!.querySelector<SettingsToggleButtonElement>(
+                '#faceTrackingToggle');
+        assertEquals(null, faceTrackingToggle);
+      });
+
+  test(
+      'face tracking feature shows if the feature flag is enabled',
+      async () => {
+        loadTimeData.overrideValues({
+          isAccessibilityGameFaceIntegrationEnabled: true,
+        });
+
+        await initPage();
+        const faceTrackingToggle =
+            page.shadowRoot!.querySelector<SettingsToggleButtonElement>(
+                '#faceTrackingToggle');
+        assert(faceTrackingToggle);
+        assertTrue(isVisible(faceTrackingToggle));
+
+        const faceTrackingSettingsButton =
+            page.shadowRoot!.querySelector('#faceTrackingSettingsButton');
+        assert(faceTrackingSettingsButton);
+        assertFalse(isVisible(faceTrackingSettingsButton));
+
+        assertFalse(faceTrackingToggle.checked);
+        assertFalse(page.prefs.settings.a11y.face_tracking.enabled.value);
+        faceTrackingToggle.click();
+
+        await waitBeforeNextRender(page);
+        flush();
+        assertTrue(faceTrackingToggle.checked);
+        assertTrue(page.prefs.settings.a11y.face_tracking.enabled.value);
+        assertTrue(isVisible(faceTrackingSettingsButton));
       });
 });

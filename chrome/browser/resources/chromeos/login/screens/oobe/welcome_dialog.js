@@ -6,9 +6,12 @@ import '//resources/polymer/v3_0/paper-styles/color.js';
 import '//resources/js/action_link.js';
 import '//resources/cr_elements/cr_shared_style.css.js';
 import '../../components/oobe_icons.html.js';
+import '../../components/oobe_illo_icons.html.js';
 import '../../components/common_styles/oobe_dialog_host_styles.css.js';
 import '../../components/oobe_vars/oobe_shared_vars.css.js';
 import '../../components/buttons/oobe_icon_button.js';
+import '../../components/hd_iron_icon.js';
+import '../../components/quick_start_entry_point.js';
 
 import {assert} from '//resources/ash/common/assert.js';
 import {loadTimeData} from '//resources/ash/common/load_time_data.m.js';
@@ -102,6 +105,11 @@ export class OobeWelcomeDialog extends OobeWelcomeDialogBase {
         readOnly: true,
       },
 
+      isOobeLoaded_: {
+        type: Boolean,
+        value: false,
+      },
+
       isQuickStartEnabled: Boolean,
     };
   }
@@ -150,6 +158,7 @@ export class OobeWelcomeDialog extends OobeWelcomeDialogBase {
       'oobe-screens-loaded', this.enableButtonsWhenLoaded.bind(this));
     this.$.getStarted.disabled = false;
     this.$.enableDebuggingButton.disabled = false;
+    this.isOobeLoaded_ = true;
   }
 
   onLanguageClicked_(e) {
@@ -260,6 +269,16 @@ export class OobeWelcomeDialog extends OobeWelcomeDialogBase {
    * @suppress {missingProperties}
    */
   setVideoPlay_(play) {
+    // Postpone the call until OOBE is loaded, if necessary.
+    if (!this.isOobeLoaded_) {
+      document.addEventListener(
+        'oobe-screens-loaded', () => {
+          this.isOobeLoaded_ = true;
+          this.setVideoPlay_(play);
+        }, { once: true });
+      return;
+    }
+
     if (this.$$('#welcomeAnimation')) {
       this.$$('#welcomeAnimation').playing = play;
     }

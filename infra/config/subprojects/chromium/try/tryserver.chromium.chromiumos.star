@@ -5,7 +5,7 @@
 
 load("//lib/branches.star", "branches")
 load("//lib/builder_config.star", "builder_config")
-load("//lib/builders.star", "os", "reclient")
+load("//lib/builders.star", "os", "reclient", "siso")
 load("//lib/try.star", "try_")
 load("//lib/consoles.star", "consoles")
 load("//project.star", "settings")
@@ -23,11 +23,21 @@ try_.defaults.set(
     reclient_instance = reclient.instance.DEFAULT_UNTRUSTED,
     reclient_jobs = reclient.jobs.LOW_JOBS_FOR_CQ,
     service_account = try_.DEFAULT_SERVICE_ACCOUNT,
+    siso_enable_cloud_profiler = True,
+    siso_enable_cloud_trace = True,
+    siso_project = siso.project.DEFAULT_UNTRUSTED,
 )
 
 consoles.list_view(
     name = "tryserver.chromium.chromiumos",
     branch_selector = branches.selector.CROS_LTS_BRANCHES,
+)
+
+try_.builder(
+    name = "chromeos-amd64-generic-asan-rel",
+    mirrors = [
+        "ci/chromeos-amd64-generic-asan-rel",
+    ],
 )
 
 try_.builder(
@@ -75,6 +85,35 @@ try_.compilator_builder(
     main_list_view = "try",
 )
 
+try_.orchestrator_builder(
+    name = "chromeos-amd64-generic-siso-rel",
+    description_html = """\
+This builder shadows chromeos-amd64-generic-rel builder to compare between Siso builds and Ninja builds.<br/>
+This builder should be removed after migrating chromeos-amd64-generic-rel from Ninja to Siso. b/277863839
+""",
+    mirrors = builder_config.copy_from("try/chromeos-amd64-generic-rel"),
+    try_settings = builder_config.try_settings(
+        is_compile_only = True,
+    ),
+    compilator = "chromeos-amd64-generic-siso-rel-compilator",
+    experiments = {
+        # go/nplus1shardsproposal
+        "chromium.add_one_test_shard": 10,
+    },
+    main_list_view = "try",
+    tryjob = try_.job(
+        # TODO(b/277863839): increase percentage.
+        # TODO(b/294160948): Siso doesn't support cxx actions for lacros.
+        experiment_percentage = 0.01,
+    ),
+)
+
+try_.compilator_builder(
+    name = "chromeos-amd64-generic-siso-rel-compilator",
+    main_list_view = "try",
+    siso_enabled = True,
+)
+
 try_.builder(
     name = "chromeos-arm-generic-dbg",
     mirrors = [
@@ -111,62 +150,9 @@ try_.builder(
 try_.builder(
     name = "lacros-amd64-generic-rel-skylab",
     branch_selector = branches.selector.CROS_BRANCHES,
-    builder_spec = builder_config.builder_spec(
-        gclient_config = builder_config.gclient_config(
-            config = "chromium",
-            apply_configs = [
-                "checkout_lacros_sdk",
-                "chromeos",
-            ],
-        ),
-        chromium_config = builder_config.chromium_config(
-            config = "chromium",
-            apply_configs = [
-                "mb",
-            ],
-            build_config = builder_config.build_config.RELEASE,
-            target_arch = builder_config.target_arch.INTEL,
-            target_bits = 64,
-            target_platform = builder_config.target_platform.CHROMEOS,
-            target_cros_boards = [
-                "amd64-generic",
-            ],
-        ),
-        build_gs_bucket = "chromium-chromiumos-archive",
-        # TODO(https://crbug.com/1399919): change skylab_upload_location
-        # as a property. Change try builder as CI mirrors
-        skylab_upload_location = builder_config.skylab_upload_location(
-            gs_bucket = "chromium-try-skylab",
-        ),
-    ),
-)
-
-try_.builder(
-    name = "lacros-amd64-generic-rel-skylab-fyi",
-    branch_selector = branches.selector.CROS_BRANCHES,
-    builder_spec = builder_config.builder_spec(
-        gclient_config = builder_config.gclient_config(
-            config = "chromium",
-            apply_configs = [
-                "chromeos",
-                "checkout_lacros_sdk",
-            ],
-        ),
-        chromium_config = builder_config.chromium_config(
-            config = "chromium",
-            apply_configs = ["mb", "mb_no_luci_auth"],
-            target_bits = 64,
-            target_platform = "chromeos",
-            target_cros_boards = "eve",
-            cros_boards_with_qemu_images = "amd64-generic",
-        ),
-        build_gs_bucket = "chromium-fyi-archive",
-        skylab_upload_location = builder_config.skylab_upload_location(
-            gs_bucket = "gs://lacros-amd64-generic-rel-skylab-try",
-        ),
-    ),
-    builderless = not settings.is_main,
-    main_list_view = "try",
+    mirrors = [
+        "ci/lacros-amd64-generic-rel-skylab",
+    ],
 )
 
 try_.builder(
@@ -259,7 +245,38 @@ try_.orchestrator_builder(
 try_.compilator_builder(
     name = "linux-chromeos-rel-compilator",
     branch_selector = branches.selector.CROS_LTS_BRANCHES,
+    cores = 32,
     main_list_view = "try",
+)
+
+try_.orchestrator_builder(
+    name = "linux-chromeos-siso-rel",
+    description_html = """\
+This builder shadows linux-chromeos-rel builder to compare between Siso builds and Ninja builds.<br/>
+This builder should be removed after migrating linux-chromeos-rel from Ninja to Siso. b/277863839
+""",
+    mirrors = builder_config.copy_from("try/linux-chromeos-rel"),
+    try_settings = builder_config.try_settings(
+        is_compile_only = True,
+    ),
+    compilator = "linux-chromeos-siso-rel-compilator",
+    coverage_test_types = ["unit", "overall"],
+    experiments = {
+        # go/nplus1shardsproposal
+        "chromium.add_one_test_shard": 10,
+    },
+    main_list_view = "try",
+    tryjob = try_.job(
+        experiment_percentage = 20,
+    ),
+    use_clang_coverage = True,
+)
+
+try_.compilator_builder(
+    name = "linux-chromeos-siso-rel-compilator",
+    cores = 32,
+    main_list_view = "try",
+    siso_enabled = True,
 )
 
 try_.builder(
@@ -277,10 +294,11 @@ try_.orchestrator_builder(
         "ci/linux-lacros-builder-rel",
         "ci/linux-lacros-tester-rel",
     ],
-    check_for_flakiness = True,
     compilator = "linux-lacros-rel-compilator",
+    coverage_test_types = ["unit", "overall"],
     main_list_view = "try",
     tryjob = try_.job(),
+    use_clang_coverage = True,
     # TODO(crbug.com/1372179): Use orchestrator pool once overloaded test pools
     # are addressed
     # use_orchestrator_pool = True,
@@ -291,6 +309,32 @@ try_.compilator_builder(
     branch_selector = branches.selector.CROS_BRANCHES,
     cores = 32,
     main_list_view = "try",
+)
+
+try_.orchestrator_builder(
+    name = "linux-lacros-siso-rel",
+    description_html = """\
+This builder shadows linux-lacros-rel builder to compare between Siso builds and Ninja builds.<br/>
+This builder should be removed after migrating linux-lacros-rel from Ninja to Siso. b/277863839
+""",
+    mirrors = builder_config.copy_from("try/linux-lacros-rel"),
+    try_settings = builder_config.try_settings(
+        is_compile_only = True,
+    ),
+    compilator = "linux-lacros-siso-rel-compilator",
+    coverage_test_types = ["unit", "overall"],
+    main_list_view = "try",
+    tryjob = try_.job(
+        experiment_percentage = 20,
+    ),
+    use_clang_coverage = True,
+)
+
+try_.compilator_builder(
+    name = "linux-lacros-siso-rel-compilator",
+    cores = 32,
+    main_list_view = "try",
+    siso_enabled = True,
 )
 
 try_.builder(
@@ -327,43 +371,4 @@ try_.builder(
             "chrome/test/data/webui/chromeos/chromebox_for_meetings/.+",
         ],
     ),
-)
-
-try_.builder(
-    name = "chromeos-amd64-generic-rel-rts",
-    mirrors = builder_config.copy_from("try/chromeos-amd64-generic-rel"),
-    try_settings = builder_config.try_settings(
-        rts_config = builder_config.rts_config(
-            condition = builder_config.rts_condition.QUICK_RUN_ONLY,
-        ),
-    ),
-    experiments = {
-        "chromium_rts.inverted_rts": 100,
-    },
-)
-
-try_.builder(
-    name = "linux-chromeos-rel-rts",
-    mirrors = builder_config.copy_from("try/linux-chromeos-rel"),
-    try_settings = builder_config.try_settings(
-        rts_config = builder_config.rts_config(
-            condition = builder_config.rts_condition.QUICK_RUN_ONLY,
-        ),
-    ),
-    experiments = {
-        "chromium_rts.inverted_rts": 100,
-    },
-)
-
-try_.builder(
-    name = "linux-lacros-rel-rts",
-    mirrors = builder_config.copy_from("try/linux-lacros-rel"),
-    try_settings = builder_config.try_settings(
-        rts_config = builder_config.rts_config(
-            condition = builder_config.rts_condition.QUICK_RUN_ONLY,
-        ),
-    ),
-    experiments = {
-        "chromium_rts.inverted_rts": 100,
-    },
 )

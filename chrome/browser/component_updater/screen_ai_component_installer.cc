@@ -94,6 +94,12 @@ base::FilePath ScreenAIComponentInstallerPolicy::GetRelativeInstallDir() const {
   return screen_ai::GetRelativeInstallDir();
 }
 
+// static
+std::string ScreenAIComponentInstallerPolicy::GetOmahaId() {
+  return crx_file::id_util::GenerateIdFromHash(
+      kScreenAIPublicKeySHA256, std::size(kScreenAIPublicKeySHA256));
+}
+
 void ScreenAIComponentInstallerPolicy::GetHash(
     std::vector<uint8_t>* hash) const {
   hash->assign(kScreenAIPublicKeySHA256,
@@ -114,21 +120,18 @@ void ScreenAIComponentInstallerPolicy::DeleteComponent() {
   base::FilePath component_binary_path =
       screen_ai::GetLatestComponentBinaryPath();
 
-  if (!component_binary_path.empty())
+  if (!component_binary_path.empty()) {
     base::DeletePathRecursively(component_binary_path.DirName());
+    screen_ai::ScreenAIInstallState::RecordComponentInstallationResult(
+        /*install=*/false,
+        /*successful=*/true);
+  }
 }
 
-void RegisterScreenAIComponent(ComponentUpdateService* cus,
-                               PrefService* local_state) {
-  DCHECK_CURRENTLY_ON(BrowserThread::UI);
-
+void ManageScreenAIComponentRegistration(ComponentUpdateService* cus,
+                                         PrefService* local_state) {
   if (screen_ai::ScreenAIInstallState::ShouldInstall(local_state)) {
-    screen_ai::ScreenAIInstallState::GetInstance()->SetState(
-        screen_ai::ScreenAIInstallState::State::kDownloading);
-
-    auto installer = base::MakeRefCounted<ComponentInstaller>(
-        std::make_unique<ScreenAIComponentInstallerPolicy>());
-    installer->Register(cus, base::OnceClosure());
+    RegisterScreenAIComponent(cus);
     return;
   }
 
@@ -136,6 +139,22 @@ void RegisterScreenAIComponent(ComponentUpdateService* cus,
   if (!screen_ai::GetLatestComponentBinaryPath().empty()) {
     ScreenAIComponentInstallerPolicy::DeleteComponent();
   }
+}
+
+void RegisterScreenAIComponent(ComponentUpdateService* cus) {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
+
+  // Only register once.
+  if (screen_ai::ScreenAIInstallState::GetInstance()->get_state() !=
+      screen_ai::ScreenAIInstallState::State::kNotDownloaded) {
+    return;
+  }
+  screen_ai::ScreenAIInstallState::GetInstance()->SetState(
+      screen_ai::ScreenAIInstallState::State::kDownloading);
+
+  auto installer = base::MakeRefCounted<ComponentInstaller>(
+      std::make_unique<ScreenAIComponentInstallerPolicy>());
+  installer->Register(cus, base::OnceClosure());
 }
 
 }  // namespace component_updater

@@ -46,7 +46,7 @@
 #include "ash/shell.h"
 #include "ash/wm/overview/overview_controller.h"
 #include "ash/wm/tablet_mode/tablet_mode_controller_test_api.h"
-#include "ash/wm/tablet_mode/tablet_mode_multitask_menu_event_handler.h"
+#include "ash/wm/tablet_mode/tablet_mode_multitask_menu_controller.h"
 #include "ash/wm/tablet_mode/tablet_mode_window_manager.h"
 #include "base/functional/callback_helpers.h"
 #include "base/ranges/algorithm.h"
@@ -208,6 +208,11 @@ class BrowserNonClientFrameViewChromeOSThemeChangeTest
         delegate->SetPreferManifestBackgroundColor(
             PreferManifestBackgroundColor());
         delegate->SetShouldAnimateThemeChanges(ShouldAnimateThemeChanges());
+        // When system colored SWAs were introduced for Jelly,
+        // `UseSystemThemeColor()` overrode other styling information in the
+        // manifest. This test now verifies behavior for SWAs that are opted out
+        // of the system styling (by setting it to false).
+        delegate->SetUseSystemThemeColor(false);
         break;
       }
       case ThemeChangeTestMode::kNonSWA:
@@ -245,8 +250,8 @@ class BrowserNonClientFrameViewChromeOSThemeChangeTest
   }
 
   // Installs the web app under test, blocking until installation is complete,
-  // and returning the `web_app::AppId` for the installed web app.
-  web_app::AppId WaitForAppInstall() {
+  // and returning the `webapps::AppId` for the installed web app.
+  webapps::AppId WaitForAppInstall() {
     switch (GetThemeChangeTestMode()) {
       case ThemeChangeTestMode::kSWA:
         system_web_app_installation_->WaitForAppInstall();
@@ -260,7 +265,7 @@ class BrowserNonClientFrameViewChromeOSThemeChangeTest
         }
         const GURL app_url =
             test_server_->GetURL("app.com", "/ssl/google.html");
-        auto web_app_info = std::make_unique<WebAppInstallInfo>();
+        auto web_app_info = std::make_unique<web_app::WebAppInstallInfo>();
         web_app_info->start_url = app_url;
         web_app_info->scope = app_url.GetWithoutFilename();
         web_app_info->theme_color = SK_ColorWHITE;
@@ -322,7 +327,7 @@ IN_PROC_BROWSER_TEST_P(BrowserNonClientFrameViewChromeOSThemeChangeTest,
     GTEST_SKIP();
   }
 
-  const web_app::AppId app_id = WaitForAppInstall();
+  const webapps::AppId app_id = WaitForAppInstall();
   auto* browser = web_app::LaunchWebAppBrowser(profile(), app_id);
   auto* contents_web_view =
       BrowserView::GetBrowserViewForBrowser(browser)->contents_web_view();
@@ -714,15 +719,18 @@ class WebAppNonClientFrameViewAshTest
 
   static SkColor GetThemeColor() { return SK_ColorBLUE; }
 
-  raw_ptr<Browser, ExperimentalAsh> app_browser_ = nullptr;
-  raw_ptr<BrowserView, ExperimentalAsh> browser_view_ = nullptr;
-  raw_ptr<chromeos::DefaultFrameHeader, ExperimentalAsh> frame_header_ =
+  raw_ptr<Browser, DanglingUntriaged | ExperimentalAsh> app_browser_ = nullptr;
+  raw_ptr<BrowserView, DanglingUntriaged | ExperimentalAsh> browser_view_ =
       nullptr;
-  raw_ptr<WebAppFrameToolbarView, ExperimentalAsh> web_app_frame_toolbar_ =
-      nullptr;
-  raw_ptr<const std::vector<ContentSettingImageView*>, ExperimentalAsh>
+  raw_ptr<chromeos::DefaultFrameHeader, DanglingUntriaged | ExperimentalAsh>
+      frame_header_ = nullptr;
+  raw_ptr<WebAppFrameToolbarView, DanglingUntriaged | ExperimentalAsh>
+      web_app_frame_toolbar_ = nullptr;
+  raw_ptr<const std::vector<ContentSettingImageView*>,
+          DanglingUntriaged | ExperimentalAsh>
       content_setting_views_ = nullptr;
-  raw_ptr<AppMenuButton, ExperimentalAsh> web_app_menu_button_ = nullptr;
+  raw_ptr<AppMenuButton, DanglingUntriaged | ExperimentalAsh>
+      web_app_menu_button_ = nullptr;
 
   void SetUpCommandLine(base::CommandLine* command_line) override {
     TopChromeMdParamTest<InProcessBrowserTest>::SetUpCommandLine(command_line);
@@ -757,13 +765,13 @@ class WebAppNonClientFrameViewAshTest
   // |SetUpWebApp()| must be called after |SetUpOnMainThread()| to make sure
   // the Network Service process has been setup properly.
   void SetUpWebApp() {
-    auto web_app_info = std::make_unique<WebAppInstallInfo>();
+    auto web_app_info = std::make_unique<web_app::WebAppInstallInfo>();
     web_app_info->start_url = GetAppURL();
     web_app_info->scope = GetAppURL().GetWithoutFilename();
     web_app_info->display_mode = blink::mojom::DisplayMode::kStandalone;
     web_app_info->theme_color = GetThemeColor();
 
-    web_app::AppId app_id = web_app::test::InstallWebApp(
+    webapps::AppId app_id = web_app::test::InstallWebApp(
         browser()->profile(), std::move(web_app_info));
     content::TestNavigationObserver navigation_observer(GetAppURL());
     navigation_observer.StartWatchingNewWebContents();
@@ -925,6 +933,7 @@ IN_PROC_BROWSER_TEST_P(WebAppNonClientFrameViewAshTest,
   password_manager::PasswordForm password_form;
   password_form.username_value = u"test";
   password_form.url = GetAppURL().DeprecatedGetOriginAsURL();
+  password_form.match_type = password_manager::PasswordForm::MatchType::kExact;
   PasswordsClientUIDelegateFromWebContents(web_contents)
       ->OnPasswordAutofilled({&password_form},
                              url::Origin::Create(password_form.url), nullptr);
@@ -1341,7 +1350,7 @@ IN_PROC_BROWSER_TEST_P(FloatBrowserNonClientFrameViewChromeOSTest,
   auto* multitask_menu_event_handler =
       ash::TabletModeControllerTestApi()
           .tablet_mode_window_manager()
-          ->tablet_mode_multitask_menu_event_handler();
+          ->tablet_mode_multitask_menu_controller();
   EXPECT_TRUE(multitask_menu_event_handler->multitask_menu());
 
   if (browser_view->webui_tab_strip()) {

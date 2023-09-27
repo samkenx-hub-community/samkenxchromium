@@ -16,7 +16,6 @@
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/accessibility/ax_enums.mojom.h"
 #include "ui/accessibility/ax_node_data.h"
-#include "ui/base/layout.h"
 #include "ui/display/screen.h"
 #include "ui/events/event_utils.h"
 #include "ui/events/test/event_generator.h"
@@ -377,6 +376,12 @@ TEST_F(ButtonTest, NotifyActionNoClick) {
       ui::ET_MOUSE_RELEASED, center, center, ui::EventTimeForNow(),
       ui::EF_RIGHT_MOUSE_BUTTON, ui::EF_RIGHT_MOUSE_BUTTON));
   EXPECT_FALSE(button()->canceled());
+}
+
+TEST_F(ButtonTest, ButtonControllerNotifyClick) {
+  EXPECT_FALSE(button()->pressed());
+  button()->button_controller()->NotifyClick();
+  EXPECT_TRUE(button()->pressed());
 }
 
 // No touch on desktop Mac. Tracked in http://crbug.com/445520.

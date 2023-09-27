@@ -41,7 +41,7 @@ def main():
   # current Chrome version. First we read the version file.
   version_parts = ['MAJOR', 'MINOR', 'BUILD', 'PATCH']
   version = []
-  version_file = open(options.version_file, 'r')
+  version_file = open(options.version_file, 'r', encoding='utf-8')
   for part in version_parts:
     # The version file should have 4 lines, with format like MAJOR=63
     components = version_file.readline().split('=')
@@ -54,7 +54,7 @@ def main():
 
   devices = {}
   file_name = args[0]
-  with open(file_name, 'r') as f:
+  with open(file_name, 'r', encoding='utf-8') as f:
     data = f.read()
 
     # Extract the list from the source file.
@@ -113,7 +113,8 @@ def main():
           'deviceScaleFactor': device['screen']['device-pixel-ratio'],
           'touch': 'touch' in device['capabilities'],
           'mobile': 'mobile' in device['capabilities'],
-        }
+        },
+        'type': device['type']
       }
       if 'user-agent-metadata' in device:
         client_hints = device['user-agent-metadata']

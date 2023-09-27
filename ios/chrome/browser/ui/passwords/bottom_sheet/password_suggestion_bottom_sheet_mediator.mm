@@ -7,17 +7,19 @@
 #import "base/memory/raw_ptr.h"
 #import "base/strings/sys_string_conversions.h"
 #import "components/autofill/ios/form_util/form_activity_params.h"
+#import "components/password_manager/core/browser/password_manager.h"
 #import "components/password_manager/core/browser/password_store_interface.h"
 #import "components/password_manager/core/browser/password_ui_utils.h"
 #import "components/password_manager/core/browser/ui/credential_ui_entry.h"
-#import "components/password_manager/ios/password_manager_java_script_feature.h"
+#import "components/password_manager/ios/ios_password_manager_driver_factory.h"
 #import "components/password_manager/ios/shared_password_controller.h"
 #import "components/prefs/pref_service.h"
+#import "ios/chrome/browser/autofill/bottom_sheet/autofill_bottom_sheet_java_script_feature.h"
 #import "ios/chrome/browser/autofill/bottom_sheet/autofill_bottom_sheet_tab_helper.h"
 #import "ios/chrome/browser/autofill/form_input_suggestions_provider.h"
 #import "ios/chrome/browser/autofill/form_suggestion_tab_helper.h"
-#import "ios/chrome/browser/autofill/manual_fill/passwords_fetcher.h"
 #import "ios/chrome/browser/default_browser/utils.h"
+#import "ios/chrome/browser/passwords/password_tab_helper.h"
 #import "ios/chrome/browser/shared/model/prefs/pref_names.h"
 #import "ios/chrome/browser/shared/model/web_state_list/active_web_state_observation_forwarder.h"
 #import "ios/chrome/browser/shared/model/web_state_list/web_state_list.h"
@@ -35,10 +37,6 @@
 #import "ui/base/l10n/l10n_util_mac.h"
 #import "url/gurl.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 using PasswordSuggestionBottomSheetExitReason::kDismissal;
 using PasswordSuggestionBottomSheetExitReason::kUsePasswordSuggestion;
 using ReauthenticationEvent::kAttempt;
@@ -47,8 +45,7 @@ using ReauthenticationEvent::kMissingPasscode;
 using ReauthenticationEvent::kSuccess;
 
 @interface PasswordSuggestionBottomSheetMediator () <WebStateListObserving,
-                                                     CRWWebStateObserver,
-                                                     PasswordFetcherDelegate>
+                                                     CRWWebStateObserver>
 
 // The object that provides suggestions while filling forms.
 @property(nonatomic, weak) id<FormInputSuggestionsProvider> suggestionsProvider;
@@ -58,9 +55,6 @@ using ReauthenticationEvent::kSuccess;
 
 // Default globe favicon when no favicon is available.
 @property(nonatomic, readonly) FaviconAttributes* defaultGlobeIconAttributes;
-
-// The password fetcher to query the user profile.
-@property(nonatomic, strong) PasswordFetcher* passwordFetcher;
 
 @end
 
@@ -74,8 +68,18 @@ using ReauthenticationEvent::kSuccess;
 
   // The WebStateList observed by this mediator and the observer bridge.
   raw_ptr<WebStateList> _webStateList;
-  std::unique_ptr<web::WebStateObserverBridge> _observer;
+
+  // Bridge and forwarder for observing WebState events. The forwarder is a
+  // scoped observation, so the bridge will automatically be removed from the
+  // relevant observer list.
+  std::unique_ptr<web::WebStateObserverBridge> _webStateObserver;
   std::unique_ptr<ActiveWebStateObservationForwarder> _forwarder;
+
+  // Bridge for observing WebStateList events.
+  std::unique_ptr<WebStateListObserverBridge> _webStateListObserver;
+  std::unique_ptr<
+      base::ScopedObservation<WebStateList, WebStateListObserverBridge>>
+      _webStateListObservation;
 
   // Vector of credentials related to the current page.
   std::vector<password_manager::CredentialUIEntry> _credentials;
@@ -84,8 +88,8 @@ using ReauthenticationEvent::kSuccess;
   // the bottom sheet is dismissed. Default is true.
   bool _needsRefocus;
 
-  // Web Frame associated with this bottom sheet.
-  std::string _frameId;
+  // Whether to disable the bottom sheet on exit. Default is false.
+  bool _disableBottomSheetOnExit;
 
   // FaviconLoader is a keyed service that uses LargeIconService to retrieve
   // favicon images.
@@ -114,7 +118,7 @@ using ReauthenticationEvent::kSuccess;
                         accountPasswordStore {
   if (self = [super init]) {
     _needsRefocus = true;
-    _frameId = params.frame_id;
+    _disableBottomSheetOnExit = false;
     _faviconLoader = faviconLoader;
     _prefService = prefService;
     _reauthenticationModule = reauthModule;
@@ -127,9 +131,14 @@ using ReauthenticationEvent::kSuccess;
     web::WebState* activeWebState = _webStateList->GetActiveWebState();
 
     // Create and register the observers.
-    _observer = std::make_unique<web::WebStateObserverBridge>(self);
+    _webStateObserver = std::make_unique<web::WebStateObserverBridge>(self);
     _forwarder = std::make_unique<ActiveWebStateObservationForwarder>(
-        _webStateList, _observer.get());
+        _webStateList, _webStateObserver.get());
+    _webStateListObserver = std::make_unique<WebStateListObserverBridge>(self);
+    _webStateListObservation = std::make_unique<
+        base::ScopedObservation<WebStateList, WebStateListObserverBridge>>(
+        _webStateListObserver.get());
+    _webStateListObservation->Observe(_webStateList);
 
     if (activeWebState) {
       FormSuggestionTabHelper* tabHelper =
@@ -139,22 +148,18 @@ using ReauthenticationEvent::kSuccess;
       self.suggestionsProvider = tabHelper->GetAccessoryViewProvider();
       DCHECK(self.suggestionsProvider);
 
+      __weak __typeof(self) weakSelf = self;
       [self.suggestionsProvider
           retrieveSuggestionsForForm:params
                             webState:activeWebState
             accessoryViewUpdateBlock:^(
                 NSArray<FormSuggestion*>* suggestions,
                 id<FormInputSuggestionsProvider> formInputSuggestionsProvider) {
-              self.suggestions = suggestions;
+              weakSelf.suggestions = suggestions;
+              [weakSelf fetchCredentialsForForm:params.unique_form_id
+                                       webState:activeWebState
+                                     webFrameId:params.frame_id];
             }];
-
-      // Fetch passwords related to the suggestions.
-      _credentials.clear();
-      self.passwordFetcher = [[PasswordFetcher alloc]
-          initWithProfilePasswordStore:_profilePasswordStore
-                  accountPasswordStore:_accountPasswordStore
-                              delegate:self
-                                   URL:url::Origin::Create(_URL).GetURL()];
     }
   }
   return self;
@@ -166,8 +171,11 @@ using ReauthenticationEvent::kSuccess;
 - (void)disconnect {
   _prefService = nullptr;
   _faviconLoader = nullptr;
+
+  _webStateListObservation = nullptr;
+  _webStateListObserver = nullptr;
   _forwarder = nullptr;
-  _observer = nullptr;
+  _webStateObserver = nullptr;
   _webStateList = nullptr;
 }
 
@@ -259,33 +267,61 @@ using ReauthenticationEvent::kSuccess;
   }
 }
 
-- (void)refocus {
-  if (_needsRefocus && _webStateList) {
+- (void)dismiss {
+  if ((_needsRefocus || _disableBottomSheetOnExit) && _webStateList) {
     [self logExitReason:kDismissal];
     [self incrementDismissCount];
 
     web::WebState* activeWebState = _webStateList->GetActiveWebState();
-    password_manager::PasswordManagerJavaScriptFeature* feature =
-        password_manager::PasswordManagerJavaScriptFeature::GetInstance();
-    web::WebFramesManager* framesManager =
-        feature->GetWebFramesManager(activeWebState);
-    if (framesManager) {
-      web::WebFrame* frame = framesManager->GetFrameWithId(_frameId);
-      AutofillBottomSheetTabHelper::FromWebState(activeWebState)
-          ->DetachListenersAndRefocus(frame);
-      [self disconnect];
+    if (!activeWebState) {
+      return;
     }
+
+    AutofillBottomSheetTabHelper* tabHelper =
+        AutofillBottomSheetTabHelper::FromWebState(activeWebState);
+    if (!tabHelper) {
+      return;
+    }
+
+    tabHelper->DetachPasswordListenersForAllFrames(_needsRefocus);
+    [self disconnect];
   }
 }
 
-// Disables future refocus requests.
 - (void)disableRefocus {
   _needsRefocus = false;
 }
 
+- (void)willSelectSuggestion:(NSInteger)row {
+  if ([[self usernameAtRow:row] length] == 0) {
+    // If the currently selected row has no username, the bottom sheet will
+    // disable itself on exit to allow the user to open the keyboard to fill in
+    // the username field.
+    _disableBottomSheetOnExit = true;
+  }
+  [self disableRefocus];
+}
+
+- (NSString*)usernameAtRow:(NSInteger)row {
+  FormSuggestion* suggestion = [self.suggestions objectAtIndex:row];
+
+  // Removing suffix ' ••••••••' appended to the username in the suggestion.
+  NSString* username = suggestion.value;
+  if ([username containsString:kPasswordFormSuggestionSuffix]) {
+    username = [username
+        stringByReplacingOccurrencesOfString:kPasswordFormSuggestionSuffix
+                                  withString:@""];
+  }
+  return username;
+}
+
 - (void)loadFaviconWithBlockHandler:
     (FaviconLoader::FaviconAttributesCompletionBlock)faviconLoadedBlock {
-  CHECK(_faviconLoader);
+  if (!_faviconLoader) {
+    // Mediator is disconnecting (bottom sheet is being closed). No need to
+    // fetch for the favicon anymore.
+    return;
+  }
   if (!_URL.is_empty()) {
     _faviconLoader->FaviconForPageUrl(
         _URL, kDesiredMediumFaviconSizePt, kMinFaviconSizePt,
@@ -297,68 +333,40 @@ using ReauthenticationEvent::kSuccess;
 
 #pragma mark - WebStateListObserving
 
-- (void)webStateList:(WebStateList*)webStateList
-    didReplaceWebState:(web::WebState*)oldWebState
-          withWebState:(web::WebState*)newWebState
-               atIndex:(int)atIndex {
+- (void)didChangeWebStateList:(WebStateList*)webStateList
+                       change:(const WebStateListChange&)change
+                       status:(const WebStateListStatus&)status {
   DCHECK_EQ(_webStateList, webStateList);
-  if (atIndex == webStateList->active_index()) {
-    [self disableRefocus];
-    [self.consumer dismiss];
+  if (status.active_web_state_change()) {
+    [self onWebStateChange];
   }
-}
-
-- (void)webStateList:(WebStateList*)webStateList
-    didChangeActiveWebState:(web::WebState*)newWebState
-                oldWebState:(web::WebState*)oldWebState
-                    atIndex:(int)atIndex
-                     reason:(ActiveWebStateChangeReason)reason {
-  DCHECK_EQ(_webStateList, webStateList);
-  [self disableRefocus];
-  [self.consumer dismiss];
 }
 
 - (void)webStateListDestroyed:(WebStateList*)webStateList {
   DCHECK_EQ(webStateList, _webStateList);
-  _forwarder = nullptr;
-  _observer = nullptr;
-  _webStateList = nullptr;
-  [self disableRefocus];
-  [self.consumer dismiss];
+  // `disconnect` cleans up all references to `_webStateList` and objects that
+  // depend on it.
+  [self disconnect];
+  [self onWebStateChange];
 }
 
 #pragma mark - CRWWebStateObserver
 
 - (void)webStateDestroyed:(web::WebState*)webState {
-  [self disableRefocus];
-  [self.consumer dismiss];
-}
-
-- (void)webState:(web::WebState*)webState
-    didFinishNavigation:(web::NavigationContext*)navigation {
-  [self disableRefocus];
-  [self.consumer dismiss];
+  [self onWebStateChange];
 }
 
 - (void)renderProcessGoneForWebState:(web::WebState*)webState {
-  [self disableRefocus];
-  [self.consumer dismiss];
-}
-
-#pragma mark - PasswordFetcherDelegate
-
-- (void)passwordFetcher:(PasswordFetcher*)passwordFetcher
-      didFetchPasswords:
-          (std::vector<std::unique_ptr<password_manager::PasswordForm>>)
-              passwords {
-  std::vector<password_manager::CredentialUIEntry> credentials;
-  for (const auto& form : passwords) {
-    credentials.push_back(password_manager::CredentialUIEntry(*form));
-  }
-  _credentials = credentials;
+  [self onWebStateChange];
 }
 
 #pragma mark - Private
+
+- (void)onWebStateChange {
+  _needsRefocus = false;
+  _disableBottomSheetOnExit = false;
+  [self.consumer dismiss];
+}
 
 // Perform suggestion selection
 - (void)selectSuggestion:(FormSuggestion*)suggestion {
@@ -394,19 +402,56 @@ using ReauthenticationEvent::kSuccess;
 // Increments the dismiss count preference.
 - (void)incrementDismissCount {
   if (_prefService) {
-    int newDismissCount =
-        _prefService->GetInteger(prefs::kIosPasswordBottomSheetDismissCount) +
-        1;
-    CHECK(newDismissCount <=
-          AutofillBottomSheetTabHelper::kPasswordBottomSheetMaxDismissCount);
-    _prefService->SetInteger(prefs::kIosPasswordBottomSheetDismissCount,
-                             newDismissCount);
+    int currentDismissCount =
+        _prefService->GetInteger(prefs::kIosPasswordBottomSheetDismissCount);
+    if (currentDismissCount <
+        AutofillBottomSheetTabHelper::kPasswordBottomSheetMaxDismissCount) {
+      _prefService->SetInteger(prefs::kIosPasswordBottomSheetDismissCount,
+                               currentDismissCount + 1);
+    }
   }
 }
 
 // Logs reauthentication events.
 - (void)logReauthEvent:(ReauthenticationEvent)event {
   base::UmaHistogramEnumeration("IOS.Reauth.Password.BottomSheet", event);
+}
+
+// Fetches all credentials for the current form.
+- (void)fetchCredentialsForForm:(autofill::FormRendererId)formId
+                       webState:(web::WebState*)webState
+                     webFrameId:(const std::string&)frameId {
+  _credentials.clear();
+
+  if (![self hasSuggestions]) {
+    return;
+  }
+
+  PasswordTabHelper* tabHelper = PasswordTabHelper::FromWebState(webState);
+  if (!tabHelper) {
+    return;
+  }
+
+  password_manager::PasswordManager* passwordManager =
+      tabHelper->GetPasswordManager();
+  CHECK(passwordManager);
+
+  web::WebFramesManager* webFramesManager =
+      AutofillBottomSheetJavaScriptFeature::GetInstance()->GetWebFramesManager(
+          webState);
+  web::WebFrame* frame = webFramesManager->GetFrameWithId(frameId);
+
+  password_manager::PasswordManagerDriver* driver =
+      IOSPasswordManagerDriverFactory::FromWebStateAndWebFrame(webState, frame);
+  const std::vector<const password_manager::PasswordForm*>* passwordForms =
+      passwordManager->GetBestMatches(driver, formId);
+  if (!passwordForms) {
+    return;
+  }
+
+  for (const auto* form : *passwordForms) {
+    _credentials.push_back(password_manager::CredentialUIEntry(*form));
+  }
 }
 
 @end

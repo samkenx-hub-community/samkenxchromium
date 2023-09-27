@@ -7,24 +7,24 @@
 
 #include "base/feature_list.h"
 #include "base/metrics/field_trial_params.h"
+#include "build/build_config.h"
 
 namespace supervised_user {
 
-BASE_DECLARE_FEATURE(kWebFilterInterstitialRefresh);
+// Experiment to enable kid-friendly content feed.
+BASE_DECLARE_FEATURE(kKidFriendlyContentFeed);
 
 BASE_DECLARE_FEATURE(kLocalWebApprovals);
 extern const char kLocalWebApprovalsPreferredButtonLocal[];
 extern const char kLocalWebApprovalsPreferredButtonRemote[];
 
-BASE_DECLARE_FEATURE(kSynchronousSignInChecking);
-
 // Flags related to supervision features on Desktop and iOS platforms.
-BASE_DECLARE_FEATURE(kEnableSupervisionOnDesktopAndIOS);
 BASE_DECLARE_FEATURE(kFilterWebsitesForSupervisedUsersOnDesktopAndIOS);
 BASE_DECLARE_FEATURE(kEnableExtensionsPermissionsForSupervisedUsersOnDesktop);
 BASE_DECLARE_FEATURE(kSupervisedPrefsControlledBySupervisedStore);
 BASE_DECLARE_FEATURE(kEnableManagedByParentUi);
 extern const base::FeatureParam<std::string> kManagedByParentUiMoreInfoUrl;
+BASE_DECLARE_FEATURE(kClearingCookiesKeepsSupervisedUsersSignedIn);
 
 // Returns whether banner can be displayed to the user after website filtering
 // is enabled
@@ -32,15 +32,21 @@ bool CanDisplayFirstTimeInterstitialBanner();
 
 BASE_DECLARE_FEATURE(kLocalExtensionApprovalsV2);
 
-BASE_DECLARE_FEATURE(kRetireStaticDenyList);
-
+// Experiments to enable proto fetchers
 BASE_DECLARE_FEATURE(kEnableProtoApiForClassifyUrl);
 
-BASE_DECLARE_FEATURE(kUpdateSupervisedUserFactoryCreation);
+// Instead of manually implementing the process, use the proto_fetcher.cc's one.
+BASE_DECLARE_FEATURE(kUseBuiltInRetryingMechanismForListFamilyMembers);
 
-// Returns whether refreshed version of the website filter interstitial is
-// enabled.
-bool IsWebFilterInterstitialRefreshEnabled();
+// Enable different web sign in interception behaviour for supervised users:
+//
+// 1. Supervised user signs in to existing signed out Profile: show modal
+//    explaining that supervision features will apply.
+// 2. Supervised user signs in as secondary account in existing signed in
+//    Profile
+//
+// Only affects Desktop platforms.
+BASE_DECLARE_FEATURE(kCustomWebSignInInterceptForSupervisedUsers);
 
 // Returns whether local parent approvals on Family Link user's device are
 // enabled.
@@ -56,12 +62,23 @@ bool IsLocalWebApprovalThePreferredButton();
 // Returns whether the ClassifyUrl call uses proto apis.
 bool IsProtoApiForClassifyUrlEnabled();
 
-// Returns whether the First Run Experience will rely on checking the sign-in
-// status synchronously - http://b/264382308.
-bool IsSynchronousSignInCheckingEnabled();
+// Decides whether to use built-in configurable mechanism, instead of manually
+// programmed.
+bool IsRetryMechanismForListFamilyMembersEnabled();
 
 // Returns whether the new local extension approval experience is enabled.
 bool IsLocalExtensionApprovalsV2Enabled();
+
+// Returns true if child account supervision features should be enabled for this
+// client.
+//
+// This method does not take into account whether the user is actually a child;
+// that must be handled by calling code.
+bool IsChildAccountSupervisionEnabled();
+
+// Returns whether the experiment to display a kid-friendly content stream on
+// the New Tab page has been enabled.
+bool IsKidFriendlyContentFeedAvailable();
 
 }  // namespace supervised_user
 

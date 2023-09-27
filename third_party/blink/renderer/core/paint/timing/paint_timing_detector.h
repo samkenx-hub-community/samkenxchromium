@@ -135,6 +135,7 @@ class CORE_EXPORT PaintTimingDetector
     uint64_t largest_image_paint_size_ = 0;
     base::TimeTicks largest_image_load_start_;
     base::TimeTicks largest_image_load_end_;
+    base::TimeTicks largest_image_discovery_time_;
     blink::LargestContentfulPaintType largest_contentful_paint_type_ =
         blink::LargestContentfulPaintType::kNone;
     double largest_contentful_paint_image_bpp_ = 0.0;
@@ -145,6 +146,20 @@ class CORE_EXPORT PaintTimingDetector
         largest_contentful_paint_image_request_priority_;
     bool is_loaded_from_memory_cache_ = false;
     bool is_preloaded_with_early_hints_ = false;
+
+    void Reset() {
+      this->largest_image_paint_time_ = base::TimeTicks();
+      this->largest_image_paint_size_ = 0;
+      this->largest_image_load_start_ = base::TimeTicks();
+      this->largest_image_load_end_ = base::TimeTicks();
+      this->largest_contentful_paint_type_ =
+          blink::LargestContentfulPaintType::kNone;
+      this->largest_contentful_paint_image_bpp_ = 0.0;
+      this->largest_text_paint_time_ = base::TimeTicks();
+      this->largest_text_paint_size_ = 0;
+      this->largest_contentful_paint_time_ = base::TimeTicks();
+      this->largest_contentful_paint_image_request_priority_ = absl::nullopt;
+    }
   };
 
   // Returns true if the image might ultimately be a candidate for largest
@@ -206,11 +221,18 @@ class CORE_EXPORT PaintTimingDetector
   }
   void RestartRecordingLCP();
 
+  void RestartRecordingLCPToUkm();
+
   LargestContentfulPaintCalculator* GetLargestContentfulPaintCalculator();
 
   const PaintTimingDetector::LargestContentfulPaintDetails&
   LargestContentfulPaintDetailsForMetrics() const {
-    return lcp_details_for_ukm_;
+    return lcp_details_for_metrics_;
+  }
+
+  const PaintTimingDetector::LargestContentfulPaintDetails&
+  SoftNavigationLargestContentfulPaintDetailsForMetrics() const {
+    return soft_navigation_lcp_details_for_metrics_;
   }
 
   base::TimeTicks FirstInputOrScrollNotifiedTimestamp() const {
@@ -232,9 +254,11 @@ class CORE_EXPORT PaintTimingDetector
 
   // Method called to stop recording the Largest Contentful Paint.
   void OnInputOrScroll();
-  bool HasLargestImagePaintChanged(base::TimeTicks, uint64_t size) const;
-  bool HasLargestTextPaintChanged(base::TimeTicks, uint64_t size) const;
-  void UpdateLargestContentfulPaintTime();
+  bool HasLargestImagePaintChangedForMetrics(base::TimeTicks,
+                                             uint64_t size) const;
+  bool HasLargestTextPaintChangedForMetrics(base::TimeTicks,
+                                            uint64_t size) const;
+  void UpdateLargestContentfulPaintTimeForMetrics();
   Member<LocalFrameView> frame_view_;
   // This member lives forever because it is also used for Text Element
   // Timing.
@@ -256,10 +280,21 @@ class CORE_EXPORT PaintTimingDetector
 
   absl::optional<PaintTimingVisualizer> visualizer_;
 
-  LargestContentfulPaintDetails lcp_details_;
-  LargestContentfulPaintDetails lcp_details_for_ukm_;
-  bool record_lcp_to_ukm_ = true;
+  // The |latest_lcp_details_| struct is just for internal accounting purposes
+  // and is not reported anywhere (neither to metrics, nor to the web exposed
+  // API).
+  LargestContentfulPaintDetails latest_lcp_details_;
+  // The LCP details reported to metrics (UKM).
+  LargestContentfulPaintDetails lcp_details_for_metrics_;
+  // The soft navigation LCP details reported to metrics (UKM).
+  LargestContentfulPaintDetails soft_navigation_lcp_details_for_metrics_;
+  // Ensures LCP stops being reported as a hard navigation metric once we start
+  // reporting soft navigation ones.
+  bool record_lcp_to_metrics_ = true;
+  // LCP was restarted, due to a potential soft navigation.
   bool lcp_was_restarted_ = false;
+  // This flag indicates if LCP is being reported to UKM.
+  bool record_soft_navigation_lcp_for_metrics_ = false;
 };
 
 // Largest Text Paint and Text Element Timing aggregate text nodes by these
@@ -300,8 +335,9 @@ class ScopedPaintTimingDetectorBlockPaintHook {
     // LayoutMultiColumnFlowThread is in a different layer from the DIV. In
     // these cases, |top_| will be null. This is a known bug, see the related
     // crbug.com/933479.
-    if (top_ && top_->data_)
+    if (top_ && top_->data_) {
       top_->data_->aggregated_visual_rect_.Union(visual_rect);
+    }
   }
 
   absl::optional<base::AutoReset<ScopedPaintTimingDetectorBlockPaintHook*>>
@@ -326,8 +362,9 @@ class ScopedPaintTimingDetectorBlockPaintHook {
 // static
 inline void PaintTimingDetector::NotifyTextPaint(
     const gfx::Rect& text_visual_rect) {
-  if (IgnorePaintTimingScope::ShouldIgnore())
+  if (IgnorePaintTimingScope::ShouldIgnore()) {
     return;
+  }
   ScopedPaintTimingDetectorBlockPaintHook::AggregateTextPaint(text_visual_rect);
 }
 

@@ -6,6 +6,7 @@
 
 #include "mojo/public/cpp/bindings/pending_remote.h"
 #include "third_party/blink/renderer/bindings/core/v8/script_promise_resolver.h"
+#include "third_party/blink/renderer/bindings/modules/v8/v8_ml_compute_result.h"
 #include "third_party/blink/renderer/core/dom/dom_exception.h"
 #include "third_party/blink/renderer/core/execution_context/execution_context.h"
 #include "third_party/blink/renderer/modules/ml/ml.h"
@@ -17,10 +18,12 @@ namespace blink {
 
 namespace {
 
-webnn::mojom::blink::GraphInfoPtr BuildWebNNGraphInfo(
+namespace blink_mojom = webnn::mojom::blink;
+
+base::expected<blink_mojom::GraphInfoPtr, String> BuildWebNNGraphInfo(
     const MLNamedOperands& named_outputs) {
   // The `GraphInfo` represents an entire information of WebNN graph.
-  auto graph_info = webnn::mojom::blink::GraphInfo::New();
+  auto graph_info = blink_mojom::GraphInfo::New();
   // The id used to identify operand on the server side. Each operation
   // generates an output operand that will be inserted in a hash map with the
   // MLOperand and id, incrementing the id by one.
@@ -29,7 +32,7 @@ webnn::mojom::blink::GraphInfoPtr BuildWebNNGraphInfo(
   for (const auto& [name, operand] : named_outputs) {
     // Create `mojo::Operand` for output operands of graph with the name.
     auto output_operand =
-        mojo::ConvertTo<webnn::mojom::blink::OperandPtr>(operand.Get());
+        mojo::ConvertTo<blink_mojom::OperandPtr>(operand.Get());
     output_operand->name = name;
     operand_id++;
     graph_info->id_to_operand_map.insert(operand_id, std::move(output_operand));
@@ -54,17 +57,28 @@ webnn::mojom::blink::GraphInfoPtr BuildWebNNGraphInfo(
           operand_id++;
           graph_info->id_to_operand_map.insert(
               operand_id,
-              mojo::ConvertTo<webnn::mojom::blink::OperandPtr>(operand.Get()));
+              mojo::ConvertTo<blink_mojom::OperandPtr>(operand.Get()));
           //  Build the array of input operands for this graph with the id.
           graph_info->input_operands.push_back(operand_id);
           operand_to_id_map.insert(operand, operand_id);
           break;
         }
         case MLOperand::OperandKind::kConstant: {
-          // TODO(crbug.com/1273291): Convert `mojo::Operand` for constant
-          // operand.
-          NOTIMPLEMENTED();
-          return nullptr;
+          // Convert `mojo::Operand` for constant operand.
+          operand_id++;
+          graph_info->id_to_operand_map.insert(
+              operand_id,
+              mojo::ConvertTo<blink_mojom::OperandPtr>(operand.Get()));
+          //  Build the map of constant operands for this graph with the id.
+          const auto* array_buffer_view = operand->ArrayBufferView();
+          CHECK(array_buffer_view);
+          CHECK(!array_buffer_view->IsDetached());
+          graph_info->constant_id_to_buffer_map.insert(
+              operand_id, base::make_span(static_cast<const uint8_t*>(
+                                              array_buffer_view->BaseAddress()),
+                                          array_buffer_view->byteLength()));
+          operand_to_id_map.insert(operand, operand_id);
+          break;
         }
         case MLOperand::OperandKind::kOutput:
           // Because the operators are visited in topological order, if this
@@ -84,22 +98,34 @@ webnn::mojom::blink::GraphInfoPtr BuildWebNNGraphInfo(
       // operators. Create `mojo::Operand` for this operand.
       operand_id++;
       graph_info->id_to_operand_map.insert(
-          operand_id,
-          mojo::ConvertTo<webnn::mojom::blink::OperandPtr>(operand.Get()));
+          operand_id, mojo::ConvertTo<blink_mojom::OperandPtr>(operand.Get()));
       operand_to_id_map.insert(operand, operand_id);
     }
 
-    // Create `mojo::Operator` with the id of the input and output operands.
-    auto operation =
-        ConvertToMojoOperator(operand_to_id_map, current_operator.Get());
-    if (!operation) {
+    // Create `mojo::Operation` with the id of the input and output operands.
+    auto mojo_operation =
+        ConvertToMojoOperation(operand_to_id_map, current_operator.Get());
+    if (!mojo_operation.has_value()) {
       // Return here if the operator is not implemented.
-      return nullptr;
+      return base::unexpected(mojo_operation.error());
     }
-    graph_info->operators.emplace_back(std::move(operation));
+    graph_info->operations.emplace_back(std::move(mojo_operation.value()));
   }
 
   return graph_info;
+}
+
+#define DEFINE_WEBNN_ERROR_CODE_MAPPING(error_code) \
+  case blink_mojom::Error::Code::error_code: {      \
+    return DOMExceptionCode::error_code;            \
+  }
+
+DOMExceptionCode ConvertWebNNErrorCodeToDOMExceptionCode(
+    blink_mojom::Error::Code error_code) {
+  switch (error_code) {
+    DEFINE_WEBNN_ERROR_CODE_MAPPING(kUnknownError)
+    DEFINE_WEBNN_ERROR_CODE_MAPPING(kNotSupportedError)
+  }
 }
 
 }  // namespace
@@ -126,15 +152,16 @@ void MLGraphMojo::Trace(Visitor* visitor) const {
 void MLGraphMojo::BuildAsyncImpl(const MLNamedOperands& outputs,
                                  ScriptPromiseResolver* resolver) {
   auto graph_info = BuildWebNNGraphInfo(outputs);
-  if (!graph_info) {
+  if (!graph_info.has_value()) {
     resolver->Reject(MakeGarbageCollected<DOMException>(
-        DOMExceptionCode::kDataError, "Failed to build graph."));
+        DOMExceptionCode::kDataError,
+        "Failed to build graph: " + graph_info.error()));
     return;
   }
   // Create `WebNNGraph` message pipe with `WebNNContext` mojo interface.
   auto* script_state = resolver->GetScriptState();
   ml_context_->CreateWebNNGraph(
-      script_state, std::move(graph_info),
+      script_state, std::move(graph_info.value()),
       WTF::BindOnce(&MLGraphMojo::OnCreateWebNNGraph, WrapPersistent(this),
                     WrapPersistent(resolver)));
 }
@@ -153,10 +180,82 @@ void MLGraphMojo::ComputeAsyncImpl(const MLNamedArrayBufferViews& inputs,
                                    const MLNamedArrayBufferViews& outputs,
                                    ScriptPromiseResolver* resolver,
                                    ExceptionState& exception_state) {
-  // TODO(crbug.com/1273291): Support async compute.
-  NOTIMPLEMENTED();
-  resolver->Reject(MakeGarbageCollected<DOMException>(
-      DOMExceptionCode::kNotSupportedError, "Async compute not implemented."));
+  // TransferNamedArrayBufferViews deteches input and output array buffers, so
+  // JavaScript can't modify them during Compute().
+  auto inputs_info = TransferNamedArrayBufferViews(
+      resolver->GetScriptState()->GetIsolate(), inputs, exception_state);
+  if (!inputs_info) {
+    resolver->Reject(MakeGarbageCollected<DOMException>(
+        DOMExceptionCode::kDataError,
+        "Invalid inputs: " + exception_state.Message()));
+    return;
+  }
+  auto outputs_info = TransferNamedArrayBufferViews(
+      resolver->GetScriptState()->GetIsolate(), outputs, exception_state);
+  if (!outputs_info) {
+    resolver->Reject(MakeGarbageCollected<DOMException>(
+        DOMExceptionCode::kDataError,
+        "Invalid outputs: " + exception_state.Message()));
+    return;
+  }
+
+  // The inputs were already verified in the base class so we can fill the
+  // buffer directly with the input tensors.
+  HashMap<String, mojo_base::BigBuffer> name_to_buffer_map;
+  for (const auto& [name, input_info] : *inputs_info) {
+    name_to_buffer_map.insert(
+        name,
+        base::make_span(static_cast<const uint8_t*>(input_info.contents.Data()),
+                        input_info.contents.DataLength()));
+  }
+  remote_graph_->Compute(
+      std::move(name_to_buffer_map),
+      WTF::BindOnce(&MLGraphMojo::OnDidCompute, WrapPersistent(this),
+                    WrapPersistent(resolver), std::move(inputs_info),
+                    std::move(outputs_info)));
+}
+
+void MLGraphMojo::OnDidCompute(
+    ScriptPromiseResolver* resolver,
+    std::unique_ptr<Vector<std::pair<String, ArrayBufferViewInfo>>> inputs_info,
+    std::unique_ptr<Vector<std::pair<String, ArrayBufferViewInfo>>>
+        outputs_info,
+    blink_mojom::ComputeResult mojo_result,
+    const absl::optional<HashMap<String, mojo_base::BigBuffer>> mojo_outputs) {
+  if (mojo_result != blink_mojom::ComputeResult::kOk ||
+      !mojo_outputs.has_value()) {
+    resolver->Reject(MakeGarbageCollected<DOMException>(
+        DOMExceptionCode::kOperationError,
+        "Failed to obtain the computation result."));
+    return;
+  }
+  for (const auto& [output_name, output_view_info] : *outputs_info) {
+    // The verification before computing ensures the `ml_outputs` match graph's
+    // expectation, so we only need to verify the result `mojo_outputs` from
+    // WebNN Service here.
+    auto output_buffer_iter = mojo_outputs->find(output_name);
+    if (output_buffer_iter == mojo_outputs->end()) {
+      resolver->Reject(MakeGarbageCollected<DOMException>(
+          DOMExceptionCode::kOperationError,
+          "There is an unknown output tensor in the computation result: " +
+              output_name));
+      return;
+    }
+    const auto output_byte_length = output_view_info.contents.DataLength();
+    if (output_buffer_iter->value.size() != output_byte_length) {
+      resolver->Reject(MakeGarbageCollected<DOMException>(
+          DOMExceptionCode::kUnknownError,
+          "The output tensor size does not match graph's expectation: " +
+              output_name));
+      return;
+    }
+    memcpy(output_view_info.contents.Data(), output_buffer_iter->value.data(),
+           output_byte_length);
+  }
+  auto* result = MLComputeResult::Create();
+  result->setInputs(*CreateNamedArrayBufferViews(std::move(inputs_info)));
+  result->setOutputs(*CreateNamedArrayBufferViews(std::move(outputs_info)));
+  resolver->Resolve(result);
 }
 
 void MLGraphMojo::ComputeSyncImpl(const MLNamedArrayBufferViews& inputs,
@@ -169,34 +268,25 @@ void MLGraphMojo::ComputeSyncImpl(const MLNamedArrayBufferViews& inputs,
                                     "Sync compute not implemented");
 }
 
-void MLGraphMojo::OnCreateWebNNGraph(
-    ScriptPromiseResolver* resolver,
-    MLContext::CreateWebNNGraphResult result,
-    mojo::PendingRemote<webnn::mojom::blink::WebNNGraph> pending_remote) {
-  switch (result) {
-    case MLContext::CreateWebNNGraphResult::kUnknownError: {
-      resolver->Reject(MakeGarbageCollected<DOMException>(
-          DOMExceptionCode::kUnknownError, "Internal error."));
-      return;
-    }
-    case MLContext::CreateWebNNGraphResult::kNotSupported: {
-      resolver->Reject(MakeGarbageCollected<DOMException>(
-          DOMExceptionCode::kNotSupportedError,
-          "Input configuration not supported."));
-      return;
-    }
-    case MLContext::CreateWebNNGraphResult::kOk: {
-      auto* script_state = resolver->GetScriptState();
-      auto* execution_context = ExecutionContext::From(script_state);
-      // Bind the end point of `WebNNGraph` mojo interface in the blink side.
-      remote_graph_.Bind(
-          std::move(pending_remote),
-          execution_context->GetTaskRunner(TaskType::kInternalDefault));
-
-      resolver->Resolve(this);
-      return;
-    }
+void MLGraphMojo::OnCreateWebNNGraph(ScriptPromiseResolver* resolver,
+                                     blink_mojom::CreateGraphResultPtr result) {
+  // Handle error message and throw exception.
+  if (result->is_error()) {
+    const auto& create_graph_error = result->get_error();
+    resolver->Reject(MakeGarbageCollected<DOMException>(
+        ConvertWebNNErrorCodeToDOMExceptionCode(create_graph_error->error_code),
+        create_graph_error->error_message));
+    return;
   }
+
+  auto* script_state = resolver->GetScriptState();
+  auto* execution_context = ExecutionContext::From(script_state);
+  // Bind the end point of `WebNNGraph` mojo interface in the blink side.
+  remote_graph_.Bind(
+      std::move(result->get_graph_remote()),
+      execution_context->GetTaskRunner(TaskType::kInternalDefault));
+
+  resolver->Resolve(this);
 }
 
 }  // namespace blink

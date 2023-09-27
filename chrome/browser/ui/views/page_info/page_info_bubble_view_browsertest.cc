@@ -12,6 +12,7 @@
 #include "base/strings/strcat.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/metrics/user_action_tester.h"
+#include "base/test/with_feature_override.h"
 #include "build/build_config.h"
 #include "chrome/browser/interstitials/security_interstitial_page_test_utils.h"
 #include "chrome/browser/optimization_guide/optimization_guide_keyed_service.h"
@@ -45,6 +46,7 @@
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/content_settings/core/common/content_settings_types.h"
+#include "components/content_settings/core/common/features.h"
 #include "components/content_settings/core/common/pref_names.h"
 #include "components/optimization_guide/core/optimization_guide_switches.h"
 #include "components/page_info/core/about_this_site_service.h"
@@ -55,6 +57,7 @@
 #include "components/password_manager/core/browser/password_manager_metrics_util.h"
 #include "components/privacy_sandbox/privacy_sandbox_features.h"
 #include "components/safe_browsing/content/browser/password_protection/password_protection_test_util.h"
+#include "components/safe_browsing/core/common/features.h"
 #include "components/strings/grit/components_strings.h"
 #include "components/ukm/test_ukm_recorder.h"
 #include "content/public/browser/navigation_handle.h"
@@ -90,6 +93,8 @@ using AboutThisSiteInteraction =
     page_info::AboutThisSiteService::AboutThisSiteInteraction;
 
 namespace {
+using ::testing::IsFalse;
+using ::testing::IsTrue;
 
 constexpr char kExpiredCertificateFile[] = "expired_cert.pem";
 
@@ -175,8 +180,8 @@ class PageInfoBubbleViewBrowserTest : public InProcessBrowserTest {
     // launched. Disable features for the new version of "Cookies in use"
     // dialog. The new UI is covered by
     // PageInfoBubbleViewBrowserTestCookiesSubpage.
-    feature_list_.InitWithFeatures({}, {page_info::kPageSpecificSiteDataDialog,
-                                        page_info::kPageInfoCookiesSubpage});
+    feature_list_.InitWithFeatures({},
+                                   {safe_browsing::kRedInterstitialFacelift});
   }
 
   PageInfoBubbleViewBrowserTest(const PageInfoBubbleViewBrowserTest& test) =
@@ -601,7 +606,7 @@ IN_PROC_BROWSER_TEST_F(PageInfoBubbleViewBrowserTest,
   run_loop.Run();
 
   views::View* cookies_button = GetView(
-      PageInfoViewFactory::VIEW_ID_PAGE_INFO_LINK_OR_BUTTON_COOKIE_DIALOG);
+      PageInfoViewFactory::VIEW_ID_PAGE_INFO_LINK_OR_BUTTON_COOKIES_SUBPAGE);
   PerformMouseClickOnView(cookies_button);
 }
 
@@ -875,7 +880,7 @@ class PageInfoBubbleViewPrerenderBrowserTest
   ~PageInfoBubbleViewPrerenderBrowserTest() override = default;
 
   void SetUp() override {
-    prerender_helper_.SetUp(embedded_test_server());
+    prerender_helper_.RegisterServerRequestMonitor(embedded_test_server());
     PageInfoBubbleViewBrowserTest::SetUp();
   }
 
@@ -915,8 +920,7 @@ class PageInfoBubbleViewAboutThisSiteBrowserTest : public InProcessBrowserTest {
   virtual void InitFeatureList() {
     feature_list_.InitWithFeatures(
         {
-            page_info::kPageInfoAboutThisSiteEn,
-            page_info::kPageInfoAboutThisSiteNonEn,
+            page_info::kPageInfoAboutThisSiteMoreLangs,
         },
         {});
   }
@@ -1162,14 +1166,14 @@ IN_PROC_BROWSER_TEST_F(PageInfoBubbleViewSiteSettingsBrowserTest,
 }
 
 class PageInfoBubbleViewBrowserTestCookiesSubpage
-    : public PageInfoBubbleViewBrowserTest {
+    : public base::test::WithFeatureOverride,
+      public PageInfoBubbleViewBrowserTest {
  public:
-  PageInfoBubbleViewBrowserTestCookiesSubpage() {
+  PageInfoBubbleViewBrowserTestCookiesSubpage()
+      : base::test::WithFeatureOverride(
+            content_settings::features::kUserBypassUI) {
     feature_list_.InitWithFeatures(
-        {page_info::kPageInfoCookiesSubpage,
-         page_info::kPageSpecificSiteDataDialog,
-         privacy_sandbox::kPrivacySandboxFirstPartySetsUI},
-        {});
+        {privacy_sandbox::kPrivacySandboxFirstPartySetsUI}, {});
   }
 
   void SetUpOnMainThread() override {
@@ -1214,7 +1218,14 @@ class PageInfoBubbleViewBrowserTestCookiesSubpage
     run_loop2.Run();
     EXPECT_EQ(
         user_actions_stats.GetActionCount("PageInfo.CookiesSubpage.Opened"), 1);
-    EXPECT_TRUE(prefs_->GetBoolean(prefs::kInContextCookieControlsOpened));
+
+    // The preference should only be recorded when blocking 3P cookies.
+    const bool block_third_party =
+        prefs_->GetInteger(prefs::kCookieControlsMode) ==
+        static_cast<int>(
+            content_settings::CookieControlsMode::kBlockThirdParty);
+    EXPECT_EQ(prefs_->GetBoolean(prefs::kInContextCookieControlsOpened),
+              block_third_party);
   }
 
  private:
@@ -1227,7 +1238,7 @@ class PageInfoBubbleViewBrowserTestCookiesSubpage
 // Checks if there is correct number of buttons in cookies subpage when fps are
 // blocked and third party cookies are allowed(in settings) and checks if the
 // metrics for opening cookies dialog work properly.
-IN_PROC_BROWSER_TEST_F(PageInfoBubbleViewBrowserTestCookiesSubpage,
+IN_PROC_BROWSER_TEST_P(PageInfoBubbleViewBrowserTestCookiesSubpage,
                        ClickingCookieDialogButton) {
   SetCookieControlsMode(content_settings::CookieControlsMode::kIncognitoOnly);
   OpenPageInfoAndGoToCookiesSubpage(/*fps_owner =*/{});
@@ -1250,7 +1261,7 @@ IN_PROC_BROWSER_TEST_F(PageInfoBubbleViewBrowserTestCookiesSubpage,
 // Checks if there is a correct number of buttons in cookies subpage when fps
 // are allowed and third party cookies are blocked and tests the
 // click on the fps button (result and user action).
-IN_PROC_BROWSER_TEST_F(PageInfoBubbleViewBrowserTestCookiesSubpage,
+IN_PROC_BROWSER_TEST_P(PageInfoBubbleViewBrowserTestCookiesSubpage,
                        ClickingFpsButton) {
   GURL url_example = GURL("http://example/other/stuff.htm");
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), url_example));
@@ -1260,11 +1271,18 @@ IN_PROC_BROWSER_TEST_F(PageInfoBubbleViewBrowserTestCookiesSubpage,
 
   OpenPageInfoAndGoToCookiesSubpage({fps_owner});
 
-  // FPS allowed and 3pc blocked -> buttons for cookie dialog and 3pc and fps.
-  size_t kExpectedChildren = 3;
-  auto* cookies_buttons_container =
-      GetView(PageInfoViewFactory::VIEW_ID_PAGE_INFO_COOKIES_BUTTONS_CONTAINER);
-  EXPECT_EQ(kExpectedChildren, cookies_buttons_container->children().size());
+  if (IsParamFeatureEnabled()) {
+    size_t kExpectedChildren = 2;
+    auto* cookies_buttons_container = GetView(
+        PageInfoViewFactory::VIEW_ID_PAGE_INFO_COOKIES_BUTTONS_CONTAINER);
+    EXPECT_EQ(kExpectedChildren, cookies_buttons_container->children().size());
+  } else {
+    // FPS allowed and 3pc blocked -> buttons for cookie dialog and 3pc and fps.
+    size_t kExpectedChildren = 3;
+    auto* cookies_buttons_container = GetView(
+        PageInfoViewFactory::VIEW_ID_PAGE_INFO_COOKIES_BUTTONS_CONTAINER);
+    EXPECT_EQ(kExpectedChildren, cookies_buttons_container->children().size());
+  }
   EXPECT_TRUE(GetView(
       PageInfoViewFactory::VIEW_ID_PAGE_INFO_LINK_OR_BUTTON_COOKIE_DIALOG));
   auto* fps_button = GetView(
@@ -1294,7 +1312,7 @@ IN_PROC_BROWSER_TEST_F(PageInfoBubbleViewBrowserTestCookiesSubpage,
 // Checks if there is a correct number of buttons in cookies subpage when fps
 // are blocked and third party cookies are blocked(in settings) and testing the
 // toggle on blocking third party button.
-IN_PROC_BROWSER_TEST_F(PageInfoBubbleViewBrowserTestCookiesSubpage,
+IN_PROC_BROWSER_TEST_P(PageInfoBubbleViewBrowserTestCookiesSubpage,
                        ToggleForBlockingThirdPartyCookies) {
   GURL url_example = GURL("http://example/other/stuff.htm");
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), url_example));
@@ -1305,33 +1323,61 @@ IN_PROC_BROWSER_TEST_F(PageInfoBubbleViewBrowserTestCookiesSubpage,
 
   // FPS blocked and 3pc blocked -> buttons for cookie dialog and third party
   // cookies.
-  size_t kExpectedChildren = 2;
-  auto* cookies_buttons_container =
-      GetView(PageInfoViewFactory::VIEW_ID_PAGE_INFO_COOKIES_BUTTONS_CONTAINER);
-  EXPECT_EQ(kExpectedChildren, cookies_buttons_container->children().size());
-  EXPECT_TRUE(GetView(
-      PageInfoViewFactory::VIEW_ID_PAGE_INFO_LINK_OR_BUTTON_COOKIE_DIALOG));
-  EXPECT_TRUE(GetView(
-      PageInfoViewFactory::VIEW_ID_PAGE_INFO_BLOCK_THIRD_PARTY_COOKIES_ROW));
-  auto* third_party_cookies_toggle = static_cast<views::ToggleButton*>(GetView(
-      PageInfoViewFactory::VIEW_ID_PAGE_INFO_BLOCK_THIRD_PARTY_COOKIES_TOGGLE));
-  EXPECT_TRUE(third_party_cookies_toggle->GetIsOn());
+  if (IsParamFeatureEnabled()) {
+    size_t kExpectedChildren = 1;
+    auto* cookies_buttons_container = GetView(
+        PageInfoViewFactory::VIEW_ID_PAGE_INFO_COOKIES_BUTTONS_CONTAINER);
+    EXPECT_THAT(cookies_buttons_container->children().size(),
+                testing::Eq(kExpectedChildren));
+    EXPECT_TRUE(GetView(
+        PageInfoViewFactory::VIEW_ID_PAGE_INFO_LINK_OR_BUTTON_COOKIE_DIALOG));
+    EXPECT_TRUE(GetView(
+        PageInfoViewFactory::VIEW_ID_PAGE_INFO_THIRD_PARTY_COOKIES_ROW));
 
-  base::UserActionTester user_actions_stats;
+    auto* third_party_cookies_toggle =
+        static_cast<views::ToggleButton*>(GetView(
+            PageInfoViewFactory::VIEW_ID_PAGE_INFO_THIRD_PARTY_COOKIES_TOGGLE));
+    EXPECT_THAT(third_party_cookies_toggle->GetIsOn(), IsFalse());
 
-  PerformMouseClickOnView(third_party_cookies_toggle);
-  EXPECT_FALSE(third_party_cookies_toggle->GetIsOn());
-  EXPECT_EQ(user_actions_stats.GetActionCount("PageInfo.Cookies.Allowed"), 1);
+    base::UserActionTester user_actions_stats;
 
-  PerformMouseClickOnView(third_party_cookies_toggle);
-  EXPECT_TRUE(third_party_cookies_toggle->GetIsOn());
-  EXPECT_EQ(user_actions_stats.GetActionCount("PageInfo.Cookies.Blocked"), 1);
+    PerformMouseClickOnView(third_party_cookies_toggle);
+    EXPECT_THAT(third_party_cookies_toggle->GetIsOn(), IsTrue());
+    EXPECT_EQ(user_actions_stats.GetActionCount("PageInfo.Cookies.Allowed"), 1);
+
+    PerformMouseClickOnView(third_party_cookies_toggle);
+    EXPECT_THAT(third_party_cookies_toggle->GetIsOn(), IsFalse());
+    EXPECT_EQ(user_actions_stats.GetActionCount("PageInfo.Cookies.Blocked"), 1);
+  } else {
+    size_t kExpectedChildren = 2;
+    auto* cookies_buttons_container = GetView(
+        PageInfoViewFactory::VIEW_ID_PAGE_INFO_COOKIES_BUTTONS_CONTAINER);
+    EXPECT_EQ(kExpectedChildren, cookies_buttons_container->children().size());
+    EXPECT_TRUE(GetView(
+        PageInfoViewFactory::VIEW_ID_PAGE_INFO_LINK_OR_BUTTON_COOKIE_DIALOG));
+    EXPECT_TRUE(GetView(
+        PageInfoViewFactory::VIEW_ID_PAGE_INFO_BLOCK_THIRD_PARTY_COOKIES_ROW));
+    auto* third_party_cookies_toggle = static_cast<views::ToggleButton*>(
+        GetView(PageInfoViewFactory::
+                    VIEW_ID_PAGE_INFO_BLOCK_THIRD_PARTY_COOKIES_TOGGLE));
+    EXPECT_THAT(third_party_cookies_toggle->GetIsOn(), IsTrue());
+
+    base::UserActionTester user_actions_stats;
+
+    PerformMouseClickOnView(third_party_cookies_toggle);
+    EXPECT_THAT(third_party_cookies_toggle->GetIsOn(), IsFalse());
+    EXPECT_EQ(user_actions_stats.GetActionCount("PageInfo.Cookies.Allowed"), 1);
+
+    PerformMouseClickOnView(third_party_cookies_toggle);
+    EXPECT_THAT(third_party_cookies_toggle->GetIsOn(), IsTrue());
+    EXPECT_EQ(user_actions_stats.GetActionCount("PageInfo.Cookies.Blocked"), 1);
+  }
 }
 
 // Checks if there is a correct number of buttons in cookies subpage when fps
 // are allowed and third party cookies are allowed(in settings) and click on
 // link in description of cookies subapge.
-IN_PROC_BROWSER_TEST_F(PageInfoBubbleViewBrowserTestCookiesSubpage,
+IN_PROC_BROWSER_TEST_P(PageInfoBubbleViewBrowserTestCookiesSubpage,
                        LinkInDescriptionForCookiesSettings) {
   GURL url_example = GURL("http://example/other/stuff.htm");
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), url_example));
@@ -1365,3 +1411,102 @@ IN_PROC_BROWSER_TEST_F(PageInfoBubbleViewBrowserTestCookiesSubpage,
 
   EXPECT_EQ(new_tab_observer.GetWebContents()->GetVisibleURL(), url);
 }
+
+class PageInfoBubbleViewBrowserTestWithRedInterstitialFaceliftEnabled
+    : public PageInfoBubbleViewBrowserTest {
+ public:
+  void SetUpCommandLine(base::CommandLine* command_line) override {
+    PageInfoBubbleViewBrowserTest::SetUpCommandLine(command_line);
+    feature_list.InitAndEnableFeature(safe_browsing::kRedInterstitialFacelift);
+  }
+
+ private:
+  base::test::ScopedFeatureList feature_list;
+};
+
+IN_PROC_BROWSER_TEST_F(
+    PageInfoBubbleViewBrowserTestWithRedInterstitialFaceliftEnabled,
+    MalwareNewStrings) {
+  net::EmbeddedTestServer https_server(net::EmbeddedTestServer::TYPE_HTTPS);
+  https_server.AddDefaultHandlers(
+      base::FilePath(FILE_PATH_LITERAL("chrome/test/data")));
+  ASSERT_TRUE(https_server.Start());
+
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(
+      browser(), https_server.GetURL("/simple.html")));
+
+  // Setup the bogus identity with an expired cert and SB flagging.
+  PageInfoUI::IdentityInfo identity;
+  identity.safe_browsing_status = PageInfo::SAFE_BROWSING_STATUS_MALWARE;
+  OpenPageInfoBubble(browser());
+
+  SetPageInfoBubbleIdentityInfo(identity);
+
+  // Verify bubble uses new malware summary and details strings.
+  EXPECT_EQ(GetPageInfoBubbleViewSummaryText(),
+            l10n_util::GetStringUTF16(IDS_PAGE_INFO_MALWARE_SUMMARY_NEW));
+  EXPECT_EQ(GetPageInfoBubbleViewDetailText(),
+            l10n_util::GetStringUTF16(IDS_PAGE_INFO_MALWARE_DETAILS_NEW) +
+                u" " + l10n_util::GetStringUTF16(IDS_LEARN_MORE));
+}
+
+IN_PROC_BROWSER_TEST_F(
+    PageInfoBubbleViewBrowserTestWithRedInterstitialFaceliftEnabled,
+    SocialEngineeringNewStrings) {
+  net::EmbeddedTestServer https_server(net::EmbeddedTestServer::TYPE_HTTPS);
+  https_server.AddDefaultHandlers(
+      base::FilePath(FILE_PATH_LITERAL("chrome/test/data")));
+  ASSERT_TRUE(https_server.Start());
+
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(
+      browser(), https_server.GetURL("/simple.html")));
+
+  // Setup the bogus identity with an expired cert and SB flagging.
+  PageInfoUI::IdentityInfo identity;
+  identity.safe_browsing_status =
+      PageInfo::SAFE_BROWSING_STATUS_SOCIAL_ENGINEERING;
+  OpenPageInfoBubble(browser());
+
+  SetPageInfoBubbleIdentityInfo(identity);
+
+  // Verify bubble uses new malware summary and details strings.
+  EXPECT_EQ(
+      GetPageInfoBubbleViewSummaryText(),
+      l10n_util::GetStringUTF16(IDS_PAGE_INFO_SOCIAL_ENGINEERING_SUMMARY_NEW));
+  EXPECT_EQ(
+      GetPageInfoBubbleViewDetailText(),
+      l10n_util::GetStringUTF16(IDS_PAGE_INFO_SOCIAL_ENGINEERING_DETAILS_NEW) +
+          u" " + l10n_util::GetStringUTF16(IDS_LEARN_MORE));
+}
+
+IN_PROC_BROWSER_TEST_F(
+    PageInfoBubbleViewBrowserTestWithRedInterstitialFaceliftEnabled,
+    UnwantedSoftwareNewStrings) {
+  net::EmbeddedTestServer https_server(net::EmbeddedTestServer::TYPE_HTTPS);
+  https_server.AddDefaultHandlers(
+      base::FilePath(FILE_PATH_LITERAL("chrome/test/data")));
+  ASSERT_TRUE(https_server.Start());
+
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(
+      browser(), https_server.GetURL("/simple.html")));
+
+  // Setup the bogus identity with an expired cert and SB flagging.
+  PageInfoUI::IdentityInfo identity;
+  identity.safe_browsing_status =
+      PageInfo::SAFE_BROWSING_STATUS_UNWANTED_SOFTWARE;
+  OpenPageInfoBubble(browser());
+
+  SetPageInfoBubbleIdentityInfo(identity);
+
+  // Verify bubble uses new malware summary and details strings.
+  EXPECT_EQ(
+      GetPageInfoBubbleViewSummaryText(),
+      l10n_util::GetStringUTF16(IDS_PAGE_INFO_UNWANTED_SOFTWARE_SUMMARY_NEW));
+  EXPECT_EQ(
+      GetPageInfoBubbleViewDetailText(),
+      l10n_util::GetStringUTF16(IDS_PAGE_INFO_UNWANTED_SOFTWARE_DETAILS_NEW) +
+          u" " + l10n_util::GetStringUTF16(IDS_LEARN_MORE));
+}
+
+INSTANTIATE_FEATURE_OVERRIDE_TEST_SUITE(
+    PageInfoBubbleViewBrowserTestCookiesSubpage);

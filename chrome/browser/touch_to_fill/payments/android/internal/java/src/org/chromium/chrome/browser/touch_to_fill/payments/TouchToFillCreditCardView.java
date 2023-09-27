@@ -66,7 +66,8 @@ class TouchToFillCreditCardView extends TouchToFillViewBase {
     TouchToFillCreditCardView(Context context, BottomSheetController bottomSheetController) {
         super(bottomSheetController,
                 (RelativeLayout) LayoutInflater.from(context).inflate(
-                        R.layout.touch_to_fill_sheet, null));
+                        R.layout.touch_to_fill_sheet, null),
+                true);
 
         getSheetItemListView().addItemDecoration(new HorizontalDividerItemDecoration(context));
     }

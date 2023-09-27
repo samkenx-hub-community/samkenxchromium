@@ -24,6 +24,7 @@
 #include "net/cookies/site_for_cookies.h"
 #include "net/http/http_request_headers.h"
 #include "net/http/http_status_code.h"
+#include "services/network/public/cpp/is_potentially_trustworthy.h"
 #include "services/network/public/cpp/resource_request.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "services/network/public/cpp/simple_url_loader.h"
@@ -43,7 +44,12 @@ using AccountList = IdpNetworkRequestManager::AccountList;
 using ClientMetadata = IdpNetworkRequestManager::ClientMetadata;
 using Endpoints = IdpNetworkRequestManager::Endpoints;
 using FetchStatus = content::IdpNetworkRequestManager::FetchStatus;
+using TokenResult = content::IdpNetworkRequestManager::TokenResult;
+using TokenError =
+    content::IdpNetworkRequestManager::IdentityCredentialTokenError;
 using ParseStatus = content::IdpNetworkRequestManager::ParseStatus;
+using AccountsResponseInvalidReason =
+    content::IdpNetworkRequestManager::AccountsResponseInvalidReason;
 
 // TODO(kenrb): These need to be defined in the explainer or draft spec and
 // referenced here.
@@ -82,6 +88,7 @@ constexpr char kAccountGivenNameKey[] = "given_name";
 constexpr char kAccountPictureKey[] = "picture";
 constexpr char kAccountApprovedClientsKey[] = "approved_clients";
 constexpr char kHintsKey[] = "login_hints";
+constexpr char kHostedDomainsKey[] = "hosted_domains";
 
 // Keys in 'branding' 'icons' dictionary in accounts endpoint.
 constexpr char kIdpBrandingIconUrl[] = "url";
@@ -93,6 +100,11 @@ constexpr char kTokenKey[] = "token";
 // the serve wants to direct the user to continue on a pop-up
 // window before it provides a token result.
 constexpr char kContinueOnKey[] = "continue_on";
+// The id assertion endpoint may contain an error dict containing a code and url
+// which describes the error.
+constexpr char kErrorKey[] = "error";
+constexpr char kErrorCodeKey[] = "code";
+constexpr char kErrorUrlKey[] = "url";
 
 // Body content types.
 constexpr char kUrlEncodedContentType[] = "application/x-www-form-urlencoded";
@@ -142,6 +154,27 @@ GURL ResolveConfigUrl(const GURL& config_url, const std::string& endpoint) {
   return config_url.Resolve(endpoint);
 }
 
+GURL ExtractUrl(const base::Value::Dict& response, const char* key) {
+  const std::string* response_url = response.FindString(key);
+  if (!response_url) {
+    return GURL();
+  }
+  GURL url = GURL(*response_url);
+  // TODO(crbug.com/1476951): Allow localhost URLs
+  if (!url.is_valid() || !url.SchemeIsHTTPOrHTTPS()) {
+    return GURL();
+  }
+  return url;
+}
+
+std::string ExtractString(const base::Value::Dict& response, const char* key) {
+  const std::string* str = response.FindString(key);
+  if (!str) {
+    return "";
+  }
+  return *str;
+}
+
 absl::optional<content::IdentityRequestAccount> ParseAccount(
     const base::Value::Dict& account,
     const std::string& client_id) {
@@ -152,12 +185,21 @@ absl::optional<content::IdentityRequestAccount> ParseAccount(
   auto* picture = account.FindString(kAccountPictureKey);
   auto* approved_clients = account.FindList(kAccountApprovedClientsKey);
   std::vector<std::string> account_hints;
-  if (IsFedCmLoginHintEnabled()) {
-    auto* hints = account.FindList(kHintsKey);
-    if (hints) {
-      for (const base::Value& entry : *hints) {
+  auto* hints = account.FindList(kHintsKey);
+  if (hints) {
+    for (const base::Value& entry : *hints) {
+      if (entry.is_string()) {
+        account_hints.emplace_back(entry.GetString());
+      }
+    }
+  }
+  std::vector<std::string> hosted_domains;
+  if (IsFedCmHostedDomainEnabled()) {
+    auto* hosted_domains_list = account.FindList(kHostedDomainsKey);
+    if (hosted_domains_list) {
+      for (const base::Value& entry : *hosted_domains_list) {
         if (entry.is_string()) {
-          account_hints.emplace_back(entry.GetString());
+          hosted_domains.emplace_back(entry.GetString());
         }
       }
     }
@@ -189,32 +231,42 @@ absl::optional<content::IdentityRequestAccount> ParseAccount(
   return content::IdentityRequestAccount(
       *id, *email, *name, given_name ? *given_name : "",
       picture ? GURL(*picture) : GURL(), std::move(account_hints),
-      approved_value);
+      std::move(hosted_domains), approved_value);
 }
 
 // Parses accounts from given Value. Returns true if parse is successful and
 // adds parsed accounts to the |account_list|.
 bool ParseAccounts(const base::Value::List& accounts,
                    AccountList& account_list,
-                   const std::string& client_id) {
+                   const std::string& client_id,
+                   AccountsResponseInvalidReason& parsing_error) {
   DCHECK(account_list.empty());
 
   base::flat_set<std::string> account_ids;
   for (auto& account : accounts) {
     const base::Value::Dict* account_dict = account.GetIfDict();
     if (!account_dict) {
+      parsing_error = AccountsResponseInvalidReason::kAccountIsNotDict;
       return false;
     }
 
     auto parsed_account = ParseAccount(*account_dict, client_id);
     if (parsed_account) {
-      if (account_ids.count(parsed_account->id))
+      if (account_ids.count(parsed_account->id)) {
+        parsing_error = AccountsResponseInvalidReason::kAccountsShareSameId;
         return false;
+      }
       account_list.push_back(parsed_account.value());
       account_ids.insert(parsed_account->id);
+    } else {
+      parsing_error =
+          AccountsResponseInvalidReason::kAccountMissesRequiredField;
+      return false;
     }
   }
-  return !account_list.empty();
+
+  DCHECK(!account_list.empty());
+  return true;
 }
 
 absl::optional<SkColor> ParseCssColor(const std::string* value) {
@@ -459,22 +511,10 @@ void OnClientMetadataParsed(
     return;
   }
 
-  const base::Value::Dict& response = result->GetDict();
-  auto ExtractUrl = [&](const char* key) {
-    const std::string* endpoint = response.FindString(key);
-    if (!endpoint) {
-      return GURL();
-    }
-    GURL url = GURL(*endpoint);
-    if (!url.is_valid() || !url.SchemeIsHTTPOrHTTPS()) {
-      return GURL();
-    }
-    return url;
-  };
-
   IdpNetworkRequestManager::ClientMetadata data;
-  data.privacy_policy_url = ExtractUrl(kPrivacyPolicyKey);
-  data.terms_of_service_url = ExtractUrl(kTermsOfServiceKey);
+  const base::Value::Dict& response = result->GetDict();
+  data.privacy_policy_url = ExtractUrl(response, kPrivacyPolicyKey);
+  data.terms_of_service_url = ExtractUrl(response, kTermsOfServiceKey);
 
   std::move(callback).Run({ParseStatus::kSuccess, fetch_status.response_code},
                           data);
@@ -486,6 +526,8 @@ void OnAccountsRequestParsed(
     FetchStatus fetch_status,
     data_decoder::DataDecoder::ValueOrError result) {
   if (fetch_status.parse_status != ParseStatus::kSuccess) {
+    RecordAccountsResponseInvalidReason(
+        AccountsResponseInvalidReason::kResponseIsNotJsonOrDict);
     std::move(callback).Run(fetch_status, AccountList());
     return;
   }
@@ -494,17 +536,33 @@ void OnAccountsRequestParsed(
   const base::Value::Dict& response = result->GetDict();
   const base::Value::List* accounts = response.FindList(kAccountsKey);
 
-  if (accounts && accounts->empty()) {
+  if (!accounts) {
+    RecordAccountsResponseInvalidReason(
+        AccountsResponseInvalidReason::kNoAccountsKey);
+    std::move(callback).Run(
+        {ParseStatus::kInvalidResponseError, fetch_status.response_code},
+        AccountList());
+    return;
+  }
+
+  if (accounts->empty()) {
+    RecordAccountsResponseInvalidReason(
+        AccountsResponseInvalidReason::kAccountListIsEmpty);
     std::move(callback).Run(
         {ParseStatus::kEmptyListError, fetch_status.response_code},
         AccountList());
     return;
   }
 
+  AccountsResponseInvalidReason parsing_error =
+      AccountsResponseInvalidReason::kResponseIsNotJsonOrDict;
   bool accounts_valid =
-      accounts && ParseAccounts(*accounts, account_list, client_id);
+      ParseAccounts(*accounts, account_list, client_id, parsing_error);
 
   if (!accounts_valid) {
+    CHECK_NE(parsing_error,
+             AccountsResponseInvalidReason::kResponseIsNotJsonOrDict);
+    RecordAccountsResponseInvalidReason(parsing_error);
     std::move(callback).Run(
         {ParseStatus::kInvalidResponseError, fetch_status.response_code},
         AccountList());
@@ -521,8 +579,15 @@ void OnTokenRequestParsed(
     const GURL& token_url,
     FetchStatus fetch_status,
     data_decoder::DataDecoder::ValueOrError result) {
+  TokenResult token_result;
+
   if (fetch_status.parse_status != ParseStatus::kSuccess) {
-    std::move(callback).Run(fetch_status, std::string());
+    if (IsFedCmErrorEnabled() &&
+        fetch_status.parse_status == ParseStatus::kNoResponseError) {
+      token_result.error = TokenError{"server_error", GURL()};
+    }
+
+    std::move(callback).Run(fetch_status, token_result);
     return;
   }
 
@@ -531,8 +596,9 @@ void OnTokenRequestParsed(
   const std::string* continue_on = response.FindString(kContinueOnKey);
 
   if (token) {
+    token_result.token = *token;
     std::move(callback).Run({ParseStatus::kSuccess, fetch_status.response_code},
-                            *token);
+                            token_result);
     return;
   }
 
@@ -546,9 +612,18 @@ void OnTokenRequestParsed(
     }
   }
 
+  if (IsFedCmErrorEnabled()) {
+    const base::Value::Dict* response_error = response.FindDict(kErrorKey);
+    if (response_error) {
+      std::string error_code = ExtractString(*response_error, kErrorCodeKey);
+      GURL error_url = ExtractUrl(*response_error, kErrorUrlKey);
+      token_result.error = TokenError{error_code, error_url};
+    }
+  }
+
   std::move(callback).Run(
       {ParseStatus::kInvalidResponseError, fetch_status.response_code},
-      std::string());
+      token_result);
 }
 
 void OnLogoutCompleted(IdpNetworkRequestManager::LogoutCallback callback,
@@ -563,6 +638,11 @@ void OnLogoutCompleted(IdpNetworkRequestManager::LogoutCallback callback,
 IdpNetworkRequestManager::Endpoints::Endpoints() = default;
 IdpNetworkRequestManager::Endpoints::~Endpoints() = default;
 IdpNetworkRequestManager::Endpoints::Endpoints(const Endpoints& other) =
+    default;
+
+IdpNetworkRequestManager::TokenResult::TokenResult() = default;
+IdpNetworkRequestManager::TokenResult::~TokenResult() = default;
+IdpNetworkRequestManager::TokenResult::TokenResult(const TokenResult& other) =
     default;
 
 // static
@@ -850,7 +930,7 @@ IdpNetworkRequestManager::CreateUncredentialedResourceRequest(
   } else {
     resource_request->redirect_mode = network::mojom::RedirectMode::kError;
   }
-  resource_request->request_initiator = relying_party_origin_;
+  resource_request->request_initiator = url::Origin();
   resource_request->trusted_params = network::ResourceRequest::TrustedParams();
   resource_request->trusted_params->isolation_info =
       net::IsolationInfo::CreateTransient();

@@ -5,9 +5,10 @@
 import {TestRunner} from 'test_runner';
 import {ElementsTestRunner} from 'elements_test_runner';
 
+import * as SDK from 'devtools/core/sdk/sdk.js';
+
 (async function() {
   TestRunner.addResult(`Tests that keyframes are shown in styles pane.\n`);
-  await TestRunner.loadLegacyModule('elements');
   await TestRunner.showPanel('elements');
   await TestRunner.loadHTML(`
       <style>
@@ -40,7 +41,7 @@ import {ElementsTestRunner} from 'elements_test_runner';
   async function step2() {
     TestRunner.addResult('=== After key modification ===');
     await ElementsTestRunner.dumpSelectedElementStyles(true);
-    SDK.domModelUndoStack.undo();
+    SDK.DOMModel.DOMModelUndoStack.instance().undo();
     ElementsTestRunner.waitForStyles('element', step3, true);
   }
 
@@ -48,7 +49,7 @@ import {ElementsTestRunner} from 'elements_test_runner';
     TestRunner.addResult('=== After undo ===');
     await ElementsTestRunner.dumpSelectedElementStyles(true);
 
-    SDK.domModelUndoStack.redo();
+    SDK.DOMModel.DOMModelUndoStack.instance().redo();
     ElementsTestRunner.waitForStyles('element', step4, true);
   }
 

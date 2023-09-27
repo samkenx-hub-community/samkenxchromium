@@ -15,7 +15,6 @@ buildflag_header("buildflags") {
 
 if (ios_enable_credential_provider_extension) {
   source_set("credential_provider") {
-    configs += [ "//build/config/compiler:enable_arc" ]
     sources = [
       "archivable_credential+password_form.h",
       "archivable_credential+password_form.mm",
@@ -38,12 +37,11 @@ if (ios_enable_credential_provider_extension) {
       "//components/keyed_service/core",
       "//components/keyed_service/ios",
       "//components/password_manager/core/browser",
-      "//components/password_manager/core/browser:affiliation",
+      "//components/password_manager/core/browser/affiliation",
       "//components/password_manager/core/common",
       "//components/password_manager/core/common:features",
       "//components/prefs:prefs",
       "//components/signin/public/identity_manager",
-      "//components/sync/base",
       "//ios/chrome/browser/favicon",
       "//ios/chrome/browser/passwords",
       "//ios/chrome/browser/shared/model/browser_state",
@@ -64,7 +62,6 @@ if (ios_enable_credential_provider_extension) {
   }
 
   source_set("unit_tests") {
-    configs += [ "//build/config/compiler:enable_arc" ]
     testonly = true
     sources = [
       "archivable_credential+password_form_unittest.mm",

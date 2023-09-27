@@ -50,10 +50,6 @@
 #import "ios/chrome/test/app/chrome_test_util.h"
 #import "testing/gtest/include/gtest/gtest.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 namespace {
 
 fake_server::FakeServer* gSyncFakeServer = nullptr;
@@ -190,7 +186,7 @@ void AddSessionToFakeSyncServer(
   // Header specifics.
   sync_pb::SessionSpecifics header =
       sync_sessions::SessionSyncTestHelper::BuildHeaderSpecificsWithoutWindows(
-          session.tag, session.form_factor);
+          session.tag, session.name, session.form_factor);
   sync_sessions::SessionSyncTestHelper::AddWindowSpecifics(window_id, tab_list,
                                                            &header);
   specifics_list.push_back(header);
@@ -365,21 +361,6 @@ void AddTypedURLToClient(const GURL& url) {
                           history::SOURCE_BROWSED, false);
 }
 
-void AddTypedURLToFakeSyncServer(const std::string& url) {
-  sync_pb::EntitySpecifics entitySpecifics;
-  sync_pb::TypedUrlSpecifics* typedUrl = entitySpecifics.mutable_typed_url();
-  typedUrl->set_url(url);
-  typedUrl->set_title(url);
-  typedUrl->add_visits(base::Time::Max().ToInternalValue());
-  typedUrl->add_visit_transitions(sync_pb::SyncEnums::TYPED);
-
-  std::unique_ptr<syncer::LoopbackServerEntity> entity =
-      syncer::PersistentUniqueClientEntity::CreateFromSpecificsForTesting(
-          /*non_unique_name=*/std::string(), /*client_tag=*/url,
-          entitySpecifics, 12345, 12345);
-  gSyncFakeServer->InjectEntity(std::move(entity));
-}
-
 void AddHistoryVisitToFakeSyncServer(const GURL& url) {
   sync_pb::EntitySpecifics entitySpecifics;
   sync_pb::HistorySpecifics* history = entitySpecifics.mutable_history();
@@ -479,24 +460,6 @@ void DeleteTypedUrlFromClient(const GURL& url) {
           browser_state, ServiceAccessType::EXPLICIT_ACCESS);
 
   history_service->DeleteURLs({url});
-}
-
-void DeleteTypedUrlFromFakeSyncServer(std::string url) {
-  std::vector<sync_pb::SyncEntity> typed_urls =
-      gSyncFakeServer->GetSyncEntitiesByModelType(syncer::TYPED_URLS);
-  std::string entity_id;
-  for (const sync_pb::SyncEntity& typed_url : typed_urls) {
-    if (typed_url.specifics().typed_url().url() == url) {
-      entity_id = typed_url.id_string();
-      break;
-    }
-  }
-  if (!entity_id.empty()) {
-    std::unique_ptr<syncer::LoopbackServerEntity> entity;
-    entity =
-        syncer::PersistentTombstoneEntity::CreateNew(entity_id, std::string());
-    gSyncFakeServer->InjectEntity(std::move(entity));
-  }
 }
 
 void AddBookmarkWithSyncPassphrase(const std::string& sync_passphrase) {

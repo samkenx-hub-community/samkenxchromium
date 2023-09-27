@@ -5,6 +5,7 @@
 #include "ash/system/night_light/night_light_feature_pod_controller.h"
 #include "ash/constants/ash_features.h"
 #include "ash/constants/quick_settings_catalogs.h"
+#include "ash/public/cpp/schedule_enums.h"
 #include "ash/session/session_controller_impl.h"
 #include "ash/shell.h"
 #include "ash/strings/grit/ash_strings.h"
@@ -16,6 +17,7 @@
 #include "ash/system/unified/unified_system_tray.h"
 #include "ash/system/unified/unified_system_tray_bubble.h"
 #include "ash/test/ash_test_base.h"
+#include "ash/test/time_of_day_test_util.h"
 #include "base/memory/raw_ptr.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/scoped_feature_list.h"
@@ -50,6 +52,9 @@ class NightLightFeaturePodControllerTest
   }
 
   void CreateButton() {
+    if (!system_tray_->IsBubbleShown()) {
+      system_tray_->ShowBubble();
+    }
     controller_ = std::make_unique<NightLightFeaturePodController>(
         system_tray_->bubble()->unified_system_tray_controller());
     if (IsQsRevampEnabled()) {
@@ -81,7 +86,7 @@ class NightLightFeaturePodControllerTest
 
  private:
   base::test::ScopedFeatureList feature_list_;
-  raw_ptr<UnifiedSystemTray, ExperimentalAsh> system_tray_;
+  raw_ptr<UnifiedSystemTray, DanglingUntriaged | ExperimentalAsh> system_tray_;
   std::unique_ptr<NightLightFeaturePodController> controller_;
   std::unique_ptr<FeaturePodButton> button_;
   std::unique_ptr<FeatureTile> tile_;
@@ -96,10 +101,14 @@ TEST_P(NightLightFeaturePodControllerTest, ButtonVisibility) {
   CreateButton();
   EXPECT_TRUE(IsButtonVisible());
 
-  // The button is not visible at the lock screen.
   GetSessionControllerClient()->LockScreen();
   CreateButton();
-  EXPECT_FALSE(IsButtonVisible());
+  // For QsRevamp: the feature tile is visible in the locked screen.
+  if (IsQsRevampEnabled()) {
+    EXPECT_TRUE(IsButtonVisible());
+  } else {
+    EXPECT_FALSE(IsButtonVisible());
+  }
 }
 
 // Tests that toggling night light from the system tray switches the color
@@ -112,8 +121,7 @@ TEST_P(NightLightFeaturePodControllerTest, Toggle) {
   // Night light off without any auto scheduling.
   EXPECT_FALSE(controller->GetEnabled());
   EXPECT_FALSE(IsButtonToggled());
-  EXPECT_EQ(NightLightController::ScheduleType::kNone,
-            controller->GetScheduleType());
+  EXPECT_EQ(ScheduleType::kNone, controller->GetScheduleType());
   EXPECT_EQ(
       l10n_util::GetStringUTF16(IDS_ASH_STATUS_TRAY_NIGHT_LIGHT_OFF_STATE),
       GetButtonLabelText());
@@ -123,8 +131,7 @@ TEST_P(NightLightFeaturePodControllerTest, Toggle) {
   PressIcon();
   EXPECT_TRUE(controller->GetEnabled());
   EXPECT_TRUE(IsButtonToggled());
-  EXPECT_EQ(NightLightController::ScheduleType::kNone,
-            controller->GetScheduleType());
+  EXPECT_EQ(ScheduleType::kNone, controller->GetScheduleType());
   EXPECT_EQ(l10n_util::GetStringUTF16(IDS_ASH_STATUS_TRAY_NIGHT_LIGHT_ON_STATE),
             GetButtonLabelText());
 }
@@ -137,10 +144,8 @@ TEST_P(NightLightFeaturePodControllerTest, SunsetToSunrise) {
 
   // Enable sunset-to-sunrise scheduling.
   NightLightControllerImpl* controller = Shell::Get()->night_light_controller();
-  controller->SetScheduleType(
-      NightLightController::ScheduleType::kSunsetToSunrise);
-  EXPECT_EQ(NightLightController::ScheduleType::kSunsetToSunrise,
-            controller->GetScheduleType());
+  controller->SetScheduleType(ScheduleType::kSunsetToSunrise);
+  EXPECT_EQ(ScheduleType::kSunsetToSunrise, controller->GetScheduleType());
 
   const std::u16string sublabel_on = l10n_util::GetStringUTF16(
       IDS_ASH_STATUS_TRAY_NIGHT_LIGHT_ON_STATE_SUNSET_TO_SUNRISE_SCHEDULED);
@@ -151,8 +156,7 @@ TEST_P(NightLightFeaturePodControllerTest, SunsetToSunrise) {
   // sunset-to-sunrise scheduling.
   bool enabled = controller->GetEnabled();
   PressIcon();
-  EXPECT_EQ(NightLightController::ScheduleType::kSunsetToSunrise,
-            controller->GetScheduleType());
+  EXPECT_EQ(ScheduleType::kSunsetToSunrise, controller->GetScheduleType());
   EXPECT_EQ(!enabled, controller->GetEnabled());
   EXPECT_EQ(!enabled, IsButtonToggled());
   EXPECT_EQ(!enabled ? sublabel_on : sublabel_off, GetButtonLabelText());
@@ -160,8 +164,7 @@ TEST_P(NightLightFeaturePodControllerTest, SunsetToSunrise) {
   // Pressing the night light button should switch the status but keep
   // sunset-to-sunrise scheduling.
   PressIcon();
-  EXPECT_EQ(NightLightController::ScheduleType::kSunsetToSunrise,
-            controller->GetScheduleType());
+  EXPECT_EQ(ScheduleType::kSunsetToSunrise, controller->GetScheduleType());
   EXPECT_EQ(enabled, controller->GetEnabled());
   EXPECT_EQ(enabled, IsButtonToggled());
   EXPECT_EQ(enabled ? sublabel_on : sublabel_off, GetButtonLabelText());
@@ -174,18 +177,17 @@ TEST_P(NightLightFeaturePodControllerTest, Custom) {
 
   // Enable custom scheduling.
   NightLightControllerImpl* controller = Shell::Get()->night_light_controller();
-  controller->SetScheduleType(NightLightController::ScheduleType::kCustom);
-  EXPECT_EQ(NightLightController::ScheduleType::kCustom,
-            controller->GetScheduleType());
+  controller->SetScheduleType(ScheduleType::kCustom);
+  EXPECT_EQ(ScheduleType::kCustom, controller->GetScheduleType());
 
   auto* clock_model = Shell::Get()->system_tray_model()->clock();
   const std::u16string start_time_str =
       base::TimeFormatTimeOfDayWithHourClockType(
-          controller->GetCustomStartTime().ToTimeToday(),
+          ToTimeToday(controller->GetCustomStartTime()),
           clock_model->hour_clock_type(), base::kKeepAmPm);
   const std::u16string end_time_str =
       base::TimeFormatTimeOfDayWithHourClockType(
-          controller->GetCustomEndTime().ToTimeToday(),
+          ToTimeToday(controller->GetCustomEndTime()),
           clock_model->hour_clock_type(), base::kKeepAmPm);
   const std::u16string sublabel_on = l10n_util::GetStringFUTF16(
       IDS_ASH_STATUS_TRAY_NIGHT_LIGHT_ON_STATE_CUSTOM_SCHEDULED, end_time_str);
@@ -197,8 +199,7 @@ TEST_P(NightLightFeaturePodControllerTest, Custom) {
   // label but keep the custom scheduling.
   bool enabled = controller->GetEnabled();
   PressIcon();
-  EXPECT_EQ(NightLightController::ScheduleType::kCustom,
-            controller->GetScheduleType());
+  EXPECT_EQ(ScheduleType::kCustom, controller->GetScheduleType());
   EXPECT_EQ(!enabled, controller->GetEnabled());
   EXPECT_EQ(!enabled, IsButtonToggled());
   EXPECT_EQ(!enabled ? sublabel_on : sublabel_off, GetButtonLabelText());
@@ -206,8 +207,7 @@ TEST_P(NightLightFeaturePodControllerTest, Custom) {
   // Pressing the night light button should switch the status and update the
   // label but keep the custom scheduling.
   PressIcon();
-  EXPECT_EQ(NightLightController::ScheduleType::kCustom,
-            controller->GetScheduleType());
+  EXPECT_EQ(ScheduleType::kCustom, controller->GetScheduleType());
   EXPECT_EQ(enabled, controller->GetEnabled());
   EXPECT_EQ(enabled, IsButtonToggled());
   EXPECT_EQ(enabled ? sublabel_on : sublabel_off, GetButtonLabelText());
@@ -218,7 +218,7 @@ TEST_P(NightLightFeaturePodControllerTest, IconUMATracking) {
 
   // Disable sunset-to-sunrise scheduling.
   NightLightControllerImpl* controller = Shell::Get()->night_light_controller();
-  controller->SetScheduleType(NightLightController::ScheduleType::kNone);
+  controller->SetScheduleType(ScheduleType::kNone);
 
   // No metrics logged before clicking on any views.
   auto histogram_tester = std::make_unique<base::HistogramTester>();

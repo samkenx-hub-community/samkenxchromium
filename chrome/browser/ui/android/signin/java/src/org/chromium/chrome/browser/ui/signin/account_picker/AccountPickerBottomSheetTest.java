@@ -50,6 +50,7 @@ import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 import org.mockito.quality.Strictness;
 
+import org.chromium.base.BuildInfo;
 import org.chromium.base.Callback;
 import org.chromium.base.test.util.Batch;
 import org.chromium.base.test.util.CommandLineFlags;
@@ -60,7 +61,6 @@ import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
 import org.chromium.chrome.browser.preferences.SharedPreferencesManager;
 import org.chromium.chrome.browser.share.send_tab_to_self.SendTabToSelfCoordinator;
 import org.chromium.chrome.browser.signin.services.SigninPreferencesManager;
-import org.chromium.chrome.browser.ui.signin.DeviceLockActivityLauncher;
 import org.chromium.chrome.browser.ui.signin.R;
 import org.chromium.chrome.browser.ui.signin.account_picker.AccountPickerBottomSheetCoordinator.EntryPoint;
 import org.chromium.chrome.test.AutomotiveContextWrapperTestRule;
@@ -69,6 +69,7 @@ import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
 import org.chromium.chrome.test.batch.BlankCTATabInitialStateRule;
 import org.chromium.chrome.test.util.browser.signin.AccountManagerTestRule;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
+import org.chromium.components.browser_ui.device_lock.DeviceLockActivityLauncher;
 import org.chromium.components.signin.AccountManagerFacadeProvider;
 import org.chromium.components.signin.base.GoogleServiceAuthError;
 import org.chromium.components.signin.base.GoogleServiceAuthError.State;
@@ -591,6 +592,7 @@ public class AccountPickerBottomSheetTest {
 
     @Test
     @MediumTest
+    @SuppressWarnings("CheckReturnValue")
     public void testSigninWithAddedAccount() {
         var accountConsistencyHistogram =
                 HistogramWatcher.newBuilder()
@@ -606,7 +608,8 @@ public class AccountPickerBottomSheetTest {
 
         onVisibleView(withText(R.string.signin_add_account_to_device)).perform(click());
 
-        ViewUtils.waitForView(withText(NEW_ACCOUNT_EMAIL));
+        // TODO(crbug.com/1469988): This is a no-op, replace with ViewUtils.waitForVisibleView().
+        ViewUtils.isEventuallyVisible(withText(NEW_ACCOUNT_EMAIL));
         clickContinueButtonAndCheckSignInInProgressSheet();
         accountConsistencyHistogram.assertExpected();
     }
@@ -726,6 +729,7 @@ public class AccountPickerBottomSheetTest {
 
     @Test
     @MediumTest
+    @SuppressWarnings("CheckReturnValue")
     public void testAddAccountOnExpandedSheet() {
         var accountConsistencyHistogram =
                 HistogramWatcher.newBuilder()
@@ -740,7 +744,8 @@ public class AccountPickerBottomSheetTest {
 
         onVisibleView(withText(R.string.signin_add_account_to_device)).perform(click());
 
-        ViewUtils.waitForView(withText(NEW_ACCOUNT_EMAIL));
+        // TODO(crbug.com/1469988): This is a no-op, replace with ViewUtils.waitForVisibleView().
+        ViewUtils.isEventuallyVisible(withText(NEW_ACCOUNT_EMAIL));
         checkCollapsedAccountListForWebSignin(NEW_ACCOUNT_EMAIL, null, null);
         accountConsistencyHistogram.assertExpected();
     }
@@ -770,6 +775,11 @@ public class AccountPickerBottomSheetTest {
         TestThreadUtils.runOnUiThreadBlocking(() -> {
             bottomSheetView.findViewById(R.id.account_picker_continue_as_button).performClick();
         });
+
+        if (BuildInfo.getInstance().isAutomotive) {
+            completeDeviceLock(true);
+        }
+
         CriteriaHelper.pollUiThread(() -> {
             return !bottomSheetView.findViewById(R.id.account_picker_selected_account).isShown();
         });
@@ -780,9 +790,39 @@ public class AccountPickerBottomSheetTest {
         TestThreadUtils.runOnUiThreadBlocking(() -> {
             bottomSheetView.findViewById(R.id.account_picker_continue_as_button).performClick();
         });
+
         CriteriaHelper.pollUiThread(() -> {
-            return bottomSheetView.findViewById(R.id.account_picker_signin_spinner_view).isShown();
+            bottomSheetView.findViewById(R.id.account_picker_signin_spinner_view).isShown();
         });
+
+        if (BuildInfo.getInstance().isAutomotive) {
+            completeDeviceLock(true);
+        }
+
+        assertSignInProceeded(bottomSheetView);
+    }
+
+    private void clickContinueButtonAndCheckSignInInProgressSheetOnAutomotive(
+            boolean deviceLockCreated) {
+        View bottomSheetView = mCoordinator.getBottomSheetViewForTesting();
+        TestThreadUtils.runOnUiThreadBlocking(() -> {
+            bottomSheetView.findViewById(R.id.account_picker_continue_as_button).performClick();
+        });
+
+        completeDeviceLock(deviceLockCreated);
+
+        if (deviceLockCreated) {
+            assertSignInProceeded(bottomSheetView);
+        } else {
+            onView(withText(R.string.signin_account_picker_bottom_sheet_signin_title))
+                    .check(matches(not(isDisplayed())));
+            onView(withId(R.id.account_picker_account_list)).check(matches(not(isDisplayed())));
+            onView(withId(R.id.account_picker_selected_account)).check(matches(isDisplayed()));
+            onView(withId(R.id.account_picker_dismiss_button)).check(matches(isDisplayed()));
+        }
+    }
+
+    private void assertSignInProceeded(View bottomSheetView) {
         // TODO(https://crbug.com/1116348): Check AccountPickerDelegate.signIn() is called
         // after solving AsyncTask wait problem in espresso
         // Currently the ProgressBar animation cannot be disabled on android-marshmallow-arm64-rel
@@ -801,41 +841,12 @@ public class AccountPickerBottomSheetTest {
         onView(withId(R.id.account_picker_dismiss_button)).check(matches(not(isDisplayed())));
     }
 
-    private void clickContinueButtonAndCheckSignInInProgressSheetOnAutomotive(
-            boolean deviceLockCreated) {
-        View bottomSheetView = mCoordinator.getBottomSheetViewForTesting();
-        TestThreadUtils.runOnUiThreadBlocking(() -> {
-            bottomSheetView.findViewById(R.id.account_picker_continue_as_button).performClick();
-        });
+    private void completeDeviceLock(boolean deviceLockCreated) {
         assertTrue(mDeviceLockActivityLauncher.isLaunched());
         TestThreadUtils.runOnUiThreadBlocking(() -> {
             mDeviceLockActivityLauncher.runCallback(
                     deviceLockCreated ? Activity.RESULT_OK : Activity.RESULT_CANCELED);
         });
-        if (deviceLockCreated) {
-            // TODO(https://crbug.com/1116348): Check AccountPickerDelegate.signIn() is called
-            // after solving AsyncTask wait problem in espresso
-            // Currently the ProgressBar animation cannot be disabled on
-            // android-marshmallow-arm64-rel bot with DisableAnimationsTestRule, we hide the
-            // ProgressBar manually here to enable checks of other elements on the screen.
-            // TODO(https://crbug.com/1115067): Delete this line once DisableAnimationsTestRule is
-            // fixed.
-            TestThreadUtils.runOnUiThreadBlocking(() -> {
-                bottomSheetView.findViewById(R.id.account_picker_signin_spinner_view)
-                        .setVisibility(View.GONE);
-            });
-            onView(withText(R.string.signin_account_picker_bottom_sheet_signin_title))
-                    .check(matches(isDisplayed()));
-            onView(withId(R.id.account_picker_account_list)).check(matches(not(isDisplayed())));
-            onView(withId(R.id.account_picker_selected_account)).check(matches(not(isDisplayed())));
-            onView(withId(R.id.account_picker_dismiss_button)).check(matches(not(isDisplayed())));
-        } else {
-            onView(withText(R.string.signin_account_picker_bottom_sheet_signin_title))
-                    .check(matches(not(isDisplayed())));
-            onView(withId(R.id.account_picker_account_list)).check(matches(not(isDisplayed())));
-            onView(withId(R.id.account_picker_selected_account)).check(matches(isDisplayed()));
-            onView(withId(R.id.account_picker_dismiss_button)).check(matches(isDisplayed()));
-        }
     }
 
     private static void checkZeroAccountBottomSheet() {
@@ -908,8 +919,8 @@ public class AccountPickerBottomSheetTest {
         CustomDeviceLockActivityLauncher() {}
 
         @Override
-        public void launchDeviceLockActivity(Context context, boolean inSignInFlow,
-                String selectedAccount, WindowAndroid windowAndroid,
+        public void launchDeviceLockActivity(Context context, String selectedAccount,
+                boolean requireDeviceLockReauthentication, WindowAndroid windowAndroid,
                 WindowAndroid.IntentCallback callback) {
             mCallback = callback;
             mLaunched = true;

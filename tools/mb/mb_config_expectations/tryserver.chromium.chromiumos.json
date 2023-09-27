@@ -1,4 +1,14 @@
 {
+  "chromeos-amd64-generic-asan-rel": {
+    "args_file": "//build/args/chromeos/amd64-generic.gni",
+    "gn_args": {
+      "dcheck_always_on": false,
+      "is_asan": true,
+      "is_chromeos_device": true,
+      "ozone_platform_headless": true,
+      "use_remoteexec": true
+    }
+  },
   "chromeos-amd64-generic-cfi-thin-lto-rel": {
     "args_file": "//build/args/chromeos/amd64-generic.gni",
     "gn_args": {
@@ -46,7 +56,7 @@
       "use_remoteexec": true
     }
   },
-  "chromeos-amd64-generic-rel-rts": {
+  "chromeos-amd64-generic-siso-rel": {
     "args_file": "//build/args/chromeos/amd64-generic-vm.gni",
     "gn_args": {
       "also_build_lacros_chrome_for_architecture": "amd64",
@@ -164,19 +174,6 @@
     "gn_args": {
       "chromeos_is_browser_only": true,
       "dcheck_always_on": true,
-      "is_chromeos_device": true,
-      "is_debug": false,
-      "is_skylab": true,
-      "ozone_platform_headless": true,
-      "target_os": "chromeos",
-      "use_remoteexec": true
-    }
-  },
-  "lacros-amd64-generic-rel-skylab-fyi": {
-    "args_file": "//build/args/chromeos/amd64-generic-crostoolchain.gni",
-    "gn_args": {
-      "chromeos_is_browser_only": true,
-      "dcheck_always_on": false,
       "is_chromeos_device": true,
       "is_debug": false,
       "is_skylab": true,
@@ -304,7 +301,7 @@
       "use_remoteexec": true
     }
   },
-  "linux-chromeos-rel-rts": {
+  "linux-chromeos-siso-rel": {
     "gn_args": {
       "also_build_lacros_chrome": true,
       "coverage_instrumentation_input_file": "//.code-coverage/files_to_instrument.txt",
@@ -337,23 +334,29 @@
     "gn_args": {
       "also_build_ash_chrome": true,
       "chromeos_is_browser_only": true,
+      "coverage_instrumentation_input_file": "//.code-coverage/files_to_instrument.txt",
       "dcheck_always_on": true,
+      "is_clang": true,
       "is_component_build": false,
       "is_debug": false,
       "symbol_level": 0,
       "target_os": "chromeos",
+      "use_clang_coverage": true,
       "use_remoteexec": true
     }
   },
-  "linux-lacros-rel-rts": {
+  "linux-lacros-siso-rel": {
     "gn_args": {
       "also_build_ash_chrome": true,
       "chromeos_is_browser_only": true,
+      "coverage_instrumentation_input_file": "//.code-coverage/files_to_instrument.txt",
       "dcheck_always_on": true,
+      "is_clang": true,
       "is_component_build": false,
       "is_debug": false,
       "symbol_level": 0,
       "target_os": "chromeos",
+      "use_clang_coverage": true,
       "use_remoteexec": true
     }
   }

@@ -19,8 +19,8 @@
 #import "ios/chrome/browser/shared/model/application_context/application_context.h"
 #import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/shared/model/url/chrome_url_constants.h"
-#import "ios/chrome/browser/webui/net_export_tab_helper.h"
-#import "ios/chrome/browser/webui/show_mail_composer_context.h"
+#import "ios/chrome/browser/webui/model/net_export_tab_helper.h"
+#import "ios/chrome/browser/webui/model/show_mail_composer_context.h"
 #import "ios/chrome/common/channel_info.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ios/web/public/thread/web_thread.h"
@@ -29,10 +29,6 @@
 #import "ios/web/public/webui/web_ui_ios_message_handler.h"
 #import "net/log/net_log_capture_mode.h"
 #import "net/url_request/url_request_context_getter.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace {
 

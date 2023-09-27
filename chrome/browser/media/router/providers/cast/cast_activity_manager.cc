@@ -18,6 +18,7 @@
 #include "base/ranges/algorithm.h"
 #include "base/strings/strcat.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/types/expected_macros.h"
 #include "chrome/browser/media/router/data_decoder_util.h"
 #include "chrome/browser/media/router/media_router_feature.h"
 #include "chrome/browser/media/router/providers/cast/app_activity.h"
@@ -25,6 +26,7 @@
 #include "chrome/browser/media/router/providers/cast/cast_session_client.h"
 #include "chrome/browser/media/router/providers/cast/mirroring_activity.h"
 #include "chrome/grit/generated_resources.h"
+#include "components/access_code_cast/common/access_code_cast_metrics.h"
 #include "components/media_router/browser/logger_impl.h"
 #include "components/media_router/browser/media_router_metrics.h"
 #include "components/media_router/common/media_source.h"
@@ -44,6 +46,13 @@ namespace media_router {
 namespace {
 
 constexpr char kLoggerComponent[] = "CastActivityManager";
+
+void RecordSavedDeviceConnectDurationMetric(
+    base::Time route_request_creation_timestamp) {
+  base::TimeDelta route_success_time =
+      base::Time::Now() - route_request_creation_timestamp;
+  AccessCodeCastMetrics::RecordSavedDeviceConnectDuration(route_success_time);
+}
 
 }  // namespace
 
@@ -95,12 +104,11 @@ void CastActivityManager::LaunchSession(
     const std::string& presentation_id,
     const url::Origin& origin,
     int frame_tree_node_id,
-    bool off_the_record,
     mojom::MediaRouteProvider::CreateRouteCallback callback) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (cast_source.app_params().empty()) {
     LaunchSessionParsed(cast_source, sink, presentation_id, origin,
-                        frame_tree_node_id, off_the_record, std::move(callback),
+                        frame_tree_node_id, std::move(callback),
                         data_decoder::DataDecoder::ValueOrError());
   } else {
     GetDataDecoder().ParseJson(
@@ -108,7 +116,7 @@ void CastActivityManager::LaunchSession(
         base::BindOnce(&CastActivityManager::LaunchSessionParsed,
                        weak_ptr_factory_.GetWeakPtr(), cast_source, sink,
                        presentation_id, origin, frame_tree_node_id,
-                       off_the_record, std::move(callback)));
+                       std::move(callback)));
   }
 }
 
@@ -118,7 +126,6 @@ void CastActivityManager::LaunchSessionParsed(
     const std::string& presentation_id,
     const url::Origin& origin,
     int frame_tree_node_id,
-    bool off_the_record,
     mojom::MediaRouteProvider::CreateRouteCallback callback,
     data_decoder::DataDecoder::ValueOrError result) {
   if (!cast_source.app_params().empty() && !result.has_value()) {
@@ -142,7 +149,6 @@ void CastActivityManager::LaunchSessionParsed(
                    /* is_local */ true);
   route.set_presentation_id(presentation_id);
   route.set_local_presentation(true);
-  route.set_off_the_record(off_the_record);
   if (cast_source.ContainsStreamingApp()) {
     route.set_controller_type(RouteControllerType::kMirroring);
   } else {
@@ -201,8 +207,6 @@ void CastActivityManager::DoLaunchSession(DoLaunchSessionParams params) {
     base::UmaHistogramBoolean(kHistogramAudioSender,
                               cast_source.site_requested_audio_capture());
   }
-  RecordLaunchSessionRequestSupportedAppTypes(
-      cast_source.supported_app_types());
 
   cast_source.ContainsStreamingApp()
       ? AddMirroringActivity(route, app_id, frame_tree_node_id,
@@ -302,7 +306,6 @@ void CastActivityManager::JoinSession(
     const std::string& presentation_id,
     const url::Origin& origin,
     int frame_tree_node_id,
-    bool off_the_record,
     mojom::MediaRouteProvider::JoinRouteCallback callback) {
   AppActivity* activity = nullptr;
   if (presentation_id == kAutoJoinPresentationId) {
@@ -312,7 +315,7 @@ void CastActivityManager::JoinSession(
       auto sink = GetSinkForMirroringActivity(frame_tree_node_id);
       if (sink) {
         LaunchSession(cast_source, *sink, presentation_id, origin,
-                      frame_tree_node_id, off_the_record, std::move(callback));
+                      frame_tree_node_id, std::move(callback));
         return;
       }
     }
@@ -320,7 +323,7 @@ void CastActivityManager::JoinSession(
     activity = FindActivityForSessionJoin(cast_source, presentation_id);
   }
 
-  if (!activity || !activity->CanJoinSession(cast_source, off_the_record)) {
+  if (!activity || !activity->CanJoinSession(cast_source)) {
     std::move(callback).Run(absl::nullopt, nullptr,
                             std::string("No matching route"),
                             mojom::RouteRequestResultCode::ROUTE_NOT_FOUND);
@@ -697,7 +700,7 @@ void CastActivityManager::SendRouteJsonMessage(
     const std::string& media_route_id,
     const std::string& message,
     data_decoder::DataDecoder::ValueOrError result) {
-  const auto activity = [&]()
+  const auto get_activity = [&]()
       -> base::expected<std::pair<CastActivity*, std::string>, std::string> {
     if (!result.has_value()) {
       return base::unexpected(
@@ -725,16 +728,15 @@ void CastActivityManager::SendRouteJsonMessage(
           "message.");
     }
     return std::make_pair(it->second.get(), *client_id);
-  }();
-  if (!activity.has_value()) {
+  };
+  ASSIGN_OR_RETURN(auto activity, get_activity(), [&](std::string error) {
     logger_->LogError(
-        mojom::LogCategory::kRoute, kLoggerComponent, activity.error(), "",
+        mojom::LogCategory::kRoute, kLoggerComponent, std::move(error), "",
         MediaRoute::GetMediaSourceIdFromMediaRouteId(media_route_id),
         MediaRoute::GetPresentationIdFromMediaRouteId(media_route_id));
-    return;
-  }
-  activity->first->SendMessageToClient(
-      std::move(activity->second),
+  });
+  activity.first->SendMessageToClient(
+      std::move(activity.second),
       blink::mojom::PresentationConnectionMessage::NewMessage(message));
 }
 
@@ -932,6 +934,11 @@ void CastActivityManager::HandleLaunchSessionResponse(
                    "Successfully Launched the session.", sink.id(),
                    cast_source.source_id(),
                    MediaRoute::GetPresentationIdFromMediaRouteId(route_id));
+
+  if (sink.cast_data().discovery_type ==
+      CastDiscoveryType::kAccessCodeRememberedDevice) {
+    RecordSavedDeviceConnectDurationMetric(params.creation_time);
+  }
 
   std::move(params.callback)
       .Run(route, std::move(presentation_connection),

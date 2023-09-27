@@ -10,7 +10,7 @@
 #include "third_party/blink/renderer/core/layout/layout_block_flow.h"
 #include "third_party/blink/renderer/core/layout/ng/inline/ng_inline_node_data.h"
 #include "third_party/blink/renderer/core/layout/ng/ng_layout_input_node.h"
-#include "third_party/blink/renderer/core/layout/ng/svg/ng_svg_character_data.h"
+#include "third_party/blink/renderer/core/layout/svg/svg_character_data.h"
 #include "third_party/blink/renderer/platform/wtf/casting.h"
 #include "third_party/blink/renderer/platform/wtf/text/wtf_string.h"
 
@@ -96,8 +96,8 @@ class CORE_EXPORT NGInlineNode : public NGLayoutInputNode {
   bool IsBidiEnabled() const { return Data().is_bidi_enabled_; }
   TextDirection BaseDirection() const { return Data().BaseDirection(); }
 
+  bool HasFloats() const { return Data().HasFloats(); }
   bool HasInitialLetterBox() const { return Data().has_initial_letter_box_; }
-
   bool HasRuby() const { return Data().has_ruby_; }
 
   bool IsBlockLevel() { return EnsureData().is_block_level_; }
@@ -124,7 +124,7 @@ class CORE_EXPORT NGInlineNode : public NGLayoutInputNode {
   void CheckConsistency() const;
 
   // This function is available after PrepareLayout(), only for SVG <text>.
-  const Vector<std::pair<unsigned, NGSvgCharacterData>>& SvgCharacterDataList()
+  const Vector<std::pair<unsigned, SvgCharacterData>>& SvgCharacterDataList()
       const;
   // This function is available after PrepareLayout(), only for SVG <text>.
   const HeapVector<SvgTextContentRange>& SvgTextLengthRangeList() const;
@@ -136,10 +136,13 @@ class CORE_EXPORT NGInlineNode : public NGLayoutInputNode {
   struct FloatingObject {
     DISALLOW_NEW();
 
-    void Trace(Visitor* visitor) const {}
+    void Trace(Visitor* visitor) const {
+      visitor->Trace(float_style);
+      visitor->Trace(style);
+    }
 
-    const ComputedStyle& float_style;
-    const ComputedStyle& style;
+    Member<const ComputedStyle> float_style;
+    Member<const ComputedStyle> style;
     LayoutUnit float_inline_max_size_with_margin;
   };
 
@@ -174,6 +177,10 @@ class CORE_EXPORT NGInlineNode : public NGLayoutInputNode {
       const String* previous_text,
       const HeapVector<NGInlineItem>* previous_items) const;
   void AssociateItemsWithInlines(NGInlineNodeData*) const;
+  bool IsNGShapeCacheAllowed(const String&,
+                             const Font*,
+                             const HeapVector<NGInlineItem>&,
+                             ShapeResultSpacing<String>&) const;
 
   NGInlineNodeData* MutableData() const {
     return To<LayoutBlockFlow>(box_.Get())->GetNGInlineNodeData();

@@ -16,12 +16,12 @@ import org.chromium.chrome.browser.feed.R;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.signin.services.IdentityServicesProvider;
 import org.chromium.chrome.browser.signin.services.SigninManager;
-import org.chromium.chrome.browser.ui.signin.DeviceLockActivityLauncher;
 import org.chromium.chrome.browser.ui.signin.account_picker.AccountPickerBottomSheetCoordinator;
 import org.chromium.chrome.browser.ui.signin.account_picker.AccountPickerBottomSheetCoordinator.EntryPoint;
 import org.chromium.chrome.browser.ui.signin.account_picker.AccountPickerBottomSheetStrings;
 import org.chromium.chrome.browser.ui.signin.account_picker.AccountPickerDelegate;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
+import org.chromium.components.browser_ui.device_lock.DeviceLockActivityLauncher;
 import org.chromium.components.signin.AccountUtils;
 import org.chromium.components.signin.base.GoogleServiceAuthError;
 import org.chromium.components.signin.identitymanager.AccountInfoServiceProvider;
@@ -121,7 +121,6 @@ public class SigninBottomSheetCoordinator implements AccountPickerDelegate {
                 .show();
     }
 
-    @VisibleForTesting
     public View getBottomSheetViewForTesting() {
         return mAccountPickerBottomSheetCoordinator.getBottomSheetViewForTesting();
     }
@@ -132,7 +131,6 @@ public class SigninBottomSheetCoordinator implements AccountPickerDelegate {
         this.mAccountPickerBottomSheetCoordinator = accountPickerBottomSheetCoordinator;
     }
 
-    @VisibleForTesting
     public void setToastOverrideForTesting() {
         this.mSetTestToast = true;
     }

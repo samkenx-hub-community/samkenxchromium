@@ -44,6 +44,7 @@ namespace password_manager_util {
 // For credentials returned from PasswordStore::GetLogins, the enum specifies
 // the type of the match for the requested page. Higher value always means
 // weaker match.
+// GENERATED_JAVA_ENUM_PACKAGE: org.chromium.chrome.browser.password_manager
 enum class GetLoginMatchType {
   // Exact origin or Android credentials.
   kExact,
@@ -205,18 +206,8 @@ bool IsCredentialProviderEnabledOnStartup(const PrefService* prefs);
 void SetCredentialProviderEnabledOnStartup(PrefService* prefs, bool enabled);
 #endif
 
-// Retrieves the extended top level domain for a given |url|
-// ("https://www.facebook.com/" => "facebook.com"). If the calculated top
-// private domain matches an entry from the |psl_extensions| (e.g. "app.link"),
-// the domain is extended by one level ("https://facebook.app.link/" =>
-// "facebook.app.link"). If the |url| is not a valid URI or has an unsupported
-// schema (e.g. "android://"), empty string is returned.
-std::string GetExtendedTopLevelDomain(
-    const GURL& url,
-    const base::flat_set<std::string>& psl_extensions);
-
 // Contains all special symbols considered for password-generation.
-constexpr char kSpecialSymbols[] = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
+inline constexpr char kSpecialSymbols[] = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
 
 // Helper functions for character type classification. The built-in functions
 // depend on locale, platform and other stuff. To make the output more
@@ -232,6 +223,9 @@ bool IsUppercaseLetter(char16_t c);
 // Checks if a supplied character |c| is a special symbol.
 // Special symbols are defined by the string |kSpecialSymbols|.
 bool IsSpecialSymbol(char16_t c);
+
+// Returns true if 'type' is a username in a password-less form.
+bool IsSingleUsernameType(autofill::ServerFieldType type);
 
 }  // namespace password_manager_util
 

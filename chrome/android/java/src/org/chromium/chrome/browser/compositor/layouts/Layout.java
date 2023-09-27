@@ -351,20 +351,15 @@ public abstract class Layout {
     protected void notifySizeChanged(float width, float height, @Orientation int orientation) {}
 
     /**
-     * Sets the managers needed to for the layout to get information from outside. The managers
-     * are tailored to be called from the GL thread.
-     *
+     * Sets the the {@link TabModelSelector} for the layout.
      * @param modelSelector The {@link TabModelSelector} to be set on the layout.
-     * @param manager       The {@link TabContentManager} to get tab display content.
      */
-    public void setTabModelSelector(TabModelSelector modelSelector, TabContentManager manager) {
+    public void setTabModelSelector(TabModelSelector modelSelector) {
         mTabModelSelector = modelSelector;
-        setTabContentManager(manager);
     }
 
     /**
-     * Sets the manager needed for the layout to get thumbnails.
-     *
+     * Sets the {@link TabContentManager} needed for the layout to get thumbnails.
      * @param manager The {@link TabContentManager} to get tab display content.
      */
     protected void setTabContentManager(TabContentManager manager) {
@@ -691,7 +686,7 @@ public abstract class Layout {
 
     /**
      * @param e                 The {@link MotionEvent} to consider.
-     * @param offsets           The current touch offsets that should be applied to the
+     * @param offsets           The current motion offsets that should be applied to the
      *                          {@link EventFilter}s.
      * @param isKeyboardShowing Whether or not the keyboard is showing.
      * @return The {@link EventFilter} the {@link Layout} is listening to.
@@ -704,6 +699,9 @@ public abstract class Layout {
                 layoutEventFilter.setCurrentMotionEventOffsets(offsets.x, offsets.y);
             }
             if (layoutEventFilter.onInterceptTouchEvent(e, isKeyboardShowing)) {
+                return layoutEventFilter;
+            }
+            if (layoutEventFilter.onInterceptHoverEvent(e)) {
                 return layoutEventFilter;
             }
         }
@@ -767,8 +765,7 @@ public abstract class Layout {
     /**
      * @return The {@link LayoutType}.
      */
-    @LayoutType
-    public abstract int getLayoutType();
+    public abstract @LayoutType int getLayoutType();
 
     /** Returns whether the layout is currently running animations. */
     public boolean isRunningAnimations() {

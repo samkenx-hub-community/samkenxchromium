@@ -2,16 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# TODO(crbug.com/1344830): Migrate away from deprecated MDC APIs.
-config("disable_deprecated_declarations") {
-  cflags = [ "-Wno-deprecated-declarations" ]
-}
-
 source_set("sad_tab") {
-  configs += [
-    ":disable_deprecated_declarations",
-    "//build/config/compiler:enable_arc",
-  ]
   sources = [
     "sad_tab_view.h",
     "sad_tab_view.mm",
@@ -31,7 +22,6 @@ source_set("sad_tab") {
     "//ios/chrome/browser/web",
     "//ios/chrome/common/ui/colors",
     "//ios/chrome/common/ui/util",
-    "//ios/third_party/material_components_ios",
     "//ios/web",
     "//net",
     "//ui/base",
@@ -41,7 +31,6 @@ source_set("sad_tab") {
 }
 
 source_set("coordinator") {
-  configs += [ "//build/config/compiler:enable_arc" ]
   sources = [
     "sad_tab_coordinator.h",
     "sad_tab_coordinator.mm",
@@ -66,10 +55,6 @@ source_set("coordinator") {
 }
 
 source_set("unit_tests") {
-  configs += [
-    ":disable_deprecated_declarations",
-    "//build/config/compiler:enable_arc",
-  ]
   testonly = true
   sources = [
     "sad_tab_coordinator_unittest.mm",
@@ -95,10 +80,7 @@ source_set("unit_tests") {
 }
 
 source_set("eg2_tests") {
-  configs += [
-    "//build/config/compiler:enable_arc",
-    "//build/config/ios:xctest_config",
-  ]
+  configs += [ "//build/config/ios:xctest_config" ]
   testonly = true
   sources = [ "sad_tab_view_egtest.mm" ]
 

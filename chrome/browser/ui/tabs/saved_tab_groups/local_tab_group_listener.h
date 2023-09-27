@@ -7,6 +7,7 @@
 
 #include "base/uuid.h"
 #include "chrome/browser/ui/tabs/saved_tab_groups/saved_tab_group_web_contents_listener.h"
+#include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
 #include "components/saved_tab_groups/saved_tab_group_model.h"
 #include "components/tab_groups/tab_group_id.h"
 
@@ -26,7 +27,7 @@ class LocalTabGroupListener {
       tab_groups::TabGroupId local_id,
       base::Uuid saved_guid,
       SavedTabGroupModel* model,
-      std::vector<std::pair<content::WebContents*, base::Uuid>> mapping);
+      std::map<content::WebContents*, base::Uuid> web_contents_to_uuid);
   virtual ~LocalTabGroupListener();
 
   // Pauses listening to changes to the local tab group. Call this before
@@ -39,10 +40,17 @@ class LocalTabGroupListener {
   // CHECKed).
   void ResumeTracking();
 
+  void UpdateVisualDataFromLocal(
+      const TabGroupChange::VisualsChange* visuals_change);
+
   // Updates the saved group with the new tab and tracks it for further changes.
   void AddWebContentsFromLocal(content::WebContents* web_contents,
                                TabStripModel* tab_strip_model,
                                int index);
+
+  // Replaces the webcontents associated with the SavedTabGroupTab.
+  void OnReplaceWebContents(content::WebContents* old_web_contents,
+                            content::WebContents* new_web_contents);
 
   // Moves the SavedTab associated with `web_contents` in the TabStripModel to
   // its new relative position in the SavedTabGroup.

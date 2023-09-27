@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 source_set("omaha") {
-  configs += [ "//build/config/compiler:enable_arc" ]
   sources = [
     "omaha_service.h",
     "omaha_service.mm",
@@ -17,7 +16,7 @@ source_set("omaha") {
     "//components/profile_metrics",
     "//components/version_info",
     "//ios/chrome/app:tests_hook",
-    "//ios/chrome/browser/browser_state_metrics",
+    "//ios/chrome/browser/browser_state_metrics/model",
     "//ios/chrome/browser/shared/model/application_context",
     "//ios/chrome/browser/shared/model/browser_state",
     "//ios/chrome/browser/upgrade",
@@ -32,7 +31,6 @@ source_set("omaha") {
 }
 
 source_set("unit_tests") {
-  configs += [ "//build/config/compiler:enable_arc" ]
   testonly = true
   sources = [ "omaha_service_unittest.mm" ]
   deps = [

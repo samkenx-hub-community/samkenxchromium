@@ -21,6 +21,7 @@ ci.defaults.set(
     reclient_instance = reclient.instance.DEFAULT_TRUSTED,
     reclient_jobs = reclient.jobs.DEFAULT,
     service_account = ci.DEFAULT_SERVICE_ACCOUNT,
+    shadow_service_account = ci.DEFAULT_SHADOW_SERVICE_ACCOUNT,
 )
 
 consoles.console_view(
@@ -74,6 +75,7 @@ ci.builder(
             short_name = "dbg",
         ),
     ],
+    contact_team_email = "chrome-fuchsia-engprod@google.com",
 )
 
 ci.builder(
@@ -109,6 +111,7 @@ ci.builder(
             short_name = "asan",
         ),
     ],
+    contact_team_email = "chrome-fuchsia-engprod@google.com",
 )
 
 ci.builder(
@@ -144,6 +147,7 @@ ci.builder(
             short_name = "dbg",
         ),
     ],
+    contact_team_email = "chrome-fuchsia-engprod@google.com",
 )
 
 ci.builder(
@@ -175,4 +179,5 @@ ci.builder(
             short_name = "x64-llemu",
         ),
     ],
+    contact_team_email = "chrome-fuchsia-engprod@google.com",
 )

@@ -6,6 +6,9 @@ import {TestRunner} from 'test_runner';
 import {SourcesTestRunner} from 'sources_test_runner';
 import {BindingsTestRunner} from 'bindings_test_runner';
 
+import * as Workspace from 'devtools/models/workspace/workspace.js';
+import * as SourcesModule from 'devtools/panels/sources/sources.js';
+
 (async function() {
   TestRunner.addResult(`Verify that search across all files omits filesystem uiSourceCodes with binding to network.\n`);
   await TestRunner.loadLegacyModule('sources');
@@ -15,15 +18,15 @@ import {BindingsTestRunner} from 'bindings_test_runner';
   var testMapping = BindingsTestRunner.initializeTestMapping();
   var fs = new BindingsTestRunner.TestFileSystem('/var/www');
   var fsEntry = BindingsTestRunner.addFooJSFile(fs);
-  var scope = new Sources.SourcesSearchScope();
+  var scope = new SourcesModule.SourcesSearchScope.SourcesSearchScope();
   fs.reportCreated(function() {});
 
   TestRunner.runTestSuite([
     function waitForUISourceCodes(next) {
       Promise
           .all([
-            TestRunner.waitForUISourceCode('foo.js', Workspace.projectTypes.Network),
-            TestRunner.waitForUISourceCode('foo.js', Workspace.projectTypes.FileSystem)
+            TestRunner.waitForUISourceCode('foo.js', Workspace.Workspace.projectTypes.Network),
+            TestRunner.waitForUISourceCode('foo.js', Workspace.Workspace.projectTypes.FileSystem)
           ])
           .then(next);
     },
@@ -39,7 +42,7 @@ import {BindingsTestRunner} from 'bindings_test_runner';
   ]);
 
   function dumpSearchResults(next) {
-    var searchConfig = new Search.SearchConfig('window.foo f:foo', true, false);
+    var searchConfig = new Workspace.SearchConfig.SearchConfig('window.foo f:foo', true, false);
     SourcesTestRunner.runSearchAndDumpResults(scope, searchConfig, next);
   }
 

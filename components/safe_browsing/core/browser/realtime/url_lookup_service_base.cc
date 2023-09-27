@@ -145,7 +145,7 @@ RealTimeUrlLookupServiceBase::~RealTimeUrlLookupServiceBase() = default;
 
 // static
 bool RealTimeUrlLookupServiceBase::CanCheckUrl(const GURL& url) {
-  if (VerdictCacheManager::has_artificial_unsafe_url()) {
+  if (VerdictCacheManager::has_artificial_cached_url()) {
     return true;
   }
   base::UmaHistogramBoolean("SafeBrowsing.RT.CannotCheckInvalidUrl",
@@ -383,15 +383,8 @@ void RealTimeUrlLookupServiceBase::SendRequest(
   RecordBooleanWithAndWithoutSuffix("SafeBrowsing.RT.HasTokenInRequest",
                                     GetMetricSuffix(),
                                     !access_token_string.empty());
-  // `pref_service_` can be null in tests or in the Chrome Enterprise version of
-  // the lookup service.
-  if (pref_service_ && IsEnhancedProtectionEnabled(*pref_service_)) {
-    pref_service_->SetTime(
-        access_token_string.empty()
-            ? prefs::kSafeBrowsingEsbProtegoPingWithoutTokenLastLogTime
-            : prefs::kSafeBrowsingEsbProtegoPingWithTokenLastLogTime,
-        base::Time::Now());
-  }
+
+  MaybeLogLastProtegoPingTimeToPrefs(!access_token_string.empty());
 
   // NOTE: Pass |callback_task_runner| by copying it here as it's also needed
   // just below.

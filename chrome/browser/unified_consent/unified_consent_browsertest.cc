@@ -6,17 +6,14 @@
 #include <string>
 
 #include "base/test/metrics/histogram_tester.h"
-#include "build/chromeos_buildflags.h"
 #include "chrome/browser/sync/test/integration/sync_service_impl_harness.h"
 #include "chrome/browser/sync/test/integration/sync_test.h"
 #include "chrome/browser/sync/test/integration/updated_progress_marker_checker.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/unified_consent/unified_consent_service_factory.h"
 #include "chrome/common/pref_names.h"
-#include "chrome/test/base/scoped_testing_local_state.h"
-#include "chrome/test/base/testing_profile.h"
-#include "components/embedder_support/pref_names.h"
-#include "components/sync/test/fake_server_network_resources.h"
+#include "components/prefs/pref_service.h"
+#include "components/safe_browsing/core/common/safe_browsing_prefs.h"
 #include "components/unified_consent/unified_consent_metrics.h"
 #include "components/unified_consent/unified_consent_service.h"
 #include "content/public/test/browser_test.h"
@@ -44,7 +41,8 @@ class UnifiedConsentBrowserTest : public SyncTest {
     InitializeSyncClientsIfNeeded();
 
     sync_blocker_ = GetSyncService(client_id)->GetSetupInProgressHandle();
-    ASSERT_TRUE(GetClient(client_id)->SignInPrimaryAccount());
+    ASSERT_TRUE(GetClient(client_id)->SignInPrimaryAccount(
+        signin::ConsentLevel::kSync));
     GetSyncService(client_id)->SetSyncFeatureRequested();
     ASSERT_TRUE(GetClient(client_id)->AwaitEngineInitialization());
   }
@@ -100,7 +98,7 @@ IN_PROC_BROWSER_TEST_F(
 IN_PROC_BROWSER_TEST_F(UnifiedConsentBrowserTest,
                        SettingsOptInTakeOverServicePrefChanges) {
   std::string pref_A = prefs::kSearchSuggestEnabled;
-  std::string pref_B = embedder_support::kAlternateErrorPagesEnabled;
+  std::string pref_B = prefs::kSafeBrowsingEnabled;
 
   // First client: Enable sync.
   EnableSync(0);
@@ -133,7 +131,7 @@ IN_PROC_BROWSER_TEST_F(UnifiedConsentBrowserTest,
 
   // Sync both clients, so the synced state of both prefs (i.e. off) will arrive
   // at the second client.
-  AwaitQuiescence();
+  ASSERT_TRUE(AwaitQuiescence());
 
   // Both clients: Expect that pref A is off and pref B is on.
   // Reason:

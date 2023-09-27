@@ -17,7 +17,7 @@
 #include "base/ranges/algorithm.h"
 #include "base/stl_util.h"
 #include "base/strings/to_string.h"
-#include "base/task/single_thread_task_runner.h"
+#include "base/task/sequenced_task_runner.h"
 #include "base/values.h"
 #include "build/chromeos_buildflags.h"
 #include "chrome/browser/profiles/profile.h"
@@ -27,13 +27,16 @@
 #include "chrome/browser/web_applications/locks/all_apps_lock.h"
 #include "chrome/browser/web_applications/web_app_command_scheduler.h"
 #include "chrome/browser/web_applications/web_app_install_utils.h"
+#include "chrome/browser/web_applications/web_app_provider.h"
 #include "chrome/browser/web_applications/web_app_registrar.h"
 #include "chrome/browser/web_applications/web_app_registry_update.h"
+#include "chrome/browser/web_applications/web_app_sync_bridge.h"
 #include "chrome/browser/web_applications/web_contents/web_app_data_retriever.h"
 #include "chrome/browser/web_applications/web_contents/web_app_url_loader.h"
 #include "chrome/browser/web_applications/web_contents/web_contents_manager.h"
 #include "chrome/common/chrome_features.h"
 #include "components/webapps/browser/install_result_code.h"
+#include "components/webapps/browser/uninstall_result_code.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/url_constants.h"
 
@@ -47,7 +50,7 @@ ExternallyManagedAppManager::InstallResult::InstallResult() = default;
 
 ExternallyManagedAppManager::InstallResult::InstallResult(
     webapps::InstallResultCode code,
-    absl::optional<AppId> app_id,
+    absl::optional<webapps::AppId> app_id,
     bool did_uninstall_and_replace)
     : code(code),
       app_id(std::move(app_id)),
@@ -107,30 +110,21 @@ ExternallyManagedAppManager::~ExternallyManagedAppManager() {
   }
 }
 
-void ExternallyManagedAppManager::SetSubsystems(
-    WebAppUiManager* ui_manager,
-    WebAppInstallFinalizer* finalizer,
-    WebAppCommandScheduler* command_scheduler,
-    WebContentsManager* web_contents_manager) {
-  ui_manager_ = ui_manager;
-  finalizer_ = finalizer;
-  command_scheduler_ = command_scheduler;
-  if (!web_contents_manager) {
-    CHECK_IS_TEST();
-  } else {
-    // TODO(http://b/283521737): Remove this and use WebContentsManager.
-    url_loader_ = web_contents_manager->CreateUrlLoader();
-    // TODO(http://b/283521737): Remove this and use WebContentsManager.
-    data_retriever_factory_ = base::BindRepeating(
-        [](base::WeakPtr<WebContentsManager> web_contents_manager)
-            -> std::unique_ptr<WebAppDataRetriever> {
-          if (!web_contents_manager) {
-            return nullptr;
-          }
-          return web_contents_manager->CreateDataRetriever();
-        },
-        web_contents_manager->GetWeakPtr());
-  }
+void ExternallyManagedAppManager::SetProvider(base::PassKey<WebAppProvider>,
+                                              WebAppProvider& provider) {
+  provider_ = &provider;
+  // TODO(http://b/283521737): Remove this and use WebContentsManager.
+  url_loader_ = provider.web_contents_manager().CreateUrlLoader();
+  // TODO(http://b/283521737): Remove this and use WebContentsManager.
+  data_retriever_factory_ = base::BindRepeating(
+      [](base::WeakPtr<WebContentsManager> web_contents_manager)
+          -> std::unique_ptr<WebAppDataRetriever> {
+        if (!web_contents_manager) {
+          return nullptr;
+        }
+        return web_contents_manager->CreateDataRetriever();
+      },
+      provider.web_contents_manager().GetWeakPtr());
 }
 
 void ExternallyManagedAppManager::InstallNow(
@@ -167,14 +161,14 @@ void ExternallyManagedAppManager::UninstallApps(
     ExternalInstallSource install_source,
     const UninstallCallback& callback) {
   for (auto& url : uninstall_urls) {
-    finalizer()->UninstallExternalWebAppByUrl(
-        url, ConvertExternalInstallSourceToSource(install_source),
+    provider_->scheduler().RemoveInstallUrl(
+        /*app_id=*/absl::nullopt,
+        ConvertExternalInstallSourceToSource(install_source), url,
         ConvertExternalInstallSourceToUninstallSource(install_source),
         base::BindOnce(
             [](const UninstallCallback& callback, const GURL& app_url,
                webapps::UninstallResultCode code) {
-              callback.Run(app_url,
-                           code == webapps::UninstallResultCode::kSuccess);
+              callback.Run(app_url, UninstallSucceeded(code));
             },
             callback, url));
   }
@@ -185,15 +179,15 @@ void ExternallyManagedAppManager::SynchronizeInstalledApps(
     ExternalInstallSource install_source,
     SynchronizeCallback callback) {
   CHECK(callback);
-  DCHECK(base::ranges::all_of(
+  CHECK(base::ranges::all_of(
       desired_apps_install_options,
       [&install_source](const ExternalInstallOptions& install_options) {
         return install_options.install_source == install_source;
       }));
   // Only one concurrent SynchronizeInstalledApps() expected per
   // ExternalInstallSource.
-  DCHECK(!base::Contains(synchronize_requests_, install_source));
-  command_scheduler_->ScheduleCallbackWithLock<AllAppsLock>(
+  CHECK(!base::Contains(synchronize_requests_, install_source));
+  provider_->scheduler().ScheduleCallbackWithLock<AllAppsLock>(
       "ExternallyManagedAppManager::SynchronizeInstalledApps",
       std::make_unique<AllAppsLockDescription>(),
       base::BindOnce(
@@ -254,27 +248,32 @@ ExternallyManagedAppManager::CreateInstallationTask(
     ExternalInstallOptions install_options) {
   std::unique_ptr<ExternallyManagedAppInstallTask> install_task =
       std::make_unique<ExternallyManagedAppInstallTask>(
-          profile_, url_loader_.get(), ui_manager(), finalizer(),
-          command_scheduler(), data_retriever_factory_,
-          std::move(install_options));
+          *provider_, std::move(install_options));
   return install_task;
 }
 
 std::unique_ptr<ExternallyManagedAppRegistrationTaskBase>
-ExternallyManagedAppManager::CreateRegistration(GURL install_url) {
+ExternallyManagedAppManager::CreateRegistration(
+    GURL install_url,
+    const base::TimeDelta registration_timeout) {
   DCHECK(!IsShuttingDown());
   ExternallyManagedAppRegistrationTask::RegistrationCallback callback =
       base::BindOnce(&ExternallyManagedAppManager::OnRegistrationFinished,
                      weak_ptr_factory_.GetWeakPtr(), install_url);
   return std::make_unique<ExternallyManagedAppRegistrationTask>(
-      std::move(install_url), url_loader_.get(), web_contents_.get(),
-      std::move(callback));
+      std::move(install_url), registration_timeout, url_loader_.get(),
+      web_contents_.get(), std::move(callback));
 }
 
 void ExternallyManagedAppManager::OnRegistrationFinished(
     const GURL& install_url,
     RegistrationResultCode result) {
-  DCHECK_EQ(current_registration_->install_url(), install_url);
+  if (IsShuttingDown()) {
+    return;
+  }
+
+  DCHECK(!current_registration_ ||
+         current_registration_->install_url() == install_url);
 
   if (registration_callback_) {
     registration_callback_.Run(install_url, result);
@@ -285,7 +284,7 @@ void ExternallyManagedAppManager::OnRegistrationFinished(
 }
 
 void ExternallyManagedAppManager::PostMaybeStartNext() {
-  base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
       FROM_HERE, base::BindOnce(&ExternallyManagedAppManager::MaybeStartNext,
                                 weak_ptr_factory_.GetWeakPtr()));
 }
@@ -294,7 +293,7 @@ void ExternallyManagedAppManager::MaybeStartNext() {
   if (current_install_ || IsShuttingDown()) {
     return;
   }
-  command_scheduler()->ScheduleCallbackWithLock<AllAppsLock>(
+  provider_->scheduler().ScheduleCallbackWithLock<AllAppsLock>(
       "ExternallyManagedAppManager::MaybeStartNext",
       std::make_unique<AllAppsLockDescription>(),
       base::BindOnce(&ExternallyManagedAppManager::MaybeStartNextOnLockAcquired,
@@ -315,18 +314,29 @@ void ExternallyManagedAppManager::MaybeStartNextOnLockAcquired(
     const ExternalInstallOptions& install_options =
         front->task->install_options();
 
+    absl::optional<webapps::AppId> app_id =
+        lock.registrar().LookupExternalAppId(install_options.install_url);
+    const bool is_placeholder_installed =
+        app_id.has_value()
+            ? lock.registrar().IsPlaceholderApp(
+                  app_id.value(), ConvertExternalInstallSourceToSource(
+                                      install_options.install_source))
+            : false;
+
     if (install_options.force_reinstall) {
-      StartInstallationTask(std::move(front));
+      StartInstallationTask(
+          std::move(front),
+          /*installed_placeholder_app_id=*/is_placeholder_installed
+              ? std::move(app_id)
+              : absl::nullopt);
       return;
     }
-
-    absl::optional<AppId> app_id =
-        lock.registrar().LookupExternalAppId(install_options.install_url);
 
     // If the URL is not in web_app registrar,
     // then no external source has installed it.
     if (!app_id.has_value()) {
-      StartInstallationTask(std::move(front));
+      StartInstallationTask(std::move(front),
+                            /*installed_placeholder_app_id=*/absl::nullopt);
       return;
     }
 
@@ -343,11 +353,8 @@ void ExternallyManagedAppManager::MaybeStartNextOnLockAcquired(
 
       // If the app is already installed, only reinstall it if the app is a
       // placeholder app and the client asked for it to be reinstalled.
-      if (install_options.reinstall_placeholder &&
-          lock.registrar().IsPlaceholderApp(
-              app_id.value(), ConvertExternalInstallSourceToSource(
-                                  install_options.install_source))) {
-        StartInstallationTask(std::move(front));
+      if (is_placeholder_installed) {
+        StartInstallationTask(std::move(front), std::move(app_id));
         return;
       }
 
@@ -358,11 +365,12 @@ void ExternallyManagedAppManager::MaybeStartNextOnLockAcquired(
           (!lock.registrar()
                 .GetAppById(app_id.value())
                 ->IsPolicyInstalledApp())) {
-        StartInstallationTask(std::move(front));
+        StartInstallationTask(std::move(front),
+                              /*installed_placeholder_app_id=*/absl::nullopt);
         return;
       } else {
         // Add install source before returning the result.
-        ScopedRegistryUpdate update(&lock.sync_bridge());
+        ScopedRegistryUpdate update = lock.sync_bridge().BeginUpdate();
         WebApp* app_to_update = update->UpdateApp(app_id.value());
         app_to_update->AddSource(ConvertExternalInstallSourceToSource(
             install_options.install_source));
@@ -382,7 +390,8 @@ void ExternallyManagedAppManager::MaybeStartNextOnLockAcquired(
     // If neither of the above conditions applies, the app probably got
     // uninstalled but it wasn't been removed from the map. We should install
     // the app in this case.
-    StartInstallationTask(std::move(front));
+    StartInstallationTask(std::move(front),
+                          /*installed_placeholder_app_id=*/absl::nullopt);
     return;
   }
   DCHECK(!current_install_);
@@ -395,7 +404,8 @@ void ExternallyManagedAppManager::MaybeStartNextOnLockAcquired(
 }
 
 void ExternallyManagedAppManager::StartInstallationTask(
-    std::unique_ptr<TaskAndCallback> task) {
+    std::unique_ptr<TaskAndCallback> task,
+    absl::optional<AppId> installed_placeholder_app_id) {
   if (IsShuttingDown()) {
     return;
   }
@@ -403,14 +413,16 @@ void ExternallyManagedAppManager::StartInstallationTask(
   DCHECK(!is_in_shutdown_);
   if (current_registration_) {
     // Preempt current registration.
-    pending_registrations_.push_front(current_registration_->install_url());
+    pending_registrations_.push_front(
+        {current_registration_->install_url(),
+         current_registration_->registration_timeout()});
     current_registration_.reset();
   }
 
   current_install_ = std::move(task);
   CreateWebContentsIfNecessary();
   current_install_->task->Install(
-      web_contents_.get(),
+      std::move(installed_placeholder_app_id),
       base::BindOnce(&ExternallyManagedAppManager::OnInstalled,
                      weak_ptr_factory_.GetWeakPtr()));
 }
@@ -423,9 +435,11 @@ bool ExternallyManagedAppManager::RunNextRegistration() {
     return false;
   }
 
-  GURL url_to_check = std::move(pending_registrations_.front());
+  const auto [url_to_check, registration_timeout] =
+      std::move(pending_registrations_.front());
   pending_registrations_.pop_front();
-  current_registration_ = CreateRegistration(std::move(url_to_check));
+  current_registration_ =
+      CreateRegistration(std::move(url_to_check), registration_timeout);
   current_registration_->Start();
   return true;
 }
@@ -500,7 +514,8 @@ void ExternallyManagedAppManager::MaybeEnqueueServiceWorkerRegistration(
     return;
   }
 
-  pending_registrations_.push_back(url);
+  pending_registrations_.push_back(
+      {url, install_options.service_worker_registration_timeout});
 }
 
 bool ExternallyManagedAppManager::IsShuttingDown() {
@@ -521,19 +536,10 @@ base::Value ExternallyManagedAppManager::SynchronizeInstalledAppsOnLockAcquired(
     desired_installs->Append(option.install_url.spec());
   }
   std::vector<GURL> installed_urls;
-  for (const auto& apps_it :
+  for (const auto& [app_id, install_urls] :
        lock.registrar().GetExternallyInstalledApps(install_source)) {
-    // TODO(crbug.com/1339965): Remove this check once we cleanup
-    // ExternallyInstalledWebAppPrefs on external app uninstall.
-    bool has_same_external_source =
-        lock.registrar()
-            .GetAppById(apps_it.first)
-            ->GetSources()
-            .test(ConvertExternalInstallSourceToSource(install_source));
-    if (has_same_external_source) {
-      for (const GURL& url : apps_it.second) {
-        installed_urls.push_back(url);
-      }
+    for (const GURL& url : install_urls) {
+      installed_urls.push_back(url);
     }
   }
 
@@ -577,7 +583,7 @@ base::Value ExternallyManagedAppManager::SynchronizeInstalledAppsOnLockAcquired(
 
   // Run callback immediately if there's no work to be done.
   if (urls_to_remove.empty() && desired_apps_install_options.empty()) {
-    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
         FROM_HERE,
         base::BindOnce(std::move(callback), std::map<GURL, InstallResult>(),
                        std::map<GURL, bool>()));
@@ -593,7 +599,7 @@ base::Value ExternallyManagedAppManager::SynchronizeInstalledAppsOnLockAcquired(
 
   if (urls_to_remove.empty()) {
     // If there are no uninstalls, this will trigger the installs.
-    ContinueOrCompleteSynchronization(install_source);
+    ContinueSynchronization(install_source);
   } else {
     UninstallApps(
         urls_to_remove, install_source,
@@ -635,7 +641,7 @@ void ExternallyManagedAppManager::InstallForSynchronizeCallback(
   --request.remaining_install_requests;
   DCHECK_GE(request.remaining_install_requests, 0);
 
-  ContinueOrCompleteSynchronization(source);
+  ContinueSynchronization(source);
 }
 
 void ExternallyManagedAppManager::UninstallForSynchronizeCallback(
@@ -649,10 +655,10 @@ void ExternallyManagedAppManager::UninstallForSynchronizeCallback(
   --request.remaining_uninstall_requests;
   DCHECK_GE(request.remaining_uninstall_requests, 0);
 
-  ContinueOrCompleteSynchronization(source);
+  ContinueSynchronization(source);
 }
 
-void ExternallyManagedAppManager::ContinueOrCompleteSynchronization(
+void ExternallyManagedAppManager::ContinueSynchronization(
     ExternalInstallSource source) {
   auto source_and_request = synchronize_requests_.find(source);
   DCHECK(source_and_request != synchronize_requests_.end());
@@ -677,13 +683,30 @@ void ExternallyManagedAppManager::ContinueOrCompleteSynchronization(
   if (request.remaining_install_requests > 0)
     return;
 
+  if (base::FeatureList::IsEnabled(features::kWebAppDedupeInstallUrls)) {
+    provider_->scheduler().ScheduleDedupeInstallUrls(
+        base::BindOnce(&ExternallyManagedAppManager::CompleteSynchronization,
+                       weak_ptr_factory_.GetWeakPtr(), source));
+  } else {
+    CompleteSynchronization(source);
+  }
+}
+
+void ExternallyManagedAppManager::CompleteSynchronization(
+    ExternalInstallSource source) {
+  auto source_and_request = synchronize_requests_.find(source);
+  DCHECK(source_and_request != synchronize_requests_.end());
+
+  SynchronizeRequest& request = source_and_request->second;
   CHECK(request.callback);
-  base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+
+  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
       FROM_HERE, base::BindOnce(std::move(request.callback),
                                 std::move(request.install_results),
                                 std::move(request.uninstall_results)));
   synchronize_requests_.erase(source);
 }
+
 void ExternallyManagedAppManager::ClearSynchronizeRequestsForTesting() {
   synchronize_requests_.erase(synchronize_requests_.begin(),
                               synchronize_requests_.end());

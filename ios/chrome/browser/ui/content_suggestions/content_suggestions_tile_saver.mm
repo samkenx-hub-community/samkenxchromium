@@ -13,18 +13,14 @@
 #import "components/favicon/core/fallback_url_util.h"
 #import "components/ntp_tiles/ntp_tile.h"
 #import "ios/chrome/browser/ui/favicon/favicon_attributes_provider.h"
-#import "ios/chrome/browser/widget_kit/features.h"
+#import "ios/chrome/browser/widget_kit/model/features.h"
 #import "ios/chrome/common/app_group/app_group_constants.h"
 #import "ios/chrome/common/ntp_tile/ntp_tile.h"
 #import "ios/chrome/common/ui/favicon/favicon_attributes.h"
 #import "net/base/mac/url_conversions.h"
 
 #if BUILDFLAG(ENABLE_WIDGET_KIT_EXTENSION)
-#import "ios/chrome/browser/widget_kit/widget_kit_swift.h"
-#endif
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
+#import "ios/chrome/browser/widget_kit/model/model_swift.h"
 #endif
 
 namespace content_suggestions_tile_saver {
@@ -154,7 +150,15 @@ void WriteSingleUpdatedTileToDisk(NTPTile* tile) {
   WriteSavedMostVisited(tiles);
 }
 
+// Updates the Shortcut's widget with the user's current most visited sites
+void UpdateShortcutsWidget() {
+#if BUILDFLAG(ENABLE_WIDGET_KIT_EXTENSION)
+  [WidgetTimelinesUpdater reloadTimelinesOfKind:@"ShortcutsWidget"];
+#endif
+}
+
 void WriteSavedMostVisited(NSDictionary<NSURL*, NTPTile*>* most_visited_data) {
+  NSDate* last_modification_date = NSDate.date;
   NSError* error = nil;
   NSData* data = [NSKeyedArchiver archivedDataWithRootObject:most_visited_data
                                        requiringSecureCoding:NO
@@ -168,10 +172,9 @@ void WriteSavedMostVisited(NSDictionary<NSURL*, NTPTile*>* most_visited_data) {
   NSUserDefaults* sharedDefaults = app_group::GetGroupUserDefaults();
 
   [sharedDefaults setObject:data forKey:app_group::kSuggestedItems];
-  // Updates the Shortcut's widget with the user's current most visited sites
-#if BUILDFLAG(ENABLE_WIDGET_KIT_EXTENSION)
-  [WidgetTimelinesUpdater reloadTimelinesOfKind:@"ShortcutsWidget"];
-#endif
+  [sharedDefaults setObject:last_modification_date
+                     forKey:app_group::kSuggestedItemsLastModificationDate];
+  UpdateShortcutsWidget();
 }
 
 NSDictionary* ReadSavedMostVisited() {
@@ -215,9 +218,9 @@ void UpdateSingleFavicon(const GURL& site_url,
             [imageData writeToURL:fileURL atomically:YES];
           });
 
-          base::ThreadPool::PostTask(
+          base::ThreadPool::PostTaskAndReply(
               FROM_HERE, {base::MayBlock(), base::TaskPriority::BEST_EFFORT},
-              std::move(writeImage));
+              std::move(writeImage), base::BindOnce(&UpdateShortcutsWidget));
         } else {
           NSDictionary* tiles = ReadSavedMostVisited();
           NTPTile* tile = [tiles objectForKey:siteNSURL];

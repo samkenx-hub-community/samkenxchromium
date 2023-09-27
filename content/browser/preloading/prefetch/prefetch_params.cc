@@ -8,14 +8,12 @@
 #include "base/metrics/field_trial_params.h"
 #include "base/rand_util.h"
 #include "content/browser/preloading/prefetch/prefetch_features.h"
+#include "content/common/features.h"
 #include "content/public/browser/prefetch_service_delegate.h"
+#include "content/public/common/content_features.h"
 #include "third_party/blink/public/mojom/speculation_rules/speculation_rules.mojom.h"
 
 namespace content {
-
-bool PrefetchContentRefactorIsEnabled() {
-  return base::FeatureList::IsEnabled(features::kPrefetchUseContentRefactor);
-}
 
 GURL PrefetchProxyHost(const GURL& default_proxy_url) {
   // Command line overrides take priority.
@@ -228,7 +226,7 @@ bool PrefetchShouldBlockUntilHead(
     case blink::mojom::SpeculationEagerness::kEager:
       return base::GetFieldTrialParamByFeatureAsBool(
           features::kPrefetchUseContentRefactor,
-          "block_until_head_eager_prefetch", false);
+          "block_until_head_eager_prefetch", true);
     case blink::mojom::SpeculationEagerness::kModerate:
       return base::GetFieldTrialParamByFeatureAsBool(
           features::kPrefetchUseContentRefactor,
@@ -240,8 +238,31 @@ bool PrefetchShouldBlockUntilHead(
   }
 }
 
+base::TimeDelta PrefetchBlockUntilHeadTimeout(
+    blink::mojom::SpeculationEagerness prefetch_eagerness) {
+  int timeout_in_milliseconds = 0;
+  switch (prefetch_eagerness) {
+    case blink::mojom::SpeculationEagerness::kEager:
+      timeout_in_milliseconds = base::GetFieldTrialParamByFeatureAsInt(
+          features::kPrefetchUseContentRefactor,
+          "block_until_head_timeout_eager_prefetch", 1000);
+      break;
+    case blink::mojom::SpeculationEagerness::kModerate:
+      timeout_in_milliseconds = base::GetFieldTrialParamByFeatureAsInt(
+          features::kPrefetchUseContentRefactor,
+          "block_until_head_timeout_moderate_prefetch", 0);
+      break;
+    case blink::mojom::SpeculationEagerness::kConservative:
+      timeout_in_milliseconds = base::GetFieldTrialParamByFeatureAsInt(
+          features::kPrefetchUseContentRefactor,
+          "block_until_head_timeout_conservative_prefetch", 0);
+      break;
+  }
+  return base::Milliseconds(timeout_in_milliseconds);
+}
+
 std::string GetPrefetchEagernessHistogramSuffix(
-    const blink::mojom::SpeculationEagerness& eagerness) {
+    blink::mojom::SpeculationEagerness eagerness) {
   switch (eagerness) {
     case blink::mojom::SpeculationEagerness::kEager:
       return "Eager";
@@ -265,18 +286,18 @@ base::TimeDelta PrefetchMaximumRetryAfterDelta() {
 }
 
 bool PrefetchNewLimitsEnabled() {
-  return base::FeatureList::IsEnabled(features::kPrefetchNewLimits);
+  return base::FeatureList::IsEnabled(::features::kPrefetchNewLimits);
 }
 
 size_t MaxNumberOfEagerPrefetchesPerPageForPrefetchNewLimits() {
-  int max = base::GetFieldTrialParamByFeatureAsInt(features::kPrefetchNewLimits,
-                                                   "max_eager_prefetches", 50);
+  int max = base::GetFieldTrialParamByFeatureAsInt(
+      ::features::kPrefetchNewLimits, "max_eager_prefetches", 50);
   return std::max(0, max);
 }
 
 size_t MaxNumberOfNonEagerPrefetchesPerPageForPrefetchNewLimits() {
   int max = base::GetFieldTrialParamByFeatureAsInt(
-      features::kPrefetchNewLimits, "max_non_eager_prefetches", 2);
+      ::features::kPrefetchNewLimits, "max_non_eager_prefetches", 2);
   return std::max(0, max);
 }
 

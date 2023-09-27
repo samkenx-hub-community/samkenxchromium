@@ -10,27 +10,33 @@
 #include <utility>
 #include <vector>
 
+#include "base/metrics/histogram_functions.h"
+#include "base/metrics/metrics_hashes.h"
 #include "base/notreached.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/common/accessibility/read_anything_constants.h"
 #include "chrome/renderer/accessibility/ax_tree_distiller.h"
+#include "components/language/core/common/locale_util.h"
 #include "content/public/renderer/chrome_object_extensions_utils.h"
 #include "content/public/renderer/render_frame.h"
 #include "gin/converter.h"
 #include "gin/dictionary.h"
 #include "gin/handle.h"
 #include "gin/object_template_builder.h"
+#include "read_anything_app_controller.h"
 #include "third_party/blink/public/common/browser_interface_broker_proxy.h"
-#include "third_party/blink/public/web/blink.h"
+#include "third_party/blink/public/platform/scheduler/web_agent_group_scheduler.h"
 #include "third_party/blink/public/web/web_local_frame.h"
 #include "third_party/blink/public/web/web_script_source.h"
 #include "third_party/re2/src/re2/re2.h"
+#include "ui/accessibility/accessibility_features.h"
 #include "ui/accessibility/ax_enum_util.h"
 #include "ui/accessibility/ax_node.h"
 #include "ui/accessibility/ax_role_properties.h"
 #include "ui/accessibility/ax_selection.h"
 #include "ui/accessibility/ax_serializable_tree.h"
+#include "ui/accessibility/ax_text_utils.h"
 #include "ui/accessibility/ax_tree.h"
 #include "ui/accessibility/ax_tree_serializer.h"
 #include "ui/accessibility/ax_tree_update.h"
@@ -342,7 +348,8 @@ gin::WrapperInfo ReadAnythingAppController::kWrapperInfo = {
 // static
 ReadAnythingAppController* ReadAnythingAppController::Install(
     content::RenderFrame* render_frame) {
-  v8::Isolate* isolate = blink::MainThreadIsolate();
+  v8::Isolate* isolate =
+      render_frame->GetWebFrame()->GetAgentGroupScheduler()->Isolate();
   v8::HandleScope handle_scope(isolate);
   v8::Local<v8::Context> context =
       render_frame->GetWebFrame()->MainWorldScriptContext();
@@ -410,7 +417,6 @@ void ReadAnythingAppController::OnActiveAXTreeIDChanged(
   if (tree_id == model_.active_tree_id()) {
     return;
   }
-  ui::AXTreeID previous_active_tree_id = model_.active_tree_id();
   model_.SetActiveTreeId(tree_id);
   model_.SetActiveUkmSourceId(ukm_source_id);
   model_.SetActiveTreeSelectable(GetSelectable(url));
@@ -447,13 +453,23 @@ void ReadAnythingAppController::Distill() {
     return;
   }
 
+  // For screen2x data generation mode, chrome is open from the CLI to a
+  // specific URL. The caller monitors for a dump of the distilled proto written
+  // to a local file. Distill should only be called once the page is finished
+  // loading, so we have the proto representing the entire webpage.
+  if (features::IsDataCollectionModeForScreen2xEnabled() &&
+      !model_.page_finished_loading_for_data_collection()) {
+    return;
+  }
+
   model_.set_requires_distillation(false);
 
   ui::AXSerializableTree* tree =
       model_.GetTreeFromId(model_.active_tree_id()).get();
   std::unique_ptr<ui::AXTreeSource<const ui::AXNode*>> tree_source(
       tree->CreateTreeSource());
-  ui::AXTreeSerializer<const ui::AXNode*> serializer(tree_source.get());
+  ui::AXTreeSerializer<const ui::AXNode*, std::vector<const ui::AXNode*>>
+      serializer(tree_source.get());
   ui::AXTreeUpdate snapshot;
   CHECK(serializer.SerializeChanges(tree->root(), &snapshot));
   model_.SetDistillationInProgress(true);
@@ -491,9 +507,28 @@ void ReadAnythingAppController::OnAXTreeDistilled(
   // the content if the selection is not in the distilled content.
   PostProcessSelection();
 
-  // TODO(crbug.com/1266555): If no content nodes were identified, the
-  // controller should handle drawing the empty state (like how it handles the
-  // loading state) instead of the JS.
+  if (model_.is_empty()) {
+    // TODO(b/1266555): Use v8::Function rather than javascript. If possible,
+    // replace this function call with firing an event.
+    std::string script = "chrome.readingMode.showEmpty();";
+    render_frame_->ExecuteJavaScript(base::ASCIIToUTF16(script));
+    if (IsSelectable()) {
+      base::UmaHistogramEnumeration(string_constants::kEmptyStateHistogramName,
+                                    ReadAnythingEmptyState::kEmptyStateShown);
+    }
+  }
+
+  // AXNode's language code is BCP 47. Only the base language is needed to
+  // record the metric.
+  std::string language = model_.GetTreeFromId(model_.active_tree_id())
+                             .get()
+                             ->root()
+                             ->GetLanguage();
+  if (!language.empty()) {
+    base::UmaHistogramSparse(
+        string_constants::kLanguageHistogramName,
+        base::HashMetricName(language::ExtractBaseLanguage(language)));
+  }
 
   // Once drawing is complete, unserialize all of the pending updates on the
   // active tree which may require more distillations (as tracked by the model's
@@ -508,7 +543,12 @@ void ReadAnythingAppController::PostProcessSelection() {
   if (model_.PostProcessSelection()) {
     Draw();
   }
-  DrawSelection();
+  // Skip drawing the selection in the side panel if the selection originally
+  // came from there.
+  if (!model_.selection_from_action()) {
+    DrawSelection();
+  }
+  model_.set_selection_from_action(false);
 }
 
 void ReadAnythingAppController::Draw() {
@@ -538,6 +578,23 @@ void ReadAnythingAppController::OnThemeChanged(ReadAnythingThemePtr new_theme) {
   render_frame_->ExecuteJavaScript(base::ASCIIToUTF16(script));
 }
 
+void ReadAnythingAppController::OnSettingsRestoredFromPrefs(
+    read_anything::mojom::LineSpacing line_spacing,
+    read_anything::mojom::LetterSpacing letter_spacing,
+    const std::string& font,
+    double font_size,
+    read_anything::mojom::Colors color,
+    double speech_rate,
+    read_anything::mojom::HighlightGranularity granularity) {
+  model_.OnSettingsRestoredFromPrefs(line_spacing, letter_spacing, font,
+                                     font_size, color, speech_rate,
+                                     granularity);
+  // TODO(abigailbklein): Use v8::Function rather than javascript. If possible,
+  // replace this function call with firing an event.
+  std::string script = "chrome.readingMode.restoreSettingsFromPrefs();";
+  render_frame_->ExecuteJavaScript(base::ASCIIToUTF16(script));
+}
+
 #if BUILDFLAG(ENABLE_SCREEN_AI_SERVICE)
 void ReadAnythingAppController::ScreenAIServiceReady() {
   distiller_->ScreenAIServiceReady();
@@ -561,6 +618,35 @@ gin::ObjectTemplateBuilder ReadAnythingAppController::GetObjectTemplateBuilder(
                    &ReadAnythingAppController::ForegroundColor)
       .SetProperty("letterSpacing", &ReadAnythingAppController::LetterSpacing)
       .SetProperty("lineSpacing", &ReadAnythingAppController::LineSpacing)
+      .SetProperty("standardLineSpacing",
+                   &ReadAnythingAppController::StandardLineSpacing)
+      .SetProperty("looseLineSpacing",
+                   &ReadAnythingAppController::LooseLineSpacing)
+      .SetProperty("veryLooseLineSpacing",
+                   &ReadAnythingAppController::VeryLooseLineSpacing)
+      .SetProperty("standardLetterSpacing",
+                   &ReadAnythingAppController::StandardLetterSpacing)
+      .SetProperty("wideLetterSpacing",
+                   &ReadAnythingAppController::WideLetterSpacing)
+      .SetProperty("veryWideLetterSpacing",
+                   &ReadAnythingAppController::VeryWideLetterSpacing)
+      .SetProperty("colorTheme", &ReadAnythingAppController::ColorTheme)
+      .SetProperty("highlightGranularity",
+                   &ReadAnythingAppController::HighlightGranularity)
+      .SetProperty("highlightOn", &ReadAnythingAppController::HighlightOn)
+      .SetProperty("defaultTheme", &ReadAnythingAppController::DefaultTheme)
+      .SetProperty("lightTheme", &ReadAnythingAppController::LightTheme)
+      .SetProperty("darkTheme", &ReadAnythingAppController::DarkTheme)
+      .SetProperty("yellowTheme", &ReadAnythingAppController::YellowTheme)
+      .SetProperty("blueTheme", &ReadAnythingAppController::BlueTheme)
+      .SetProperty("speechRate", &ReadAnythingAppController::SpeechRate)
+      .SetProperty("isWebUIToolbarVisible",
+                   &ReadAnythingAppController::IsWebUIToolbarEnabled)
+      .SetProperty("isReadAloudEnabled",
+                   &ReadAnythingAppController::IsReadAloudEnabled)
+      .SetProperty("isSelectable", &ReadAnythingAppController::IsSelectable)
+      .SetProperty("speechSynthesisLanguageCode",
+                   &ReadAnythingAppController::GetLanguageCodeForSpeech)
       .SetMethod("getChildren", &ReadAnythingAppController::GetChildren)
       .SetMethod("getTextDirection",
                  &ReadAnythingAppController::GetTextDirection)
@@ -572,15 +658,53 @@ gin::ObjectTemplateBuilder ReadAnythingAppController::GetObjectTemplateBuilder(
       .SetMethod("isOverline", &ReadAnythingAppController::IsOverline)
       .SetMethod("onConnected", &ReadAnythingAppController::OnConnected)
       .SetMethod("onCopy", &ReadAnythingAppController::OnCopy)
+      .SetMethod("onFontSizeChanged",
+                 &ReadAnythingAppController::OnFontSizeChanged)
+      .SetMethod("onFontSizeReset", &ReadAnythingAppController::OnFontSizeReset)
       .SetMethod("onScroll", &ReadAnythingAppController::OnScroll)
       .SetMethod("onLinkClicked", &ReadAnythingAppController::OnLinkClicked)
-      .SetMethod("isSelectable", &ReadAnythingAppController::isSelectable)
+      .SetMethod("onStandardLineSpacing",
+                 &ReadAnythingAppController::OnStandardLineSpacing)
+      .SetMethod("onLooseLineSpacing",
+                 &ReadAnythingAppController::OnLooseLineSpacing)
+      .SetMethod("onVeryLooseLineSpacing",
+                 &ReadAnythingAppController::OnVeryLooseLineSpacing)
+      .SetMethod("onStandardLetterSpacing",
+                 &ReadAnythingAppController::OnStandardLetterSpacing)
+      .SetMethod("onWideLetterSpacing",
+                 &ReadAnythingAppController::OnWideLetterSpacing)
+      .SetMethod("onVeryWideLetterSpacing",
+                 &ReadAnythingAppController::OnVeryWideLetterSpacing)
+      .SetMethod("onLightTheme", &ReadAnythingAppController::OnLightTheme)
+      .SetMethod("onDefaultTheme", &ReadAnythingAppController::OnDefaultTheme)
+      .SetMethod("onDarkTheme", &ReadAnythingAppController::OnDarkTheme)
+      .SetMethod("onYellowTheme", &ReadAnythingAppController::OnYellowTheme)
+      .SetMethod("onBlueTheme", &ReadAnythingAppController::OnBlueTheme)
+      .SetMethod("onFontChange", &ReadAnythingAppController::OnFontChange)
+      .SetMethod("onSpeechRateChange",
+                 &ReadAnythingAppController::OnSpeechRateChange)
+      .SetMethod("turnedHighlightOn",
+                 &ReadAnythingAppController::TurnedHighlightOn)
+      .SetMethod("turnedHighlightOff",
+                 &ReadAnythingAppController::TurnedHighlightOff)
+      .SetMethod("getLineSpacingValue",
+                 &ReadAnythingAppController::GetLineSpacingValue)
+      .SetMethod("getLetterSpacingValue",
+                 &ReadAnythingAppController::GetLetterSpacingValue)
       .SetMethod("onSelectionChange",
                  &ReadAnythingAppController::OnSelectionChange)
+      .SetMethod("onCollapseSelection",
+                 &ReadAnythingAppController::OnCollapseSelection)
+      .SetProperty("supportedFonts",
+                   &ReadAnythingAppController::GetSupportedFonts)
       .SetMethod("setContentForTesting",
                  &ReadAnythingAppController::SetContentForTesting)
       .SetMethod("setThemeForTesting",
-                 &ReadAnythingAppController::SetThemeForTesting);
+                 &ReadAnythingAppController::SetThemeForTesting)
+      .SetMethod("setLanguageForTesting",
+                 &ReadAnythingAppController::SetLanguageForTesting)
+      .SetMethod("getNextSentence",
+                 &ReadAnythingAppController::GetNextSentence);
 }
 
 ui::AXNodeID ReadAnythingAppController::RootId() const {
@@ -627,6 +751,66 @@ float ReadAnythingAppController::LetterSpacing() const {
 
 float ReadAnythingAppController::LineSpacing() const {
   return model_.line_spacing();
+}
+
+int ReadAnythingAppController::ColorTheme() const {
+  return model_.color_theme();
+}
+
+float ReadAnythingAppController::SpeechRate() const {
+  return model_.speech_rate();
+}
+
+int ReadAnythingAppController::HighlightGranularity() const {
+  return model_.highlight_granularity();
+}
+
+int ReadAnythingAppController::StandardLineSpacing() const {
+  return static_cast<int>(read_anything::mojom::LineSpacing::kStandard);
+}
+
+int ReadAnythingAppController::LooseLineSpacing() const {
+  return static_cast<int>(read_anything::mojom::LineSpacing::kLoose);
+}
+
+int ReadAnythingAppController::VeryLooseLineSpacing() const {
+  return static_cast<int>(read_anything::mojom::LineSpacing::kVeryLoose);
+}
+
+int ReadAnythingAppController::StandardLetterSpacing() const {
+  return static_cast<int>(read_anything::mojom::LetterSpacing::kStandard);
+}
+
+int ReadAnythingAppController::WideLetterSpacing() const {
+  return static_cast<int>(read_anything::mojom::LetterSpacing::kWide);
+}
+
+int ReadAnythingAppController::VeryWideLetterSpacing() const {
+  return static_cast<int>(read_anything::mojom::LetterSpacing::kVeryWide);
+}
+
+int ReadAnythingAppController::DefaultTheme() const {
+  return static_cast<int>(read_anything::mojom::Colors::kDefault);
+}
+
+int ReadAnythingAppController::LightTheme() const {
+  return static_cast<int>(read_anything::mojom::Colors::kLight);
+}
+
+int ReadAnythingAppController::DarkTheme() const {
+  return static_cast<int>(read_anything::mojom::Colors::kDark);
+}
+
+int ReadAnythingAppController::YellowTheme() const {
+  return static_cast<int>(read_anything::mojom::Colors::kYellow);
+}
+
+int ReadAnythingAppController::BlueTheme() const {
+  return static_cast<int>(read_anything::mojom::Colors::kBlue);
+}
+
+int ReadAnythingAppController::HighlightOn() const {
+  return static_cast<int>(read_anything::mojom::HighlightGranularity::kOn);
 }
 
 std::vector<ui::AXNodeID> ReadAnythingAppController::GetChildren(
@@ -734,8 +918,26 @@ bool ReadAnythingAppController::IsOverline(ui::AXNodeID ax_node_id) const {
   return ax_node->HasTextStyle(ax::mojom::TextStyle::kOverline);
 }
 
-bool ReadAnythingAppController::isSelectable() const {
+bool ReadAnythingAppController::IsSelectable() const {
   return model_.active_tree_selectable();
+}
+
+bool ReadAnythingAppController::IsWebUIToolbarEnabled() const {
+  return features::IsReadAnythingWebUIToolbarEnabled();
+}
+
+bool ReadAnythingAppController::IsReadAloudEnabled() const {
+  return features::IsReadAnythingReadAloudEnabled();
+}
+
+std::vector<std::string> ReadAnythingAppController::GetSupportedFonts() const {
+  return model_.GetSupportedFonts();
+}
+
+const std::string& ReadAnythingAppController::GetLanguageCodeForSpeech() const {
+  // TODO(crbug.com/1474951): Instead of returning the default browser language
+  // we should use the page language.
+  return model_.default_language_code();
 }
 
 void ReadAnythingAppController::OnConnected() {
@@ -751,6 +953,21 @@ void ReadAnythingAppController::OnConnected() {
 
 void ReadAnythingAppController::OnCopy() const {
   page_handler_->OnCopy();
+}
+
+void ReadAnythingAppController::OnFontSizeChanged(bool increase) {
+  if (increase) {
+    model_.IncreaseTextSize();
+  } else {
+    model_.DecreaseTextSize();
+  }
+
+  page_handler_->OnFontSizeChange(model_.font_size());
+}
+
+void ReadAnythingAppController::OnFontSizeReset() {
+  model_.ResetTextSize();
+  page_handler_->OnFontSizeChange(model_.font_size());
 }
 
 void ReadAnythingAppController::OnScroll(bool on_selection) const {
@@ -769,6 +986,96 @@ void ReadAnythingAppController::OnLinkClicked(ui::AXNodeID ax_node_id) const {
   page_handler_->OnLinkClicked(model_.active_tree_id(), ax_node_id);
 }
 
+void ReadAnythingAppController::OnStandardLineSpacing() {
+  page_handler_->OnLineSpaceChange(
+      read_anything::mojom::LineSpacing::kStandard);
+}
+
+void ReadAnythingAppController::OnLooseLineSpacing() {
+  page_handler_->OnLineSpaceChange(read_anything::mojom::LineSpacing::kLoose);
+}
+
+void ReadAnythingAppController::OnVeryLooseLineSpacing() {
+  page_handler_->OnLineSpaceChange(
+      read_anything::mojom::LineSpacing::kVeryLoose);
+}
+
+void ReadAnythingAppController::OnStandardLetterSpacing() {
+  page_handler_->OnLetterSpaceChange(
+      read_anything::mojom::LetterSpacing::kStandard);
+}
+
+void ReadAnythingAppController::OnWideLetterSpacing() {
+  page_handler_->OnLetterSpaceChange(
+      read_anything::mojom::LetterSpacing::kWide);
+}
+
+void ReadAnythingAppController::OnVeryWideLetterSpacing() {
+  page_handler_->OnLetterSpaceChange(
+      read_anything::mojom::LetterSpacing::kVeryWide);
+}
+
+void ReadAnythingAppController::OnLightTheme() {
+  page_handler_->OnColorChange(read_anything::mojom::Colors::kLight);
+}
+
+void ReadAnythingAppController::OnDefaultTheme() {
+  page_handler_->OnColorChange(read_anything::mojom::Colors::kDefault);
+}
+
+void ReadAnythingAppController::OnDarkTheme() {
+  page_handler_->OnColorChange(read_anything::mojom::Colors::kDark);
+}
+
+void ReadAnythingAppController::OnYellowTheme() {
+  page_handler_->OnColorChange(read_anything::mojom::Colors::kYellow);
+}
+
+void ReadAnythingAppController::OnBlueTheme() {
+  page_handler_->OnColorChange(read_anything::mojom::Colors::kBlue);
+}
+
+void ReadAnythingAppController::OnFontChange(const std::string& font) {
+  page_handler_->OnFontChange(font);
+}
+
+void ReadAnythingAppController::OnSpeechRateChange(double rate) {
+  page_handler_->OnSpeechRateChange(rate);
+}
+
+void ReadAnythingAppController::TurnedHighlightOn() {
+  page_handler_->OnHighlightGranularityChanged(
+      read_anything::mojom::HighlightGranularity::kOn);
+}
+
+void ReadAnythingAppController::TurnedHighlightOff() {
+  page_handler_->OnHighlightGranularityChanged(
+      read_anything::mojom::HighlightGranularity::kOff);
+}
+
+double ReadAnythingAppController::GetLineSpacingValue(int line_spacing) const {
+  if (line_spacing >
+      static_cast<int>(read_anything::mojom::LineSpacing::kMaxValue)) {
+    return model_.GetLineSpacingValue(
+        read_anything::mojom::LineSpacing::kDefaultValue);
+  }
+
+  return model_.GetLineSpacingValue(
+      static_cast<read_anything::mojom::LineSpacing>(line_spacing));
+}
+
+double ReadAnythingAppController::GetLetterSpacingValue(
+    int letter_spacing) const {
+  if (letter_spacing >
+      static_cast<int>(read_anything::mojom::LetterSpacing::kMaxValue)) {
+    return model_.GetLetterSpacingValue(
+        read_anything::mojom::LetterSpacing::kDefaultValue);
+  }
+
+  return model_.GetLetterSpacingValue(
+      static_cast<read_anything::mojom::LetterSpacing>(letter_spacing));
+}
+
 void ReadAnythingAppController::OnSelectionChange(ui::AXNodeID anchor_node_id,
                                                   int anchor_offset,
                                                   ui::AXNodeID focus_node_id,
@@ -785,8 +1092,10 @@ void ReadAnythingAppController::OnSelectionChange(ui::AXNodeID anchor_node_id,
   // Ignore the new selection if it's collapsed, which is created by a simple
   // click, unless there was a previous selection, in which case the click
   // clears the selection, so we should tell the main page to clear too.
-  if ((anchor_offset == focus_offset) && (anchor_node_id == focus_node_id) &&
-      !model_.has_selection()) {
+  if ((anchor_offset == focus_offset) && (anchor_node_id == focus_node_id)) {
+    if (model_.has_selection()) {
+      OnCollapseSelection();
+    }
     return;
   }
 
@@ -823,6 +1132,45 @@ void ReadAnythingAppController::OnSelectionChange(ui::AXNodeID anchor_node_id,
                                    anchor_offset, focus_node_id, focus_offset);
 }
 
+void ReadAnythingAppController::OnCollapseSelection() const {
+  page_handler_->OnCollapseSelection();
+}
+
+int ReadAnythingAppController::GetNextSentence(const std::u16string& text,
+                                               int maxTextLength) {
+  // TODO(crbug.com/1474951): Investigate using getting text from the model,
+  // rather than passing it through typescript.
+  // TODO(crbug.com/1474941): Investigate providing correct line breaks
+  // or alternatively making adjustments to ax_text_utils to return boundaries
+  // that minimize choppiness.
+  std::vector<int> offsets;
+  const std::u16string shorterString = text.substr(0, maxTextLength);
+  size_t sentence_ends_short = ui::FindAccessibleTextBoundary(
+      shorterString, offsets, ax::mojom::TextBoundary::kSentenceStart, 0,
+      ax::mojom::MoveDirection::kForward,
+      ax::mojom::TextAffinity::kDefaultValue);
+  size_t sentence_ends_long = ui::FindAccessibleTextBoundary(
+      text, offsets, ax::mojom::TextBoundary::kSentenceStart, 0,
+      ax::mojom::MoveDirection::kForward,
+      ax::mojom::TextAffinity::kDefaultValue);
+
+  // Compare the index result for the sentence of maximum text length and of
+  // the longer text string. If the two values are the same, the index is
+  // correct. If they are different, the maximum text length may have
+  // incorrectly spliced a word (e.g. returned "this is a sen" instead of
+  // "this is a" or "this is a sentence"), so if this is the case, we'll want
+  // to use the last word boundary instead.
+  if (sentence_ends_short == sentence_ends_long) {
+    return sentence_ends_short;
+  }
+
+  size_t word_ends = ui::FindAccessibleTextBoundary(
+      shorterString, offsets, ax::mojom::TextBoundary::kWordStart,
+      shorterString.length() - 1, ax::mojom::MoveDirection::kBackward,
+      ax::mojom::TextAffinity::kDefaultValue);
+  return word_ends;
+}
+
 // TODO(crbug.com/1266555): Change line_spacing and letter_spacing types from
 // int to their corresponding enums.
 void ReadAnythingAppController::SetThemeForTesting(const std::string& font_name,
@@ -840,10 +1188,25 @@ void ReadAnythingAppController::SetThemeForTesting(const std::string& font_name,
                                         letter_spacing_enum));
 }
 
+void ReadAnythingAppController::SetLanguageForTesting(
+    const std::string& language_code) {
+  SetDefaultLanguageCode(language_code);
+}
+
+void ReadAnythingAppController::SetDefaultLanguageCode(
+    const std::string& code) {
+  model_.set_default_language_code(code);
+
+  // Signal to the WebUI that the supported fonts may have changed.
+  std::string script = "chrome.readingMode.updateFonts();";
+  render_frame_->ExecuteJavaScript(base::ASCIIToUTF16(script));
+}
+
 void ReadAnythingAppController::SetContentForTesting(
     v8::Local<v8::Value> v8_snapshot_lite,
     std::vector<ui::AXNodeID> content_node_ids) {
-  v8::Isolate* isolate = blink::MainThreadIsolate();
+  v8::Isolate* isolate =
+      render_frame_->GetWebFrame()->GetAgentGroupScheduler()->Isolate();
   ui::AXTreeUpdate snapshot =
       GetSnapshotFromV8SnapshotLite(isolate, v8_snapshot_lite);
   ui::AXEvent selectionEvent;

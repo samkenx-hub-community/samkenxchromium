@@ -151,6 +151,12 @@ class TestGpuService : public mojom::GpuService {
           jea_receiver) override {}
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 
+#if !BUILDFLAG(IS_CHROMEOS)
+  void BindWebNNContextProvider(
+      mojo::PendingReceiver<webnn::mojom::WebNNContextProvider> receiver,
+      int32_t client_id) override {}
+#endif  // !BUILDFLAG(IS_CHROMEOS)
+
 #if BUILDFLAG(IS_WIN)
   void RegisterDCOMPSurfaceHandle(
       mojo::PlatformHandle surface_handle,
@@ -183,6 +189,10 @@ class TestGpuService : public mojom::GpuService {
                            CopyGpuMemoryBufferCallback callback) override {
     std::move(callback).Run(false);
   }
+
+  void BindClientGmbInterface(
+      mojo::PendingReceiver<gpu::mojom::ClientGmbInterface> receiver,
+      int client_id) override {}
 
   void GetVideoMemoryUsageStats(
       GetVideoMemoryUsageStatsCallback callback) override {}
@@ -234,7 +244,8 @@ class TestGpuService : public mojom::GpuService {
       WriteClangProfilingProfileCallback callback) override {}
 #endif
 
-  void GetDawnInfo(GetDawnInfoCallback callback) override {}
+  void GetDawnInfo(bool collect_metrics,
+                   GetDawnInfoCallback callback) override {}
 
   void Crash() override {}
 

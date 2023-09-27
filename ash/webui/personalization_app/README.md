@@ -10,7 +10,7 @@ see: [`//components/user_manager/user_type.h`](../../../components/user_manager/
 
 For a more in depth explanation, see:
 
-[Profiles, Sessions, Users, and more for ChromeOS Personalization](go/chromeos-personalization-user-types)
+[Profiles, Sessions, Users, and more for ChromeOS Personalization](http://go/chromeos-personalization-user-types)
 
 ## Tests
 
@@ -20,25 +20,25 @@ Personalization App takes a layered approach to testing. There are C++ unit
 tests, javascript component browser tests, and javascript full-app browsertests.
 
 * mojom handler unit tests
-  * `//chrome/browser/ash/web_applications/personalization_app/*unittest.cc`
+  * `//chrome/browser/ash/system_web_apps/apps/personalization_app/*unittest.cc`
   * `unit_tests --gtest_filter=*PersonalizationApp*`
   * primarily to test behavior of mojom handlers
   * heavily mocked out ash environment
     * fake user manager
-    * fake wallpaper_controller
+    * fake wallpaper\_controller
     * etc
 * component browser tests
-  * `personalization_app_component_browsertest.js`
+  * `personalization_app_component_browsertest.cc`
   * `browser_tests --gtest_filter=*PersonalizationAppComponent*`
   * loads test cases from `//chrome/test/data/webui/chromeos/personalization_app/*`
   * Opens an empty browser window, loads javascript necessary to render a
     single Polymer element, and executes javascript tests against that component
   * All mojom calls are faked in javascript
     * any mojom call that reaches
-    `personalization_app_mojom_banned_browsertest_fixture.h`
+    `personalization_app_mojom_banned_mocha_test_base.h`
     will immediately fail the test
 * controller browser tests
-  * `personalization_app_controller_browsertest.js`
+  * `personalization_app_controller_browsertest.cc`
   * `browser_tests --gtest_filter=*PersonalizationAppController*`
   * no UI elements, javascript testing of controller functions, reducers, logic
   * All mojom calls are faked in javascript the same way as component browser
@@ -97,10 +97,19 @@ handlers
 * mojom handling logic
   * mojom handler unit tests
 
+### Debugging tests
+* [Debugging BrowserTest failures](https://g3doc.corp.google.com/chrome/chromeos/system_services_team/dev_instructions/g3doc/debugging.md#debugging-browsertest-failures).
+* The [browser test doc](https://www.chromium.org/developers/testing/browser-tests/#debugging)
+has some useful information.
+* Inject `debugger;` as a breakpoint.
+* Run a specific test/test suite: `test("test name", () => ...) => test.only("test name"...)`.
+* Debug flaky tests: Pass flags `--gtest_repeat=1000 --gtest_break_on_failure`.
+
 ## Environment Setup
 ### VSCode
 
 - Follow [vscode setup](https://chromium.googlesource.com/chromium/src/+/HEAD/docs/vscode.md).
+  - (Optional) Set up [code-server](http://go/vscode/remote_development_via_web) for remote development.
 - Create `tsconfig.json` using [helper script](https://chromium.googlesource.com/chromium/src/+/HEAD/ash/webui/personalization_app/tools/gen_tsconfig.py).
   Please follow the help doc in the header of the helper script.
 - Edit `${PATH_TO_CHROMIUM}/src/.git/info/exclude` and add these lines

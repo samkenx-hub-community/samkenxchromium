@@ -8,7 +8,8 @@
 #include <string.h>
 
 #include "base/apple/bridging.h"
-#include "base/mac/foundation_util.h"
+#include "base/apple/foundation_util.h"
+#include "base/containers/contains.h"
 #include "base/strings/sys_string_conversions.h"
 #import "base/task/sequenced_task_runner.h"
 #include "base/task/sequenced_task_runner.h"
@@ -21,10 +22,6 @@
 
 #import <Foundation/Foundation.h>
 #include <IOKit/hid/IOHIDKeys.h>
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 namespace device {
 
@@ -143,8 +140,8 @@ GamepadDeviceMac* GamepadPlatformDataFetcherMac::GetGamepadFromHidDevice(
 }
 
 void GamepadPlatformDataFetcherMac::DeviceAdd(IOHIDDeviceRef device) {
+  using base::apple::CFCastStrict;
   using base::apple::CFToNSPtrCast;
-  using base::mac::CFCastStrict;
 
   if (!enabled_) {
     return;
@@ -175,8 +172,9 @@ void GamepadPlatformDataFetcherMac::DeviceAdd(IOHIDDeviceRef device) {
   DCHECK_EQ(kXInputTypeNone,
             gamepad_id_list.GetXInputType(vendor_int, product_int));
 
-  if (devices_.find(location_int) != devices_.end())
+  if (base::Contains(devices_, location_int)) {
     return;
+  }
 
   const GamepadId gamepad_id =
       gamepad_id_list.GetGamepadId(product_name, vendor_int, product_int);

@@ -35,6 +35,7 @@
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/time/time.h"
+#include "chromeos/constants/chromeos_features.h"
 #include "ui/base/data_transfer_policy/mock_data_transfer_policy_controller.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/compositor/layer.h"
@@ -172,9 +173,9 @@ class MockAshNotificationDragDropDelegate
       if (data->HasHtml()) {
         HandleHtmlData();
       } else {
-        base::FilePath file_path;
-        data->GetFilename(&file_path);
-        HandleFilePathData(file_path);
+        std::vector<ui::FileInfo> files;
+        data->GetFilenames(&files);
+        HandleFilePathData(files[0].path);
       }
     }
   }
@@ -446,7 +447,11 @@ class AshNotificationViewTest : public AshNotificationViewTestBase {
  public:
   AshNotificationViewTest()
       : AshNotificationViewTestBase(
-            base::test::TaskEnvironment::TimeSource::MOCK_TIME) {}
+            base::test::TaskEnvironment::TimeSource::MOCK_TIME) {
+    // TODO(b/293647571): Remove this feature disablement when the crash has
+    // been fixed.
+    scoped_features_.InitAndDisableFeature(chromeos::features::kJelly);
+  }
 
   // AshNotificationViewTestBase:
   void SetUp() override {
@@ -471,6 +476,7 @@ class AshNotificationViewTest : public AshNotificationViewTestBase {
   AshNotificationView* notification_view() { return notification_view_.get(); }
 
  private:
+  base::test::ScopedFeatureList scoped_features_;
   std::unique_ptr<AshNotificationView> notification_view_;
 };
 
@@ -1027,6 +1033,7 @@ TEST_F(AshNotificationViewTest, SingleToGroupAnimationsRecordSmoothness) {
 
   message_center::MessageCenter::Get()->RemoveAllNotifications(
       /*by_user=*/true, message_center::MessageCenter::RemoveType::ALL);
+  auto notification = CreateTestNotification();
   notification_center_test_api()->ToggleBubble();
 
   auto notification1 = CreateTestNotificationInAGroup();
@@ -1360,17 +1367,21 @@ class AshNotificationViewDragTestBase : public AshNotificationViewTestBase {
         }),
         run_loop.QuitClosure());
 
+    StartDragAt(start_point);
+    run_loop.Run();
+  }
+
+  // Starts drag at the specified location.
+  void StartDragAt(const gfx::Point& point_in_screen) {
     if (DoesUseGesture()) {
       // Press touch to trigger notification drag.
-      GetEventGenerator()->PressTouch(start_point);
+      GetEventGenerator()->PressTouch(point_in_screen);
     } else {
       // Press the mouse then move to trigger notification drag.
-      GetEventGenerator()->MoveMouseTo(start_point);
+      GetEventGenerator()->MoveMouseTo(point_in_screen);
       GetEventGenerator()->PressLeftButton();
       MoveDragByOneStep();
     }
-
-    run_loop.Run();
   }
 
   // Drags and drops `notification_view`. If `drag_to_widget` is true,
@@ -1877,6 +1888,52 @@ TEST_P(ScreenCaptureNotificationViewDragTest, Basics) {
   // Check the notification catalog name.
   tester.ExpectBucketCount("Ash.NotificationView.ImageDrag.Start",
                            ash::NotificationCatalogName::kScreenCapture, 1);
+}
+
+class DragAfterNotificationRemovalTest : public AshNotificationViewDragTestBase,
+                                         public testing::WithParamInterface<
+                                             /*use_revamp_feature=*/bool> {
+ private:
+  // AshNotificationViewDragTestBase:
+  bool DoesUseGesture() const override { return false; }
+  bool IsPopupNotification() const override { return true; }
+  bool DoesUseQsRevamp() const override { return GetParam(); }
+};
+
+INSTANTIATE_TEST_SUITE_P(All,
+                         DragAfterNotificationRemovalTest,
+                         /*use_revamp_feature=*/testing::Bool());
+
+// Verifies that removing a notification then dragging its corresponding view
+// shortly after removal works as expected.
+TEST_P(DragAfterNotificationRemovalTest, Basics) {
+  std::unique_ptr<Notification> notification = CreateTestNotification(
+      /*has_image=*/true, /*show_snooze_button=*/false, /*has_message=*/false,
+      message_center::NOTIFICATION_TYPE_SIMPLE,
+      absl::make_optional<base::FilePath>("dummy_file_path"));
+
+  // Wait until the notification popup shows.
+  MessagePopupAnimationWaiter(
+      GetPrimaryUnifiedSystemTray()->GetMessagePopupCollection())
+      .Wait();
+  EXPECT_FALSE(
+      message_center::MessageCenter::Get()->GetPopupNotifications().empty());
+
+  // Remove `notification` from the message center.
+  message_center::MessageCenter::Get()->RemoveNotification(notification->id(),
+                                                           /*by_user=*/true);
+  EXPECT_TRUE(
+      message_center::MessageCenter::Get()->GetPopupNotifications().empty());
+
+  // Drag the view corresponding to `notification`. Note that at this moment
+  // `notification_view` still exists due to the fade-out animation.
+  const AshNotificationView* const notification_view =
+      GetViewForNotificationId(notification->id());
+  ASSERT_TRUE(notification_view);
+  StartDragAt(GetDragAreaCenterInScreen(*notification_view));
+
+  // Drag should NOT start.
+  EXPECT_FALSE(notification_view->GetWidget()->dragged_view());
 }
 
 }  // namespace ash

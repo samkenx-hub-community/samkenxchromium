@@ -6,7 +6,11 @@
 #define CHROME_BROWSER_UI_WEBUI_SIDE_PANEL_CUSTOMIZE_CHROME_CUSTOMIZE_CHROME_PAGE_HANDLER_H_
 
 #include "base/memory/raw_ptr.h"
+#include "base/memory/weak_ptr.h"
 #include "base/scoped_observation.h"
+#include "chrome/browser/manta/manta_service.h"
+#include "chrome/browser/manta/proto/manta.pb.h"
+#include "chrome/browser/manta/snapper_provider.h"
 #include "chrome/browser/search/background/ntp_background_service.h"
 #include "chrome/browser/search/background/ntp_background_service_observer.h"
 #include "chrome/browser/search/background/ntp_custom_background_service.h"
@@ -68,10 +72,7 @@ class CustomizeChromePageHandler
 
   // side_panel::mojom::CustomizeChromePageHandler:
   void SetDefaultColor() override;
-  void SetSeedColor(SkColor seed_color) override;
-  void GetOverviewChromeColors(
-      GetOverviewChromeColorsCallback callback) override;
-  void GetChromeColors(GetChromeColorsCallback callback) override;
+  void SetFollowDeviceTheme(bool follow) override;
   void SetBackgroundImage(const std::string& attribution_1,
                           const std::string& attribution_2,
                           const GURL& attribution_url,
@@ -95,9 +96,15 @@ class CustomizeChromePageHandler
   void SetModuleDisabled(const std::string& module_id, bool disabled) override;
   void UpdateModulesSettings() override;
   void UpdateScrollToSection() override;
+  void SearchWallpaper(const std::string& query,
+                       SearchWallpaperCallback callback) override;
 
  private:
   void LogEvent(NTPLoggingEventType event);
+
+  void WallpaperSearchCallback(
+      SearchWallpaperCallback callback,
+      std::unique_ptr<manta::proto::Response> response);
 
   bool IsCustomLinksEnabled() const;
   bool IsShortcutsVisible() const;
@@ -130,6 +137,8 @@ class CustomizeChromePageHandler
   scoped_refptr<ui::SelectFileDialog> select_file_dialog_;
   raw_ptr<content::WebContents> web_contents_;
   raw_ptr<NtpBackgroundService> ntp_background_service_;
+  raw_ptr<manta::MantaService> manta_service_;
+  std::unique_ptr<manta::SnapperProvider> snapper_provider_;
   GetBackgroundCollectionsCallback background_collections_callback_;
   base::TimeTicks background_collections_request_start_time_;
   std::string images_request_collection_id_;
@@ -153,6 +162,8 @@ class CustomizeChromePageHandler
 
   mojo::Remote<side_panel::mojom::CustomizeChromePage> page_;
   mojo::Receiver<side_panel::mojom::CustomizeChromePageHandler> receiver_;
+
+  base::WeakPtrFactory<CustomizeChromePageHandler> weak_ptr_factory_{this};
 };
 
 #endif  // CHROME_BROWSER_UI_WEBUI_SIDE_PANEL_CUSTOMIZE_CHROME_CUSTOMIZE_CHROME_PAGE_HANDLER_H_

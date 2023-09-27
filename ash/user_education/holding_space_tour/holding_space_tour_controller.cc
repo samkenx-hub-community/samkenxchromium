@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "ash/ash_element_identifiers.h"
 #include "ash/display/window_tree_host_manager.h"
 #include "ash/drag_drop/scoped_drag_drop_observer.h"
 #include "ash/public/cpp/holding_space/holding_space_client.h"
@@ -20,20 +21,18 @@
 #include "ash/shell.h"
 #include "ash/system/holding_space/holding_space_tray.h"
 #include "ash/system/status_area_widget.h"
-#include "ash/user_education/user_education_constants.h"
 #include "ash/user_education/user_education_help_bubble_controller.h"
 #include "ash/user_education/user_education_ping_controller.h"
 #include "ash/user_education/user_education_types.h"
 #include "ash/user_education/user_education_util.h"
+#include "ash/wallpaper/views/wallpaper_view.h"
+#include "ash/wallpaper/views/wallpaper_widget_controller.h"
 #include "ash/wallpaper/wallpaper_drag_drop_delegate.h"
-#include "ash/wallpaper/wallpaper_view.h"
-#include "ash/wallpaper/wallpaper_widget_controller.h"
 #include "base/check_op.h"
 #include "base/containers/cxx20_erase_vector.h"
 #include "base/files/file_path.h"
 #include "base/pickle.h"
 #include "base/scoped_observation.h"
-#include "components/user_education/common/tutorial_description.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "ui/aura/client/drag_drop_client.h"
 #include "ui/base/clipboard/clipboard_format_type.h"
@@ -236,10 +235,11 @@ class DragDropDelegate : public WallpaperDragDropDelegate {
   ui::DragDropTypes::DragOperation OnDragUpdated(
       const ui::OSExchangeData& data,
       const gfx::Point& location_in_screen) override {
-    // Dropping `data` on the wallpaper will have no effect unless doing so
-    // would result in pinning of files to holding space.
-    return CanDrop(data) ? ui::DragDropTypes::DragOperation::DRAG_COPY
-                         : ui::DragDropTypes::DragOperation::DRAG_NONE;
+#if EXPENSIVE_DCHECKS_ARE_ON()
+    // NOTE: Data is assumed to be constant during a drag-and-drop sequence.
+    DCHECK(CanDrop(data));
+#endif  // EXPENSIVE_DCHECKS_ARE_ON()
+    return ui::DragDropTypes::DragOperation::DRAG_COPY;
   }
 
   void OnDragExited() override {
@@ -424,22 +424,6 @@ HoldingSpaceTourController::~HoldingSpaceTourController() {
 // static
 HoldingSpaceTourController* HoldingSpaceTourController::Get() {
   return g_instance;
-}
-
-// TODO(http://b/275909980): Implement tutorial descriptions.
-std::map<TutorialId, user_education::TutorialDescription>
-HoldingSpaceTourController::GetTutorialDescriptions() {
-  std::map<TutorialId, user_education::TutorialDescription>
-      tutorial_descriptions_by_id;
-  tutorial_descriptions_by_id.emplace(
-      std::piecewise_construct,
-      std::forward_as_tuple(TutorialId::kHoldingSpaceTourPrototype1),
-      std::forward_as_tuple());
-  tutorial_descriptions_by_id.emplace(
-      std::piecewise_construct,
-      std::forward_as_tuple(TutorialId::kHoldingSpaceTourPrototype2),
-      std::forward_as_tuple());
-  return tutorial_descriptions_by_id;
 }
 
 }  // namespace ash

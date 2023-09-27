@@ -160,10 +160,12 @@ bool IsFromUserInteraction(FeedbackSource source) {
     case kFeedbackSourceBrowserCommand:
     case kFeedbackSourceConnectivityDiagnostics:
     case kFeedbackSourceDesktopTabGroups:
+    case kFeedbackSourceCookieControls:
     case kFeedbackSourceNetworkHealthPage:
     case kFeedbackSourceMdSettingsAboutPage:
     case kFeedbackSourceOldSettingsAboutPage:
     case kFeedbackSourceOsSettingsSearch:
+    case kFeedbackSourcePriceInsights:
     case kFeedbackSourceQuickAnswers:
     case kFeedbackSourceQuickOffice:
     case kFeedbackSourceSettingsPerformancePage:
@@ -188,13 +190,6 @@ void OnLacrosActiveTabUrlFetched(
   chrome::ShowFeedbackPage(page_url, profile, source, description_template,
                            description_placeholder_text, category_tag,
                            extra_diagnostics, std::move(autofill_metadata));
-}
-
-void LaunchFeedbackSWA(Profile* profile, const GURL& url) {
-  ash::SystemAppLaunchParams params;
-  params.url = url;
-  ash::LaunchSystemWebAppAsync(profile, ash::SystemWebAppType::OS_FEEDBACK,
-                               std::move(params));
 }
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 
@@ -230,18 +225,17 @@ void RequestFeedbackFlow(const GURL& page_url,
     include_bluetooth_logs = IsFromUserInteraction(source);
     show_questionnaire = IsFromUserInteraction(source);
   }
-  // Disable the new feedback tool for kiosk, because SWAs are disabled there.
-  if (!chromeos::IsKioskSession() &&
-      base::FeatureList::IsEnabled(ash::features::kOsFeedback)) {
+  // Disable the new feedback tool for kiosk, when SWAs are disabled there.
+  if (!chromeos::IsKioskSession() ||
+      base::FeatureList::IsEnabled(ash::features::kKioskEnableSystemWebApps)) {
     // TODO(crbug.com/1407646): Include autofill metadata into CrOS new feedback
     // tool.
-    GURL url = BuildFeedbackUrl(extra_diagnostics, description_template,
-                                description_placeholder_text, category_tag,
-                                page_url, source, std::move(autofill_metadata));
-
-    // Wait for all SWAs to be registered before continuing.
-    ash::SystemWebAppManager::Get(profile)->on_apps_synchronized().Post(
-        FROM_HERE, base::BindOnce(&LaunchFeedbackSWA, profile, url));
+    ash::SystemAppLaunchParams params;
+    params.url = BuildFeedbackUrl(
+        extra_diagnostics, description_template, description_placeholder_text,
+        category_tag, page_url, source, std::move(autofill_metadata));
+    ash::LaunchSystemWebAppAsync(profile, ash::SystemWebAppType::OS_FEEDBACK,
+                                 std::move(params));
     return;
   }
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)

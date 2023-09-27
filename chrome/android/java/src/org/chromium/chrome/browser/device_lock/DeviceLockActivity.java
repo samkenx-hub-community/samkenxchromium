@@ -13,9 +13,10 @@ import android.view.View;
 import android.widget.FrameLayout;
 
 import androidx.annotation.CallSuper;
-import androidx.annotation.VisibleForTesting;
+import androidx.annotation.Nullable;
 
 import org.chromium.chrome.browser.SynchronousInitializationActivity;
+import org.chromium.chrome.browser.device_reauth.ReauthenticatorBridge;
 import org.chromium.chrome.browser.ui.device_lock.DeviceLockCoordinator;
 import org.chromium.components.signin.AccountUtils;
 import org.chromium.ui.base.ActivityWindowAndroid;
@@ -30,10 +31,10 @@ import org.chromium.ui.modaldialog.ModalDialogManager;
 public class DeviceLockActivity
         extends SynchronousInitializationActivity implements DeviceLockCoordinator.Delegate {
     private static final String ARGUMENT_FRAGMENT_ARGS = "DeviceLockActivity.FragmentArgs";
-    private static final String ARGUMENT_IN_SIGN_IN_FLOW =
-            "DeviceLockActivity.FragmentArgs.InSignInFlow";
     private static final String ARGUMENT_SELECTED_ACCOUNT =
             "DeviceLockActivity.FragmentArgs.SelectedAccount";
+    private static final String ARGUMENT_REQUIRE_DEVICE_LOCK_REAUTHENTICATION =
+            "DeviceLockActivity.FragmentArgs.RequireDeviceLockReauthentication";
 
     private FrameLayout mFrameLayout;
     private WindowAndroid mWindowAndroid;
@@ -48,7 +49,6 @@ public class DeviceLockActivity
         super.onActivityResult(requestCode, resultCode, data);
     }
 
-    @VisibleForTesting
     void setIntentRequestTrackerForTesting(IntentRequestTracker intentRequestTracker) {
         mIntentRequestTracker = intentRequestTracker;
     }
@@ -63,11 +63,20 @@ public class DeviceLockActivity
         mIntentRequestTracker = mWindowAndroid.getIntentRequestTracker();
 
         Bundle fragmentArgs = getIntent().getBundleExtra(ARGUMENT_FRAGMENT_ARGS);
-        Account selectedAccount = AccountUtils.createAccountFromName(
-                fragmentArgs.getString(ARGUMENT_SELECTED_ACCOUNT));
-        mDeviceLockCoordinator =
-                new DeviceLockCoordinator(fragmentArgs.getBoolean(ARGUMENT_IN_SIGN_IN_FLOW), this,
-                        mWindowAndroid, this, selectedAccount);
+        @Nullable
+        String selectedAccountName = fragmentArgs.getString(ARGUMENT_SELECTED_ACCOUNT, null);
+        boolean requireDeviceLockReauthentication =
+                fragmentArgs.getBoolean(ARGUMENT_REQUIRE_DEVICE_LOCK_REAUTHENTICATION, true);
+        @Nullable
+        Account selectedAccount = selectedAccountName != null
+                ? AccountUtils.createAccountFromName(selectedAccountName)
+                : null;
+
+        ReauthenticatorBridge reauthenticatorBridge = requireDeviceLockReauthentication
+                ? DeviceLockCoordinator.createDeviceLockAuthenticatorBridge()
+                : null;
+        mDeviceLockCoordinator = new DeviceLockCoordinator(
+                this, mWindowAndroid, reauthenticatorBridge, this, selectedAccount);
     }
 
     @CallSuper
@@ -83,21 +92,24 @@ public class DeviceLockActivity
         return null;
     }
 
-    protected static Bundle createArguments(boolean inSignInFlow, String selectedAccount) {
+    protected static Bundle createArguments(
+            @Nullable String selectedAccount, boolean requireDeviceLockReauthentication) {
         Bundle result = new Bundle();
-        result.putBoolean(ARGUMENT_IN_SIGN_IN_FLOW, inSignInFlow);
         result.putString(ARGUMENT_SELECTED_ACCOUNT, selectedAccount);
+        result.putBoolean(
+                ARGUMENT_REQUIRE_DEVICE_LOCK_REAUTHENTICATION, requireDeviceLockReauthentication);
         return result;
     }
 
     /**
      * Creates a new intent to start the {@link DeviceLockActivity}.
      */
-    protected static Intent createIntent(
-            Context context, boolean inSignInFlow, String selectedAccount) {
+    protected static Intent createIntent(Context context, @Nullable String selectedAccount,
+            boolean requireDeviceLockReauthentication) {
         Intent intent = new Intent(context, DeviceLockActivity.class);
         intent.putExtra(ARGUMENT_FRAGMENT_ARGS,
-                DeviceLockActivity.createArguments(inSignInFlow, selectedAccount));
+                DeviceLockActivity.createArguments(
+                        selectedAccount, requireDeviceLockReauthentication));
         return intent;
     }
 

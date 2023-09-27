@@ -117,6 +117,15 @@ class UpdateServiceImpl : public UpdateService {
       Callback callback,
       bool update_blocked);
 
+  void OnShouldBlockForceInstallForMeteredNetwork(
+      const std::vector<std::string>& app_ids,
+      const AppClientInstallData& app_client_install_data,
+      const AppInstallDataIndex& app_install_data_index,
+      PolicySameVersionUpdate policy_same_version_update,
+      StateChangeCallback state_update,
+      Callback callback,
+      bool update_blocked);
+
   SEQUENCE_CHECKER(sequence_checker_);
 
   scoped_refptr<Configurator> config_;
@@ -130,6 +139,10 @@ class UpdateServiceImpl : public UpdateService {
   // Cancellation callbacks, keyed by appid.
   std::multimap<std::string, base::RepeatingClosure> cancellation_callbacks_;
 };
+
+namespace internal {
+UpdateService::Result ToResult(update_client::Error error);
+}  // namespace internal
 
 }  // namespace updater
 

@@ -96,10 +96,6 @@ LayoutObject* LayoutObjectChildList::RemoveChildNode(
   DCHECK_EQ(this, owner->VirtualChildren());
 
   if (!owner->DocumentBeingDestroyed()) {
-    if (old_child->IsOutOfFlowPositioned()) {
-      LayoutBlock::RemovePositionedObject(To<LayoutBox>(old_child));
-    }
-
     // So that we'll get the appropriate dirty bit set (either that a normal
     // flow child got yanked or that a positioned child got yanked). We also
     // issue paint invalidations, so that the area exposed when the child
@@ -114,7 +110,6 @@ LayoutObject* LayoutObjectChildList::RemoveChildNode(
     InvalidatePaintOnRemoval(*old_child);
 
     if (notify_layout_object) {
-      LayoutCounter::LayoutObjectSubtreeWillBeDetached(old_child);
       old_child->WillBeRemovedFromTree();
     }
 
@@ -210,7 +205,6 @@ void LayoutObjectChildList::InsertChildNode(LayoutObject* owner,
 
     if (notify_layout_object) {
       new_child->InsertedIntoTree();
-      LayoutCounter::LayoutObjectSubtreeAttached(new_child);
     }
 
     if (owner->IsInLayoutNGInlineFormattingContext() ||
@@ -238,7 +232,7 @@ void LayoutObjectChildList::InsertChildNode(LayoutObject* owner,
       SubtreePaintPropertyUpdateReason::kContainerChainMayChange);
   new_child->SetNeedsOverflowRecalc();
 
-  if (!owner->NormalChildNeedsLayout()) {
+  if (!owner->ChildNeedsFullLayout()) {
     owner->SetChildNeedsLayout();  // We may supply the static position for an
                                    // absolute positioned child.
   }

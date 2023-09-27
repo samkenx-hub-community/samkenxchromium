@@ -20,6 +20,7 @@
 #include "base/strings/string_number_conversions.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/timer/elapsed_timer.h"
+#include "base/trace_event/common/trace_event_common.h"
 #include "base/trace_event/trace_event.h"
 #include "base/trace_event/traced_value.h"
 #include "build/build_config.h"
@@ -465,6 +466,10 @@ void Display::Resize(const gfx::Size& size) {
   damage_tracker_->DisplayResized();
 }
 
+void Display::SetOutputSurfaceClipRect(const gfx::Rect& clip_rect) {
+  renderer_->SetOutputSurfaceClipRect(clip_rect);
+}
+
 void Display::InvalidateCurrentSurfaceId() {
   current_surface_id_ = SurfaceId();
   // Force a gc as the display may not be visible (gc occurs after drawing,
@@ -608,9 +613,17 @@ namespace {
 
 DBG_FLAG_FBOOL("frame.debug.non_root_passes", debug_non_root_passes)
 
-void DebugDrawFrame(const AggregatedFrame& frame) {
-  if (!VizDebugger::GetInstance()->IsEnabled())
+DBG_FLAG_FBOOL("frame.render_pass.non_root_passes_in_root_space",
+               non_root_passes_in_root_space)
+
+void DebugDrawFrame(
+    const AggregatedFrame& frame,
+    const std::unique_ptr<DisplayResourceProvider>& resource_provider) {
+  bool is_debugger_connected = false;
+  DBG_CONNECTED_OR_TRACING(is_debugger_connected);
+  if (!is_debugger_connected) {
     return;
+  }
 
   for (auto& render_pass : frame.render_pass_list) {
     if (render_pass != frame.render_pass_list.back() &&
@@ -618,10 +631,16 @@ void DebugDrawFrame(const AggregatedFrame& frame) {
       continue;
     }
 
+    auto output_rect = render_pass->output_rect;
+    auto damage_rect = render_pass->damage_rect;
+    if (non_root_passes_in_root_space()) {
+      output_rect = render_pass->transform_to_root_target.MapRect(output_rect);
+      damage_rect = render_pass->transform_to_root_target.MapRect(damage_rect);
+    }
+
     DBG_DRAW_RECT_OPT("frame.render_pass.output_rect", DBG_OPT_BLUE,
-                      render_pass->output_rect);
-    DBG_DRAW_RECT_OPT("frame.render_pass.damage", DBG_OPT_RED,
-                      render_pass->damage_rect);
+                      output_rect);
+    DBG_DRAW_RECT_OPT("frame.render_pass.damage", DBG_OPT_RED, damage_rect);
 
     DBG_LOG_OPT("frame.render_pass.meta", DBG_OPT_BLUE,
                 "Render pass id=%" PRIu64
@@ -638,8 +657,13 @@ void DebugDrawFrame(const AggregatedFrame& frame) {
 
     for (auto* quad : render_pass->quad_list) {
       auto* sqs = quad->shared_quad_state;
-      auto& transform = sqs->quad_to_target_transform;
-      auto display_rect = transform.MapRect(gfx::RectF(quad->rect));
+      auto quad_to_root_transform = sqs->quad_to_target_transform;
+      if (non_root_passes_in_root_space()) {
+        quad_to_root_transform.PostConcat(
+            render_pass->transform_to_root_target);
+      }
+      auto display_rect =
+          quad_to_root_transform.MapRect(gfx::RectF(quad->rect));
       DBG_DRAW_TEXT_OPT("frame.render_pass.material", DBG_OPT_GREEN,
                         display_rect.origin(),
                         base::NumberToString(static_cast<int>(quad->material)));
@@ -652,13 +676,31 @@ void DebugDrawFrame(const AggregatedFrame& frame) {
           "frame.render_pass.resource_id", DBG_OPT_RED, display_rect.origin(),
           base::NumberToString(quad->resources.ids[0].GetUnsafeValue()));
 
+      if (quad->resources.ids[0] != kInvalidResourceId) {
+        DBG_DRAW_TEXT_OPT(
+            "frame.render_pass.buf_format", DBG_OPT_BLUE, display_rect.origin(),
+            base::NumberToString(static_cast<int>(
+                resource_provider->GetBufferFormat(quad->resources.ids[0]))));
+        DBG_DRAW_TEXT_OPT(
+            "frame.render_pass.buf_sampled_color_space", DBG_OPT_RED,
+            display_rect.origin(),
+            resource_provider->GetSamplerColorSpace(quad->resources.ids[0])
+                .ToString());
+        DBG_DRAW_TEXT_OPT(
+            "frame.render_pass.buf_overlay_color_space", DBG_OPT_GREEN,
+            display_rect.origin(),
+            resource_provider->GetOverlayColorSpace(quad->resources.ids[0])
+                .ToString());
+      }
       DBG_DRAW_RECT("frame.render_pass.quad", display_rect);
     }
   }
 }
 
 void DebugDrawFrameVisible(const AggregatedFrame& frame) {
-  if (!VizDebugger::GetInstance()->IsEnabled()) {
+  bool is_debugger_connected = false;
+  DBG_CONNECTED_OR_TRACING(is_debugger_connected);
+  if (!is_debugger_connected) {
     return;
   }
 
@@ -683,9 +725,6 @@ void DebugDrawFrameVisible(const AggregatedFrame& frame) {
 void VisualDebuggerSync(gfx::OverlayTransform current_display_transform,
                         gfx::Size current_surface_size,
                         int64_t last_presented_trace_id) {
-  if (!VizDebugger::GetInstance()->IsEnabled())
-    return;
-
   const gfx::Transform display_transform = gfx::OverlayTransformToTransform(
       current_display_transform, gfx::SizeF(current_surface_size));
   current_surface_size =
@@ -693,6 +732,10 @@ void VisualDebuggerSync(gfx::OverlayTransform current_display_transform,
           display_transform, gfx::Rect(current_surface_size))
           .size();
 
+  TRACE_EVENT2(TRACE_DISABLED_BY_DEFAULT("viz.visual_debugger"),
+               "visual_debugger_sync", "last_presented_trace_id",
+               last_presented_trace_id, "display_size",
+               current_surface_size.ToString());
   VizDebugger::GetInstance()->CompleteFrame(
       last_presented_trace_id, current_surface_size, base::TimeTicks::Now());
 }
@@ -783,7 +826,7 @@ bool Display::DrawAndSwap(const DrawAndSwapParams& params) {
       VLOG(3) << "Post-aggregation\n" << frame.ToString();
     }
   }
-  DebugDrawFrame(frame);
+  DebugDrawFrame(frame, resource_provider_);
 
   if (frame.delegated_ink_metadata) {
     TRACE_EVENT_INSTANT1(
@@ -1503,6 +1546,11 @@ void Display::InitDelegatedInkPointRendererReceiver(
                      /*create_if_necessary=*/true)) {
     ink_renderer->InitMessagePipeline(std::move(pending_receiver));
   }
+}
+
+void Display::ResetDisplayClientForTesting(DisplayClient* old_client) {
+  CHECK_EQ(client_, old_client);
+  client_ = nullptr;
 }
 
 }  // namespace viz

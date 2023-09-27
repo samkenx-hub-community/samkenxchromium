@@ -62,6 +62,30 @@ Status ExecuteSelectAccount(Session* session,
   return status;
 }
 
+Status ExecuteConfirmIdpSignin(Session* session,
+                               WebView* web_view,
+                               const base::Value::Dict& params,
+                               std::unique_ptr<base::Value>* value,
+                               Timeout* timeout) {
+  FedCmTracker* tracker = nullptr;
+  Status status = web_view->GetFedCmTracker(&tracker);
+  if (!status.IsOk()) {
+    return status;
+  }
+  if (!tracker->HasDialog()) {
+    return Status(kNoSuchAlert);
+  }
+
+  base::Value::Dict command_params;
+  command_params.Set("dialogId", tracker->GetLastDialogId());
+
+  std::unique_ptr<base::Value> result;
+  status = web_view->SendCommandAndGetResult("FedCm.confirmIdpSignin",
+                                             command_params, &result);
+  tracker->DialogClosed();
+  return status;
+}
+
 Status ExecuteGetAccounts(Session* session,
                           WebView* web_view,
                           const base::Value::Dict& params,
@@ -124,6 +148,16 @@ Status ExecuteSetDelayEnabled(Session* session,
                               const base::Value::Dict& params,
                               std::unique_ptr<base::Value>* value,
                               Timeout* timeout) {
+  // We don't technically need the tracker to implement this command. However,
+  // the tracker calls enable during initialization, so if it gets initialized
+  // after this command, it would overwrite the delay enabled flag.
+  // To avoid that, ensure it is created here.
+  FedCmTracker* tracker = nullptr;
+  Status status = web_view->GetFedCmTracker(&tracker);
+  if (!status.IsOk()) {
+    return status;
+  }
+
   if (!params.FindBool("enabled")) {
     return Status(kInvalidArgument, "enabled must be specified");
   }
@@ -132,8 +166,8 @@ Status ExecuteSetDelayEnabled(Session* session,
   command_params.Set("disableRejectionDelay", !*params.FindBool("enabled"));
 
   std::unique_ptr<base::Value> result;
-  Status status = web_view->SendCommandAndGetResult("FedCm.enable",
-                                                    command_params, &result);
+  status = web_view->SendCommandAndGetResult("FedCm.enable", command_params,
+                                             &result);
   return status;
 }
 

@@ -182,6 +182,17 @@ message IsolationDataProto {
 
   // The version of the IWA.
   required string version = 5;
+
+  message PendingUpdateInfo {
+    oneof location {
+      InstalledBundle installed_bundle = 1;
+      DevModeBundle dev_mode_bundle = 2;
+      DevModeProxy dev_mode_proxy = 3;
+    }
+    required string version = 4;
+  }
+
+  optional PendingUpdateInfo pending_update_info = 6;
 }
 
 // Full WebApp object data. See detailed comments in
@@ -248,7 +259,7 @@ message WebAppProto {
 
   // Time the app is installed.
   // ms since the Unix epoch. See sync/base/time.h.
-  optional int64 install_time = 16;
+  optional int64 first_install_time = 16;
 
   // A list of protocol handlers.
   repeated WebAppProtocolHandler protocol_handlers = 17;
@@ -428,4 +439,14 @@ message WebAppProto {
   // https://github.com/WICG/manifest-incubations/blob/gh-pages/scope_extensions-explainer.md
   // for association requirements.
   repeated WebAppScopeExtensionProto scope_extensions_validated = 62;
+
+  // Stores whether the current web app is set as the default app to capture
+  // links.
+  optional bool is_user_selected_app_for_capturing_links = 63;
+
+  // Time the app was updated as part of a full install. For example when a
+  // policy installs an app that is already in the DB installed as a
+  // default/sync installed app and the DB data is overwritten. ms since the
+  // Unix epoch. See sync/base/time.h.
+  optional int64 latest_install_time = 64;
 }

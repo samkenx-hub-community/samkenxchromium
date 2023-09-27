@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include "components/services/screen_ai/proto/main_content_extractor_proto_convertor.h"
+#include "build/build_config.h"
 
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
@@ -10,7 +11,7 @@
 #include "base/path_service.h"
 #include "base/strings/string_piece.h"
 #include "base/strings/stringprintf.h"
-#include "components/services/screen_ai/proto/test_proto_loader.h"
+#include "base/test/test_proto_loader.h"
 #include "components/services/screen_ai/proto/view_hierarchy.pb.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
@@ -225,6 +226,30 @@ void ExpectViewHierarchyProtos(screenai::ViewHierarchy& generated,
   }
 }
 
+bool LoadTextProto(const base::FilePath& proto_file_path,
+                   const char* proto_descriptor_relative_file_path,
+                   google::protobuf::MessageLite& proto) {
+  std::string file_content;
+  if (!base::ReadFileToString(proto_file_path, &file_content)) {
+    LOG(ERROR) << "Failed to read expected proto from: " << proto_file_path;
+    return false;
+  }
+
+  base::FilePath descriptor_full_path;
+  if (!base::PathService::Get(base::DIR_GEN_TEST_DATA_ROOT,
+                              &descriptor_full_path)) {
+    LOG(ERROR) << "Generated test data root not found!";
+    return false;
+  }
+  descriptor_full_path =
+      descriptor_full_path.AppendASCII(proto_descriptor_relative_file_path);
+
+  base::TestProtoLoader loader(descriptor_full_path, proto.GetTypeName());
+  std::string serialized_message;
+  loader.ParseFromText(file_content, serialized_message);
+  return proto.ParseFromString(serialized_message);
+}
+
 }  // namespace
 
 namespace screen_ai {
@@ -297,7 +322,12 @@ INSTANTIATE_TEST_SUITE_P(MainContentExtractorProtoConvertorTest,
                          ProtoConvertorViewHierarchyTest,
                          testing::Range(0, kProtoConversionTestCasesCount));
 
-TEST_P(ProtoConvertorViewHierarchyTest, AxTreeJsonToProtoTest) {
+#if BUILDFLAG(IS_MAC) && defined(ADDRESS_SANITIZER)
+#define MAYBE_AxTreeJsonToProtoTest DISABLED_AxTreeJsonToProtoTest
+#else
+#define MAYBE_AxTreeJsonToProtoTest AxTreeJsonToProtoTest
+#endif
+TEST_P(ProtoConvertorViewHierarchyTest, MAYBE_AxTreeJsonToProtoTest) {
   const base::FilePath kInputJsonPath = GetInputFilePath();
   const base::FilePath kExpectedProtoPath = GetExpectedFilePath();
 
@@ -309,9 +339,11 @@ TEST_P(ProtoConvertorViewHierarchyTest, AxTreeJsonToProtoTest) {
   ASSERT_TRUE(json.has_value());
 
   // Convert JSON file to AX tree update.
+  const std::map<std::string, ax::mojom::Role>
+      content_extraction_to_chrome_roles =
+          GetMainContentExtractorToChromeRoleConversionMapForTesting();
   ui::AXTreeUpdate tree_update = ui::AXTreeUpdateFromJSON(
-      json.value(),
-      &GetMainContentExtractorToChromeRoleConversionMapForTesting());
+      json.value(), &content_extraction_to_chrome_roles);
   ASSERT_GT(tree_update.nodes.size(), 0u);
 
   // Convert AX Tree to Screen2x proto.
@@ -326,9 +358,9 @@ TEST_P(ProtoConvertorViewHierarchyTest, AxTreeJsonToProtoTest) {
 
   // Load expected Proto.
   screenai::ViewHierarchy expected_view_hierarchy;
-  ASSERT_TRUE(test_proto_loader::TestProtoLoader::LoadTextProto(
+  ASSERT_TRUE(LoadTextProto(
       kExpectedProtoPath,
-      "gen/components/services/screen_ai/proto/view_hierarchy.descriptor",
+      "components/services/screen_ai/proto/view_hierarchy.descriptor",
       expected_view_hierarchy));
 
   // Compare protos.

@@ -4,28 +4,30 @@
 
 #include "chrome/browser/ui/webui/settings/ash/os_settings_sections.h"
 
+#include "ash/constants/ash_features.h"
 #include "base/containers/contains.h"
 #include "build/branding_buildflags.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/ui/webui/settings/ash/about_section.h"
-#include "chrome/browser/ui/webui/settings/ash/accessibility_section.h"
-#include "chrome/browser/ui/webui/settings/ash/apps_section.h"
-#include "chrome/browser/ui/webui/settings/ash/bluetooth_section.h"
-#include "chrome/browser/ui/webui/settings/ash/crostini_section.h"
-#include "chrome/browser/ui/webui/settings/ash/date_time_section.h"
+#include "chrome/browser/ui/webui/ash/settings/pages/a11y/accessibility_section.h"
+#include "chrome/browser/ui/webui/ash/settings/pages/about/about_section.h"
+#include "chrome/browser/ui/webui/ash/settings/pages/apps/apps_section.h"
+#include "chrome/browser/ui/webui/ash/settings/pages/bluetooth/bluetooth_section.h"
+#include "chrome/browser/ui/webui/ash/settings/pages/crostini/crostini_section.h"
+#include "chrome/browser/ui/webui/ash/settings/pages/date_time/date_time_section.h"
+#include "chrome/browser/ui/webui/ash/settings/pages/files/files_section.h"
+#include "chrome/browser/ui/webui/ash/settings/pages/people/people_section.h"
+#include "chrome/browser/ui/webui/ash/settings/pages/printing/printing_section.h"
 #include "chrome/browser/ui/webui/settings/ash/device_section.h"
-#include "chrome/browser/ui/webui/settings/ash/files_section.h"
 #include "chrome/browser/ui/webui/settings/ash/internet_section.h"
 #include "chrome/browser/ui/webui/settings/ash/kerberos_section.h"
 #include "chrome/browser/ui/webui/settings/ash/languages_section.h"
 #include "chrome/browser/ui/webui/settings/ash/main_section.h"
 #include "chrome/browser/ui/webui/settings/ash/multidevice_section.h"
-#include "chrome/browser/ui/webui/settings/ash/people_section.h"
 #include "chrome/browser/ui/webui/settings/ash/personalization_section.h"
-#include "chrome/browser/ui/webui/settings/ash/printing_section.h"
 #include "chrome/browser/ui/webui/settings/ash/privacy_section.h"
 #include "chrome/browser/ui/webui/settings/ash/reset_section.h"
 #include "chrome/browser/ui/webui/settings/ash/search_section.h"
+#include "chrome/browser/ui/webui/settings/ash/system_preferences_section.h"
 #include "chromeos/ash/components/phonehub/phone_hub_manager.h"
 
 namespace ash::settings {
@@ -39,11 +41,9 @@ OsSettingsSections::OsSettingsSections(
     SearchTagRegistry* search_tag_registry,
     multidevice_setup::MultiDeviceSetupClient* multidevice_setup_client,
     phonehub::PhoneHubManager* phone_hub_manager,
-    syncer::SyncService* sync_service,
     KerberosCredentialsManager* kerberos_credentials_manager,
     ArcAppListPrefs* arc_app_list_prefs,
     signin::IdentityManager* identity_manager,
-    android_sms::AndroidSmsService* android_sms_service,
     CupsPrintersManager* printers_manager,
     apps::AppServiceProxy* app_service_proxy,
     eche_app::EcheAppManager* eche_app_manager) {
@@ -60,71 +60,72 @@ OsSettingsSections::OsSettingsSections(
       mojom::Section::kBluetooth,
       std::make_unique<BluetoothSection>(profile, search_tag_registry, prefs));
 
-  AddSection(
-      mojom::Section::kMultiDevice,
-      std::make_unique<MultiDeviceSection>(
-          profile, search_tag_registry, multidevice_setup_client,
-          phone_hub_manager, android_sms_service, prefs, eche_app_manager));
+  AddSection(mojom::Section::kMultiDevice,
+             std::make_unique<MultiDeviceSection>(
+                 profile, search_tag_registry, multidevice_setup_client,
+                 phone_hub_manager, prefs, eche_app_manager));
 
-  AddSection(
-      mojom::Section::kPeople,
-      std::make_unique<PeopleSection>(profile, search_tag_registry,
-                                      sync_service, identity_manager, prefs));
+  AddSection(mojom::Section::kPeople,
+             std::make_unique<PeopleSection>(profile, search_tag_registry,
+                                             identity_manager, prefs));
 
-  AddSection(mojom::Section::kDevice, std::make_unique<DeviceSection>(
-                                          profile, search_tag_registry, prefs));
+  AddSection(mojom::Section::kDevice,
+             std::make_unique<DeviceSection>(profile, search_tag_registry,
+                                             printers_manager, prefs));
 
   AddSection(mojom::Section::kPersonalization,
              std::make_unique<PersonalizationSection>(
                  profile, search_tag_registry, prefs));
-
-  AddSection(mojom::Section::kSearchAndAssistant,
-             std::make_unique<SearchSection>(profile, search_tag_registry));
 
   AddSection(mojom::Section::kApps, std::make_unique<AppsSection>(
                                         profile, search_tag_registry, prefs,
                                         arc_app_list_prefs, app_service_proxy));
 
   AddSection(
-      mojom::Section::kCrostini,
-      std::make_unique<CrostiniSection>(profile, search_tag_registry, prefs));
-
-  AddSection(mojom::Section::kDateAndTime,
-             std::make_unique<DateTimeSection>(profile, search_tag_registry));
-
-  AddSection(
       mojom::Section::kPrivacyAndSecurity,
       std::make_unique<PrivacySection>(profile, search_tag_registry, prefs));
-
-  AddSection(
-      mojom::Section::kLanguagesAndInput,
-      std::make_unique<LanguagesSection>(profile, search_tag_registry, prefs));
-
-  AddSection(mojom::Section::kFiles,
-             std::make_unique<FilesSection>(profile, search_tag_registry));
-
-  AddSection(mojom::Section::kPrinting,
-             std::make_unique<PrintingSection>(profile, search_tag_registry,
-                                               printers_manager));
 
   AddSection(mojom::Section::kAccessibility,
              std::make_unique<AccessibilitySection>(
                  profile, search_tag_registry, prefs));
 
-  AddSection(mojom::Section::kReset,
-             std::make_unique<ResetSection>(profile, search_tag_registry));
-
-  AddSection(mojom::Section::kAboutChromeOs,
-#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
-             std::make_unique<AboutSection>(profile, search_tag_registry, prefs)
-#else
-             std::make_unique<AboutSection>(profile, search_tag_registry)
-#endif  // BUILDFLAG(GOOGLE_CHROME_BRANDING)
-  );
+  AddSection(
+      mojom::Section::kAboutChromeOs,
+      std::make_unique<AboutSection>(profile, search_tag_registry, prefs));
 
   AddSection(mojom::Section::kKerberos,
              std::make_unique<KerberosSection>(profile, search_tag_registry,
                                                kerberos_credentials_manager));
+
+  if (ash::features::IsOsSettingsRevampWayfindingEnabled()) {
+    AddSection(mojom::Section::kSystemPreferences,
+               std::make_unique<SystemPreferencesSection>(
+                   profile, search_tag_registry, prefs));
+  } else {
+    AddSection(
+        mojom::Section::kCrostini,
+        std::make_unique<CrostiniSection>(profile, search_tag_registry, prefs));
+
+    AddSection(mojom::Section::kDateAndTime,
+               std::make_unique<DateTimeSection>(profile, search_tag_registry));
+
+    AddSection(mojom::Section::kFiles,
+               std::make_unique<FilesSection>(profile, search_tag_registry));
+
+    AddSection(mojom::Section::kLanguagesAndInput,
+               std::make_unique<LanguagesSection>(profile, search_tag_registry,
+                                                  prefs));
+
+    AddSection(mojom::Section::kPrinting,
+               std::make_unique<PrintingSection>(profile, search_tag_registry,
+                                                 printers_manager));
+
+    AddSection(mojom::Section::kReset,
+               std::make_unique<ResetSection>(profile, search_tag_registry));
+
+    AddSection(mojom::Section::kSearchAndAssistant,
+               std::make_unique<SearchSection>(profile, search_tag_registry));
+  }
 }
 
 OsSettingsSections::OsSettingsSections() = default;

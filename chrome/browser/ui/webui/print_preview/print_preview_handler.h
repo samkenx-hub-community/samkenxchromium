@@ -119,14 +119,15 @@ class PrintPreviewHandler : public content::WebUIMessageHandler {
   virtual void BadMessageReceived();
 
   // Gets the initiator for the print preview dialog.
+  // Virtual so tests can override.
   virtual content::WebContents* GetInitiator();
 
   // Initiates print after any content analysis checks have been passed
   // successfully.
-  virtual void FinishHandlePrint(UserActionBuckets user_action,
-                                 base::Value::Dict settings,
-                                 scoped_refptr<base::RefCountedMemory> data,
-                                 const std::string& callback_id);
+  virtual void FinishHandleDoPrint(UserActionBuckets user_action,
+                                   base::Value::Dict settings,
+                                   scoped_refptr<base::RefCountedMemory> data,
+                                   const std::string& callback_id);
 
  private:
   friend class PrintPreviewPdfGeneratedBrowserTest;
@@ -149,6 +150,8 @@ class PrintPreviewHandler : public content::WebUIMessageHandler {
   content::WebContents* preview_web_contents();
 
   PrintPreviewUI* print_preview_ui();
+
+  const mojom::RequestPrintPreviewParams* GetRequestParams();
 
   PrefService* GetPrefs();
 
@@ -181,7 +184,7 @@ class PrintPreviewHandler : public content::WebUIMessageHandler {
 
   // Gets the job settings from Web UI and initiate printing. First element of
   // |args| is a job settings JSON string.
-  void HandlePrint(const base::Value::List& args);
+  void HandleDoPrint(const base::Value::List& args);
 
   // Handles the request to hide the preview dialog for printing.
   // |args| is unused.
@@ -269,8 +272,8 @@ class PrintPreviewHandler : public content::WebUIMessageHandler {
 
 #if BUILDFLAG(ENABLE_PRINT_CONTENT_ANALYSIS)
   // Called when enterprise policy returns a verdict.
-  // Calls FinishHandlePrint if it's allowed else calls OnPrintResult to report
-  // print not allowed.
+  // Calls FinishHandleDoPrint() if it's allowed or calls OnPrintResult() to
+  // report print not allowed.
   void OnVerdictByEnterprisePolicy(UserActionBuckets user_action,
                                    base::Value::Dict settings,
                                    scoped_refptr<base::RefCountedMemory> data,
@@ -320,7 +323,8 @@ class PrintPreviewHandler : public content::WebUIMessageHandler {
   // Note that this is not propagated to LocalPrinterHandlerLacros.
   // The pointer is constant - if ash crashes and the mojo connection is lost,
   // lacros will automatically be restarted.
-  raw_ptr<crosapi::mojom::LocalPrinter> local_printer_ = nullptr;
+  raw_ptr<crosapi::mojom::LocalPrinter, DanglingUntriaged> local_printer_ =
+      nullptr;
 #endif
 
 #if BUILDFLAG(IS_CHROMEOS_LACROS)
@@ -331,8 +335,8 @@ class PrintPreviewHandler : public content::WebUIMessageHandler {
   // Null if the interface is unavailable.
   // The pointer is constant - if ash crashes and the mojo connection is lost,
   // lacros will automatically be restarted.
-  raw_ptr<crosapi::mojom::DriveIntegrationService> drive_integration_service_ =
-      nullptr;
+  raw_ptr<crosapi::mojom::DriveIntegrationService, DanglingUntriaged>
+      drive_integration_service_ = nullptr;
 #endif
 
   base::WeakPtrFactory<PrintPreviewHandler> weak_factory_{this};

@@ -58,8 +58,7 @@ class InstallAppLocallyCommandTest
     auto protocol_handler_manager =
         std::make_unique<WebAppProtocolHandlerManager>(profile());
     auto shortcut_manager = std::make_unique<WebAppShortcutManager>(
-        profile(), /*icon_manager=*/nullptr, file_handler_manager.get(),
-        protocol_handler_manager.get());
+        profile(), file_handler_manager.get(), protocol_handler_manager.get());
     auto os_integration_manager = std::make_unique<OsIntegrationManager>(
         profile(), std::move(shortcut_manager), std::move(file_handler_manager),
         std::move(protocol_handler_manager), /*url_handler_manager=*/nullptr);
@@ -93,7 +92,7 @@ class InstallAppLocallyCommandTest
     WebAppTest::TearDown();
   }
 
-  AppId InstallNonLocallyInstalledAppWithIcons(
+  webapps::AppId InstallNonLocallyInstalledAppWithIcons(
       std::map<SquareSizePx, SkBitmap> icon_map) {
     std::unique_ptr<WebAppInstallInfo> info =
         std::make_unique<WebAppInstallInfo>();
@@ -101,7 +100,8 @@ class InstallAppLocallyCommandTest
     info->title = u"Test App";
     info->user_display_mode = mojom::UserDisplayMode::kStandalone;
     info->icon_bitmaps.any = std::move(icon_map);
-    base::test::TestFuture<const AppId&, webapps::InstallResultCode> result;
+    base::test::TestFuture<const webapps::AppId&, webapps::InstallResultCode>
+        result;
 
     // InstallFromInfo does not trigger OS integration.
     provider().scheduler().InstallFromInfo(
@@ -111,11 +111,11 @@ class InstallAppLocallyCommandTest
     bool success = result.Wait();
     EXPECT_TRUE(success);
     if (!success) {
-      return AppId();
+      return webapps::AppId();
     }
     EXPECT_EQ(result.Get<webapps::InstallResultCode>(),
               webapps::InstallResultCode::kSuccessNewInstall);
-    const AppId app_id = result.Get<AppId>();
+    const webapps::AppId app_id = result.Get<webapps::AppId>();
     provider().sync_bridge_unsafe().SetAppIsLocallyInstalledForTesting(
         app_id, /*is_locally_installed=*/false);
     return app_id;
@@ -138,7 +138,8 @@ class InstallAppLocallyCommandTest
     return bitmap;
   }
 
-  SkColor GetShortcutColor(const AppId& app_id, const std::string& app_name) {
+  SkColor GetShortcutColor(const webapps::AppId& app_id,
+                           const std::string& app_name) {
     if (!HasShortcutsOsIntegration()) {
       return SK_ColorTRANSPARENT;
     }
@@ -175,7 +176,7 @@ class InstallAppLocallyCommandTest
   }
 
  private:
-  raw_ptr<FakeWebAppProvider, DanglingUntriaged> provider_;
+  raw_ptr<FakeWebAppProvider, DanglingUntriaged> provider_ = nullptr;
   base::test::ScopedFeatureList scoped_feature_list_;
   std::unique_ptr<OsIntegrationTestOverrideImpl::BlockingRegistration>
       test_override_;
@@ -190,7 +191,7 @@ TEST_P(InstallAppLocallyCommandTest, BasicBehavior) {
   icon_map[icon_size::k24] = CreateSolidColorIcon(icon_size::k24, SK_ColorRED);
   icon_map[icon_size::k128] =
       CreateSolidColorIcon(icon_size::k128, SK_ColorGREEN);
-  const AppId& app_id =
+  const webapps::AppId& app_id =
       InstallNonLocallyInstalledAppWithIcons(std::move(icon_map));
 
   auto state =
@@ -232,7 +233,7 @@ TEST_P(InstallAppLocallyCommandTest, BasicBehavior) {
 }
 
 TEST_P(InstallAppLocallyCommandTest, NoAppInRegistrarCorrectLog) {
-  const AppId app_id = "abcde";
+  const webapps::AppId app_id = "abcde";
 
   base::test::TestFuture<void> test_future;
   provider().scheduler().InstallAppLocally(app_id, test_future.GetCallback());

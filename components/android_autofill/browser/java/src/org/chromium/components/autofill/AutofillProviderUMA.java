@@ -90,6 +90,9 @@ public class AutofillProviderUMA {
     // The million seconds from the autofill session starting to the suggestion being displayed.
     public static final String UMA_AUTOFILL_SUGGESTION_TIME = "Autofill.WebView.SuggestionTime";
 
+    // A bitmask of observed Autofill events per session.
+    public static final String UMA_AUTOFILL_EVENTS = "Autofill.WebView.Events";
+
     // The expected time range of time is from 10ms to 2 seconds, and 50 buckets is sufficient.
     private static final long MIN_TIME_MILLIS = 10;
     private static final long MAX_TIME_MILLIS = TimeUnit.SECONDS.toMillis(2);
@@ -109,7 +112,13 @@ public class AutofillProviderUMA {
     private static final int AUTOFILL_PROVIDER_SAMSUNG_PASS = 2;
     private static final String LASTPASS_PACKAGE_NAME = "com.lastpass.lpandroid";
     private static final int AUTOFILL_PROVIDER_LAST_PASS = 3;
-    private static final int AUTOFILL_PROVIDER_MAX = 4;
+    private static final String DASHLANE_PACKAGE_NAME = "com.dashlane";
+    private static final int AUTOFILL_PROVIDER_DASHLANE = 4;
+    private static final String ONE_PASSWORD_PACKAGE_NAME = "com.onepassword.android";
+    private static final int AUTOFILL_PROVIDER_1PASSWORD = 5;
+    private static final String BITWARDEN_PACKAGE_NAME = "com.x8bit.bitwarden";
+    private static final int AUTOFILL_PROVIDER_BITWARDEN = 6;
+    private static final int AUTOFILL_PROVIDER_MAX = 7;
 
     private static void recordTimesHistogram(String name, long durationMillis) {
         RecordHistogram.recordCustomTimesHistogram(
@@ -117,18 +126,21 @@ public class AutofillProviderUMA {
     }
 
     private static class SessionRecorder {
-        public static final int EVENT_VIRTUAL_STRUCTURE_PROVIDED = 0x1 << 0;
-        public static final int EVENT_SUGGESTION_DISPLAYED = 0x1 << 1;
-        public static final int EVENT_FORM_AUTOFILLED = 0x1 << 2;
-        public static final int EVENT_USER_CHANGED_FIELD_VALUE = 0x1 << 3;
-        public static final int EVENT_FORM_SUBMITTED = 0x1 << 4;
-        public static final int EVENT_USER_CHANGED_AUTOFILLED_FIELD = 0x1 << 5;
+        // These values are recorded as UMAs - do not change them.
+        public static final int EVENT_VIRTUAL_STRUCTURE_PROVIDED = 1 << 0;
+        public static final int EVENT_SUGGESTION_DISPLAYED = 1 << 1;
+        public static final int EVENT_FORM_AUTOFILLED = 1 << 2;
+        public static final int EVENT_USER_CHANGED_FIELD_VALUE = 1 << 3;
+        public static final int EVENT_USER_CHANGED_AUTOFILLED_FIELD = 1 << 4;
+        public static final int EVENT_FIELD_CHANGED_VISIBILITY = 1 << 5;
+        public static final int EVENT_FORM_SUBMITTED = 1 << 6;
+        public static final int EVENT_MAX = 1 << 7;
 
         private Long mSuggestionTimeMillis;
 
         public void record(int event) {
-            // Not record any event until we get EVENT_VIRTUAL_STRUCTURE_PROVIDED which makes the
-            // following events meaningful.
+            // Do not record any event until we get EVENT_VIRTUAL_STRUCTURE_PROVIDED, which makes
+            // the following events meaningful.
             if (event != EVENT_VIRTUAL_STRUCTURE_PROVIDED && mState == 0) return;
             if (EVENT_USER_CHANGED_FIELD_VALUE == event && mUserChangedAutofilledField == null) {
                 mUserChangedAutofilledField = Boolean.valueOf(false);
@@ -137,7 +149,7 @@ public class AutofillProviderUMA {
                     mUserChangedAutofilledField = Boolean.valueOf(true);
                 }
                 mUserChangedAutofilledField = true;
-                event = EVENT_USER_CHANGED_FIELD_VALUE;
+                event |= EVENT_USER_CHANGED_FIELD_VALUE;
             }
             mState |= event;
         }
@@ -152,6 +164,7 @@ public class AutofillProviderUMA {
         public void recordHistogram() {
             RecordHistogram.recordEnumeratedHistogram(UMA_AUTOFILL_AUTOFILL_SESSION,
                     toUMAAutofillSessionValue(), AUTOFILL_SESSION_HISTOGRAM_COUNT);
+            RecordHistogram.recordEnumeratedHistogram(UMA_AUTOFILL_EVENTS, mState, EVENT_MAX);
             // Only record if user ever changed form.
             if (mUserChangedAutofilledField != null) {
                 RecordHistogram.recordBooleanHistogram(
@@ -187,47 +200,53 @@ public class AutofillProviderUMA {
         }
 
         private int toUMAAutofillSessionValue() {
-            if (mState == 0) {
+            // Only the below five events are considered for translating the events to
+            // an AUTOFILL_SESSION record.
+            int state = mState
+                    & (EVENT_VIRTUAL_STRUCTURE_PROVIDED | EVENT_SUGGESTION_DISPLAYED
+                            | EVENT_FORM_AUTOFILLED | EVENT_USER_CHANGED_FIELD_VALUE
+                            | EVENT_FORM_SUBMITTED);
+            if (state == 0) {
                 return NO_CALLBACK_FORM_FRAMEWORK;
-            } else if (mState == EVENT_VIRTUAL_STRUCTURE_PROVIDED) {
+            } else if (state == EVENT_VIRTUAL_STRUCTURE_PROVIDED) {
                 return NO_SUGGESTION_USER_NOT_CHANGE_FORM_NO_FORM_SUBMITTED;
-            } else if (mState
+            } else if (state
                     == (EVENT_VIRTUAL_STRUCTURE_PROVIDED | EVENT_USER_CHANGED_FIELD_VALUE)) {
                 return NO_SUGGESTION_USER_CHANGE_FORM_NO_FORM_SUBMITTED;
-            } else if (mState == (EVENT_VIRTUAL_STRUCTURE_PROVIDED | EVENT_FORM_SUBMITTED)) {
+            } else if (state == (EVENT_VIRTUAL_STRUCTURE_PROVIDED | EVENT_FORM_SUBMITTED)) {
                 return NO_SUGGESTION_USER_NOT_CHANGE_FORM_FORM_SUBMITTED;
-            } else if (mState
+            } else if (state
                     == (EVENT_VIRTUAL_STRUCTURE_PROVIDED | EVENT_USER_CHANGED_FIELD_VALUE
                             | EVENT_FORM_SUBMITTED)) {
                 return NO_SUGGESTION_USER_CHANGE_FORM_FORM_SUBMITTED;
-            } else if (mState
+            } else if (state
                     == (EVENT_VIRTUAL_STRUCTURE_PROVIDED | EVENT_SUGGESTION_DISPLAYED
                             | EVENT_FORM_AUTOFILLED)) {
                 return USER_SELECT_SUGGESTION_USER_NOT_CHANGE_FORM_NO_FORM_SUBMITTED;
-            } else if (mState
+            } else if (state
                     == (EVENT_VIRTUAL_STRUCTURE_PROVIDED | EVENT_SUGGESTION_DISPLAYED
                             | EVENT_FORM_AUTOFILLED | EVENT_FORM_SUBMITTED)) {
                 return USER_SELECT_SUGGESTION_USER_NOT_CHANGE_FORM_FORM_SUBMITTED;
-            } else if (mState
+            } else if (state
                     == (EVENT_VIRTUAL_STRUCTURE_PROVIDED | EVENT_SUGGESTION_DISPLAYED
                             | EVENT_FORM_AUTOFILLED | EVENT_USER_CHANGED_FIELD_VALUE
                             | EVENT_FORM_SUBMITTED)) {
                 return USER_SELECT_SUGGESTION_USER_CHANGE_FORM_FORM_SUBMITTED;
-            } else if (mState
+            } else if (state
                     == (EVENT_VIRTUAL_STRUCTURE_PROVIDED | EVENT_SUGGESTION_DISPLAYED
                             | EVENT_FORM_AUTOFILLED | EVENT_USER_CHANGED_FIELD_VALUE)) {
                 return USER_SELECT_SUGGESTION_USER_CHANGE_FORM_NO_FORM_SUBMITTED;
-            } else if (mState == (EVENT_VIRTUAL_STRUCTURE_PROVIDED | EVENT_SUGGESTION_DISPLAYED)) {
+            } else if (state == (EVENT_VIRTUAL_STRUCTURE_PROVIDED | EVENT_SUGGESTION_DISPLAYED)) {
                 return USER_NOT_SELECT_SUGGESTION_USER_NOT_CHANGE_FORM_NO_FORM_SUBMITTED;
-            } else if (mState
+            } else if (state
                     == (EVENT_VIRTUAL_STRUCTURE_PROVIDED | EVENT_SUGGESTION_DISPLAYED
                             | EVENT_FORM_SUBMITTED)) {
                 return USER_NOT_SELECT_SUGGESTION_USER_NOT_CHANGE_FORM_FORM_SUBMITTED;
-            } else if (mState
+            } else if (state
                     == (EVENT_VIRTUAL_STRUCTURE_PROVIDED | EVENT_SUGGESTION_DISPLAYED
                             | EVENT_USER_CHANGED_FIELD_VALUE | EVENT_FORM_SUBMITTED)) {
                 return USER_NOT_SELECT_SUGGESTION_USER_CHANGE_FORM_FORM_SUBMITTED;
-            } else if (mState
+            } else if (state
                     == (EVENT_VIRTUAL_STRUCTURE_PROVIDED | EVENT_SUGGESTION_DISPLAYED
                             | EVENT_USER_CHANGED_FIELD_VALUE)) {
                 return USER_NOT_SELECT_SUGGESTION_USER_CHANGE_FORM_NO_FORM_SUBMITTED;
@@ -339,6 +358,12 @@ public class AutofillProviderUMA {
         }
     }
 
+    public void onFieldChangedVisibility() {
+        if (mRecorder != null) {
+            mRecorder.record(SessionRecorder.EVENT_FIELD_CHANGED_VISIBILITY);
+        }
+    }
+
     /**
      * Invoked when the server query was done or has arrived when the autofill sension starts.
      *
@@ -360,6 +385,15 @@ public class AutofillProviderUMA {
                 break;
             case LASTPASS_PACKAGE_NAME:
                 recordUmaAutofillProvider(AUTOFILL_PROVIDER_LAST_PASS);
+                break;
+            case DASHLANE_PACKAGE_NAME:
+                recordUmaAutofillProvider(AUTOFILL_PROVIDER_DASHLANE);
+                break;
+            case ONE_PASSWORD_PACKAGE_NAME:
+                recordUmaAutofillProvider(AUTOFILL_PROVIDER_1PASSWORD);
+                break;
+            case BITWARDEN_PACKAGE_NAME:
+                recordUmaAutofillProvider(AUTOFILL_PROVIDER_BITWARDEN);
                 break;
             default:
                 recordUmaAutofillProvider(AUTOFILL_PROVIDER_UNKNOWN);

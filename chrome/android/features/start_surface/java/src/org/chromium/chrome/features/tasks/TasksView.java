@@ -36,6 +36,7 @@ import org.chromium.chrome.browser.flags.MutableFlagWithSafeDefault;
 import org.chromium.chrome.browser.lifecycle.ActivityLifecycleDispatcher;
 import org.chromium.chrome.browser.ntp.IncognitoDescriptionView;
 import org.chromium.chrome.browser.ntp.search.SearchBoxCoordinator;
+import org.chromium.chrome.features.start_surface.StartSurfaceConfiguration;
 import org.chromium.components.browser_ui.styles.ChromeColors;
 import org.chromium.components.browser_ui.widget.CoordinatorLayoutForPointer;
 import org.chromium.components.browser_ui.widget.displaystyle.UiConfig;
@@ -62,11 +63,17 @@ public class TasksView extends CoordinatorLayoutForPointer {
             CookieControlsEnforcement.NO_ENFORCEMENT;
     private View.OnClickListener mIncognitoCookieControlsIconClickListener;
     private UiConfig mUiConfig;
+    private final boolean mIsSurfacePolishEnabled;
+    private final boolean mIsSurfacePolishOmniboxColorEnabled;
 
     /** Default constructor needed to inflate via XML. */
     public TasksView(Context context, AttributeSet attrs) {
         super(context, attrs);
         mContext = context;
+
+        mIsSurfacePolishEnabled = ChromeFeatureList.sSurfacePolish.isEnabled();
+        mIsSurfacePolishOmniboxColorEnabled = mIsSurfacePolishEnabled
+                && StartSurfaceConfiguration.SURFACE_POLISH_OMNIBOX_COLOR.getValue();
     }
 
     public void initialize(ActivityLifecycleDispatcher activityLifecycleDispatcher,
@@ -85,6 +92,7 @@ public class TasksView extends CoordinatorLayoutForPointer {
                 (FrameLayout) findViewById(R.id.tab_switcher_module_container);
         mMvTilesContainerLayout = findViewById(R.id.mv_tiles_container);
         mSearchBoxCoordinator = new SearchBoxCoordinator(getContext(), this);
+        updateSearchBoxHeight();
 
         mHeaderView = (AppBarLayout) findViewById(R.id.task_surface_header);
 
@@ -93,6 +101,16 @@ public class TasksView extends CoordinatorLayoutForPointer {
         mUiConfig = new UiConfig(this);
         setHeaderPadding();
         setTabCarouselTitleStyle();
+    }
+
+    /**
+     * Updates the height of the fake search box for surface polish.
+     */
+    public void updateSearchBoxHeight() {
+        if (mIsSurfacePolishEnabled) {
+            mSearchBoxCoordinator.getView().getLayoutParams().height =
+                    getResources().getDimensionPixelSize(R.dimen.ntp_search_box_height_polish);
+        }
     }
 
     @Override
@@ -180,13 +198,20 @@ public class TasksView extends CoordinatorLayoutForPointer {
      * @param isIncognito Whether it's in incognito mode.
      */
     void setIncognitoMode(boolean isIncognito) {
-        int backgroundColor = ChromeColors.getPrimaryBackgroundColor(mContext, isIncognito);
-        setBackgroundColor(backgroundColor);
-        mHeaderView.setBackgroundColor(backgroundColor);
-
         mSearchBoxCoordinator.setIncognitoMode(isIncognito);
-        Drawable searchBackground = AppCompatResources.getDrawable(mContext,
-                isIncognito ? R.drawable.fake_search_box_bg_incognito : R.drawable.ntp_search_box);
+        Drawable searchBackground;
+        if (isIncognito) {
+            searchBackground = AppCompatResources.getDrawable(
+                    mContext, R.drawable.fake_search_box_bg_incognito);
+        } else if (mIsSurfacePolishOmniboxColorEnabled) {
+            searchBackground = AppCompatResources.getDrawable(
+                    mContext, R.drawable.home_surface_search_box_background_colorful);
+        } else if (mIsSurfacePolishEnabled) {
+            searchBackground = AppCompatResources.getDrawable(
+                    mContext, R.drawable.home_surface_search_box_background_neutral);
+        } else {
+            searchBackground = AppCompatResources.getDrawable(mContext, R.drawable.ntp_search_box);
+        }
         if (searchBackground instanceof LayerDrawable) {
             Drawable shapeDrawable = ((LayerDrawable) searchBackground)
                                              .findDrawableByLayerId(R.id.fake_search_box_bg_shape);
@@ -203,9 +228,12 @@ public class TasksView extends CoordinatorLayoutForPointer {
             }
         }
         mSearchBoxCoordinator.setBackground(searchBackground);
-        int hintTextColor = mContext.getColor(isIncognito ? R.color.locationbar_light_hint_text
-                                                          : R.color.locationbar_dark_hint_text);
-        mSearchBoxCoordinator.setSearchBoxHintColor(hintTextColor);
+
+        if (!mIsSurfacePolishEnabled) {
+            int hintTextColor = mContext.getColor(isIncognito ? R.color.locationbar_light_hint_text
+                                                              : R.color.locationbar_dark_hint_text);
+            mSearchBoxCoordinator.setSearchBoxHintColor(hintTextColor);
+        }
     }
 
     /**
@@ -445,5 +473,15 @@ public class TasksView extends CoordinatorLayoutForPointer {
      */
     private void setHeaderPadding() {
         FeedStreamViewResizer.createAndAttach((Activity) mContext, mHeaderView, mUiConfig);
+    }
+
+    /**
+     * Set the background color for Start Surface.
+     * @param backgroundColor The drawable which contains the background color to set for the Start
+     *         Surface.
+     */
+    void setStartSurfaceBackgroundColor(int backgroundColor) {
+        setBackgroundColor(backgroundColor);
+        mHeaderView.setBackgroundColor(backgroundColor);
     }
 }

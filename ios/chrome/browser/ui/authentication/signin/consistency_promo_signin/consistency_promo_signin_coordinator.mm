@@ -13,7 +13,9 @@
 #import "ios/chrome/browser/shared/model/prefs/pref_names.h"
 #import "ios/chrome/browser/shared/public/commands/browsing_data_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
+#import "ios/chrome/browser/shared/public/features/features.h"
 #import "ios/chrome/browser/signin/authentication_service_factory.h"
+#import "ios/chrome/browser/signin/chrome_account_manager_service.h"
 #import "ios/chrome/browser/signin/chrome_account_manager_service_factory.h"
 #import "ios/chrome/browser/signin/constants.h"
 #import "ios/chrome/browser/signin/identity_manager_factory.h"
@@ -30,10 +32,6 @@
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ui/base/l10n/l10n_util.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
 
 @interface ConsistencyPromoSigninCoordinator () <
     ConsistencyAccountChooserCoordinatorDelegate,
@@ -70,6 +68,28 @@
 
 #pragma mark - Public
 
++ (instancetype)
+    coordinatorWithBaseViewController:(UIViewController*)viewController
+                              browser:(Browser*)browser
+                          accessPoint:(signin_metrics::AccessPoint)accessPoint {
+  ChromeBrowserState* browserState = browser->GetBrowserState();
+  ChromeAccountManagerService* accountManagerService =
+      ChromeAccountManagerServiceFactory::GetForBrowserState(browserState);
+  BOOL canShowWithZeroIdentities =
+      accessPoint != signin_metrics::AccessPoint::ACCESS_POINT_WEB_SIGNIN &&
+      IsConsistencyNewAccountInterfaceEnabled();
+  if (!accountManagerService->HasIdentities() && !canShowWithZeroIdentities) {
+    RecordConsistencyPromoUserAction(
+        signin_metrics::AccountConsistencyPromoAction::SUPPRESSED_NO_ACCOUNTS,
+        accessPoint);
+    return nil;
+  }
+  return [[ConsistencyPromoSigninCoordinator alloc]
+      initWithBaseViewController:viewController
+                         browser:browser
+                     accessPoint:accessPoint];
+}
+
 - (instancetype)initWithBaseViewController:(UIViewController*)baseViewController
                                    browser:(Browser*)browser
                                accessPoint:
@@ -83,7 +103,7 @@
 
 #pragma mark - SigninCoordinator
 
-- (void)interruptWithAction:(SigninCoordinatorInterruptAction)action
+- (void)interruptWithAction:(SigninCoordinatorInterrupt)action
                  completion:(ProceduralBlock)completion {
   [self.alertCoordinator stop];
   self.alertCoordinator = nil;
@@ -101,6 +121,7 @@
 
 - (void)start {
   [super start];
+  signin_metrics::LogSignInStarted(_accessPoint);
   base::RecordAction(base::UserMetricsAction("Signin_BottomSheet_Opened"));
   // Create ConsistencyPromoSigninMediator.
   ChromeBrowserState* browserState = self.browser->GetBrowserState();
@@ -154,7 +175,7 @@
 // Finishes the interrupt process. This method needs to be called once all
 // other dialogs on top of ConsistencyPromoSigninCoordinator are properly
 // dismissed.
-- (void)finalizeInterruptWithAction:(SigninCoordinatorInterruptAction)action
+- (void)finalizeInterruptWithAction:(SigninCoordinatorInterrupt)action
                          completion:(ProceduralBlock)interruptCompletion {
   DCHECK(!self.alertCoordinator);
   DCHECK(!self.addAccountCoordinator);
@@ -170,13 +191,13 @@
     }
   };
   switch (action) {
-    case SigninCoordinatorInterruptActionNoDismiss:
+    case SigninCoordinatorInterrupt::UIShutdownNoDismiss:
       finishCompletionBlock();
       break;
-    case SigninCoordinatorInterruptActionDismissWithoutAnimation:
-    case SigninCoordinatorInterruptActionDismissWithAnimation: {
+    case SigninCoordinatorInterrupt::DismissWithoutAnimation:
+    case SigninCoordinatorInterrupt::DismissWithAnimation: {
       BOOL animated =
-          action == SigninCoordinatorInterruptActionDismissWithAnimation;
+          action == SigninCoordinatorInterrupt::DismissWithAnimation;
       [self.navigationController.presentingViewController
           dismissViewControllerAnimated:animated
                              completion:finishCompletionBlock];
@@ -262,6 +283,7 @@
       base::RecordAction(
           base::UserMetricsAction("Signin_BottomSheet_ClosedBySignIn"));
       break;
+    case SigninCoordinatorResultDisabled:
     case SigninCoordinatorResultInterrupted:
       base::RecordAction(
           base::UserMetricsAction("Signin_BottomSheet_ClosedByInterrupt"));
@@ -313,7 +335,7 @@
 
 - (void)consistencyDefaultAccountCoordinatorAllIdentityRemoved:
     (ConsistencyDefaultAccountCoordinator*)coordinator {
-  [self interruptWithAction:SigninCoordinatorInterruptActionDismissWithAnimation
+  [self interruptWithAction:SigninCoordinatorInterrupt::DismissWithAnimation
                  completion:nil];
 }
 
@@ -489,6 +511,7 @@
   [self.alertCoordinator
       addItemWithTitle:l10n_util::GetNSString(IDS_IOS_SIGN_IN_DISMISS)
                 action:^() {
+                  [weakSelf.alertCoordinator stop];
                   weakSelf.alertCoordinator = nil;
                 }
                  style:UIAlertActionStyleCancel];

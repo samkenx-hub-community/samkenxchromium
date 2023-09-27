@@ -7,6 +7,7 @@
 
 #import <Foundation/Foundation.h>
 
+#import "components/autofill/ios/browser/autofill_manager_observer_bridge.h"
 #import "components/autofill/ios/browser/form_suggestion_provider.h"
 #import "components/autofill/ios/form_util/form_activity_observer.h"
 #include "components/password_manager/core/browser/password_manager.h"
@@ -57,7 +58,12 @@ class PasswordManagerClient;
 // one of the suggestions.
 - (void)attachListenersForBottomSheet:
             (const std::vector<autofill::FieldRendererId>&)rendererIds
-                              inFrame:(web::WebFrame*)frame;
+                           forFrameId:(const std::string&)frameId;
+
+// Detach listeners to fields which are associated with a bottom sheet.
+// When there are no more credentials, we want to show the user the keyboard
+// instead of the bottom sheet.
+- (void)detachListenersForBottomSheet:(const std::string&)frameId;
 
 @end
 
@@ -66,6 +72,7 @@ class PasswordManagerClient;
 @interface SharedPasswordController
     : NSObject <CRWWebFramesManagerObserver,
                 CRWWebStateObserver,
+                AutofillManagerObserver,
                 FormActivityObserver,
                 FormSuggestionProvider,
                 PasswordFormHelperDelegate,

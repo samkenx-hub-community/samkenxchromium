@@ -24,25 +24,11 @@ namespace invalidation {
 
 namespace {
 
-constexpr char kTopicsToHandlerDeprecated[] = "invalidation.topics_to_handler";
-
 constexpr char kTopicsToHandler[] = "invalidation.per_sender_topics_to_handler";
+constexpr char kDeprecatedSyncInvalidationGCMSenderId[] = "8181035976";
 
 constexpr char kHandler[] = "handler";
 constexpr char kIsPublic[] = "is_public";
-
-// Added in M76.
-void MigratePrefs(PrefService* prefs, const std::string& sender_id) {
-  const auto& old_prefs = prefs->GetDict(kTopicsToHandlerDeprecated);
-  if (old_prefs.empty()) {
-    return;
-  }
-  {
-    ScopedDictPrefUpdate update(prefs, kTopicsToHandler);
-    update->Set(sender_id, old_prefs.Clone());
-  }
-  prefs->ClearPref(kTopicsToHandlerDeprecated);
-}
 
 absl::optional<TopicData> FindAnyDuplicatedTopic(
     const std::set<TopicData>& lhs,
@@ -64,7 +50,6 @@ BASE_FEATURE(kRestoreInterestingTopicsFeature,
 // static
 void InvalidatorRegistrarWithMemory::RegisterProfilePrefs(
     PrefRegistrySimple* registry) {
-  registry->RegisterDictionaryPref(kTopicsToHandlerDeprecated);
   registry->RegisterDictionaryPref(kTopicsToHandler);
 }
 
@@ -76,15 +61,19 @@ void InvalidatorRegistrarWithMemory::RegisterPrefs(
   RegisterProfilePrefs(registry);
 }
 
+// static
+void InvalidatorRegistrarWithMemory::ClearDeprecatedPrefs(PrefService* prefs) {
+  if (prefs->HasPrefPath(kTopicsToHandler)) {
+    ScopedDictPrefUpdate update(prefs, kTopicsToHandler);
+    update->Remove(kDeprecatedSyncInvalidationGCMSenderId);
+  }
+}
+
 InvalidatorRegistrarWithMemory::InvalidatorRegistrarWithMemory(
     PrefService* prefs,
-    const std::string& sender_id,
-    bool migrate_old_prefs)
+    const std::string& sender_id)
     : state_(DEFAULT_INVALIDATION_ERROR), prefs_(prefs), sender_id_(sender_id) {
-  DCHECK(!sender_id_.empty());
-  if (migrate_old_prefs) {
-    MigratePrefs(prefs_, sender_id_);
-  }
+  CHECK(!sender_id_.empty());
   const base::Value::Dict* pref_data =
       prefs_->GetDict(kTopicsToHandler).FindDict(sender_id_);
   if (!pref_data) {
@@ -252,22 +241,6 @@ void InvalidatorRegistrarWithMemory::UpdateInvalidatorInstanceId(
     observer.OnInvalidatorClientIdChange(instance_id);
 }
 
-std::map<std::string, Topics>
-InvalidatorRegistrarWithMemory::GetHandlerNameToTopicsMap() {
-  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  std::map<std::string, Topics> names_to_topics;
-  for (const auto& handler_and_topics : registered_handler_to_topics_map_) {
-    names_to_topics[handler_and_topics.first->GetOwnerName()] =
-        ConvertTopicSetToLegacyTopicMap(handler_and_topics.second);
-  }
-  return names_to_topics;
-}
-
-void InvalidatorRegistrarWithMemory::RequestDetailedStatus(
-    base::RepeatingCallback<void(base::Value::Dict)> callback) const {
-  callback.Run(CollectDebugData());
-}
-
 bool InvalidatorRegistrarWithMemory::HasDuplicateTopicRegistration(
     InvalidationHandler* handler,
     const std::set<TopicData>& topics) const {
@@ -286,21 +259,6 @@ bool InvalidatorRegistrarWithMemory::HasDuplicateTopicRegistration(
     }
   }
   return false;
-}
-
-base::Value::Dict InvalidatorRegistrarWithMemory::CollectDebugData() const {
-  base::Value::Dict return_value;
-  return_value.SetByDottedPath(
-      "InvalidatorRegistrarWithMemory.Handlers",
-      static_cast<int>(handler_name_to_subscribed_topics_map_.size()));
-  for (const auto& handler_to_topics : handler_name_to_subscribed_topics_map_) {
-    const std::string& handler = handler_to_topics.first;
-    for (const auto& topic : handler_to_topics.second) {
-      return_value.SetByDottedPath(
-          "InvalidatorRegistrarWithMemory." + topic.name, handler);
-    }
-  }
-  return return_value;
 }
 
 void InvalidatorRegistrarWithMemory::RemoveSubscribedTopics(

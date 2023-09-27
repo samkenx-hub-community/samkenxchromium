@@ -27,7 +27,7 @@
 #include "chrome/browser/ash/login/users/fake_chrome_user_manager.h"
 #include "chrome/browser/ash/policy/dlp/dlp_files_controller_ash.h"
 #include "chrome/browser/chromeos/policy/dlp/dlp_rules_manager_factory.h"
-#include "chrome/browser/chromeos/policy/dlp/mock_dlp_rules_manager.h"
+#include "chrome/browser/chromeos/policy/dlp/test/mock_dlp_rules_manager.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/test/base/testing_profile.h"
 #include "components/prefs/scoped_user_pref_update.h"
@@ -38,10 +38,12 @@
 #include "components/sync_preferences/testing_pref_service_syncable.h"
 #include "components/user_manager/scoped_user_manager.h"
 #include "components/user_manager/user_type.h"
+#include "components/version_info/channel.h"
 #include "content/public/test/browser_task_environment.h"
 #include "extensions/browser/entry_info.h"
 #include "extensions/common/extension_builder.h"
 #include "extensions/common/extension_features.h"
+#include "extensions/common/features/feature_channel.h"
 #include "storage/browser/file_system/external_mount_points.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -650,16 +652,32 @@ TEST_F(AppServiceFileTasksTestEnabled, FindAppServiceExtension) {
   EXPECT_FALSE(tasks[0].is_file_extension_match);
 }
 
+TEST_F(AppServiceFileTasksTestEnabled,
+       FindAppServiceArcAppWithExtensionMatching) {
+  // Create an app with a text file filter.
+  std::string package_name = "com.example.xyzViewer";
+  std::string activity = "xyzViewerActivity";
+  std::string app_id = AddArcAppWithIntentFilter(
+      package_name, activity,
+      CreateExtensionTypeFileIntentFilter(apps_util::kIntentActionView, "xyz"));
+  std::vector<FullTaskDescriptor> tasks = FindAppServiceTasks({{"foo.xyz"}});
+  ASSERT_EQ(1U, tasks.size());
+  EXPECT_EQ(app_id, tasks[0].task_descriptor.app_id);
+  EXPECT_FALSE(tasks[0].is_generic_file_handler);
+  EXPECT_TRUE(tasks[0].is_file_extension_match);
+}
+
 // Enable MV3 File Handlers.
 class AppServiceFileHandlersTest : public AppServiceFileTasksTestEnabled {
  public:
-  AppServiceFileHandlersTest() {
+  AppServiceFileHandlersTest() : channel_(version_info::Channel::BETA) {
     feature_list_.InitAndEnableFeature(
         extensions_features::kExtensionWebFileHandlers);
   }
 
  private:
   base::test::ScopedFeatureList feature_list_;
+  extensions::ScopedCurrentChannel channel_;
 };
 
 // Verify App Service tasks for extensions with MV3 File Handlers.
@@ -994,7 +1012,8 @@ class AppServiceFileTasksPolicyTest : public AppServiceFileTasksTestEnabled {
   raw_ptr<policy::MockDlpRulesManager, ExperimentalAsh> rules_manager_ =
       nullptr;
   std::unique_ptr<MockFilesController> mock_files_controller_ = nullptr;
-  raw_ptr<ash::FakeChromeUserManager, ExperimentalAsh> user_manager_;
+  raw_ptr<ash::FakeChromeUserManager, DanglingUntriaged | ExperimentalAsh>
+      user_manager_;
   std::unique_ptr<user_manager::ScopedUserManager> scoped_user_manager_;
 };
 

@@ -57,7 +57,8 @@ constexpr char kResponseTransportHistogram[] =
 
 using TestGetAssertionRequestCallback = test::StatusAndValuesCallbackReceiver<
     GetAssertionStatus,
-    absl::optional<std::vector<AuthenticatorGetAssertionResponse>>>;
+    absl::optional<std::vector<AuthenticatorGetAssertionResponse>>,
+    FidoAuthenticator*>;
 
 }  // namespace
 
@@ -225,6 +226,10 @@ TEST_F(FidoGetAssertionHandlerTest, TransportAvailabilityInfo) {
               request_handler->transport_availability_info().request_type);
     EXPECT_FALSE(request_handler->transport_availability_info()
                      .transport_list_did_include_internal);
+    EXPECT_FALSE(request_handler->transport_availability_info()
+                     .transport_list_did_include_hybrid);
+    EXPECT_FALSE(request_handler->transport_availability_info()
+                     .transport_list_did_include_security_key);
     EXPECT_TRUE(
         request_handler->transport_availability_info().has_empty_allow_list);
     EXPECT_FALSE(request_handler->transport_availability_info()
@@ -241,6 +246,10 @@ TEST_F(FidoGetAssertionHandlerTest, TransportAvailabilityInfo) {
               request_handler->transport_availability_info().request_type);
     EXPECT_TRUE(request_handler->transport_availability_info()
                     .transport_list_did_include_internal);
+    EXPECT_TRUE(request_handler->transport_availability_info()
+                    .transport_list_did_include_hybrid);
+    EXPECT_FALSE(request_handler->transport_availability_info()
+                     .transport_list_did_include_security_key);
     EXPECT_FALSE(
         request_handler->transport_availability_info().has_empty_allow_list);
     EXPECT_TRUE(request_handler->transport_availability_info()
@@ -258,6 +267,10 @@ TEST_F(FidoGetAssertionHandlerTest, TransportAvailabilityInfo) {
               request_handler->transport_availability_info().request_type);
     EXPECT_TRUE(request_handler->transport_availability_info()
                     .transport_list_did_include_internal);
+    EXPECT_TRUE(request_handler->transport_availability_info()
+                    .transport_list_did_include_hybrid);
+    EXPECT_TRUE(request_handler->transport_availability_info()
+                    .transport_list_did_include_security_key);
     EXPECT_FALSE(
         request_handler->transport_availability_info().has_empty_allow_list);
     EXPECT_FALSE(request_handler->transport_availability_info()
@@ -273,6 +286,10 @@ TEST_F(FidoGetAssertionHandlerTest, TransportAvailabilityInfo) {
               request_handler->transport_availability_info().request_type);
     EXPECT_FALSE(request_handler->transport_availability_info()
                      .transport_list_did_include_internal);
+    EXPECT_FALSE(request_handler->transport_availability_info()
+                     .transport_list_did_include_hybrid);
+    EXPECT_TRUE(request_handler->transport_availability_info()
+                    .transport_list_did_include_security_key);
     EXPECT_FALSE(
         request_handler->transport_availability_info().has_empty_allow_list);
     EXPECT_FALSE(request_handler->transport_availability_info()
@@ -288,6 +305,10 @@ TEST_F(FidoGetAssertionHandlerTest, TransportAvailabilityInfo) {
               request_handler->transport_availability_info().request_type);
     EXPECT_TRUE(request_handler->transport_availability_info()
                     .transport_list_did_include_internal);
+    EXPECT_TRUE(request_handler->transport_availability_info()
+                    .transport_list_did_include_hybrid);
+    EXPECT_TRUE(request_handler->transport_availability_info()
+                    .transport_list_did_include_security_key);
     EXPECT_FALSE(
         request_handler->transport_availability_info().has_empty_allow_list);
     EXPECT_FALSE(request_handler->transport_availability_info()
@@ -304,6 +325,10 @@ TEST_F(FidoGetAssertionHandlerTest, TransportAvailabilityInfo) {
               request_handler->transport_availability_info().request_type);
     EXPECT_TRUE(request_handler->transport_availability_info()
                     .transport_list_did_include_internal);
+    EXPECT_FALSE(request_handler->transport_availability_info()
+                     .transport_list_did_include_hybrid);
+    EXPECT_FALSE(request_handler->transport_availability_info()
+                     .transport_list_did_include_security_key);
     EXPECT_FALSE(
         request_handler->transport_availability_info().has_empty_allow_list);
     EXPECT_TRUE(request_handler->transport_availability_info()
@@ -930,6 +955,7 @@ TEST(GetAssertionRequestHandlerWinTest, TestWinUsbDiscovery) {
     api.set_available(enable_api);
     api.InjectNonDiscoverableCredential(
         test_data::kTestGetAssertionCredentialId, test_data::kRelyingPartyId);
+    WinWebAuthnApi::ScopedOverride win_webauthn_api_override(&api);
 
     // Simulate a connected HID device.
     ScopedFakeFidoHidManager fake_hid_manager;
@@ -937,7 +963,6 @@ TEST(GetAssertionRequestHandlerWinTest, TestWinUsbDiscovery) {
 
     TestGetAssertionRequestCallback cb;
     FidoDiscoveryFactory fido_discovery_factory;
-    fido_discovery_factory.set_win_webauthn_api(&api);
     CtapGetAssertionRequest request(test_data::kRelyingPartyId,
                                     test_data::kClientDataJson);
     request.allow_list = {PublicKeyCredentialDescriptor(

@@ -14,35 +14,33 @@
 
 class DeviceAuthenticatorChromeOS : public ChromeDeviceAuthenticatorCommon {
  public:
-  // Creates an instance of DeviceAuthenticatorChromeOS for testing purposes
-  // only.
-  static scoped_refptr<DeviceAuthenticatorChromeOS> CreateForTesting(
-      std::unique_ptr<AuthenticatorChromeOSInterface> authenticator);
+  DeviceAuthenticatorChromeOS(
+      std::unique_ptr<AuthenticatorChromeOSInterface> authenticator,
+      DeviceAuthenticatorProxy* proxy,
+      const device_reauth::DeviceAuthParams& params);
+  ~DeviceAuthenticatorChromeOS() override;
 
   bool CanAuthenticateWithBiometrics() override;
 
-  void Authenticate(device_reauth::DeviceAuthRequester requester,
-                    AuthenticateCallback callback,
+  bool CanAuthenticateWithBiometricOrScreenLock() override;
+
+  void Authenticate(AuthenticateCallback callback,
                     bool use_last_valid_auth) override;
 
   void AuthenticateWithMessage(const std::u16string& message,
                                AuthenticateCallback callback) override;
 
-  void Cancel(device_reauth::DeviceAuthRequester requester) override;
+  void Cancel() override;
 
  private:
-  friend class ChromeDeviceAuthenticatorFactory;
-
-  explicit DeviceAuthenticatorChromeOS(
-      std::unique_ptr<AuthenticatorChromeOSInterface> authenticator);
-  ~DeviceAuthenticatorChromeOS() override;
-
   // Records authentication status and executes |callback| with |success|
   // parameter.
-  void OnAuthenticationCompleted(base::OnceCallback<void(bool)> callback,
-                                 bool success);
+  void OnAuthenticationCompleted(bool success);
 
   std::unique_ptr<AuthenticatorChromeOSInterface> authenticator_;
+
+  // Callback to be executed after the authentication completes.
+  AuthenticateCallback callback_;
 
   // Factory for weak pointers to this class.
   base::WeakPtrFactory<DeviceAuthenticatorChromeOS> weak_ptr_factory_{this};

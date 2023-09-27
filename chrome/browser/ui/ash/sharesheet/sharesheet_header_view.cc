@@ -37,6 +37,7 @@
 #include "components/services/app_service/public/cpp/intent_util.h"
 #include "components/url_formatter/elide_url.h"
 #include "components/url_formatter/url_formatter.h"
+#include "components/vector_icons/vector_icons.h"
 #include "storage/browser/file_system/file_system_url.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "ui/accessibility/ax_enums.mojom.h"
@@ -56,6 +57,8 @@
 #include "ui/views/controls/label.h"
 #include "ui/views/layout/box_layout.h"
 #include "ui/views/layout/layout_provider.h"
+#include "ui/views/style/typography.h"
+#include "ui/views/style/typography_provider.h"
 #include "ui/views/view.h"
 #include "ui/views/view_class_properties.h"
 
@@ -402,8 +405,8 @@ SharesheetHeaderView::ExtractShareText() {
       // Format URL to be elided correctly to prevent origin spoofing.
       auto elided_url = url_formatter::ElideUrl(
           extracted_text.url,
-          views::style::GetFont(CONTEXT_SHARESHEET_BUBBLE_BODY,
-                                views::style::STYLE_PRIMARY),
+          views::TypographyProvider::Get().GetFont(
+              CONTEXT_SHARESHEET_BUBBLE_BODY, views::style::STYLE_PRIMARY),
           available_width);
       auto url_label = CreatePreviewLabel(elided_url);
 
@@ -451,7 +454,7 @@ const gfx::VectorIcon& SharesheetHeaderView::GetTextVectorIcon() {
     case (TextPlaceholderIcon::kGenericText):
       return chromeos::kTextIcon;
     case (TextPlaceholderIcon::kLink):
-      return kLinkIcon;
+      return vector_icons::kLinkIcon;
   }
 }
 

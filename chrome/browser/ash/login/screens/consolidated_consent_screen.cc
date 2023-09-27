@@ -37,7 +37,7 @@
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/signin/identity_manager_factory.h"
 #include "chrome/common/url_constants.h"
-#include "chrome/grit/chromium_strings.h"
+#include "chrome/grit/branded_strings.h"
 #include "chrome/grit/generated_resources.h"
 #include "chromeos/ash/components/network/portal_detector/network_portal_detector.h"
 #include "components/consent_auditor/consent_auditor.h"
@@ -156,11 +156,15 @@ bool ConsolidatedConsentScreen::MaybeSkip(WizardContext& context) {
     return true;
   }
 
+  if (!context.is_branded_build) {
+    exit_callback_.Run(Result::NOT_APPLICABLE);
+    return true;
+  }
+
   if (arc::IsArcDemoModeSetupFlow())
     return false;
 
-  if (!context.is_branded_build ||
-      user_manager::UserManager::Get()->IsLoggedInAsPublicAccount()) {
+  if (user_manager::UserManager::Get()->IsLoggedInAsManagedGuestSession()) {
     exit_callback_.Run(Result::NOT_APPLICABLE);
     return true;
   }
@@ -294,10 +298,12 @@ void ConsolidatedConsentScreen::OnOwnershipStatusCheckDone(
   policy::BrowserPolicyConnectorAsh* policy_connector =
       g_browser_process->platform_part()->browser_policy_connector_ash();
   bool is_managed = policy_connector->IsDeviceEnterpriseManaged();
-  if (status == DeviceSettingsService::OWNERSHIP_NONE)
+  if (status == DeviceSettingsService::OwnershipStatus::kOwnershipNone) {
     is_owner_ = !is_managed;
-  else if (status == DeviceSettingsService::OWNERSHIP_TAKEN)
+  } else if (status ==
+             DeviceSettingsService::OwnershipStatus::kOwnershipTaken) {
     is_owner_ = user_manager::UserManager::Get()->IsCurrentUserOwner();
+  }
 
   // Save this value for future reuse in the wizard flow. Note: it might remain
   // unset.

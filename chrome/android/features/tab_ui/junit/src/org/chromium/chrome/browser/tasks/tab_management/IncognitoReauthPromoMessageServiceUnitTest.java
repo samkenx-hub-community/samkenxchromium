@@ -107,8 +107,6 @@ public class IncognitoReauthPromoMessageServiceUnitTest {
         when(mUserPrefsJniMock.get(mProfileMock)).thenReturn(mPrefServiceMock);
 
         IncognitoReauthManager.setIsIncognitoReauthFeatureAvailableForTesting(false);
-        IncognitoReauthSettingUtils.setIsDeviceScreenLockEnabledForTesting(false);
-        IncognitoReauthPromoMessageService.setIsPromoEnabledForTesting(null);
         mSharedPreferenceManager = SharedPreferencesManager.getInstance();
     }
 
@@ -126,7 +124,6 @@ public class IncognitoReauthPromoMessageServiceUnitTest {
 
     @After
     public void tearDown() {
-        Profile.setLastUsedProfileForTesting(null);
         verifyNoMoreInteractions(mProfileMock, mContextMock, mSnackbarManagerMock);
     }
 
@@ -377,7 +374,7 @@ public class IncognitoReauthPromoMessageServiceUnitTest {
             return true;
         })
                 .when(mReauthenticatorBridgeMock)
-                .reauthenticate(notNull(), /*useLastValidReauth=*/eq(false));
+                .reauthenticate(notNull());
 
         // Setup snackbar interaction.
         final String snackBarTestString = "This is written inside the snackbar.";
@@ -394,8 +391,7 @@ public class IncognitoReauthPromoMessageServiceUnitTest {
 
         verify(mReauthenticatorBridgeMock, times(1))
                 .canUseAuthenticationWithBiometricOrScreenLock();
-        verify(mReauthenticatorBridgeMock, times(1))
-                .reauthenticate(notNull(), /*useLastValidReauth=*/eq(false));
+        verify(mReauthenticatorBridgeMock, times(1)).reauthenticate(notNull());
         verify(mPrefServiceMock, times(1))
                 .setBoolean(Pref.INCOGNITO_REAUTHENTICATION_FOR_ANDROID, true);
         verify(mMessageObserverMock, times(1)).messageInvalidate(MessageType.FOR_TESTING);

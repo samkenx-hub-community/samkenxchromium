@@ -69,6 +69,14 @@ std::string GetServiceWorkerForError(const std::string& error) {
         );
         chrome.test.succeed();
       },
+      async function getDisplayInfo() {
+        await chrome.test.assertPromiseRejects(
+            chrome.os.telemetry.getDisplayInfo(),
+            'Error: Unauthorized access to chrome.os.telemetry.' +
+            'getDisplayInfo. %s'
+        );
+        chrome.test.succeed();
+      },
       async function getInternetConnectivityInfo() {
         await chrome.test.assertPromiseRejects(
             chrome.os.telemetry.getInternetConnectivityInfo(),
@@ -154,6 +162,28 @@ std::string GetServiceWorkerForError(const std::string& error) {
       },
 
       // Diagnostics APIs.
+      async function cancelRoutine() {
+        await chrome.test.assertPromiseRejects(
+            chrome.os.diagnostics.cancelRoutine({
+              uuid: '123',
+            }),
+            'Error: Unauthorized access to ' +
+            'chrome.os.diagnostics.cancelRoutine. ' +
+            '%s'
+        );
+        chrome.test.succeed();
+      },
+      async function createMemoryRoutine() {
+        await chrome.test.assertPromiseRejects(
+            chrome.os.diagnostics.createMemoryRoutine({
+              maxTestingMemKib: 42,
+            }),
+            'Error: Unauthorized access to ' +
+            'chrome.os.diagnostics.createMemoryRoutine. ' +
+            '%s'
+        );
+        chrome.test.succeed();
+      },
       async function getAvailableRoutines() {
         await chrome.test.assertPromiseRejects(
             chrome.os.diagnostics.getAvailableRoutines(),
@@ -177,6 +207,17 @@ std::string GetServiceWorkerForError(const std::string& error) {
         );
         chrome.test.succeed();
       },
+      async function isMemoryRoutineArgumentSupported() {
+        await chrome.test.assertPromiseRejects(
+            chrome.os.diagnostics.isMemoryRoutineArgumentSupported({
+              maxTestingMemKib: 42,
+            }),
+            'Error: Unauthorized access to ' +
+            'chrome.os.diagnostics.isMemoryRoutineArgumentSupported. ' +
+            '%s'
+        );
+        chrome.test.succeed();
+      },
       async function runAcPowerRoutine() {
         await chrome.test.assertPromiseRejects(
             chrome.os.diagnostics.runAcPowerRoutine(
@@ -187,6 +228,15 @@ std::string GetServiceWorkerForError(const std::string& error) {
             ),
             'Error: Unauthorized access to ' +
             'chrome.os.diagnostics.runAcPowerRoutine. ' +
+            '%s'
+        );
+        chrome.test.succeed();
+      },
+      async function runAudioDriverRoutine() {
+        await chrome.test.assertPromiseRejects(
+            chrome.os.diagnostics.runAudioDriverRoutine(),
+            'Error: Unauthorized access to ' +
+            'chrome.os.diagnostics.runAudioDriverRoutine. ' +
             '%s'
         );
         chrome.test.succeed();
@@ -233,6 +283,50 @@ std::string GetServiceWorkerForError(const std::string& error) {
             chrome.os.diagnostics.runBatteryHealthRoutine(),
             'Error: Unauthorized access to ' +
             'chrome.os.diagnostics.runBatteryHealthRoutine. ' +
+            '%s'
+        );
+        chrome.test.succeed();
+      },
+      async function runBluetoothDiscoveryRoutine() {
+        await chrome.test.assertPromiseRejects(
+            chrome.os.diagnostics.runBluetoothDiscoveryRoutine(),
+            'Error: Unauthorized access to ' +
+            'chrome.os.diagnostics.runBluetoothDiscoveryRoutine. ' +
+            '%s'
+        );
+        chrome.test.succeed();
+      },
+      async function runBluetoothPairingRoutine() {
+        await chrome.test.assertPromiseRejects(
+            chrome.os.diagnostics.runBluetoothPairingRoutine(
+              {
+                peripheral_id: "HEALTHD_TEST_ID"
+              }
+            ),
+            'Error: Unauthorized access to ' +
+            'chrome.os.diagnostics.runBluetoothPairingRoutine. ' +
+            '%s'
+        );
+        chrome.test.succeed();
+      },
+      async function runBluetoothPowerRoutine() {
+        await chrome.test.assertPromiseRejects(
+            chrome.os.diagnostics.runBluetoothPowerRoutine(),
+            'Error: Unauthorized access to ' +
+            'chrome.os.diagnostics.runBluetoothPowerRoutine. ' +
+            '%s'
+        );
+        chrome.test.succeed();
+      },
+      async function runBluetoothScanningRoutine() {
+        await chrome.test.assertPromiseRejects(
+            chrome.os.diagnostics.runBluetoothScanningRoutine(
+              {
+                length_seconds: 10
+              }
+            ),
+            'Error: Unauthorized access to ' +
+            'chrome.os.diagnostics.runBluetoothScanningRoutine. ' +
             '%s'
         );
         chrome.test.succeed();
@@ -393,6 +487,19 @@ std::string GetServiceWorkerForError(const std::string& error) {
         );
         chrome.test.succeed();
       },
+      async function runPowerButtonRoutine() {
+        await chrome.test.assertPromiseRejects(
+            chrome.os.diagnostics.runPowerButtonRoutine(
+              {
+                timeout_seconds: 10
+              }
+            ),
+            'Error: Unauthorized access to ' +
+            'chrome.os.diagnostics.runPowerButtonRoutine. ' +
+            '%s'
+        );
+        chrome.test.succeed();
+      },
       async function runSensitiveSensorRoutine() {
         await chrome.test.assertPromiseRejects(
             chrome.os.diagnostics.runSensitiveSensorRoutine(),
@@ -416,6 +523,26 @@ std::string GetServiceWorkerForError(const std::string& error) {
             chrome.os.diagnostics.runSmartctlCheckRoutine(),
             'Error: Unauthorized access to ' +
             'chrome.os.diagnostics.runSmartctlCheckRoutine. ' +
+            '%s'
+        );
+        chrome.test.succeed();
+      },
+      async function runUfsLifetimeRoutine() {
+        await chrome.test.assertPromiseRejects(
+            chrome.os.diagnostics.runUfsLifetimeRoutine(),
+            'Error: Unauthorized access to ' +
+            'chrome.os.diagnostics.runUfsLifetimeRoutine. ' +
+            '%s'
+        );
+        chrome.test.succeed();
+      },
+      async function startRoutine() {
+        await chrome.test.assertPromiseRejects(
+            chrome.os.diagnostics.startRoutine({
+              uuid: '123',
+            }),
+            'Error: Unauthorized access to ' +
+            'chrome.os.diagnostics.startRoutine. ' +
             '%s'
         );
         chrome.test.succeed();

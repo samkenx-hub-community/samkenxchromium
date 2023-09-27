@@ -17,14 +17,11 @@
 
 class WebStateListDelegate;
 class WebStateListObserver;
-class WebStateListOrderController;
 struct WebStateOpener;
 
 namespace web {
 class WebState;
-}
-
-enum class ActiveWebStateChangeReason;
+}  // namespace web
 
 // Manages a list of WebStates.
 //
@@ -85,6 +82,11 @@ class WebStateList {
   // Returns the number of WebStates in the model.
   int count() const { return static_cast<int>(web_state_wrappers_.size()); }
 
+  // Returns the number of pinned tabs. Since pinned tabs are always at the
+  // beginning of the WebStateList, any tabs whose index is smaller than is
+  // pinned, and any tabs whose index is greater or equal is not pinned.
+  int pinned_tabs_count() const { return pinned_tabs_count_; }
+
   // Returns the index of the currently active WebState, or kInvalidIndex if
   // there are no active WebState.
   int active_index() const { return active_index_; }
@@ -118,11 +120,6 @@ class WebStateList {
   // non-active WebState with that URL exists.
   int GetIndexOfInactiveWebStateWithURL(const GURL& url) const;
 
-  // Returns the index of the first non-pinned WebState in the WebStateList.
-  // Returns 0 in case no pinned WebStates are present.
-  // Returns `count()` in case only pinned WebStates are present.
-  int GetIndexOfFirstNonPinnedWebState() const;
-
   // Returns information about the opener of the WebState at the specified
   // index. The structure `opener` will be null if there is no opener.
   WebStateOpener GetOpenerOfWebStateAt(int index) const;
@@ -155,7 +152,7 @@ class WebStateList {
   // WebStates at the beginning of the list).
   int SetWebStatePinnedAt(int index, bool pinned);
 
-  // Returns true if the WebState at |index| is pinned.
+  // Returns true if the WebState at `index` is pinned.
   bool IsWebStatePinnedAt(int index) const;
 
   // Inserts the specified WebState at the best position in the WebStateList
@@ -212,6 +209,7 @@ class WebStateList {
   static const int kInvalidIndex = -1;
 
  private:
+  class DetachParams;
   class WebStateWrapper;
 
   // Locks the WebStateList for mutation. This methods checks that the list is
@@ -233,7 +231,9 @@ class WebStateList {
   // Moves the WebState at the specified index to another index.
   //
   // Assumes that the WebStateList is locked.
-  void MoveWebStateAtImpl(int from_index, int to_index);
+  void MoveWebStateAtImpl(int from_index,
+                          int to_index,
+                          bool pinned_state_change);
 
   // Replaces the WebState at the specified index with new WebState. Returns
   // the old WebState at that index to the caller (abandon ownership of the
@@ -248,13 +248,9 @@ class WebStateList {
   // to the caller (abandon ownership of the returned WebState).
   //
   // Assumes that the WebStateList is locked.
-  std::unique_ptr<web::WebState> DetachWebStateAtImpl(int index);
-
-  // Closes and destroys the WebState at the specified index. The `close_flags`
-  // is a bitwise combination of ClosingFlags values.
-  //
-  // Assumes that the WebStateList is locked.
-  void CloseWebStateAtImpl(int index, int close_flags);
+  std::unique_ptr<web::WebState> DetachWebStateAtImpl(
+      int index,
+      const DetachParams& params);
 
   // Closes and destroys all WebStates after `start_index`. The `close_flags`
   // is a bitwise combination of ClosingFlags values. WebStateList is locked
@@ -270,16 +266,11 @@ class WebStateList {
   // Makes the WebState at the specified index the active WebState.
   //
   // Assumes that the WebStateList is locked.
-  void ActivateWebStateAtImpl(int index, ActiveWebStateChangeReason reason);
+  void ActivateWebStateAtImpl(int index);
 
   // Sets the opener of any WebState that reference the WebState at the
   // specified index to null.
   void ClearOpenersReferencing(int index);
-
-  // Notify the observers if the active WebState change. `reason` is the value
-  // passed to the WebStateListObservers.
-  void NotifyIfActiveWebStateChanged(web::WebState* old_web_state,
-                                     ActiveWebStateChangeReason reason);
 
   // Returns the index of the `n`-th WebState (with n > 0) in the sequence of
   // WebStates opened from the specified WebState starting the search from
@@ -318,6 +309,15 @@ class WebStateList {
   // to call this with an index such that `ContainsIndex(index)` returns false.
   WebStateWrapper* GetWebStateWrapperAt(int index) const;
 
+  // Updates the active index, updates the WebState opener for the old active
+  // WebState if exists and brings the new active WebState to the "realized"
+  // state.
+  void SetActiveIndex(int active_index);
+
+  // Takes action when the active WebState changes. Does nothing it
+  // there is no active WebState.
+  void OnActiveWebStateChanged();
+
   SEQUENCE_CHECKER(sequence_checker_);
 
   // The WebStateList delegate.
@@ -326,15 +326,14 @@ class WebStateList {
   // Wrappers to the WebStates hosted by the WebStateList.
   std::vector<std::unique_ptr<WebStateWrapper>> web_state_wrappers_;
 
-  // An object that determines where new WebState should be inserted and where
-  // selection should move when a WebState is detached.
-  std::unique_ptr<WebStateListOrderController> order_controller_;
-
   // List of observers notified of changes to the model.
   base::ObserverList<WebStateListObserver, true> observers_;
 
   // Index of the currently active WebState, kInvalidIndex if no such WebState.
   int active_index_ = kInvalidIndex;
+
+  // Number of pinned tabs. Always in range from 0 to count() inclusive.
+  int pinned_tabs_count_ = 0;
 
   // Lock to prevent observers from mutating or deleting the list while it is
   // mutating. The lock is managed by LockForMutation() method (and released

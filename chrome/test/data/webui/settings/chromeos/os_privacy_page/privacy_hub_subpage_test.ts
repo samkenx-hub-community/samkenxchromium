@@ -5,7 +5,7 @@
 import 'chrome://os-settings/lazy_load.js';
 
 import {MediaDevicesProxy, PrivacyHubBrowserProxyImpl, SettingsPrivacyHubSubpage} from 'chrome://os-settings/lazy_load.js';
-import {MetricsConsentBrowserProxyImpl, OsSettingsPrivacyPageElement, Router, routes, SecureDnsMode, settingMojom, SettingsToggleButtonElement} from 'chrome://os-settings/os_settings.js';
+import {CrToggleElement, MetricsConsentBrowserProxyImpl, OsSettingsPrivacyPageElement, PaperTooltipElement, Router, routes, SecureDnsMode, settingMojom, SettingsToggleButtonElement} from 'chrome://os-settings/os_settings.js';
 import {assert} from 'chrome://resources/js/assert_ts.js';
 import {webUIListenerCallback} from 'chrome://resources/js/cr.js';
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
@@ -23,34 +23,24 @@ import {TestPrivacyHubBrowserProxy} from './test_privacy_hub_browser_proxy.js';
 const USER_METRICS_CONSENT_PREF_NAME = 'metrics.user_consent';
 
 const PrivacyHubVersion = {
-  Future: 'Privacy Hub with future (after MVP) features.',
-  MVP: 'Privacy Hub with MVP features.',
-  Dogfood: 'Privacy Hub with dogfooded features (camera and microphone only).',
+  V0: 'Only contains camera and microphone access control.',
+  V0AndLocation:
+      'Privacy Hub location access control along with the V0 features.',
 };
 
-function overridedValues(privacyHubVersion: string) {
+function overriddenValues(privacyHubVersion: string) {
   switch (privacyHubVersion) {
-    case PrivacyHubVersion.Future: {
+    case PrivacyHubVersion.V0: {
       return {
         showPrivacyHubPage: true,
-        showPrivacyHubMVPPage: true,
-        showPrivacyHubFuturePage: true,
+        showPrivacyHubLocationControl: false,
         showSpeakOnMuteDetectionPage: true,
       };
     }
-    case PrivacyHubVersion.Dogfood: {
+    case PrivacyHubVersion.V0AndLocation: {
       return {
         showPrivacyHubPage: true,
-        showPrivacyHubMVPPage: false,
-        showPrivacyHubFuturePage: false,
-        showSpeakOnMuteDetectionPage: true,
-      };
-    }
-    case PrivacyHubVersion.MVP: {
-      return {
-        showPrivacyHubPage: true,
-        showPrivacyHubMVPPage: true,
-        showPrivacyHubFuturePage: false,
+        showPrivacyHubLocationControl: true,
         showSpeakOnMuteDetectionPage: true,
       };
     }
@@ -61,15 +51,18 @@ function overridedValues(privacyHubVersion: string) {
 }
 
 async function parametrizedPrivacyHubSubpageTestsuite(
-    privacyHubVersion: string) {
+    privacyHubVersion: string, enforceCameraLedFallback: boolean) {
   let privacyHubSubpage: SettingsPrivacyHubSubpage;
   let privacyHubBrowserProxy: TestPrivacyHubBrowserProxy;
   let mediaDevices: FakeMediaDevices;
 
   setup(async () => {
-    loadTimeData.overrideValues(overridedValues(privacyHubVersion));
+    loadTimeData.overrideValues(overriddenValues(privacyHubVersion));
 
     privacyHubBrowserProxy = new TestPrivacyHubBrowserProxy();
+    if (enforceCameraLedFallback) {
+      privacyHubBrowserProxy.cameraLEDFallbackState = true;
+    }
     PrivacyHubBrowserProxyImpl.setInstanceForTesting(privacyHubBrowserProxy);
 
     mediaDevices = new FakeMediaDevices();
@@ -212,9 +205,9 @@ async function parametrizedPrivacyHubSubpageTestsuite(
 
     const toggleElement =
         privacyHubSubpage.shadowRoot!.querySelector('#geolocationToggle');
-    if (privacyHubVersion === PrivacyHubVersion.Dogfood) {
+    if (privacyHubVersion === PrivacyHubVersion.V0) {
       assertEquals(null, toggleElement);
-    } else {
+    } else if (privacyHubVersion === PrivacyHubVersion.V0AndLocation) {
       assert(toggleElement);
       const deepLinkElement =
           toggleElement.shadowRoot!.querySelector('cr-toggle');
@@ -276,9 +269,16 @@ async function parametrizedPrivacyHubSubpageTestsuite(
     assertEquals(
         privacyHubSubpage.i18n('noCameraConnectedText'),
         getNoCameraText()!.textContent!.trim());
-    assertEquals(
-        privacyHubSubpage.i18n('cameraToggleSubtext'),
-        getCameraToggleSublabel()!.textContent!.trim());
+
+    if (privacyHubBrowserProxy.cameraLEDFallbackState) {
+      assertEquals(
+          privacyHubSubpage.i18n('cameraToggleFallbackSubtext'),
+          getCameraToggleSublabel()!.textContent!.trim());
+    } else {
+      assertEquals(
+          privacyHubSubpage.i18n('cameraToggleSubtext'),
+          getCameraToggleSublabel()!.textContent!.trim());
+    }
 
     assertEquals(null, getMicrophoneList());
     assert(getNoMicrophoneText());
@@ -556,17 +556,206 @@ async function parametrizedPrivacyHubSubpageTestsuite(
             'ChromeOS.PrivacyHub.Microphone.Settings.Enabled', true),
         1);
   });
+
+  test('Send HaTS messages', async () => {
+    privacyHubSubpage.remove();
+
+    loadTimeData.overrideValues({
+      isPrivacyHubHatsEnabled: true,
+    });
+    privacyHubSubpage = document.createElement('settings-privacy-hub-subpage');
+
+    document.body.appendChild(privacyHubSubpage);
+    await waitAfterNextRender(privacyHubSubpage);
+    flush();
+
+    // Reset the callcounts here as the appendChild etc trigger one left page
+    // call which makes the numbers on the asserts not very intuitive.
+    privacyHubBrowserProxy.reset();
+    assertEquals(
+        0, privacyHubBrowserProxy.getCallCount('sendOpenedOsPrivacyPage'));
+    assertEquals(
+        0, privacyHubBrowserProxy.getCallCount('sendLeftOsPrivacyPage'));
+
+    const params = new URLSearchParams();
+    params.append('settingId', settingMojom.Setting.kCameraOnOff.toString());
+    Router.getInstance().navigateTo(routes.PRIVACY_HUB, params);
+
+    flush();
+
+    assertEquals(
+        1, privacyHubBrowserProxy.getCallCount('sendOpenedOsPrivacyPage'));
+    assertEquals(
+        0, privacyHubBrowserProxy.getCallCount('sendLeftOsPrivacyPage'));
+
+    params.set(
+        'settingId',
+        settingMojom.Setting.kShowUsernamesAndPhotosAtSignInV2.toString());
+    Router.getInstance().navigateTo(routes.ACCOUNTS, params);
+
+    flush();
+
+    assertEquals(
+        1, privacyHubBrowserProxy.getCallCount('sendOpenedOsPrivacyPage'));
+    assertEquals(
+        1, privacyHubBrowserProxy.getCallCount('sendLeftOsPrivacyPage'));
+  });
 }
 
 suite(
-    '<settings-privacy-hub-subpage> Dogfood',
-    () => parametrizedPrivacyHubSubpageTestsuite(PrivacyHubVersion.Dogfood));
+    '<settings-privacy-hub-subpage> Privacy Hub V0',
+    () => parametrizedPrivacyHubSubpageTestsuite(PrivacyHubVersion.V0, false));
 suite(
-    '<settings-privacy-hub-subpage> MVP',
-    () => parametrizedPrivacyHubSubpageTestsuite(PrivacyHubVersion.MVP));
+    '<settings-privacy-hub-subpage> V0 using camera LED Fallback Mechanism',
+    () => parametrizedPrivacyHubSubpageTestsuite(PrivacyHubVersion.V0, true));
 suite(
-    '<settings-privacy-hub-subpage> Future',
-    () => parametrizedPrivacyHubSubpageTestsuite(PrivacyHubVersion.Future));
+    '<settings-privacy-hub-subpage> Location access control with V0 features.',
+    () => parametrizedPrivacyHubSubpageTestsuite(
+        PrivacyHubVersion.V0AndLocation, false));
+
+
+suite('<settings-privacy-hub-subpage> app permissions', () => {
+  let privacyHubSubpage: SettingsPrivacyHubSubpage;
+  let privacyHubBrowserProxy: TestPrivacyHubBrowserProxy;
+  let mediaDevices: FakeMediaDevices;
+
+  setup(() => {
+    loadTimeData.overrideValues({
+      showPrivacyHubPage: true,
+      showAppPermissionsInsidePrivacyHub: true,
+    });
+
+    privacyHubBrowserProxy = new TestPrivacyHubBrowserProxy();
+    PrivacyHubBrowserProxyImpl.setInstanceForTesting(privacyHubBrowserProxy);
+
+    mediaDevices = new FakeMediaDevices();
+    MediaDevicesProxy.setMediaDevicesForTesting(mediaDevices);
+  });
+
+  teardown(() => {
+    if (privacyHubSubpage !== undefined) {
+      privacyHubSubpage.remove();
+    }
+    Router.getInstance().resetRouteForTesting();
+  });
+
+  function createSubpage(prefs = {}): void {
+    privacyHubSubpage = document.createElement('settings-privacy-hub-subpage');
+    privacyHubSubpage.prefs = prefs;
+    document.body.appendChild(privacyHubSubpage);
+    flush();
+  }
+
+  function getMicrophoneCrToggle(): CrToggleElement {
+    const crToggle =
+        privacyHubSubpage.shadowRoot!.querySelector<CrToggleElement>(
+            '#microphoneToggle');
+    assertTrue(!!crToggle);
+    return crToggle;
+  }
+
+  function getMicrophoneTooltip(): PaperTooltipElement {
+    const tooltip =
+        privacyHubSubpage.shadowRoot!.querySelector<PaperTooltipElement>(
+            '#microphoneToggleTooltip');
+    assertTrue(!!tooltip);
+    return tooltip;
+  }
+
+  test('Microphone toggle disabled scenarios', async () => {
+    createSubpage();
+
+    privacyHubBrowserProxy.microphoneToggleIsEnabled = false;
+    await privacyHubBrowserProxy.whenCalled(
+        'getInitialMicrophoneHardwareToggleState');
+    await waitAfterNextRender(privacyHubSubpage);
+
+    // There is no MediaDevice connected initially. Microphone toggle should be
+    // disabled as no microphone is connected.
+    assertTrue(getMicrophoneCrToggle()!.disabled);
+    // Tooltip should not be displayed when the microphone toggle is disabled
+    // due to no microphone being connected.
+    assertTrue(getMicrophoneTooltip()!.hidden);
+
+    // Add a microphone.
+    mediaDevices.addDevice('audioinput', 'Fake Microphone');
+    await waitAfterNextRender(privacyHubSubpage);
+
+    // Microphone toggle should be enabled to click now as there is a microphone
+    // connected and the hw toggle is inactive.
+    assertFalse(getMicrophoneCrToggle()!.disabled);
+    // The tooltip should only show when the HW switch is engaged.
+    assertTrue(getMicrophoneTooltip()!.hidden);
+
+    // Activate the hw toggle.
+    webUIListenerCallback('microphone-hardware-toggle-changed', true);
+    await waitAfterNextRender(privacyHubSubpage);
+
+    // Microphone toggle should be disabled again due to the hw switch being
+    // active.
+    assertTrue(getMicrophoneCrToggle()!.disabled);
+    // With the HW switch being active the tooltip should be visible.
+    assertFalse(getMicrophoneTooltip()!.hidden);
+    // Ensure that the tooltip has the intended content.
+    assertEquals(
+        privacyHubSubpage.i18n('microphoneHwToggleTooltip'),
+        getMicrophoneTooltip()!.textContent!.trim());
+
+    mediaDevices.popDevice();
+  });
+
+  test('Toggle microphone access', async () => {
+    const prefs = {
+      'ash': {
+        'user': {
+          'microphone_allowed': {
+            value: true,
+          },
+        },
+      },
+    };
+    createSubpage(prefs);
+
+    mediaDevices.addDevice('audioinput', 'Fake Mic');
+    await waitAfterNextRender(privacyHubSubpage);
+
+    const microphoneToggle = getMicrophoneCrToggle();
+
+    // Pref and toggle should be in sync and not disabled.
+    assertTrue(microphoneToggle.checked);
+    assertTrue(privacyHubSubpage.prefs.ash.user.microphone_allowed.value);
+
+    // Click the cr-toggle.
+    microphoneToggle.click();
+    await waitAfterNextRender(microphoneToggle);
+
+    assertFalse(privacyHubSubpage.prefs.ash.user.microphone_allowed.value);
+    assertFalse(microphoneToggle.checked);
+
+    // Click the cr-toggle again.
+    microphoneToggle.click();
+    await waitAfterNextRender(microphoneToggle);
+
+    assertTrue(microphoneToggle.checked);
+    assertTrue(privacyHubSubpage.prefs.ash.user.microphone_allowed.value);
+  });
+
+  test('Navigate to the microphone subpage', async () => {
+    createSubpage();
+
+    const microphoneSubpageLinkWrapper =
+        privacyHubSubpage.shadowRoot!.querySelector<HTMLButtonElement>(
+            '#microphoneSubpageLinkWrapper');
+    assertTrue(!!microphoneSubpageLinkWrapper);
+
+    microphoneSubpageLinkWrapper.click();
+    await waitAfterNextRender(privacyHubSubpage);
+
+    assertEquals(
+        routes.PRIVACY_HUB_MICROPHONE, Router.getInstance().currentRoute);
+  });
+});
+
 
 async function parametrizedTestsuiteForMetricsConsentToggle(
     isPrivacyHubVisible: boolean) {
@@ -609,6 +798,7 @@ async function parametrizedTestsuiteForMetricsConsentToggle(
         metricsConsentBrowserProxy);
 
     settingsPage = document.createElement(pageId);
+
   });
 
   async function setUpPage(prefName: string, isConfigurable: boolean) {

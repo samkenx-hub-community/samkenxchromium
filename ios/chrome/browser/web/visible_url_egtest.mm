@@ -25,10 +25,6 @@
 #import "ios/web/public/test/http_server/http_server_util.h"
 #import "url/gurl.h"
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 using chrome_test_util::OmniboxText;
 
 namespace {
@@ -227,9 +223,9 @@ class PausableResponseProvider : public HtmlResponseProvider {
   [[EarlGrey selectElementWithMatcher:chrome_test_util::BackButton()]
       performAction:grey_longPress()];
   NSString* URL1Title = base::SysUTF8ToNSString(kTestPage1);
-  [[EarlGrey
-      selectElementWithMatcher:chrome_test_util::ButtonWithAccessibilityLabel(
-                                   URL1Title)] performAction:grey_tap()];
+  [[EarlGrey selectElementWithMatcher:
+                 chrome_test_util::ContextMenuItemWithAccessibilityLabel(
+                     URL1Title)] performAction:grey_tap()];
 
   {
     // Disables EG synchronization.
@@ -278,20 +274,10 @@ class PausableResponseProvider : public HtmlResponseProvider {
     [self setServerPaused:NO];
   }
 
-  if (![ChromeEarlGrey isSynthesizedRestoreSessionEnabled] ||
-      !base::ios::IsRunningOnIOS15OrLater()) {
-    // In this case, legacy restore will commit page1 with the pushState
-    // empty page (see restore_session.html). With legacy restore check that
-    // page1 was reloaded, not page2.
-    [ChromeEarlGrey waitForWebStateContainingText:kTestPage1];
-    [[EarlGrey selectElementWithMatcher:OmniboxText(_testURL1.GetContent())]
-        assertWithMatcher:grey_notNil()];
-  } else {
-    // Verifies that page2 was reloaded.
-    [ChromeEarlGrey waitForWebStateContainingText:kTestPage2];
-    [[EarlGrey selectElementWithMatcher:OmniboxText(_testURL2.GetContent())]
-        assertWithMatcher:grey_notNil()];
-  }
+  // Verifies that page2 was reloaded.
+  [ChromeEarlGrey waitForWebStateContainingText:kTestPage2];
+  [[EarlGrey selectElementWithMatcher:OmniboxText(_testURL2.GetContent())]
+      assertWithMatcher:grey_notNil()];
 }
 
 // Tests that visible URL is always the same as last pending URL during

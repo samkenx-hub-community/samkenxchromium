@@ -77,13 +77,13 @@ absl_cc_test(
     absl::btree_test_common
     absl::compare
     absl::core_headers
-    absl::counting_allocator
     absl::flags
     absl::hash_testing
     absl::optional
     absl::random_random
     absl::raw_logging_internal
     absl::strings
+    absl::test_allocator
     absl::test_instance_tracker
     GTest::gmock_main
 )
@@ -145,11 +145,11 @@ absl_cc_test(
     ${ABSL_TEST_COPTS}
   DEPS
     absl::fixed_array
-    absl::counting_allocator
     absl::config
     absl::exception_testing
     absl::hash_testing
     absl::memory
+    absl::test_allocator
     GTest::gmock_main
 )
 
@@ -204,9 +204,9 @@ absl_cc_library(
 # Internal-only target, do not depend on directly.
 absl_cc_library(
   NAME
-    counting_allocator
+    test_allocator
   HDRS
-    "internal/counting_allocator.h"
+    "internal/test_allocator.h"
   COPTS
     ${ABSL_DEFAULT_COPTS}
   DEPS
@@ -224,12 +224,12 @@ absl_cc_test(
     absl::check
     absl::config
     absl::core_headers
-    absl::counting_allocator
     absl::exception_testing
     absl::hash_testing
     absl::inlined_vector
     absl::memory
     absl::strings
+    absl::test_allocator
     absl::test_instance_tracker
     GTest::gmock_main
 )
@@ -338,6 +338,8 @@ absl_cc_test(
     "-DUNORDERED_SET_CXX17"
   DEPS
     absl::check
+    absl::config
+    absl::container_memory
     absl::flat_hash_set
     absl::hash_generator_testing
     absl::memory
@@ -575,6 +577,7 @@ absl_cc_test(
     ${ABSL_TEST_COPTS}
   DEPS
     absl::common_policy_traits
+    absl::config
     GTest::gmock_main
 )
 
@@ -658,6 +661,7 @@ absl_cc_test(
   COPTS
     ${ABSL_TEST_COPTS}
   DEPS
+    absl::config
     absl::hash_policy_traits
     absl::node_slot_policy
     GTest::gmock_main
@@ -743,6 +747,7 @@ absl_cc_test(
     absl::prefetch
     absl::raw_hash_set
     absl::strings
+    absl::test_allocator
     GTest::gmock_main
 )
 
@@ -754,9 +759,9 @@ absl_cc_test(
   COPTS
     ${ABSL_TEST_COPTS}
   DEPS
+    absl::config
     absl::raw_hash_set
     absl::tracked
-    absl::core_headers
     GTest::gmock_main
 )
 
@@ -789,8 +794,8 @@ absl_cc_test(
     absl::layout
     absl::check
     absl::config
-    absl::core_headers
     absl::span
+    absl::utility
     GTest::gmock_main
 )
 

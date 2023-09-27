@@ -46,7 +46,7 @@ void ClientCertificatesCleared(const JavaRef<jobject>& callback) {
 
 void NotifyClientCertificatesChanged() {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
-  net::CertDatabase::GetInstance()->NotifyObserversCertDBChanged();
+  net::CertDatabase::GetInstance()->NotifyObserversClientCertStoreChanged();
 }
 
 void SafeBrowsingAllowlistAssigned(const JavaRef<jobject>& callback,
@@ -109,15 +109,6 @@ void JNI_AwContentsStatics_SetSafeBrowsingAllowlist(
       std::move(rules),
       base::BindOnce(&SafeBrowsingAllowlistAssigned,
                      ScopedJavaGlobalRef<jobject>(env, callback)));
-}
-
-// static
-void JNI_AwContentsStatics_SetServiceWorkerIoThreadClient(
-    JNIEnv* env,
-    const base::android::JavaParamRef<jobject>& io_thread_client,
-    const base::android::JavaParamRef<jobject>& browser_context) {
-  AwContentsIoThreadClient::SetServiceWorkerIoThreadClient(io_thread_client,
-                                                           browser_context);
 }
 
 // static

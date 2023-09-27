@@ -161,6 +161,7 @@
     "cap-height",
     "ch-width",
     "ic-width",
+    // from-font
 
     //
     // font-family (<generic-family> in CSS 2.1)
@@ -194,8 +195,6 @@
     // font-palette animation
     //
     "palette-mix",
-    "palette-add",
-    "palette-scale",
 
     //
     // *-color
@@ -759,6 +758,12 @@
     "fit-content",
 
     //
+    // text-autospace
+    //
+    // normal
+    "no-autospace",
+
+    //
     // text-overflow
     //
     "clip",
@@ -782,6 +787,12 @@
     // auto
     "from-font",
 
+    //
+    // text-spacing-trim
+    //
+    "space-all",
+    "space-first",
+
     // text-underline-position
     // auto
     // "from-font",
@@ -790,15 +801,11 @@
     // right
 
     //
-    // word-boundary-detection
-    //
-    "ja",
-
-    //
     // word-break
     //
     "break-all",
     "keep-all",
+    "auto-phrase",
 
     //
     // word-wrap
@@ -831,8 +838,6 @@
     // CSSParserFastPaths::IsValidKeywordPropertyAndValue.
     "checkbox",
     "radio",
-    "push-button",
-    "square-button",
     "button",
     "listbox",
     "-internal-media-control",
@@ -840,20 +845,24 @@
     "menulist-button",
     "meter",
     "progress-bar",
-    "slider-horizontal",
-    "slider-vertical",
     "searchfield",
     "textfield",
     "textarea",
-    // All appearance values that should not be accepted by the parser.
+    // TODO(crbug/924486) All appearance values that should not be accepted by the parser (high usage).
     "inner-spin-button",
+    "push-button",
+    "square-button",
+    "slider-horizontal",
+    "searchfield-cancel-button",
+    // TODO(crbug/924486) All appearance values that should not be accepted by the parser (low usage).
     "media-slider",
     "media-sliderthumb",
     "media-volume-slider",
     "media-volume-sliderthumb",
     "sliderthumb-horizontal",
     "sliderthumb-vertical",
-    "searchfield-cancel-button",
+    // TODO(crbug/1426629) All appearance values that should not be accepted by the parser (special case).
+    "slider-vertical",
     //
     // border-image
     //
@@ -1094,6 +1103,12 @@
     "window-controls-overlay",
     "tabbed",
 
+    // (display-state:) media feature
+    // normal
+    // fullscreen
+    "minimized",
+    "maximized",
+
     // (overflow-block:) media feature
     "paged",
 
@@ -1283,7 +1298,7 @@
     "type",
 
     // deprecated gradients
-    "from",
+    // "from", now part of relative color syntax
     "to",
     "color-stop",
     "radial",
@@ -1367,6 +1382,25 @@
     "in",
     // The color-mix function https://www.w3.org/TR/css-color-5/#color-mix
     "color-mix",
+
+    // relative color syntax
+    "from",
+    // RCS channel keywords.
+    // r, g, b for rgb(), rgba() and color()
+    // x, y, z are already defined for "scale"
+    // h, s, l for hsl()
+    // h, w, b for hwb()
+    // l, a, b for lab() and oklab()
+    // l, c, h for lch() and oklch()
+    "r",
+    "g",
+    "b",
+    "h",
+    "s",
+    "l",
+    "w",
+    "a",
+    "c",
 
     // transform
     "matrix",
@@ -1467,11 +1501,6 @@
     // normal
     // always
 
-    // scroll-timeline-attachment
-    // view-timeline-attachment
-    "defer",
-    "ancestor",
-
     // containment
     // paint
     "style",
@@ -1548,6 +1577,7 @@
 
     // (prefers-reduced-motion:) media feature
     // (prefers-reduced-data:) media feature
+    // (prefers-reduced-transparency:) media feature
     "reduce",
 
     // (forced-colors:) media feature
@@ -1619,6 +1649,7 @@
     // ([video]-dynamic-range) media feature
     "standard",
     "high",
+    "constrained-high",
 
     // Layered @import rule
     "layer",
@@ -1654,6 +1685,8 @@
 
     // anchor positioning
     "anchor",
+    // auto,
+    "auto-same",
     // top,
     // left,
     // right,
@@ -1671,9 +1704,12 @@
     "self-block",
     "self-inline",
 
-    // anchor-scroll
+    // anchor-default
     "implicit",
     // none,
+
+    // position-fallback-bounds
+    // normal,
 
     // animation-[end-]delay
     // contain
@@ -1686,5 +1722,28 @@
     // scroll()
     "root",
     "nearest",
+
+    // transition-behavior
+    "allow-discrete",
+
+    // (inverted-colors:) media feature
+    "inverted",
+    // none
+
+    // navigation-trigger
+    "cross-document-same-origin",
+    // none
+
+    // container-type
+    // inline-size,
+    // normal,
+    // size,
+    "snap",
+    // sticky,
+
+    // (scripting:) media feature
+    "enabled",
+    "initial-only",
+    // none
   ],
 }

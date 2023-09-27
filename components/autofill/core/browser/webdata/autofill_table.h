@@ -12,7 +12,9 @@
 #include <string>
 #include <vector>
 
+#include "base/containers/span.h"
 #include "base/gtest_prod_util.h"
+#include "base/time/time.h"
 #include "components/autofill/core/browser/data_model/autofill_profile.h"
 #include "components/sync/base/model_type.h"
 #include "components/sync/model/sync_metadata_store.h"
@@ -39,9 +41,21 @@ class AutofillTableTest;
 class CreditCard;
 struct CreditCardCloudTokenData;
 struct FormFieldData;
-class IBAN;
+class Iban;
 struct PaymentsCustomerData;
 class VirtualCardUsageData;
+// Helper struct to better group server cvc related variables for better
+// passing last_updated_timestamp, which is needed for sync bridge. Limited
+// scope in autofill table & sync bridge.
+struct ServerCvc {
+  bool operator==(const ServerCvc&) const = default;
+  // A server generated id to identify the corresponding credit card.
+  const int64_t instrument_id;
+  // CVC value of the card.
+  const std::u16string cvc;
+  // The timestamp of the most recent update to the data entry.
+  const base::Time last_updated_timestamp;
+};
 
 // This class manages the various Autofill tables within the SQLite database
 // passed to the constructor. It expects the following schemas:
@@ -280,10 +294,10 @@ class VirtualCardUsageData;
 //                      legacy version of this.
 //   virtual_card_enrollment_state
 //                      An enum indicating the virtual card enrollment state of
-//                      this card. UNSPECIFIED is the default value. UNENROLLED
-//                      means this card has not been enrolled to have virtual
-//                      cards. ENROLLED means the card has been enrolled and
-//                      has related virtual credit cards.
+//                      this card. kUnspecified is the default value.
+//                      kUnenrolled means this card has not been enrolled to
+//                      have virtual cards. kEnrolled means the card has been
+//                      enrolled and has related virtual credit cards.
 //   card_art_url       URL to generate the card art image for this card.
 //   product_description
 //                      The product description for the card. Used to be shown
@@ -291,9 +305,9 @@ class VirtualCardUsageData;
 //   card_issuer_id     The id of the card's issuer.
 //   virtual_card_enrollment_type
 //                      An enum indicating the type of virtual card enrollment
-//                      of this card. TYPE_UNSPECIFIED is the default value.
-//                      ISSUER denotes that it is an issuer-level enrollment.
-//                      NETWORK denotes that it is a network-level enrollment.
+//                      of this card. kTypeUnspecified is the default value.
+//                      kIssuer denotes that it is an issuer-level enrollment.
+//                      kNetwork denotes that it is a network-level enrollment.
 // unmasked_credit_cards
 //                      When a masked credit credit card is unmasked and the
 //                      full number is downloaded or when the full number is
@@ -336,9 +350,10 @@ class VirtualCardUsageData;
 //                      database, but always returned as an empty string in
 //                      CreditCard. Added in version 71.
 //
-// ibans                This table contains International Bank Account
-//                      Number(IBAN) data added by the user. The columns are
-//                      standard entries in an Iban form.
+// local_ibans          This table contains International Bank Account
+//                      Numbers (IBANs) added by the user. The columns are
+//                      standard entries in an Iban form. Those are local IBANs
+//                      and exist on Chrome client only.
 //
 //   guid               A guid string to uniquely identify the IBAN.
 //   use_count          The number of times this IBAN has been used to fill
@@ -349,6 +364,31 @@ class VirtualCardUsageData;
 //                      encrypted.
 //   nickname           A nickname for the IBAN, entered by the user.
 //
+//
+// masked_ibans         This table contains "masked" International Bank Account
+//                      Numbers (IBANs) added by the user. Those are server
+//                      IBANs saved on GPay server and are available across all
+//                      the Chrome devices.
+//
+//   instrument_id      String assigned by the server to identify this IBAN.
+//                      This is opaque to the client.
+//   prefix             Contains the prefix of the full IBAN value that is
+//                      shown when in a masked format.
+//   suffix             Contains the suffix of the full IBAN value that is
+//                      shown when in a masked format.
+//   length             Length of the full IBAN value.
+//   nickname           A nickname for the IBAN, entered by the user.
+//
+// masked_ibans_metadata
+//                      Metadata (currently, usage data) about server IBANS.
+//                      This will be synced from Chrome sync.
+//
+//   instrument_id      The instrument ID, which matches an ID from the
+//                      masked_ibans table.
+//   use_count          The number of times this IBAN has been used to fill
+//                      a form.
+//   use_date           The date this IBAN was last used to fill a form,
+//                      in time_t.
 //
 // server_addresses     This table contains Autofill address data synced from
 //                      the wallet server. It's basically the same as the
@@ -414,11 +454,6 @@ class VirtualCardUsageData;
 //                      Contains Google Payments customer data.
 //
 //   customer_id        A string representing the Google Payments customer id.
-//
-// payments_upi_vpa     Contains saved UPI/VPA payment data.
-//                      https://en.wikipedia.org/wiki/Unified_Payments_Interface
-//
-//   vpa                A string representing the UPI ID (a.k.a. VPA) value.
 //
 // offer_data           The data for Autofill offers which will be presented in
 //                      payments autofill flows.
@@ -501,6 +536,9 @@ class VirtualCardUsageData;
 //                      from a structured subcomponent, or if the value was
 //                      observed in a form submission, or even validated by the
 //                      user in the settings.
+//  observations        An encoding of the observations stored for this `type`.
+//                      See `ProfileTokenConfidence::
+//                      SerializeObservationsForStoredType()`.
 //
 // virtual_card_usage_data
 //                      Contains data related to retrieval attempts of a virtual
@@ -514,6 +552,28 @@ class VirtualCardUsageData;
 //  last_four           The last four digits of the virtual card number. This is
 //                      tied to the usage data because the virtual card number
 //                      may vary depending on merchants.
+//
+// local_stored_cvc     This table contains credit card CVC data stored locally
+//                      in Chrome.
+//
+//  guid                A guid string to identify the corresponding locally
+//                      stored credit card in the credit_cards table.
+//  value_encrypted     Encrypted CVC value of the card. May be 3 digits or 4
+//                      digits depending on the card issuer.
+//  last_updated_timestamp
+//                      The timestamp of the most recent update to the data
+//                      entry.
+//
+// server_stored_cvc    This table contains credit card CVC data stored synced
+//                      to Chrome Sync's Kansas server.
+//
+//  instrument_id       A server generated id to identify the corresponding
+//                      credit cards stored in the masked_credit_cards table.
+//  value_encrypted     Encrypted CVC value of the card. May be 3 digits or 4
+//                      digits depending on the card issuer.
+//  last_updated_timestamp
+//                      The timestamp of the most recent update to the data
+//                      entry.
 
 class AutofillTable : public WebDatabaseTable,
                       public syncer::SyncMetadataStore {
@@ -527,6 +587,19 @@ class AutofillTable : public WebDatabaseTable,
 
   // Retrieves the AutofillTable* owned by |db|.
   static AutofillTable* FromWebDatabase(WebDatabase* db);
+
+  // All ServerFieldTypes stored for an AutofillProfile in the local_addresses
+  // or contact_info table (depending on the profile source).
+  // When introducing a new field type, it suffices to add it here. When
+  // removing a field type, removing it from the list suffices (no additional
+  // clean-up in the table necessary). This is not reusing
+  // `AutofillProfile::SupportedTypes()` for three reasons:
+  // - Due to the table design, the stored types are already ambiguous, so we
+  //   prefer the explicitness here.
+  // - Some supported types (like PHONE_HOME_CITY_CODE) are not stored.
+  // - Some non-supported types are stored (usually types that don't have
+  //   filling support yet).
+  static base::span<const ServerFieldType> GetStoredTypesForAutofillProfile();
 
   // WebDatabaseTable:
   WebDatabaseTable::TypeKey GetTypeKey() const override;
@@ -629,26 +702,30 @@ class AutofillTable : public WebDatabaseTable,
   void SetServerProfiles(const std::vector<AutofillProfile>& profiles);
 
   // Records a single IBAN in the iban table.
-  bool AddIBAN(const IBAN& iban);
+  bool AddIban(const Iban& iban);
 
   // Updates the database values for the specified IBAN.
-  bool UpdateIBAN(const IBAN& iban);
+  bool UpdateIban(const Iban& iban);
 
   // Removes a row from the ibans table. |guid| is the identifier of the
   // IBAN to remove.
-  bool RemoveIBAN(const std::string& guid);
+  bool RemoveIban(const std::string& guid);
 
   // Retrieves an IBAN with the given |guid|.
-  std::unique_ptr<IBAN> GetIBAN(const std::string& guid);
+  std::unique_ptr<Iban> GetIban(const std::string& guid);
 
   // Retrieves the local IBANs in the database.
-  bool GetIBANs(std::vector<std::unique_ptr<IBAN>>* ibans);
+  bool GetIbans(std::vector<std::unique_ptr<Iban>>* ibans);
 
   // Records a single credit card in the credit_cards table.
   bool AddCreditCard(const CreditCard& credit_card);
 
   // Updates the database values for the specified credit card.
   bool UpdateCreditCard(const CreditCard& credit_card);
+
+  // Update the CVC in the `kLocalStoredCvcTable` for the given `guid`. Return
+  // value indicates if `kLocalStoredCvcTable` got updated or not.
+  bool UpdateLocalCvc(const std::string& guid, const std::u16string& cvc);
 
   // Removes a row from the credit_cards table.  |guid| is the identifier of the
   // credit card to remove.
@@ -676,6 +753,25 @@ class AutofillTable : public WebDatabaseTable,
   bool UnmaskServerCreditCard(const CreditCard& masked,
                               const std::u16string& full_number);
   bool MaskServerCreditCard(const std::string& id);
+
+  // Methods to add, update, remove, clear and get cvc in the
+  // `server_stored_cvc` table. Return value indicates if the operation is
+  // succeeded and value actually changed. It may return false when operation is
+  // success but no data is changed, e.g. delete an empty table.
+  bool AddServerCvc(const ServerCvc& server_cvc);
+  bool UpdateServerCvc(const ServerCvc& server_cvc);
+  bool RemoveServerCvc(int64_t instrument_id);
+  // This will clear all server cvcs.
+  bool ClearServerCvcs();
+  // When a server card is deleted on payment side (i.e. pay.google.com), sync
+  // notifies Chrome about the card deletion, not the CVC deletion, as Payment
+  // server does not have access to the CVC storage on the Sync server side, so
+  // Payment cannot delete the CVC from server side directly, and this has to be
+  // done on the Chrome side. So this ReconcileServerCvc will be invoked when
+  // card sync happens and will remove orphaned CVC from the current client.
+  bool ReconcileServerCvcs();
+  // Get all server cvcs from `server_stored_cvc` table.
+  std::vector<std::unique_ptr<ServerCvc>> GetAllServerCvcs() const;
 
   // Methods to add, update, remove and get the metadata for server cards and
   // addresses.
@@ -734,12 +830,6 @@ class AutofillTable : public WebDatabaseTable,
           virtual_card_usage_data);
   bool RemoveAllVirtualCardUsageData();
 
-  // Adds |upi_id| to the saved UPI IDs.
-  bool InsertUpiId(const std::string& upi_id);
-
-  // Returns all the UPI IDs stored in the database.
-  std::vector<std::string> GetAllUpiIds();
-
   // Deletes all data from the server card and profile tables. Returns true if
   // any data was deleted, false if not (so false means "commit not needed"
   // rather than "error").
@@ -772,7 +862,7 @@ class AutofillTable : public WebDatabaseTable,
                                        const base::Time& delete_end);
 
   // Clear all credit cards.
-  bool ClearCreditCards();
+  void ClearCreditCards();
 
   // Read all the stored metadata for |model_type| and fill |metadata_batch|
   // with it.
@@ -817,8 +907,8 @@ class AutofillTable : public WebDatabaseTable,
   bool MigrateToVersion101RemoveCreditCardArtImageTable();
   bool MigrateToVersion102AddAutofillBirthdatesTable();
   bool MigrateToVersion104AddProductDescriptionColumn();
-  bool MigrateToVersion105AddAutofillIBANTable();
-  bool MigrateToVersion106RecreateAutofillIBANTable();
+  bool MigrateToVersion105AddAutofillIbanTable();
+  bool MigrateToVersion106RecreateAutofillIbanTable();
   bool MigrateToVersion107AddContactInfoTables();
   bool MigrateToVersion108AddCardIssuerIdColumn();
   bool MigrateToVersion109AddVirtualCardUsageDataTable();
@@ -829,6 +919,10 @@ class AutofillTable : public WebDatabaseTable,
   bool MigrateToVersion113MigrateLocalAddressProfilesToNewTable();
   bool MigrateToVersion114DropLegacyAddressTables();
   bool MigrateToVersion115EncryptIbanValue();
+  bool MigrateToVersion116AddStoredCvcTable();
+  bool MigrateToVersion117AddProfileObservationColumn();
+  bool MigrateToVersion118RemovePaymentsUpiVpaTable();
+  bool MigrateToVersion119AddMaskedIbanTablesAndRenameLocalIbanTable();
 
   // Max data length saved in the table, AKA the maximum length allowed for
   // form data.
@@ -928,7 +1022,7 @@ class AutofillTable : public WebDatabaseTable,
 
   bool InitMainTable();
   bool InitCreditCardsTable();
-  bool InitIBANsTable();
+  bool InitIbansTable();
   bool InitLegacyProfilesTable();
   bool InitLegacyProfileAddressesTable();
   bool InitLegacyProfileNamesTable();
@@ -936,6 +1030,8 @@ class AutofillTable : public WebDatabaseTable,
   bool InitLegacyProfilePhonesTable();
   bool InitLegacyProfileBirthdatesTable();
   bool InitMaskedCreditCardsTable();
+  bool InitMaskedIbansTable();
+  bool InitMaskedIbansMetadataTable();
   bool InitUnmaskedCreditCardsTable();
   bool InitServerCardMetadataTable();
   bool InitServerAddressesTable();
@@ -943,8 +1039,8 @@ class AutofillTable : public WebDatabaseTable,
   bool InitAutofillSyncMetadataTable();
   bool InitModelTypeStateTable();
   bool InitPaymentsCustomerDataTable();
-  bool InitPaymentsUPIVPATable();
   bool InitServerCreditCardCloudTokenDataTable();
+  bool InitStoredCvcTable();
   bool InitOfferDataTable();
   bool InitOfferEligibleInstrumentTable();
   bool InitOfferMerchantDomainTable();

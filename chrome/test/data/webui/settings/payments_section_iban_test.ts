@@ -11,7 +11,7 @@ import {CrButtonElement, loadTimeData} from 'chrome://settings/settings.js';
 import {assertEquals, assertFalse, assertTrue} from 'chrome://webui-test/chai_assert.js';
 import {eventToPromise, whenAttributeIs} from 'chrome://webui-test/test_util.js';
 
-import {createIbanEntry, TestPaymentsManager} from './passwords_and_autofill_fake_data.js';
+import {createIbanEntry, TestPaymentsManager} from './autofill_fake_data.js';
 import {createPaymentsSection, getDefaultExpectations} from './payments_section_utils.js';
 
 // clang-format on
@@ -31,8 +31,6 @@ suite('PaymentsSectionIban', function() {
     document.body.innerHTML = window.trustedTypes!.emptyHTML;
     loadTimeData.overrideValues({
       migrationEnabled: true,
-      removeCardExpirationAndTypeTitles: true,
-      virtualCardEnrollmentEnabled: true,
       showIbansSettings: true,
     });
   });
@@ -75,8 +73,7 @@ suite('PaymentsSectionIban', function() {
       showIbansSettings: false,
     });
     const section = await createPaymentsSection(
-        /*creditCards=*/[], /*ibans=*/[], /*upiIds=*/[],
-        {credit_card_enabled: {value: true}});
+        /*creditCards=*/[], /*ibans=*/[], {credit_card_enabled: {value: true}});
     const addPaymentMethodsButton =
         section.shadowRoot!.querySelector<CrButtonElement>(
             '#addPaymentMethods');
@@ -90,8 +87,7 @@ suite('PaymentsSectionIban', function() {
 
   test('verifyAddCardOrIbanPaymentMenu', async function() {
     const section = await createPaymentsSection(
-        /*creditCards=*/[], /*ibans=*/[], /*upiIds=*/[],
-        {credit_card_enabled: {value: true}});
+        /*creditCards=*/[], /*ibans=*/[], {credit_card_enabled: {value: true}});
     const addPaymentMethodsButton =
         section.shadowRoot!.querySelector<CrButtonElement>(
             '#addPaymentMethods');
@@ -115,7 +111,7 @@ suite('PaymentsSectionIban', function() {
     const iban1 = createIbanEntry();
     const iban2 = createIbanEntry();
     await createPaymentsSection(
-        /*creditCards=*/[], [iban1, iban2], /*upiIds=*/[], /*prefValues=*/ {});
+        /*creditCards=*/[], [iban1, iban2], /*prefValues=*/ {});
 
     assertEquals(2, getLocalIbanListItems().length);
   });
@@ -124,7 +120,7 @@ suite('PaymentsSectionIban', function() {
     const iban = createIbanEntry('BA393385804800211234', 'My doctor\'s IBAN');
 
     const section = await createPaymentsSection(
-        /*creditCards=*/[], [iban], /*upiIds=*/[], /*prefValues=*/ {});
+        /*creditCards=*/[], [iban], /*prefValues=*/ {});
 
     assertEquals(1, getLocalIbanListItems().length);
 
@@ -200,7 +196,7 @@ suite('PaymentsSectionIban', function() {
   test('verifyLocalIbanMenu', async function() {
     const iban = createIbanEntry();
     const section = await createPaymentsSection(
-        /*creditCards=*/[], [iban], /*upiIds=*/[],
+        /*creditCards=*/[], [iban],
         /*prefValues=*/ {});
     assertEquals(1, getLocalIbanListItems().length);
 
@@ -224,7 +220,7 @@ suite('PaymentsSectionIban', function() {
     const iban = createIbanEntry('FI1410093000123458', 'NickName');
 
     const section = await createPaymentsSection(
-        /*creditCards=*/[], [iban], /*upiIds=*/[], /*prefValues=*/ {});
+        /*creditCards=*/[], [iban], /*prefValues=*/ {});
     assertEquals(1, getLocalIbanListItems().length);
 
     const rowShadowRoot = getIbanRowShadowRoot(section.$.paymentsList);
@@ -267,7 +263,7 @@ suite('PaymentsSectionIban', function() {
     const iban = createIbanEntry();
 
     const section = await createPaymentsSection(
-        /*creditCards=*/[], [iban], /*upiIds=*/[], /*prefValues=*/ {});
+        /*creditCards=*/[], [iban], /*prefValues=*/ {});
     assertEquals(1, getLocalIbanListItems().length);
 
     const rowShadowRoot = getIbanRowShadowRoot(section.$.paymentsList);

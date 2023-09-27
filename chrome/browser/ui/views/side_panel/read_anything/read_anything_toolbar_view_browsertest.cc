@@ -43,8 +43,8 @@ class MockReadAnythingCoordinator : public ReadAnythingCoordinator {
       : ReadAnythingCoordinator(browser) {}
 
   MOCK_METHOD(void,
-              CreateAndRegisterEntry,
-              (SidePanelRegistry * global_registry));
+              CreateAndRegisterSidePanelEntry,
+              (SidePanelRegistry * registry));
   MOCK_METHOD(ReadAnythingController*, GetController, ());
   MOCK_METHOD(ReadAnythingModel*, GetModel, ());
   MOCK_METHOD(void,
@@ -65,7 +65,10 @@ class ReadAnythingToolbarViewTest : public InProcessBrowserTest {
         coordinator_.get(), &toolbar_delegate_, &font_combobox_delegate_);
   }
 
-  void TearDownOnMainThread() override { coordinator_ = nullptr; }
+  void TearDownOnMainThread() override {
+    toolbar_view_ = nullptr;
+    coordinator_ = nullptr;
+  }
 
   // Wrapper methods around the ReadAnythingToolbarView.
 

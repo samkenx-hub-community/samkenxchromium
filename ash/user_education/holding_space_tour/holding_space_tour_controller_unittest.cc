@@ -10,10 +10,12 @@
 #include <unordered_map>
 #include <vector>
 
+#include "ash/ash_element_identifiers.h"
 #include "ash/constants/ash_features.h"
 #include "ash/display/window_tree_host_manager.h"
 #include "ash/drag_drop/drag_drop_controller.h"
 #include "ash/public/cpp/holding_space/holding_space_controller.h"
+#include "ash/public/cpp/holding_space/holding_space_file.h"
 #include "ash/public/cpp/holding_space/holding_space_image.h"
 #include "ash/public/cpp/holding_space/holding_space_model.h"
 #include "ash/public/cpp/holding_space/holding_space_prefs.h"
@@ -30,21 +32,19 @@
 #include "ash/test/test_widget_builder.h"
 #include "ash/user_education/mock_user_education_delegate.h"
 #include "ash/user_education/user_education_ash_test_base.h"
-#include "ash/user_education/user_education_constants.h"
 #include "ash/user_education/user_education_help_bubble_controller.h"
 #include "ash/user_education/user_education_ping_controller.h"
 #include "ash/user_education/user_education_types.h"
 #include "ash/user_education/user_education_util.h"
 #include "ash/user_education/views/help_bubble_factory_views_ash.h"
-#include "ash/wallpaper/wallpaper_view.h"
-#include "ash/wallpaper/wallpaper_widget_controller.h"
+#include "ash/wallpaper/views/wallpaper_view.h"
+#include "ash/wallpaper/views/wallpaper_widget_controller.h"
 #include "base/pickle.h"
 #include "base/strings/strcat.h"
 #include "base/test/bind.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/values.h"
 #include "components/account_id/account_id.h"
-#include "components/user_education/common/tutorial_description.h"
 #include "components/user_education/views/help_bubble_views_test_util.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/base/clipboard/clipboard_format_type.h"
@@ -72,7 +72,6 @@ using ::testing::ElementsAre;
 using ::testing::Eq;
 using ::testing::Invoke;
 using ::testing::Pair;
-using ::user_education::TutorialDescription;
 
 // Helpers ---------------------------------------------------------------------
 
@@ -107,8 +106,10 @@ std::unique_ptr<HoldingSpaceItem> CreateHoldingSpaceItem(
     HoldingSpaceItem::Type type,
     const base::FilePath& file_path) {
   return HoldingSpaceItem::CreateFileBackedItem(
-      type, file_path,
-      GURL(base::StrCat({"file-system:", file_path.BaseName().value()})),
+      type,
+      HoldingSpaceFile(
+          file_path, HoldingSpaceFile::FileSystemType::kTest,
+          GURL(base::StrCat({"file-system:", file_path.BaseName().value()}))),
       base::BindOnce(&CreateHoldingSpaceImage));
 }
 
@@ -246,25 +247,6 @@ class HoldingSpaceTourControllerTest : public UserEducationAshTestBase {
  private:
   base::test::ScopedFeatureList scoped_feature_list_;
 };
-
-// Tests -----------------------------------------------------------------------
-
-// Verifies that `GetTutorialDescriptions()` returns expected values.
-TEST_F(HoldingSpaceTourControllerTest, GetTutorialDescriptions) {
-  auto* holding_space_tour_controller = HoldingSpaceTourController::Get();
-  ASSERT_TRUE(holding_space_tour_controller);
-
-  std::map<TutorialId, TutorialDescription> tutorial_descriptions_by_id =
-      static_cast<UserEducationFeatureController*>(
-          holding_space_tour_controller)
-          ->GetTutorialDescriptions();
-
-  // TODO(http://b/275909980): Implement tutorial descriptions.
-  EXPECT_THAT(
-      tutorial_descriptions_by_id,
-      ElementsAre(Pair(Eq(TutorialId::kHoldingSpaceTourPrototype1), _),
-                  Pair(Eq(TutorialId::kHoldingSpaceTourPrototype2), _)));
-}
 
 // HoldingSpaceTourControllerDragAndDropTest -----------------------------------
 

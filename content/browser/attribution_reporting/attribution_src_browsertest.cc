@@ -14,11 +14,11 @@
 #include "base/task/sequenced_task_runner.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/time/time.h"
-#include "components/aggregation_service/aggregation_service.mojom.h"
 #include "components/attribution_reporting/aggregatable_dedup_key.h"
 #include "components/attribution_reporting/aggregatable_trigger_data.h"
 #include "components/attribution_reporting/event_trigger_data.h"
-#include "components/attribution_reporting/registration_type.mojom.h"
+#include "components/attribution_reporting/os_registration.h"
+#include "components/attribution_reporting/registration_eligibility.mojom.h"
 #include "components/attribution_reporting/source_registration.h"
 #include "components/attribution_reporting/source_registration_time_config.mojom.h"
 #include "components/attribution_reporting/suitable_origin.h"
@@ -66,7 +66,8 @@ namespace content {
 namespace {
 
 using ::attribution_reporting::FilterPair;
-using ::attribution_reporting::mojom::RegistrationType;
+using ::attribution_reporting::mojom::RegistrationEligibility;
+using ::net::test_server::EmbeddedTestServer;
 using ::testing::AllOf;
 using ::testing::ElementsAre;
 using ::testing::Eq;
@@ -86,13 +87,7 @@ class AttributionSrcBrowserTest : public ContentBrowserTest {
   void SetUpOnMainThread() override {
     host_resolver()->AddRule("*", "127.0.0.1");
 
-    https_server_ = std::make_unique<net::EmbeddedTestServer>(
-        net::EmbeddedTestServer::TYPE_HTTPS);
-    https_server_->SetSSLConfig(net::EmbeddedTestServer::CERT_TEST_NAMES);
-    net::test_server::RegisterDefaultHandlers(https_server_.get());
-    https_server_->ServeFilesFromSourceDirectory(
-        "content/test/data/attribution_reporting");
-    https_server_->ServeFilesFromSourceDirectory("content/test/data");
+    https_server_ = CreateAttributionTestHttpsServer();
     ASSERT_TRUE(https_server_->Start());
 
     MockAttributionHost::Override(web_contents());
@@ -114,6 +109,20 @@ class AttributionSrcBrowserTest : public ContentBrowserTest {
     return *static_cast<MockAttributionHost*>(attribution_host);
   }
 
+ protected:
+  std::unique_ptr<EmbeddedTestServer> CreateAttributionTestHttpsServer() {
+    auto https_server =
+        std::make_unique<EmbeddedTestServer>(EmbeddedTestServer::TYPE_HTTPS);
+
+    https_server->SetSSLConfig(EmbeddedTestServer::CERT_TEST_NAMES);
+    RegisterDefaultHandlers(https_server.get());
+    https_server->ServeFilesFromSourceDirectory(
+        "content/test/data/attribution_reporting");
+    https_server->ServeFilesFromSourceDirectory("content/test/data");
+
+    return https_server;
+  }
+
  private:
   AttributionManagerImpl::ScopedUseInMemoryStorageForTesting
       attribution_manager_in_memory_setting_;
@@ -130,7 +139,7 @@ IN_PROC_BROWSER_TEST_F(AttributionSrcBrowserTest, SourceRegistered) {
   EXPECT_CALL(mock_attribution_host(), RegisterDataHost)
       .WillOnce(
           [&](mojo::PendingReceiver<blink::mojom::AttributionDataHost> host,
-              RegistrationType) {
+              RegistrationEligibility) {
             data_host = GetRegisteredDataHost(std::move(host));
             loop.Quit();
           });
@@ -174,7 +183,7 @@ IN_PROC_BROWSER_TEST_F(AttributionSrcBrowserTest,
     EXPECT_CALL(mock_attribution_host(), RegisterDataHost)
         .WillOnce(
             [&](mojo::PendingReceiver<blink::mojom::AttributionDataHost> host,
-                RegistrationType) {
+                RegistrationEligibility) {
               data_host = GetRegisteredDataHost(std::move(host));
               data_host->receiver().set_disconnect_handler(
                   disconnect_loop.QuitClosure());
@@ -212,11 +221,8 @@ IN_PROC_BROWSER_TEST_F(AttributionSrcBrowserTest,
                        AttributionSrcWindowOpen_MultipleFeatures_RequestsAll) {
   // Create a separate server as we cannot register a `ControllableHttpResponse`
   // after the server starts.
-  auto https_server = std::make_unique<net::EmbeddedTestServer>(
-      net::EmbeddedTestServer::TYPE_HTTPS);
-  https_server->SetSSLConfig(net::EmbeddedTestServer::CERT_TEST_NAMES);
-  https_server->ServeFilesFromSourceDirectory(
-      "content/test/data/attribution_reporting");
+  std::unique_ptr<EmbeddedTestServer> https_server =
+      CreateAttributionTestHttpsServer();
 
   auto register_response1 =
       std::make_unique<net::test_server::ControllableHttpResponse>(
@@ -247,11 +253,8 @@ IN_PROC_BROWSER_TEST_F(AttributionSrcBrowserTest,
                        AttributionSrcWindowOpen_URLEncoded_SourceRegistered) {
   // Create a separate server as we cannot register a `ControllableHttpResponse`
   // after the server starts.
-  auto https_server = std::make_unique<net::EmbeddedTestServer>(
-      net::EmbeddedTestServer::TYPE_HTTPS);
-  https_server->SetSSLConfig(net::EmbeddedTestServer::CERT_TEST_NAMES);
-  https_server->ServeFilesFromSourceDirectory(
-      "content/test/data/attribution_reporting");
+  std::unique_ptr<EmbeddedTestServer> https_server =
+      CreateAttributionTestHttpsServer();
 
   auto register_response =
       std::make_unique<net::test_server::ControllableHttpResponse>(
@@ -280,11 +283,8 @@ IN_PROC_BROWSER_TEST_F(AttributionSrcBrowserTest,
                        AttributionSrcWindowOpen_RetainsOriginalURLCase) {
   // Create a separate server as we cannot register a `ControllableHttpResponse`
   // after the server starts.
-  auto https_server = std::make_unique<net::EmbeddedTestServer>(
-      net::EmbeddedTestServer::TYPE_HTTPS);
-  https_server->SetSSLConfig(net::EmbeddedTestServer::CERT_TEST_NAMES);
-  https_server->ServeFilesFromSourceDirectory(
-      "content/test/data/attribution_reporting");
+  std::unique_ptr<EmbeddedTestServer> https_server =
+      CreateAttributionTestHttpsServer();
 
   auto register_response =
       std::make_unique<net::test_server::ControllableHttpResponse>(
@@ -313,11 +313,8 @@ IN_PROC_BROWSER_TEST_F(AttributionSrcBrowserTest,
                        AttributionSrcWindowOpen_NonAsciiUrl) {
   // Create a separate server as we cannot register a `ControllableHttpResponse`
   // after the server starts.
-  auto https_server = std::make_unique<net::EmbeddedTestServer>(
-      net::EmbeddedTestServer::TYPE_HTTPS);
-  https_server->SetSSLConfig(net::EmbeddedTestServer::CERT_TEST_NAMES);
-  https_server->ServeFilesFromSourceDirectory(
-      "content/test/data/attribution_reporting");
+  std::unique_ptr<EmbeddedTestServer> https_server =
+      CreateAttributionTestHttpsServer();
 
   auto register_response =
       std::make_unique<net::test_server::ControllableHttpResponse>(
@@ -345,11 +342,8 @@ IN_PROC_BROWSER_TEST_F(
     AttributionSrcWindowOpenNoUserGesture_NoBackgroundRequestNoImpression) {
   // Create a separate server as we cannot register a `ControllableHttpResponse`
   // after the server starts.
-  auto https_server = std::make_unique<net::EmbeddedTestServer>(
-      net::EmbeddedTestServer::TYPE_HTTPS);
-  https_server->SetSSLConfig(net::EmbeddedTestServer::CERT_TEST_NAMES);
-  https_server->ServeFilesFromSourceDirectory(
-      "content/test/data/attribution_reporting");
+  std::unique_ptr<EmbeddedTestServer> https_server =
+      CreateAttributionTestHttpsServer();
 
   auto register_response =
       std::make_unique<net::test_server::ControllableHttpResponse>(
@@ -384,7 +378,7 @@ IN_PROC_BROWSER_TEST_F(AttributionSrcBrowserTest,
   EXPECT_CALL(mock_attribution_host(), RegisterDataHost)
       .WillOnce(
           [&](mojo::PendingReceiver<blink::mojom::AttributionDataHost> host,
-              RegistrationType) {
+              RegistrationEligibility) {
             data_host = GetRegisteredDataHost(std::move(host));
             loop.Quit();
           });
@@ -420,7 +414,7 @@ IN_PROC_BROWSER_TEST_F(AttributionSrcBrowserTest,
   EXPECT_CALL(mock_attribution_host(), RegisterDataHost)
       .WillOnce(
           [&](mojo::PendingReceiver<blink::mojom::AttributionDataHost> host,
-              RegistrationType) {
+              RegistrationEligibility) {
             data_host = GetRegisteredDataHost(std::move(host));
             loop.Quit();
           });
@@ -447,13 +441,8 @@ IN_PROC_BROWSER_TEST_F(AttributionSrcBrowserTest,
                        AttributionSrcImgSlowResponse_SourceRegistered) {
   // Create a separate server as we cannot register a `ControllableHttpResponse`
   // after the server starts.
-  auto https_server = std::make_unique<net::EmbeddedTestServer>(
-      net::EmbeddedTestServer::TYPE_HTTPS);
-  https_server->SetSSLConfig(net::EmbeddedTestServer::CERT_TEST_NAMES);
-  net::test_server::RegisterDefaultHandlers(https_server.get());
-  https_server->ServeFilesFromSourceDirectory(
-      "content/test/data/attribution_reporting");
-  https_server->ServeFilesFromSourceDirectory("content/test/data");
+  std::unique_ptr<EmbeddedTestServer> https_server =
+      CreateAttributionTestHttpsServer();
 
   auto register_response =
       std::make_unique<net::test_server::ControllableHttpResponse>(
@@ -469,7 +458,7 @@ IN_PROC_BROWSER_TEST_F(AttributionSrcBrowserTest,
   EXPECT_CALL(mock_attribution_host(), RegisterDataHost)
       .WillOnce(
           [&](mojo::PendingReceiver<blink::mojom::AttributionDataHost> host,
-              RegistrationType) {
+              RegistrationEligibility) {
             data_host = GetRegisteredDataHost(std::move(host));
             loop.Quit();
           });
@@ -510,13 +499,8 @@ IN_PROC_BROWSER_TEST_F(AttributionSrcBrowserTest,
                        NoReferrerPolicy_UsesDefault) {
   // Create a separate server as we cannot register a `ControllableHttpResponse`
   // after the server starts.
-  auto https_server = std::make_unique<net::EmbeddedTestServer>(
-      net::EmbeddedTestServer::TYPE_HTTPS);
-  https_server->SetSSLConfig(net::EmbeddedTestServer::CERT_TEST_NAMES);
-  net::test_server::RegisterDefaultHandlers(https_server.get());
-  https_server->ServeFilesFromSourceDirectory(
-      "content/test/data/attribution_reporting");
-  https_server->ServeFilesFromSourceDirectory("content/test/data");
+  std::unique_ptr<EmbeddedTestServer> https_server =
+      CreateAttributionTestHttpsServer();
 
   auto register_response =
       std::make_unique<net::test_server::ControllableHttpResponse>(
@@ -541,13 +525,8 @@ IN_PROC_BROWSER_TEST_F(AttributionSrcBrowserTest,
                        Img_SetsAttributionReportingEligibleHeader) {
   // Create a separate server as we cannot register a `ControllableHttpResponse`
   // after the server starts.
-  auto https_server = std::make_unique<net::EmbeddedTestServer>(
-      net::EmbeddedTestServer::TYPE_HTTPS);
-  https_server->SetSSLConfig(net::EmbeddedTestServer::CERT_TEST_NAMES);
-  net::test_server::RegisterDefaultHandlers(https_server.get());
-  https_server->ServeFilesFromSourceDirectory(
-      "content/test/data/attribution_reporting");
-  https_server->ServeFilesFromSourceDirectory("content/test/data");
+  std::unique_ptr<EmbeddedTestServer> https_server =
+      CreateAttributionTestHttpsServer();
 
   auto register_response1 =
       std::make_unique<net::test_server::ControllableHttpResponse>(
@@ -630,13 +609,8 @@ IN_PROC_BROWSER_TEST_F(AttributionSrcBrowserTest,
                        ReferrerPolicy_RespectsDocument) {
   // Create a separate server as we cannot register a `ControllableHttpResponse`
   // after the server starts.
-  auto https_server = std::make_unique<net::EmbeddedTestServer>(
-      net::EmbeddedTestServer::TYPE_HTTPS);
-  https_server->SetSSLConfig(net::EmbeddedTestServer::CERT_TEST_NAMES);
-  net::test_server::RegisterDefaultHandlers(https_server.get());
-  https_server->ServeFilesFromSourceDirectory(
-      "content/test/data/attribution_reporting");
-  https_server->ServeFilesFromSourceDirectory("content/test/data");
+  std::unique_ptr<EmbeddedTestServer> https_server =
+      CreateAttributionTestHttpsServer();
 
   auto register_response =
       std::make_unique<net::test_server::ControllableHttpResponse>(
@@ -654,7 +628,7 @@ IN_PROC_BROWSER_TEST_F(AttributionSrcBrowserTest,
   register_response->WaitForRequest();
   const net::test_server::HttpRequest* request =
       register_response->http_request();
-  EXPECT_TRUE(request->headers.find("Referer") == request->headers.end());
+  EXPECT_FALSE(base::Contains(request->headers, "Referer"));
 }
 
 class AttributionSrcBasicTriggerBrowserTest
@@ -681,7 +655,7 @@ IN_PROC_BROWSER_TEST_P(AttributionSrcBasicTriggerBrowserTest,
   EXPECT_CALL(mock_attribution_host(), RegisterDataHost)
       .WillOnce(
           [&](mojo::PendingReceiver<blink::mojom::AttributionDataHost> host,
-              RegistrationType) {
+              RegistrationEligibility) {
             data_host = GetRegisteredDataHost(std::move(host));
             loop.Quit();
           });
@@ -708,7 +682,7 @@ IN_PROC_BROWSER_TEST_P(AttributionSrcBasicTriggerBrowserTest,
           std::vector<attribution_reporting::AggregatableTriggerData>(),
           /*aggregatable_values=*/
           attribution_reporting::AggregatableValues(),
-          ::aggregation_service::mojom::AggregationCoordinator::kDefault,
+          /*aggregation_coordinator_origin=*/Eq(absl::nullopt),
           attribution_reporting::mojom::SourceRegistrationTimeConfig::
               kExclude))));
 }
@@ -743,7 +717,7 @@ IN_PROC_BROWSER_TEST_F(AttributionSrcBrowserTest,
   EXPECT_CALL(mock_attribution_host(), RegisterDataHost)
       .WillOnce(
           [&](mojo::PendingReceiver<blink::mojom::AttributionDataHost> host,
-              RegistrationType) {
+              RegistrationEligibility) {
             data_host = GetRegisteredDataHost(std::move(host));
             loop.Quit();
           });
@@ -774,13 +748,8 @@ IN_PROC_BROWSER_TEST_F(AttributionSrcBrowserTest,
 
   // Create a separate server as we cannot register a `ControllableHttpResponse`
   // after the server starts.
-  auto https_server = std::make_unique<net::EmbeddedTestServer>(
-      net::EmbeddedTestServer::TYPE_HTTPS);
-  https_server->SetSSLConfig(net::EmbeddedTestServer::CERT_TEST_NAMES);
-  net::test_server::RegisterDefaultHandlers(https_server.get());
-  https_server->ServeFilesFromSourceDirectory(
-      "content/test/data/attribution_reporting");
-  https_server->ServeFilesFromSourceDirectory("content/test/data");
+  std::unique_ptr<EmbeddedTestServer> https_server =
+      CreateAttributionTestHttpsServer();
 
   auto register_response =
       std::make_unique<net::test_server::ControllableHttpResponse>(
@@ -821,11 +790,8 @@ IN_PROC_BROWSER_TEST_P(AttributionSrcMultipleBackgroundRequestTest,
                        AllRegistered) {
   // Create a separate server as we cannot register a `ControllableHttpResponse`
   // after the server starts.
-  auto https_server = std::make_unique<net::EmbeddedTestServer>(
-      net::EmbeddedTestServer::TYPE_HTTPS);
-  https_server->SetSSLConfig(net::EmbeddedTestServer::CERT_TEST_NAMES);
-  https_server->ServeFilesFromSourceDirectory(
-      "content/test/data/attribution_reporting");
+  std::unique_ptr<EmbeddedTestServer> https_server =
+      CreateAttributionTestHttpsServer();
 
   auto register_response1 =
       std::make_unique<net::test_server::ControllableHttpResponse>(
@@ -840,7 +806,7 @@ IN_PROC_BROWSER_TEST_P(AttributionSrcMultipleBackgroundRequestTest,
   EXPECT_CALL(mock_attribution_host(), RegisterDataHost)
       .WillRepeatedly(
           [&](mojo::PendingReceiver<blink::mojom::AttributionDataHost> host,
-              RegistrationType) {
+              RegistrationEligibility) {
             data_host = GetRegisteredDataHost(std::move(host));
             loop.Quit();
           });
@@ -932,7 +898,7 @@ IN_PROC_BROWSER_TEST_F(AttributionSrcPrerenderBrowserTest,
   EXPECT_CALL(mock_attribution_host(), RegisterDataHost)
       .WillOnce(
           [&](mojo::PendingReceiver<blink::mojom::AttributionDataHost> host,
-              RegistrationType) {
+              RegistrationEligibility) {
             data_host = GetRegisteredDataHost(std::move(host));
             loop.Quit();
           });
@@ -1004,7 +970,7 @@ IN_PROC_BROWSER_TEST_F(AttributionSrcPrerenderBrowserTest,
   EXPECT_CALL(mock_attribution_host(), RegisterDataHost)
       .WillOnce(
           [&](mojo::PendingReceiver<blink::mojom::AttributionDataHost> host,
-              RegistrationType) {
+              RegistrationEligibility) {
             data_host = GetRegisteredDataHost(std::move(host));
             loop.Quit();
           });
@@ -1109,7 +1075,8 @@ IN_PROC_BROWSER_TEST_F(AttributionSrcFencedFrameBrowserTest,
       fenced_frame_helper_->CreateFencedFrame(
           root_rfh, GURL(url::kAboutBlankURL), net::OK,
           blink::FencedFrame::DeprecatedFencedFrameMode::kOpaqueAds));
-
+  bool rfh_should_change =
+      fenced_frame_host->ShouldChangeRenderFrameHostOnSameSiteNavigation();
   TestFrameNavigationObserver observer(fenced_frame_host.get());
 
   EXPECT_TRUE(ExecJs(root_rfh, JsReplace("document.querySelector('fencedframe')"
@@ -1118,7 +1085,7 @@ IN_PROC_BROWSER_TEST_F(AttributionSrcFencedFrameBrowserTest,
 
   observer.Wait();
 
-  if (content::WillSameSiteNavigationsChangeRenderFrameHosts()) {
+  if (rfh_should_change) {
     EXPECT_TRUE(fenced_frame_host.WaitUntilRenderFrameDeleted());
   } else {
     ASSERT_NE(fenced_frame_host.get(), nullptr);
@@ -1136,7 +1103,7 @@ IN_PROC_BROWSER_TEST_F(AttributionSrcFencedFrameBrowserTest,
   EXPECT_CALL(mock_attribution_host(), RegisterDataHost)
       .WillOnce(
           [&](mojo::PendingReceiver<blink::mojom::AttributionDataHost> host,
-              RegistrationType) {
+              RegistrationEligibility) {
             data_host = GetRegisteredDataHost(std::move(host));
             loop.Quit();
           });
@@ -1178,13 +1145,8 @@ IN_PROC_BROWSER_TEST_F(AttributionSrcCrossAppWebRuntimeDisabledBrowserTest,
                        Img_SupportHeaderNotSet) {
   // Create a separate server as we cannot register a `ControllableHttpResponse`
   // after the server starts.
-  auto https_server = std::make_unique<net::EmbeddedTestServer>(
-      net::EmbeddedTestServer::TYPE_HTTPS);
-  https_server->SetSSLConfig(net::EmbeddedTestServer::CERT_TEST_NAMES);
-  net::test_server::RegisterDefaultHandlers(https_server.get());
-  https_server->ServeFilesFromSourceDirectory(
-      "content/test/data/attribution_reporting");
-  https_server->ServeFilesFromSourceDirectory("content/test/data");
+  std::unique_ptr<EmbeddedTestServer> https_server =
+      CreateAttributionTestHttpsServer();
 
   auto register_response1 =
       std::make_unique<net::test_server::ControllableHttpResponse>(
@@ -1244,13 +1206,8 @@ IN_PROC_BROWSER_TEST_F(AttributionSrcCrossAppWebEnabledBrowserTest,
                        Img_SetsSupportHeader) {
   // Create a separate server as we cannot register a `ControllableHttpResponse`
   // after the server starts.
-  auto https_server = std::make_unique<net::EmbeddedTestServer>(
-      net::EmbeddedTestServer::TYPE_HTTPS);
-  https_server->SetSSLConfig(net::EmbeddedTestServer::CERT_TEST_NAMES);
-  net::test_server::RegisterDefaultHandlers(https_server.get());
-  https_server->ServeFilesFromSourceDirectory(
-      "content/test/data/attribution_reporting");
-  https_server->ServeFilesFromSourceDirectory("content/test/data");
+  std::unique_ptr<EmbeddedTestServer> https_server =
+      CreateAttributionTestHttpsServer();
 
   auto register_response1 =
       std::make_unique<net::test_server::ControllableHttpResponse>(
@@ -1312,13 +1269,8 @@ IN_PROC_BROWSER_TEST_P(AttributionSrcCrossAppWebEnabledSubresourceBrowserTest,
                        Register) {
   // Create a separate server as we cannot register a `ControllableHttpResponse`
   // after the server starts.
-  auto https_server = std::make_unique<net::EmbeddedTestServer>(
-      net::EmbeddedTestServer::TYPE_HTTPS);
-  https_server->SetSSLConfig(net::EmbeddedTestServer::CERT_TEST_NAMES);
-  net::test_server::RegisterDefaultHandlers(https_server.get());
-  https_server->ServeFilesFromSourceDirectory(
-      "content/test/data/attribution_reporting");
-  https_server->ServeFilesFromSourceDirectory("content/test/data");
+  std::unique_ptr<EmbeddedTestServer> https_server =
+      CreateAttributionTestHttpsServer();
 
   auto register_response1 =
       std::make_unique<net::test_server::ControllableHttpResponse>(
@@ -1367,13 +1319,8 @@ IN_PROC_BROWSER_TEST_F(
     OsLevelEnabledPostRendererInitialization_SetsSupportHeader) {
   // Create a separate server as we cannot register a `ControllableHttpResponse`
   // after the server starts.
-  auto https_server = std::make_unique<net::EmbeddedTestServer>(
-      net::EmbeddedTestServer::TYPE_HTTPS);
-  https_server->SetSSLConfig(net::EmbeddedTestServer::CERT_TEST_NAMES);
-  net::test_server::RegisterDefaultHandlers(https_server.get());
-  https_server->ServeFilesFromSourceDirectory(
-      "content/test/data/attribution_reporting");
-  https_server->ServeFilesFromSourceDirectory("content/test/data");
+  std::unique_ptr<EmbeddedTestServer> https_server =
+      CreateAttributionTestHttpsServer();
 
   auto register_response1 =
       std::make_unique<net::test_server::ControllableHttpResponse>(
@@ -1419,8 +1366,10 @@ IN_PROC_BROWSER_TEST_F(
 struct OsRegistrationTestCase {
   const char* name;
   const char* header;
-  std::vector<std::vector<GURL>> expected_os_sources;
-  std::vector<std::vector<GURL>> expected_os_triggers;
+  std::vector<std::vector<attribution_reporting::OsRegistrationItem>>
+      expected_os_sources;
+  std::vector<std::vector<attribution_reporting::OsRegistrationItem>>
+      expected_os_triggers;
 };
 
 class AttributionSrcCrossAppWebEnabledOsRegistrationBrowserTest
@@ -1437,8 +1386,12 @@ INSTANTIATE_TEST_SUITE_P(
             .expected_os_sources =
                 {
                     {
-                        GURL("https://r1.test/x"),
-                        GURL("https://r2.test/y"),
+                        attribution_reporting::OsRegistrationItem{
+                            .url = GURL("https://r1.test/x")},
+                        attribution_reporting::OsRegistrationItem{
+                            .url = GURL("https://r2.test/y"),
+                            .debug_reporting = true,
+                        },
                     },
                 },
         },
@@ -1448,8 +1401,12 @@ INSTANTIATE_TEST_SUITE_P(
             .expected_os_triggers =
                 {
                     {
-                        GURL("https://r1.test/x"),
-                        GURL("https://r2.test/y"),
+                        attribution_reporting::OsRegistrationItem{
+                            .url = GURL("https://r1.test/x")},
+                        attribution_reporting::OsRegistrationItem{
+                            .url = GURL("https://r2.test/y"),
+                            .debug_reporting = true,
+                        },
                     },
                 },
         }),
@@ -1462,20 +1419,15 @@ IN_PROC_BROWSER_TEST_P(
 
   // Create a separate server as we cannot register a `ControllableHttpResponse`
   // after the server starts.
-  auto https_server = std::make_unique<net::EmbeddedTestServer>(
-      net::EmbeddedTestServer::TYPE_HTTPS);
-  https_server->SetSSLConfig(net::EmbeddedTestServer::CERT_TEST_NAMES);
-  net::test_server::RegisterDefaultHandlers(https_server.get());
-  https_server->ServeFilesFromSourceDirectory(
-      "content/test/data/attribution_reporting");
-  https_server->ServeFilesFromSourceDirectory("content/test/data");
+  std::unique_ptr<EmbeddedTestServer> https_server =
+      CreateAttributionTestHttpsServer();
 
   std::unique_ptr<MockDataHost> data_host;
   base::RunLoop loop;
   EXPECT_CALL(mock_attribution_host(), RegisterDataHost)
       .WillOnce(
           [&](mojo::PendingReceiver<blink::mojom::AttributionDataHost> host,
-              RegistrationType) {
+              RegistrationEligibility) {
             data_host = GetRegisteredDataHost(std::move(host));
             loop.Quit();
           });
@@ -1499,8 +1451,9 @@ IN_PROC_BROWSER_TEST_P(
   register_response->WaitForRequest();
 
   auto http_response = std::make_unique<net::test_server::BasicHttpResponse>();
-  http_response->AddCustomHeader(test_case.header,
-                                 R"("https://r1.test/x", "https://r2.test/y")");
+  http_response->AddCustomHeader(
+      test_case.header,
+      R"("https://r1.test/x", "https://r2.test/y"; debug-reporting)");
   register_response->Send(http_response->ToResponseString());
   register_response->Done();
 

@@ -54,6 +54,8 @@ class TestRasterInterface : public gpu::raster::RasterInterface {
   void set_max_texture_size(int max_texture_size) {
     caps_.max_texture_size = max_texture_size;
   }
+  void set_supports_gpu_memory_buffer_format(gfx::BufferFormat format,
+                                             bool support);
 
   // gpu::raster::RasterInterface implementation.
   void Finish() override;
@@ -88,6 +90,8 @@ class TestRasterInterface : public gpu::raster::RasterInterface {
                    int dst_plane_index,
                    GLenum texture_target,
                    const SkPixmap& src_sk_pixmap) override {}
+  void WritePixelsYUV(const gpu::Mailbox& dest_mailbox,
+                      const SkYUVAPixmaps& src_yuv_pixmap) override {}
   void ConvertYUVAMailboxesToRGB(
       const gpu::Mailbox& dest_mailbox,
       SkYUVColorSpace planes_yuv_color_space,

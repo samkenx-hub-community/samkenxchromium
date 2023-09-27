@@ -17,7 +17,6 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -69,7 +68,6 @@ import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.share.ShareDelegate;
 import org.chromium.chrome.browser.ui.messages.snackbar.Snackbar;
 import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager;
-import org.chromium.chrome.browser.xsurface.FeedUserInteractionReliabilityLogger.ClosedReason;
 import org.chromium.chrome.browser.xsurface.HybridListRenderer;
 import org.chromium.chrome.browser.xsurface.SurfaceActionsHandler;
 import org.chromium.chrome.browser.xsurface.SurfaceActionsHandler.OpenMode;
@@ -77,13 +75,13 @@ import org.chromium.chrome.browser.xsurface.SurfaceActionsHandler.OpenUrlOptions
 import org.chromium.chrome.browser.xsurface.SurfaceActionsHandler.WebFeedFollowUpdate;
 import org.chromium.chrome.browser.xsurface.feed.FeedActionsHandler;
 import org.chromium.chrome.browser.xsurface.feed.FeedSurfaceScope;
+import org.chromium.chrome.browser.xsurface.feed.FeedUserInteractionReliabilityLogger.ClosedReason;
 import org.chromium.chrome.test.util.browser.Features;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
 import org.chromium.components.feed.proto.FeedUiProto;
 import org.chromium.content_public.browser.LoadUrlParams;
 import org.chromium.ui.base.WindowAndroid;
 import org.chromium.url.JUnitTestGURLs;
-import org.chromium.url.ShadowGURL;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -93,14 +91,14 @@ import java.util.Map;
 
 /** Unit tests for {@link FeedStream}. */
 @RunWith(BaseRobolectricTestRunner.class)
-@Config(manifest = Config.NONE, shadows = {ShadowPostTask.class, ShadowGURL.class})
+@Config(manifest = Config.NONE, shadows = {ShadowPostTask.class})
 // TODO(crbug.com/1210371): Rewrite using paused loop. See crbug for details.
 @LooperMode(LooperMode.Mode.LEGACY)
 public class FeedStreamTest {
     private static final int LOAD_MORE_TRIGGER_LOOKAHEAD = 5;
     private static final int LOAD_MORE_TRIGGER_SCROLL_DISTANCE_DP = 100;
     private static final String TEST_DATA = "test";
-    private static final String TEST_URL = JUnitTestGURLs.EXAMPLE_URL;
+    private static final String TEST_URL = JUnitTestGURLs.EXAMPLE_URL.getSpec();
     private static final String HEADER_PREFIX = "header";
     private static final OpenUrlOptions DEFAULT_OPEN_URL_OPTIONS = new OpenUrlOptions() {};
 
@@ -112,7 +110,9 @@ public class FeedStreamTest {
     private FeedListContentManager mContentManager;
 
     @Mock
-    private FeedStream.Natives mFeedStreamJniMock;
+    private FeedSurfaceRendererBridge mFeedSurfaceRendererBridgeMock;
+    @Mock
+    private FeedSurfaceRendererBridge.Natives mFeedRendererJniMock;
     @Mock
     private FeedServiceBridge.Natives mFeedServiceBridgeJniMock;
     @Mock
@@ -170,6 +170,18 @@ public class FeedStreamTest {
     @Rule
     public TestRule mFeaturesProcessorRule = new Features.JUnitProcessor();
 
+    private FeedSurfaceRendererBridge.Renderer mBridgeRenderer;
+
+    class FeedSurfaceRendererBridgeFactory implements FeedSurfaceRendererBridge.Factory {
+        @Override
+        public FeedSurfaceRendererBridge create(FeedSurfaceRendererBridge.Renderer renderer,
+                FeedReliabilityLoggingBridge reliabilityLoggingBridge, @StreamKind int streamKind,
+                SingleWebFeedParameters webFeedParameters) {
+            mBridgeRenderer = renderer;
+            return mFeedSurfaceRendererBridgeMock;
+        }
+    }
+
     private void setFeatureOverrides(boolean feedLoadingPlaceholderOn) {
         Map<String, Boolean> overrides = new ArrayMap<>();
         overrides.put(ChromeFeatureList.FEED_LOADING_PLACEHOLDER, feedLoadingPlaceholderOn);
@@ -183,7 +195,7 @@ public class FeedStreamTest {
         mActivityController = Robolectric.buildActivity(Activity.class);
         mActivity = mActivityController.get();
 
-        mocker.mock(FeedStreamJni.TEST_HOOKS, mFeedStreamJniMock);
+        mocker.mock(FeedSurfaceRendererBridgeJni.TEST_HOOKS, mFeedRendererJniMock);
         mocker.mock(FeedServiceBridge.getTestHooksForTesting(), mFeedServiceBridgeJniMock);
         mocker.mock(FeedReliabilityLoggingBridge.getTestHooksForTesting(),
                 mFeedReliabilityLoggingBridgeJniMock);
@@ -196,11 +208,9 @@ public class FeedStreamTest {
                 .thenReturn(LOAD_MORE_TRIGGER_SCROLL_DISTANCE_DP);
         mFeedStream = new FeedStream(mActivity, mSnackbarManager, mBottomSheetController,
                 /* isPlaceholderShown= */ false, mWindowAndroid, mShareDelegateSupplier,
-                /* isInterestFeed= */ StreamKind.FOR_YOU,
-                /* FeedAutoplaySettingsDelegate= */ null, mActionDelegate,
+                /* isInterestFeed= */ StreamKind.FOR_YOU, mActionDelegate,
                 /*helpAndFeedbackLauncher=*/null, mFeedContentFirstLoadWatcher, mStreamsMediator,
-                /*SingleWebFeedHelper=*/null);
-        mFeedStream.mMakeGURL = url -> JUnitTestGURLs.getGURL(url);
+                /*SingleWebFeedHelper=*/null, new FeedSurfaceRendererBridgeFactory());
         mRecyclerView = new RecyclerView(mActivity);
         mRecyclerView.setAdapter(mAdapter);
         mContentManager = new FeedListContentManager();
@@ -227,7 +237,7 @@ public class FeedStreamTest {
                         .addUpdatedSlices(createSliceUpdateForNewXSurfaceSlice("b"))
                         .addUpdatedSlices(createSliceUpdateForNewXSurfaceSlice("c"))
                         .build();
-        mFeedStream.onStreamUpdated(update.toByteArray());
+        mBridgeRenderer.onStreamUpdated(update.toByteArray());
 
         mFeedStream.unbind(false, false);
         assertEquals(3, mContentManager.getItemCount());
@@ -249,7 +259,7 @@ public class FeedStreamTest {
                         .addUpdatedSlices(createSliceUpdateForNewXSurfaceSlice("b"))
                         .addUpdatedSlices(createSliceUpdateForNewXSurfaceSlice("c"))
                         .build();
-        mFeedStream.onStreamUpdated(update.toByteArray());
+        mBridgeRenderer.onStreamUpdated(update.toByteArray());
 
         // Add header content.
         createHeaderContent(2);
@@ -276,7 +286,7 @@ public class FeedStreamTest {
                 FeedUiProto.StreamUpdate.newBuilder()
                         .addUpdatedSlices(createSliceUpdateForNewXSurfaceSlice("a"))
                         .build();
-        mFeedStream.onStreamUpdated(update.toByteArray());
+        mBridgeRenderer.onStreamUpdated(update.toByteArray());
 
         mFeedStream.unbind(true, false);
 
@@ -297,7 +307,7 @@ public class FeedStreamTest {
                 FeedUiProto.StreamUpdate.newBuilder()
                         .addUpdatedSlices(createSliceUpdateForNewXSurfaceSlice("a"))
                         .build();
-        mFeedStream.onStreamUpdated(update.toByteArray());
+        mBridgeRenderer.onStreamUpdated(update.toByteArray());
         mFeedStream.unbind(true, false);
 
         // Bind again with correct headercount.
@@ -308,7 +318,7 @@ public class FeedStreamTest {
         update = FeedUiProto.StreamUpdate.newBuilder()
                          .addUpdatedSlices(createSliceUpdateForNewXSurfaceSlice("b"))
                          .build();
-        mFeedStream.onStreamUpdated(update.toByteArray());
+        mBridgeRenderer.onStreamUpdated(update.toByteArray());
 
         assertEquals(3, mContentManager.getItemCount());
         assertEquals(HEADER_PREFIX + "0", mContentManager.getContent(0).getKey());
@@ -322,7 +332,7 @@ public class FeedStreamTest {
     public void testBind() {
         bindToView();
         // Called surfaceOpened.
-        verify(mFeedStreamJniMock).surfaceOpened(anyLong(), any(FeedStream.class));
+        verify(mFeedSurfaceRendererBridgeMock).surfaceOpened();
         // Set handlers in contentmanager.
         assertEquals(2, mContentManager.getContextValues(0).size());
         verify(mReliabilityLogger).onBindStream(anyInt(), anyInt());
@@ -332,7 +342,7 @@ public class FeedStreamTest {
     public void testUnbind() {
         bindToView();
         mFeedStream.unbind(false, /*switchingStream=*/false);
-        verify(mFeedStreamJniMock).surfaceClosed(anyLong(), any(FeedStream.class));
+        verify(mFeedSurfaceRendererBridgeMock).surfaceClosed();
         // Unset handlers in contentmanager.
         assertEquals(0, mContentManager.getContextValues(0).size());
         verify(mReliabilityLogger).onUnbindStream(eq(ClosedReason.LEAVE_FEED));
@@ -389,7 +399,7 @@ public class FeedStreamTest {
                         .addUpdatedSlices(createSliceUpdateForNewXSurfaceSlice("b"))
                         .addUpdatedSlices(createSliceUpdateForNewXSurfaceSlice("c"))
                         .build();
-        mFeedStream.onStreamUpdated(update.toByteArray());
+        mBridgeRenderer.onStreamUpdated(update.toByteArray());
         assertEquals(3, mContentManager.getItemCount());
         assertEquals(0, mContentManager.findContentPositionByKey("a"));
         assertEquals(1, mContentManager.findContentPositionByKey("b"));
@@ -403,7 +413,7 @@ public class FeedStreamTest {
                          .addUpdatedSlices(createSliceUpdateForNewXSurfaceSlice("d"))
                          .addUpdatedSlices(createSliceUpdateForNewXSurfaceSlice("e"))
                          .build();
-        mFeedStream.onStreamUpdated(update.toByteArray());
+        mBridgeRenderer.onStreamUpdated(update.toByteArray());
         assertEquals(5, mContentManager.getItemCount());
         assertEquals(0, mContentManager.findContentPositionByKey("a"));
         assertEquals(1, mContentManager.findContentPositionByKey("b"));
@@ -422,7 +432,7 @@ public class FeedStreamTest {
                         .addUpdatedSlices(createSliceUpdateForNewXSurfaceSlice("a"))
                         .addUpdatedSlices(createSliceUpdateForNewXSurfaceSlice("b"))
                         .build();
-        mFeedStream.onStreamUpdated(update.toByteArray());
+        mBridgeRenderer.onStreamUpdated(update.toByteArray());
         assertEquals(2, mContentManager.getItemCount());
         assertEquals(0, mContentManager.findContentPositionByKey("a"));
         assertEquals(1, mContentManager.findContentPositionByKey("b"));
@@ -432,7 +442,7 @@ public class FeedStreamTest {
                          .addUpdatedSlices(createSliceUpdateForNewXSurfaceSlice("b"))
                          .addUpdatedSlices(createSliceUpdateForNewXSurfaceSlice("a"))
                          .build();
-        mFeedStream.onStreamUpdated(update.toByteArray());
+        mBridgeRenderer.onStreamUpdated(update.toByteArray());
         assertEquals(2, mContentManager.getItemCount());
         assertEquals(0, mContentManager.findContentPositionByKey("b"));
         assertEquals(1, mContentManager.findContentPositionByKey("a"));
@@ -443,8 +453,7 @@ public class FeedStreamTest {
         // By default, stream content is not visible.
         final int triggerDistance = getLoadMoreTriggerScrollDistance();
         mFeedStream.checkScrollingForLoadMore(triggerDistance);
-        verify(mFeedStreamJniMock, never())
-                .loadMore(anyLong(), any(FeedStream.class), any(Callback.class));
+        verify(mFeedSurfaceRendererBridgeMock, never()).loadMore(any());
     }
 
     @Test
@@ -455,21 +464,19 @@ public class FeedStreamTest {
 
         // loadMore not triggered due to not enough accumulated scrolling distance.
         mFeedStream.checkScrollingForLoadMore(triggerDistance / 2);
-        verify(mFeedStreamJniMock, never())
-                .loadMore(anyLong(), any(FeedStream.class), any(Callback.class));
+        verify(mFeedSurfaceRendererBridgeMock, never()).loadMore(any(Callback.class));
 
         // loadMore not triggered due to last visible item not falling into lookahead range.
         mLayoutManager.setLastVisiblePosition(itemCount - LOAD_MORE_TRIGGER_LOOKAHEAD - 1);
         mLayoutManager.setItemCount(itemCount);
         mFeedStream.checkScrollingForLoadMore(triggerDistance / 2);
-        verify(mFeedStreamJniMock, never())
-                .loadMore(anyLong(), any(FeedStream.class), any(Callback.class));
+        verify(mFeedSurfaceRendererBridgeMock, never()).loadMore(any(Callback.class));
 
         // loadMore triggered.
         mLayoutManager.setLastVisiblePosition(itemCount - LOAD_MORE_TRIGGER_LOOKAHEAD + 1);
         mLayoutManager.setItemCount(itemCount);
         mFeedStream.checkScrollingForLoadMore(triggerDistance / 2);
-        verify(mFeedStreamJniMock).loadMore(anyLong(), any(FeedStream.class), any(Callback.class));
+        verify(mFeedSurfaceRendererBridgeMock).loadMore(any(Callback.class));
     }
 
     @Test
@@ -482,7 +489,7 @@ public class FeedStreamTest {
         mLayoutManager.setLastVisiblePosition(itemCount - LOAD_MORE_TRIGGER_LOOKAHEAD + 1);
         mLayoutManager.setItemCount(itemCount);
         mFeedStream.checkScrollingForLoadMore(triggerDistance);
-        verify(mFeedStreamJniMock).loadMore(anyLong(), any(FeedStream.class), any(Callback.class));
+        verify(mFeedSurfaceRendererBridgeMock).loadMore(any(Callback.class));
 
         // loadMore triggered again after hide&show.
         mFeedStream.checkScrollingForLoadMore(-triggerDistance);
@@ -492,7 +499,7 @@ public class FeedStreamTest {
         mLayoutManager.setLastVisiblePosition(itemCount - LOAD_MORE_TRIGGER_LOOKAHEAD + 1);
         mLayoutManager.setItemCount(itemCount);
         mFeedStream.checkScrollingForLoadMore(triggerDistance);
-        verify(mFeedStreamJniMock).loadMore(anyLong(), any(FeedStream.class), any(Callback.class));
+        verify(mFeedSurfaceRendererBridgeMock).loadMore(any(Callback.class));
     }
 
     @Test
@@ -897,9 +904,8 @@ public class FeedStreamTest {
             }
         });
 
-        verify(mFeedStreamJniMock)
-                .reportOtherUserAction(anyLong(), any(FeedStream.class),
-                        eq(FeedUserActionType.TAPPED_ADD_TO_READING_LIST));
+        verify(mFeedSurfaceRendererBridgeMock)
+                .reportOtherUserAction(eq(FeedUserActionType.TAPPED_ADD_TO_READING_LIST));
         verify(mActionDelegate).addToReadingList(eq(title), eq(TEST_URL));
     }
 
@@ -977,7 +983,7 @@ public class FeedStreamTest {
         mFeedStream.triggerRefresh(mMockRefreshCallback);
 
         verify(mSnackbarManager, times(1)).dismissSnackbars(any());
-        verify(mFeedStreamJniMock).manualRefresh(anyLong(), any(), any());
+        verify(mFeedSurfaceRendererBridgeMock).manualRefresh(any());
     }
 
     @Test
@@ -1010,14 +1016,13 @@ public class FeedStreamTest {
         mLayoutManager.setLastVisiblePosition(itemCount - LOAD_MORE_TRIGGER_LOOKAHEAD - 1);
         mLayoutManager.setItemCount(itemCount);
         handler.commitDismissal(0);
-        verify(mFeedStreamJniMock, never())
-                .loadMore(anyLong(), any(FeedStream.class), any(Callback.class));
+        verify(mFeedSurfaceRendererBridgeMock, never()).loadMore(any(Callback.class));
 
         // loadMore triggered.
         mLayoutManager.setLastVisiblePosition(itemCount - LOAD_MORE_TRIGGER_LOOKAHEAD + 1);
         mLayoutManager.setItemCount(itemCount);
         handler.commitDismissal(0);
-        verify(mFeedStreamJniMock).loadMore(anyLong(), any(FeedStream.class), any(Callback.class));
+        verify(mFeedSurfaceRendererBridgeMock).loadMore(any(Callback.class));
     }
 
     @Test
@@ -1030,8 +1035,8 @@ public class FeedStreamTest {
         mFeedStream.getScrollListenerForTest().onScrolled(mRecyclerView, 0, 100);
         mFeedStream.unbind(false, false);
 
-        verify(mFeedStreamJniMock).reportStreamScrollStart(anyLong(), any(FeedStream.class));
-        verify(mFeedStreamJniMock).reportStreamScrolled(anyLong(), any(FeedStream.class), eq(100));
+        verify(mFeedSurfaceRendererBridgeMock).reportStreamScrollStart();
+        verify(mFeedSurfaceRendererBridgeMock).reportStreamScrolled(eq(100));
     }
 
     @Test
@@ -1043,7 +1048,7 @@ public class FeedStreamTest {
                 FeedUiProto.StreamUpdate.newBuilder()
                         .addUpdatedSlices(createSliceUpdateForLoadingSpinnerSlice("a", true))
                         .build();
-        mFeedStream.onStreamUpdated(update.toByteArray());
+        mBridgeRenderer.onStreamUpdated(update.toByteArray());
         assertEquals(2, mContentManager.getItemCount());
         assertEquals("a", mContentManager.getContent(1).getKey());
         FeedListContentManager.FeedContent content = mContentManager.getContent(1);
@@ -1068,7 +1073,7 @@ public class FeedStreamTest {
                 FeedUiProto.StreamUpdate.newBuilder()
                         .addUpdatedSlices(createSliceUpdateForLoadingSpinnerSlice("a", true))
                         .build();
-        mFeedStream.onStreamUpdated(update.toByteArray());
+        mBridgeRenderer.onStreamUpdated(update.toByteArray());
         assertEquals(2, mContentManager.getItemCount());
         assertEquals("a", mContentManager.getContent(1).getKey());
         FeedListContentManager.FeedContent content = mContentManager.getContent(1);
@@ -1088,11 +1093,10 @@ public class FeedStreamTest {
     public void testUnreadContentObserver_nullInterestFeed() {
         FeedStream stream = new FeedStream(mActivity, mSnackbarManager, mBottomSheetController,
                 /* isPlaceholderShown= */ false, mWindowAndroid, mShareDelegateSupplier,
-                /* isInterestFeed= */ StreamKind.FOR_YOU,
-                /* FeedAutoplaySettingsDelegate= */ null, mActionDelegate,
+                /* isInterestFeed= */ StreamKind.FOR_YOU, mActionDelegate,
                 /*helpAndFeedbackLauncher=*/null,
                 /*FeedContentFirstLoadWatcher=*/null, /*Stream.StreamsMediator*/ null,
-                /*SingleWebFeedHelper=*/null);
+                /*SingleWebFeedHelper=*/null, new FeedSurfaceRendererBridgeFactory());
         assertNull(stream.getUnreadContentObserverForTest());
     }
 
@@ -1104,11 +1108,10 @@ public class FeedStreamTest {
         FeatureList.setTestFeatures(features);
         FeedStream stream = new FeedStream(mActivity, mSnackbarManager, mBottomSheetController,
                 /* isPlaceholderShown= */ false, mWindowAndroid, mShareDelegateSupplier,
-                /* isInterestFeed= */ StreamKind.FOLLOWING,
-                /* FeedAutoplaySettingsDelegate= */ null, mActionDelegate,
+                /* isInterestFeed= */ StreamKind.FOLLOWING, mActionDelegate,
                 /*helpAndFeedbackLauncher=*/null,
                 /*FeedContentFirstLoadWatcher=*/null, /*Stream.StreamsMediator*/ null,
-                /*SingleWebFeedHelper=*/null);
+                /*SingleWebFeedHelper=*/null, new FeedSurfaceRendererBridgeFactory());
         assertNotNull(stream.getUnreadContentObserverForTest());
         FeatureList.setTestFeatures(null);
     }
@@ -1121,11 +1124,10 @@ public class FeedStreamTest {
         FeatureList.setTestFeatures(features);
         FeedStream stream = new FeedStream(mActivity, mSnackbarManager, mBottomSheetController,
                 /* isPlaceholderShown= */ false, mWindowAndroid, mShareDelegateSupplier,
-                StreamKind.FOLLOWING,
-                /* FeedAutoplaySettingsDelegate= */ null, mActionDelegate,
+                StreamKind.FOLLOWING, mActionDelegate,
                 /*helpAndFeedbackLauncher=*/null,
                 /*FeedContentFirstLoadWatcher=*/null, /*Stream.StreamsMediator*/ null,
-                /*SingleWebFeedHelper=*/null);
+                /*SingleWebFeedHelper=*/null, new FeedSurfaceRendererBridgeFactory());
         assertNotNull(stream.getUnreadContentObserverForTest());
         FeatureList.setTestFeatures(null);
     }
@@ -1138,11 +1140,10 @@ public class FeedStreamTest {
         FeatureList.setTestFeatures(features);
         FeedStream stream = new FeedStream(mActivity, mSnackbarManager, mBottomSheetController,
                 /* isPlaceholderShown= */ false, mWindowAndroid, mShareDelegateSupplier,
-                StreamKind.FOR_YOU,
-                /* FeedAutoplaySettingsDelegate= */ null, mActionDelegate,
+                StreamKind.FOR_YOU, mActionDelegate,
                 /*helpAndFeedbackLauncher=*/null,
                 /*FeedContentFirstLoadWatcher=*/null, /*Stream.StreamsMediator*/ null,
-                /*SingleWebFeedHelper=*/null);
+                /*SingleWebFeedHelper=*/null, new FeedSurfaceRendererBridgeFactory());
         assertFalse(stream.supportsOptions());
     }
 
@@ -1154,11 +1155,10 @@ public class FeedStreamTest {
         FeatureList.setTestFeatures(features);
         FeedStream stream = new FeedStream(mActivity, mSnackbarManager, mBottomSheetController,
                 /* isPlaceholderShown= */ false, mWindowAndroid, mShareDelegateSupplier,
-                StreamKind.FOR_YOU,
-                /* FeedAutoplaySettingsDelegate= */ null, mActionDelegate,
+                StreamKind.FOR_YOU, mActionDelegate,
                 /*helpAndFeedbackLauncher=*/null,
                 /*FeedContentFirstLoadWatcher=*/null, /*Stream.StreamsMediator*/ null,
-                /*SingleWebFeedHelper=*/null);
+                /*SingleWebFeedHelper=*/null, new FeedSurfaceRendererBridgeFactory());
         assertFalse(stream.supportsOptions());
     }
 
@@ -1170,11 +1170,10 @@ public class FeedStreamTest {
         FeatureList.setTestFeatures(features);
         FeedStream stream = new FeedStream(mActivity, mSnackbarManager, mBottomSheetController,
                 /* isPlaceholderShown= */ false, mWindowAndroid, mShareDelegateSupplier,
-                StreamKind.FOLLOWING,
-                /* FeedAutoplaySettingsDelegate= */ null, mActionDelegate,
+                StreamKind.FOLLOWING, mActionDelegate,
                 /*helpAndFeedbackLauncher=*/null,
                 /*FeedContentFirstLoadWatcher=*/null, /*Stream.StreamsMediator*/ null,
-                /*SingleWebFeedHelper=*/null);
+                /*SingleWebFeedHelper=*/null, new FeedSurfaceRendererBridgeFactory());
         assertFalse(stream.supportsOptions());
     }
 
@@ -1186,12 +1185,23 @@ public class FeedStreamTest {
         FeatureList.setTestFeatures(features);
         FeedStream stream = new FeedStream(mActivity, mSnackbarManager, mBottomSheetController,
                 /* isPlaceholderShown= */ false, mWindowAndroid, mShareDelegateSupplier,
-                StreamKind.FOLLOWING,
-                /* FeedAutoplaySettingsDelegate= */ null, mActionDelegate,
+                StreamKind.FOLLOWING, mActionDelegate,
                 /*helpAndFeedbackLauncher=*/null,
                 /*FeedContentFirstLoadWatcher=*/null, /*Stream.StreamsMediator*/ null,
-                /*SingleWebFeedHelper=*/null);
+                /*SingleWebFeedHelper=*/null, new FeedSurfaceRendererBridgeFactory());
         assertTrue(stream.supportsOptions());
+    }
+
+    @Test
+    @SmallTest
+    public void testTriggerManualRefresh() {
+        bindToView();
+        FeedStream.FeedActionsHandlerImpl handler =
+                (FeedStream.FeedActionsHandlerImpl) mContentManager.getContextValues(0).get(
+                        FeedActionsHandler.KEY);
+
+        handler.triggerManualRefresh();
+        verify(mStreamsMediator).refreshStream();
     }
 
     private int getLoadMoreTriggerScrollDistance() {

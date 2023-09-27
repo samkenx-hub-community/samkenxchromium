@@ -14,7 +14,7 @@
 #include "base/time/default_tick_clock.h"
 #include "base/time/time.h"
 #include "chrome/browser/ash/login/version_updater/update_time_estimator.h"
-#include "chrome/grit/chromium_strings.h"
+#include "chrome/grit/branded_strings.h"
 #include "chrome/grit/generated_resources.h"
 #include "chromeos/ash/components/dbus/update_engine/update_engine_client.h"
 #include "chromeos/ash/components/network/network_handler.h"
@@ -77,7 +77,7 @@ void VersionUpdater::StartNetworkCheck() {
     StartUpdateCheck();
     return;
   }
-  update_info_.state = State::STATE_FIRST_PORTAL_CHECK;
+
   delegate_->UpdateInfoChanged(update_info_);
 
   if (NetworkHandler::IsInitialized()) {
@@ -162,8 +162,6 @@ void VersionUpdater::RequestUpdateCheck() {
   update_info_.update_size = 0;
   delegate_->UpdateInfoChanged(update_info_);
 
-  if (NetworkHandler::IsInitialized())
-    NetworkHandler::Get()->network_state_handler()->RemoveObserver(this);
   if (!UpdateEngineClient::Get()->HasObserver(this)) {
     UpdateEngineClient::Get()->AddObserver(this);
   }
@@ -310,7 +308,7 @@ void VersionUpdater::PortalStateChanged(const NetworkState* network,
       StartUpdateCheck();
     else
       UpdateErrorMessage(network, state);
-  } else if (update_info_.state == State::STATE_FIRST_PORTAL_CHECK) {
+  } else {
     // In the case of online state immediately proceed to the update
     // stage. Otherwise, prepare and show error message.
     if (state == NetworkState::PortalState::kOnline) {

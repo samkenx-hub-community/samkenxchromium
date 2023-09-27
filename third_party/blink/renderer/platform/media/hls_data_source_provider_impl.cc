@@ -1,4 +1,4 @@
-// Copyright 2023 The Chromium Authors. All rights reserved.
+// Copyright 2023 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -56,7 +56,7 @@ class HlsDataSourceImpl final : public media::HlsDataSource {
         std::move(callback).Run(HlsDataSource::ReadStatusCodes::kError);
         return;
       }
-      size = std::min(size, range_->GetLength() - pos);
+      size = std::min(size, static_cast<size_t>(range_->GetLength() - pos));
       pos += range_->GetOffset();
     }
 
@@ -89,8 +89,13 @@ class HlsDataSourceImpl final : public media::HlsDataSource {
     return mb_data_source_->GetMimeType();
   }
 
+  void Stop() override {
+    mb_data_source_->Abort();
+    mb_data_source_->Stop();
+  }
+
  private:
-  static absl::optional<uint64_t> DetermineSize(
+  static absl::optional<size_t> DetermineSize(
       MultiBufferDataSource& source,
       absl::optional<media::hls::types::ByteRange> range) {
     // If we have a byterange from the manifest, go with that over
@@ -101,7 +106,7 @@ class HlsDataSourceImpl final : public media::HlsDataSource {
 
     int64_t size = 0;
     if (source.GetSize(&size)) {
-      return static_cast<uint64_t>(size);
+      return base::checked_cast<size_t>(size);
     }
 
     return absl::nullopt;

@@ -34,6 +34,7 @@
 #include <tuple>
 
 #include "base/bits.h"
+#include "base/test/metrics/histogram_tester.h"
 #include "build/build_config.h"
 #include "cc/trees/target_property.h"
 #include "testing/gmock/include/gmock/gmock.h"
@@ -71,7 +72,6 @@
 #include "third_party/blink/renderer/platform/heap/garbage_collected.h"
 #include "third_party/blink/renderer/platform/heap/thread_state.h"
 #include "third_party/blink/renderer/platform/scheduler/public/event_loop.h"
-#include "third_party/blink/renderer/platform/testing/histogram_tester.h"
 #include "third_party/blink/renderer/platform/testing/paint_test_configurations.h"
 #include "third_party/blink/renderer/platform/testing/runtime_enabled_features_test_helpers.h"
 #include "third_party/blink/renderer/platform/weborigin/kurl.h"
@@ -1167,7 +1167,8 @@ TEST_P(AnimationAnimationTestNoCompositing,
 
 TEST_P(AnimationAnimationTestNoCompositing, AttachedAnimations) {
   // Prevent |element| from being collected by |CollectAllGarbageForTesting|.
-  Persistent<Element> element = GetDocument().CreateElementForBinding("foo");
+  Persistent<Element> element =
+      GetDocument().CreateElementForBinding(AtomicString("foo"));
 
   Timing timing;
   auto* keyframe_effect = MakeGarbageCollected<KeyframeEffect>(
@@ -1429,7 +1430,7 @@ TEST_P(AnimationAnimationTestCompositing, PreCommitRecordsHistograms) {
 
   // Initially the animation in this test has no target, so it is invalid.
   {
-    HistogramTester histogram;
+    base::HistogramTester histogram;
     ASSERT_TRUE(animation->PreCommit(0, nullptr, true));
     histogram.ExpectBucketCount(
         histogram_name,
@@ -1439,7 +1440,7 @@ TEST_P(AnimationAnimationTestCompositing, PreCommitRecordsHistograms) {
 
   // Restart the animation with a target and compositing state.
   {
-    HistogramTester histogram;
+    base::HistogramTester histogram;
     ResetWithCompositedAnimation();
     histogram.ExpectBucketCount(
         histogram_name,
@@ -1451,7 +1452,7 @@ TEST_P(AnimationAnimationTestCompositing, PreCommitRecordsHistograms) {
   animation->setPlaybackRate(0);
   animation->NotifyReady(ANIMATION_TIME_DELTA_FROM_SECONDS(100));
   {
-    HistogramTester histogram;
+    base::HistogramTester histogram;
     ASSERT_TRUE(animation->PreCommit(0, nullptr, true));
     histogram.ExpectBucketCount(
         histogram_name,
@@ -1478,7 +1479,7 @@ TEST_P(AnimationAnimationTestCompositing, PreCommitRecordsHistograms) {
       ->SetKeyframes({start_keyframe, end_keyframe});
   UpdateAllLifecyclePhasesForTest();
   {
-    HistogramTester histogram;
+    base::HistogramTester histogram;
     ASSERT_TRUE(animation->PreCommit(0, nullptr, true));
     histogram.ExpectBucketCount(
         histogram_name,
@@ -1841,8 +1842,13 @@ TEST_P(AnimationAnimationTestCompositing,
           ->GetCompositorAnimation()
           ->CcAnimation()
           ->GetKeyframeModel(cc::TargetProperty::OPACITY);
-  EXPECT_EQ(keyframe_model->start_time() - base::TimeTicks(),
-            base::Seconds(TEST_START_PERCENT));
+
+  double timeline_duration_ms =
+      scroll_timeline->GetDuration()->InMillisecondsF();
+  double start_time_ms =
+      (keyframe_model->start_time() - base::TimeTicks()).InMillisecondsF();
+  double progress_percent = (start_time_ms / timeline_duration_ms) * 100;
+  EXPECT_NEAR(progress_percent, TEST_START_PERCENT, 1e-3);
   EXPECT_EQ(keyframe_model->time_offset(), base::TimeDelta());
 }
 
@@ -2370,15 +2376,18 @@ TEST_P(AnimationAnimationTestCompositing, MAYBE_ContentVisibleDisplayLockTest) {
   ASSERT_TRUE(!!animation);
   EXPECT_FALSE(animation->IsInDisplayLockedSubtree());
 
-  inner->setAttribute(html_names::kStyleAttr, "content-visibility: hidden");
+  inner->setAttribute(html_names::kStyleAttr,
+                      AtomicString("content-visibility: hidden"));
   RunDocumentLifecycle();
   EXPECT_TRUE(animation->IsInDisplayLockedSubtree());
 
-  inner->setAttribute(html_names::kStyleAttr, "content-visibility: visible");
+  inner->setAttribute(html_names::kStyleAttr,
+                      AtomicString("content-visibility: visible"));
   RunDocumentLifecycle();
   EXPECT_FALSE(animation->IsInDisplayLockedSubtree());
 
-  outer->setAttribute(html_names::kStyleAttr, "content-visibility: hidden");
+  outer->setAttribute(html_names::kStyleAttr,
+                      AtomicString("content-visibility: hidden"));
   RunDocumentLifecycle();
   EXPECT_TRUE(animation->IsInDisplayLockedSubtree());
 
@@ -2477,7 +2486,8 @@ TEST_P(AnimationAnimationTestCompositing, HiddenAnimationsTickWhenVisible) {
                    animation->TimeToEffectChange().value());
 
   Element* visibility = GetElementById("visibility");
-  visibility->setAttribute(html_names::kStyleAttr, "visibility: visible;");
+  visibility->setAttribute(html_names::kStyleAttr,
+                           AtomicString("visibility: visible;"));
   RunDocumentLifecycle();
 
   // The animation should run on the compositor after the properties are

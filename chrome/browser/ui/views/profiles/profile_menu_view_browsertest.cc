@@ -98,6 +98,8 @@
 #if BUILDFLAG(IS_CHROMEOS_LACROS)
 #include "chrome/browser/lacros/account_manager/fake_account_manager_ui_dialog_waiter.h"
 #include "chrome/browser/signin/signin_ui_delegate_impl_lacros.h"
+#include "chromeos/crosapi/mojom/crosapi.mojom.h"
+#include "chromeos/startup/browser_init_params.h"
 #include "components/account_manager_core/chromeos/account_manager_facade_factory.h"
 #include "components/account_manager_core/chromeos/account_manager_mojo_service.h"
 #endif
@@ -154,8 +156,8 @@ std::unique_ptr<KeyedService> CreateTestTracker(content::BrowserContext*) {
 const char kPasswordManagerId[] = "chrome://password-manager/";
 const char kPasswordManagerPWAUrl[] = "chrome://password-manager/?source=pwa";
 
-std::unique_ptr<WebAppInstallInfo> CreatePasswordManagerWebAppInfo() {
-  auto web_app_info = std::make_unique<WebAppInstallInfo>();
+std::unique_ptr<web_app::WebAppInstallInfo> CreatePasswordManagerWebAppInfo() {
+  auto web_app_info = std::make_unique<web_app::WebAppInstallInfo>();
   web_app_info->start_url = GURL(kPasswordManagerPWAUrl);
   web_app_info->title = u"Password Manager";
   web_app_info->manifest_id = GURL(kPasswordManagerId);
@@ -219,7 +221,7 @@ class ProfileMenuViewTestBase {
   }
 
  private:
-  raw_ptr<Browser, DanglingUntriaged> target_browser_ = nullptr;
+  raw_ptr<Browser, AcrossTasksDanglingUntriaged> target_browser_ = nullptr;
 };
 
 class ProfileMenuViewExtensionsTest : public ProfileMenuViewTestBase,
@@ -801,10 +803,6 @@ class ProfileMenuClickTest : public SyncTest,
   void SetUpInProcessBrowserTestFixture() override {
     test_signin_client_subscription_ =
         secondary_account_helper::SetUpSigninClient(&test_url_loader_factory_);
-
-    // Needed by ProfileMenuClickTest_PasswordManagerWebApp test.
-    feature_list_.InitAndEnableFeature(
-        password_manager::features::kPasswordManagerRedesign);
   }
 
   // SyncTest:
@@ -841,7 +839,7 @@ class ProfileMenuClickTest : public SyncTest,
   }
 
   void EnableSync() {
-    sync_harness()->SetupSync();
+    ASSERT_TRUE(sync_harness()->SetupSync());
     ASSERT_TRUE(
         identity_manager()->HasPrimaryAccount(signin::ConsentLevel::kSync));
     ASSERT_TRUE(sync_service()->IsSyncFeatureEnabled());
@@ -889,11 +887,11 @@ class ProfileMenuClickTest : public SyncTest,
   base::HistogramTester histogram_tester_;
   std::unique_ptr<SyncServiceImplHarness> sync_harness_;
   raw_ptr<Profile, DanglingUntriaged> profile_ = nullptr;
-  base::test::ScopedFeatureList feature_list_;
 };
 
-#define PROFILE_MENU_CLICK_TEST(actionable_item_list, test_case_name)     \
-  class test_case_name : public ProfileMenuClickTest {                    \
+#define PROFILE_MENU_CLICK_TEST_F(FixtureClass, actionable_item_list,     \
+                                  test_case_name)                         \
+  class test_case_name : public FixtureClass {                            \
    public:                                                                \
     test_case_name() = default;                                           \
     test_case_name(const test_case_name&) = delete;                       \
@@ -910,6 +908,12 @@ class ProfileMenuClickTest : public SyncTest,
       ::testing::Range(size_t(0), std::size(actionable_item_list)));      \
                                                                           \
   IN_PROC_BROWSER_TEST_P(test_case_name, test_case_name)
+
+// Specialized variant of `PROFILE_MENU_CLICK_TEST_F` using
+// `ProfileMenuClickTest` as `FixtureClass`.
+#define PROFILE_MENU_CLICK_TEST(actionable_item_list, test_case_name)   \
+  PROFILE_MENU_CLICK_TEST_F(ProfileMenuClickTest, actionable_item_list, \
+                            test_case_name)
 
 // List of actionable items in the correct order as they appear in the menu.
 // If a new button is added to the menu, it should also be added to this list.
@@ -1003,7 +1007,8 @@ constexpr ProfileMenuViewBase::ActionableItem kActionableItems_SyncError[] = {
 
 PROFILE_MENU_CLICK_TEST(kActionableItems_SyncError,
                         ProfileMenuClickTest_SyncError) {
-  ASSERT_TRUE(sync_harness()->SignInPrimaryAccount());
+  ASSERT_TRUE(
+      sync_harness()->SignInPrimaryAccount(signin::ConsentLevel::kSync));
   // Check that the setup was successful.
   ASSERT_TRUE(
       identity_manager()->HasPrimaryAccount(signin::ConsentLevel::kSync));
@@ -1266,6 +1271,33 @@ PROFILE_MENU_CLICK_TEST(kActionableItems_GuestProfile,
   RunTest();
 }
 
+#if BUILDFLAG(IS_CHROMEOS_LACROS)
+
+class ProfileMenuClickTestGuestSession : public ProfileMenuClickTest {
+ public:
+  // Enable the guest session.
+  void CreatedBrowserMainParts(
+      content::BrowserMainParts* browser_main_parts) override {
+    crosapi::mojom::BrowserInitParamsPtr init_params =
+        chromeos::BrowserInitParams::GetForTests()->Clone();
+    init_params->session_type = crosapi::mojom::SessionType::kGuestSession;
+    chromeos::BrowserInitParams::SetInitParamsForTests(std::move(init_params));
+    ProfileMenuClickTest::CreatedBrowserMainParts(browser_main_parts);
+  }
+};
+
+// This tests the device guest session, which is not the same as the browser
+// guest mode.
+PROFILE_MENU_CLICK_TEST_F(ProfileMenuClickTestGuestSession,
+                          kActionableItems_GuestProfile,
+                          ProfileMenuClickTest_GuestSession) {
+  SetTargetBrowser(browser());
+
+  RunTest();
+}
+
+#endif  // BUILDFLAG(IS_CHROMEOS_LACROS)
+
 #if !BUILDFLAG(IS_CHROMEOS)
 // List of actionable items in the correct order as they appear in the menu.
 // If a new button is added to the menu, it should also be added to this list.
@@ -1280,7 +1312,7 @@ PROFILE_MENU_CLICK_TEST(kActionableItems_PasswordManagerWebApp,
 
   // Install and launch an application for the first profile.
   WebAppFrameToolbarTestHelper toolbar_helper;
-  web_app::AppId app_id = toolbar_helper.InstallAndLaunchCustomWebApp(
+  webapps::AppId app_id = toolbar_helper.InstallAndLaunchCustomWebApp(
       browser(), CreatePasswordManagerWebAppInfo(),
       GURL(kPasswordManagerPWAUrl));
   SetTargetBrowser(toolbar_helper.app_browser());
@@ -1290,19 +1322,13 @@ PROFILE_MENU_CLICK_TEST(kActionableItems_PasswordManagerWebApp,
 class ProfileMenuViewWebAppTest : public ProfileMenuViewTestBase,
                                   public web_app::WebAppControllerBrowserTest {
  protected:
-  void SetUp() override {
-    // Enable the installable PasswordManager WebUI.
-    feature_list_.InitAndEnableFeature(
-        password_manager::features::kPasswordManagerRedesign);
-    web_app::WebAppControllerBrowserTest::SetUp();
-  }
+  void SetUp() override { web_app::WebAppControllerBrowserTest::SetUp(); }
 
   WebAppFrameToolbarTestHelper* toolbar_helper() {
     return &web_app_frame_toolbar_helper_;
   }
 
  private:
-  base::test::ScopedFeatureList feature_list_;
   WebAppFrameToolbarTestHelper web_app_frame_toolbar_helper_;
 };
 
@@ -1314,7 +1340,7 @@ IN_PROC_BROWSER_TEST_F(ProfileMenuViewWebAppTest, SelectingOtherProfile) {
   ASSERT_FALSE(chrome::FindBrowserWithProfile(second_profile));
 
   // Install and launch an application for the first profile.
-  web_app::AppId app_id = toolbar_helper()->InstallAndLaunchCustomWebApp(
+  webapps::AppId app_id = toolbar_helper()->InstallAndLaunchCustomWebApp(
       browser(), CreatePasswordManagerWebAppInfo(),
       GURL(kPasswordManagerPWAUrl));
   SetTargetBrowser(toolbar_helper()->app_browser());

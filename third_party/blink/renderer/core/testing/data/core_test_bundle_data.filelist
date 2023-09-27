@@ -23,6 +23,7 @@ testing/data/advance_focus_in_form_with_key_event_listeners.html
 testing/data/advance_focus_in_form_with_tabindex_elements.html
 testing/data/autofocus_input_field_iframe.html
 testing/data/back_forward_restore_scroll.html
+testing/data/background_image.png
 testing/data/bad_tap_targets_iframe.html
 testing/data/bar.html
 testing/data/black-and-white.ico
@@ -447,6 +448,8 @@ testing/data/smartclip_user_select_none.html
 testing/data/sometext.html
 testing/data/specify_size.html
 testing/data/speculation_rules/single_url_prefetch.json
+testing/data/speculation_rules/single_url_prefetch_invalid_no_vary_search_hint.json
+testing/data/speculation_rules/single_url_prefetch_not_a_string_no_vary_search_hint.json
 testing/data/speedometer_saved_output.json
 testing/data/spell.html
 testing/data/sticky-position.html

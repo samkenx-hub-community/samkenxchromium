@@ -30,6 +30,8 @@
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/models/dialog_model_menu_model_adapter.h"
 #include "ui/views/accessibility/view_accessibility.h"
+#include "ui/views/animation/ink_drop.h"
+#include "ui/views/animation/ink_drop_state.h"
 #include "ui/views/controls/button/button_controller.h"
 #include "ui/views/layout/animating_layout_manager.h"
 #include "ui/views/layout/flex_layout.h"
@@ -40,6 +42,7 @@
 SidePanelToolbarContainer::PinnedSidePanelToolbarButton::
     PinnedSidePanelToolbarButton(BrowserView* browser_view,
                                  SidePanelEntry::Id id,
+                                 std::u16string accessible_name,
                                  std::u16string name,
                                  const gfx::VectorIcon& icon)
     : ToolbarButton(
@@ -50,6 +53,10 @@ SidePanelToolbarContainer::PinnedSidePanelToolbarButton::
       browser_view_(browser_view),
       id_(id) {
   SetTooltipText(name);
+  SetAccessibleName(accessible_name);
+  GetViewAccessibility().OverrideDescription(
+      std::u16string(), ax::mojom::DescriptionFrom::kAttributeExplicitlyEmpty);
+
   SetVectorIcon(icon);
 
   button_controller()->set_notify_action(
@@ -76,7 +83,8 @@ void SidePanelToolbarContainer::PinnedSidePanelToolbarButton::ButtonPressed() {
   browser_view_->NotifyFeatureEngagementEvent(
       "companion_side_panel_accessed_via_toolbar_button");
   browser_view_->CloseFeaturePromo(
-      feature_engagement::kIPHCompanionSidePanelFeature);
+      feature_engagement::kIPHCompanionSidePanelFeature,
+      user_education::FeaturePromoCloseReason::kFeatureEngaged);
 }
 
 void SidePanelToolbarContainer::PinnedSidePanelToolbarButton::
@@ -119,6 +127,8 @@ SidePanelToolbarContainer::SidePanelToolbarContainer(BrowserView* browser_view)
   // button view, too.
   SetNotifyEnterExitOnChild(true);
 
+  SetProperty(views::kElementIdentifierKey,
+              kToolbarSidePanelContainerElementId);
   const views::FlexSpecification hide_icon_flex_specification =
       views::FlexSpecification(views::LayoutOrientation::kHorizontal,
                                views::MinimumFlexSizeRule::kPreferredSnapToZero,
@@ -128,8 +138,11 @@ SidePanelToolbarContainer::SidePanelToolbarContainer(BrowserView* browser_view)
       ->SetFlexAllocationOrder(views::FlexAllocationOrder::kReverse)
       .SetDefault(views::kFlexBehaviorKey,
                   hide_icon_flex_specification.WithOrder(3));
-  side_panel_button_->SetProperty(views::kFlexBehaviorKey,
-                                  views::FlexSpecification());
+  side_panel_button_->SetProperty(
+      views::kFlexBehaviorKey,
+      base::FeatureList::IsEnabled(features::kResponsiveToolbar)
+          ? hide_icon_flex_specification.WithOrder(1)
+          : views::FlexSpecification());
   AddMainItem(side_panel_button_);
   // Before creating the pinned buttons, verify that the pref value is correct
   // and update it if not. If the user has been moved into a different default
@@ -204,19 +217,21 @@ void SidePanelToolbarContainer::CreatePinnedEntryButtons() {
           browser_view_->browser());
   AddPinnedEntryButtonFor(
       SidePanelEntry::Id::kSearchCompanion,
+      search_companion_coordinator->accessible_name(),
       search_companion_coordinator->GetTooltipForToolbarButton(),
       search_companion_coordinator->icon());
 }
 
 void SidePanelToolbarContainer::AddPinnedEntryButtonFor(
     SidePanelEntry::Id id,
+    std::u16string accessible_name,
     std::u16string name,
     const gfx::VectorIcon& icon) {
   if (HasPinnedEntryButtonFor(id)) {
     return;
   }
-  auto button = std::make_unique<PinnedSidePanelToolbarButton>(browser_view_,
-                                                               id, name, icon);
+  auto button = std::make_unique<PinnedSidePanelToolbarButton>(
+      browser_view_, id, accessible_name, name, icon);
   button->SetProperty(views::kElementIdentifierKey,
                       kSidePanelCompanionToolbarButtonElementId);
   button->SetVisible(false);
@@ -267,7 +282,14 @@ void SidePanelToolbarContainer::UpdateSidePanelContainerButtonsState() {
       pinned_button->SetHighlighted(true);
       side_panel_button_highlighted = false;
     } else {
-      pinned_button->SetHighlighted(false);
+      // We cannot use pinned_button->SetHighlighted(false) here because that
+      // sets the ink drop to a deactivated state and AnimateToState may restart
+      // animations for non hidden->hidden same state transitions which could
+      // cause GetHighlighted to return true when animating from deactivated ->
+      // deactivated.
+      views::InkDrop::Get(pinned_button)
+          ->GetInkDrop()
+          ->AnimateToState(views::InkDropState::HIDDEN);
     }
   }
   GetSidePanelButton()->SetHighlighted(side_panel_button_highlighted);

@@ -47,7 +47,7 @@ class ExceptionState;
 class RTCPeerConnectionHandler;
 
 class MODULES_EXPORT RTCDataChannel final
-    : public EventTargetWithInlineData,
+    : public EventTarget,
       public ActiveScriptWrappable<RTCDataChannel>,
       public ExecutionContextLifecycleObserver {
   DEFINE_WRAPPERTYPEINFO();
@@ -132,6 +132,11 @@ class MODULES_EXPORT RTCDataChannel final
     // the signaling thread (safe because the call is synchronous).
     const rtc::scoped_refptr<webrtc::DataChannelInterface>& channel() const;
 
+    // Returns true if a valid `blink_channel_` is held and `Unregister()`
+    // hasn't been called. A return value of false indicates that the `Observer`
+    // can be safely discarded.
+    bool is_registered() const;
+
     // Clears the |blink_channel_| reference, disassociates this observer from
     // the |webrtc_channel_| and releases the |webrtc_channel_| pointer. Must be
     // called on the main thread.
@@ -151,7 +156,7 @@ class MODULES_EXPORT RTCDataChannel final
 
     const scoped_refptr<base::SingleThreadTaskRunner> main_thread_;
     WeakPersistent<RTCDataChannel> blink_channel_;
-    rtc::scoped_refptr<webrtc::DataChannelInterface> webrtc_channel_;
+    const rtc::scoped_refptr<webrtc::DataChannelInterface> webrtc_channel_;
   };
 
   void OnStateChange(webrtc::DataChannelInterface::DataState state);
@@ -199,7 +204,11 @@ class MODULES_EXPORT RTCDataChannel final
   unsigned buffered_amount_ = 0u;
   bool stopped_ = false;
   bool closed_from_owner_ = false;
-  scoped_refptr<Observer> observer_;
+  // Keep the `observer_` reference const to make it clear that we don't want
+  // to free the underlying channel (or callback observer) until the
+  // `RTCDataChannel` instance goes away. This allows properties to be queried
+  // after the state reaches `kClosed`.
+  const scoped_refptr<Observer> observer_;
   scoped_refptr<base::SingleThreadTaskRunner> signaling_thread_;
   THREAD_CHECKER(thread_checker_);
 };

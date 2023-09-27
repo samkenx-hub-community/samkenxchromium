@@ -17,16 +17,10 @@
 
 namespace feed {
 
-BASE_DECLARE_FEATURE(kInterestFeedContentSuggestions);
 BASE_DECLARE_FEATURE(kInterestFeedV2);
 BASE_DECLARE_FEATURE(kInterestFeedV2Autoplay);
 BASE_DECLARE_FEATURE(kInterestFeedV2Hearts);
 BASE_DECLARE_FEATURE(kInterestFeedV2Scrolling);
-
-extern const base::FeatureParam<std::string> kDisableTriggerTypes;
-extern const base::FeatureParam<int> kTimeoutDurationSeconds;
-extern const base::FeatureParam<bool> kThrottleBackgroundFetches;
-extern const base::FeatureParam<bool> kOnlySetLastRefreshAttemptOnSuccess;
 
 // Feature that allows the client to automatically dismiss the notice card based
 // on the clicks and views on the notice card.
@@ -64,13 +58,11 @@ BASE_DECLARE_FEATURE(kFeedImageMemoryCacheSizePercentage);
 // feeds quickly.
 BASE_DECLARE_FEATURE(kFeedBackToTop);
 
-// When enabled, causes the server to send a Sync Promo Banner for the bottom of
-// feed.
-BASE_DECLARE_FEATURE(kFeedBottomSyncBanner);
-
-// When enabled, shows a sign in bottom sheet when p13n actions on boc are used
-// by signed out client.
-BASE_DECLARE_FEATURE(kFeedBoCSigninInterstitial);
+#if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS)
+// When enabled, causes the server to restrig the Sync Promo Banner for the
+// bottom of Feed to a Signin Promo.
+BASE_DECLARE_FEATURE(kFeedBottomSyncStringRemoval);
+#endif
 
 // Feature that enables StAMP cards in the feed.
 BASE_DECLARE_FEATURE(kFeedStamp);
@@ -98,9 +90,6 @@ std::string GetFeedReferrerUrl();
 // Personalize feed for unsigned users.
 BASE_DECLARE_FEATURE(kPersonalizeFeedUnsignedUsers);
 
-// Personalize feed for signed in users who haven't enabled sync.
-BASE_DECLARE_FEATURE(kPersonalizeFeedNonSyncUsers);
-
 // Returns the consent level needed to request a personalized feed.
 signin::ConsentLevel GetConsentLevelNeededForPersonalizedFeed();
 
@@ -124,9 +113,6 @@ extern const base::FeatureParam<bool> kFeedCloseRefreshRequireInteraction;
 
 // When enabled, no view cache is used.
 BASE_DECLARE_FEATURE(kFeedNoViewCache);
-
-// When enabled, play the feed video via inline playback.
-BASE_DECLARE_FEATURE(kFeedVideoInlinePlayback);
 
 // When enabled, allow tagging experiments with only an experiment ID.
 BASE_DECLARE_FEATURE(kFeedExperimentIDTagging);
@@ -156,6 +142,9 @@ BASE_DECLARE_FEATURE(kFeedDynamicColors);
 
 // Feature that enables UI update for Follow.
 BASE_DECLARE_FEATURE(kFeedFollowUiUpdate);
+
+// Feature that enables sports card in the feed.
+BASE_DECLARE_FEATURE(kFeedSportsCard);
 
 }  // namespace feed
 

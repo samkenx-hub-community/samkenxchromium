@@ -34,8 +34,8 @@ import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
 import org.chromium.chrome.browser.ui.favicon.FaviconHelper;
 import org.chromium.chrome.browser.ui.favicon.FaviconUtils;
-import org.chromium.chrome.browser.ui.signin.DeviceLockActivityLauncher;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
+import org.chromium.components.browser_ui.device_lock.DeviceLockActivityLauncher;
 import org.chromium.components.browser_ui.share.ShareImageFileUtils;
 import org.chromium.components.browser_ui.share.ShareParams;
 import org.chromium.url.GURL;
@@ -110,7 +110,10 @@ public class AndroidShareSheetController implements ChromeOptionShareCallback {
     @Override
     public void showThirdPartyShareSheet(
             ShareParams params, ChromeShareExtras chromeShareExtras, long shareStartTime) {
-        showShareSheetWithCustomAction(params, chromeShareExtras, false);
+        // When using Android share sheet, always have the custom actions available for the share
+        // sheet. This is a workaround of share sheet triggered by share custom actions e.g. long
+        // screenshot.
+        showShareSheetWithCustomAction(params, chromeShareExtras, true);
     }
 
     @Override

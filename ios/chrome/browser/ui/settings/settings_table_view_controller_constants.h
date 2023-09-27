@@ -34,11 +34,12 @@ typedef NS_ENUM(NSInteger, SettingsItemType) {
   SettingsItemTypeAutofillCreditCard,
   SettingsItemTypeAutofillProfile,
   SettingsItemTypeVoiceSearch,
-  SettingsItemTypeBottomOmnibox,
+  SettingsItemTypeAddressBar,
   SettingsItemTypeNotifications,
   SettingsItemTypePrivacy,
   SettingsItemTypeLanguageSettings,
   SettingsItemTypeContentSettings,
+  SettingsItemTypeDownloadsSettings,
   SettingsItemTypeBandwidth,
   SettingsItemTypeAboutChrome,
   SettingsItemTypeMemoryDebugging,
@@ -70,6 +71,9 @@ extern NSString* const kSettingsAccountCellId;
 
 // The accessibility identifier of the Search Engine cell.
 extern NSString* const kSettingsSearchEngineCellId;
+
+// The accessibility identifier of the Address bar option cell.
+extern NSString* const kSettingsAddressBarCellId;
 
 // The accessibility identifier of the Managed Search Engine cell.
 extern NSString* const kSettingsManagedSearchEngineCellId;
@@ -107,6 +111,9 @@ extern NSString* const kSettingsLanguagesCellId;
 // The accessibility identifier of the Content Settings cell.
 extern NSString* const kSettingsContentSettingsCellId;
 
+// The accessibility identifier of the Downloads Settings cell.
+extern NSString* const kSettingsDownloadsSettingsCellId;
+
 // The accessibility identifier of the Bandwidth cell.
 extern NSString* const kSettingsBandwidthCellId;
 
@@ -130,6 +137,9 @@ extern NSString* const kSettingsBlockPopupsCellId;
 
 // The accessibility identifier of the Show Link Preview cell.
 extern NSString* const kSettingsShowLinkPreviewCellId;
+
+// The accessibility identifier of the Detect Addresses cell.
+extern NSString* const kSettingsDetectAddressesCellId;
 
 // The accessibility identifier of the Default Apps cell.
 extern NSString* const kSettingsDefaultAppsCellId;
@@ -172,5 +182,8 @@ extern NSString* const kSettingsTabsCellId;
 
 // The accessibility identifier of the move inactive tabs settings cell.
 extern NSString* const kSettingsMoveInactiveTabsCellId;
+
+// The accessibility identifier of the tab pickup settings cell.
+extern NSString* const kSettingsTabPickupCellId;
 
 #endif  // IOS_CHROME_BROWSER_UI_SETTINGS_SETTINGS_TABLE_VIEW_CONTROLLER_CONSTANTS_H_

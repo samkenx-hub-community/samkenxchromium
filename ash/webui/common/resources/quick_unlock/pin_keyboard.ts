@@ -22,6 +22,7 @@
  *    </pin-keyboard>
  */
 
+import 'chrome://resources/cr_elements/chromeos/cros_color_overrides.css.js';
 import 'chrome://resources/cr_elements/cr_button/cr_button.js';
 import 'chrome://resources/cr_elements/cr_icon_button/cr_icon_button.js';
 import 'chrome://resources/cr_elements/cr_input/cr_input.js';
@@ -270,8 +271,12 @@ export class PinKeyboardElement extends PinKeyboardElementBase {
   focusInputSynchronously(selectionStart?: number, selectionEnd?: number):
       void {
     this.passwordElement_().focus();
-    this.selectionStart_ = selectionStart || 0;
-    this.selectionEnd_ = selectionEnd || 0;
+    if (selectionStart !== undefined) {
+      this.selectionStart_ = selectionStart;
+    }
+    if (selectionEnd !== undefined) {
+      this.selectionEnd_ = selectionEnd;
+    }
   }
 
   /**
@@ -440,6 +445,11 @@ export class PinKeyboardElement extends PinKeyboardElementBase {
 
     // Valid if the key is a number, and shift is not pressed.
     if ((event.keyCode >= 48 && event.keyCode <= 57) && !event.shiftKey) {
+      return true;
+    }
+
+    // Valid if the key is a numpad number, and shift is not pressed.
+    if ((event.keyCode >= 96 && event.keyCode <= 105) && !event.shiftKey) {
       return true;
     }
 

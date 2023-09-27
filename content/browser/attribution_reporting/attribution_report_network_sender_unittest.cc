@@ -185,9 +185,9 @@ TEST_F(AttributionReportNetworkSenderTest,
                         .Build(),
                     SourceBuilder(base::Time::UnixEpoch())
                         .SetSourceEventId(100)
+                        .SetRandomizedResponseRate(0.2)
                         .BuildStored())
           .SetTriggerData(5)
-          .SetRandomizedTriggerRate(0.2)
           .SetReportTime(base::Time::UnixEpoch() + base::Hours(1))
           .Build();
 
@@ -462,9 +462,8 @@ TEST_F(AttributionReportNetworkSenderTest, ManyReports_AllSentSuccessfully) {
 
 TEST_F(AttributionReportNetworkSenderTest, HeadersPopulated) {
   AttributionReport report =
-      ReportBuilder(
-          AttributionInfoBuilder().Build(),
-          SourceBuilder(base::Time::FromJavaTime(1234483200000)).BuildStored())
+      ReportBuilder(AttributionInfoBuilder().Build(),
+                    SourceBuilder().BuildStored())
           .SetAggregatableHistogramContributions(
               {AggregatableHistogramContribution(/*key=*/1, /*value=*/2)})
           .BuildAggregatableAttribution();

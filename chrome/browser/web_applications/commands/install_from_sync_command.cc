@@ -22,6 +22,8 @@
 #include "chrome/browser/web_applications/web_app_install_utils.h"
 #include "chrome/browser/web_applications/web_app_utils.h"
 #include "chrome/browser/web_applications/web_contents/web_app_data_retriever.h"
+#include "chrome/browser/web_applications/web_contents/web_app_url_loader.h"
+#include "chrome/browser/web_applications/web_contents/web_contents_manager.h"
 #include "components/webapps/browser/install_result_code.h"
 #include "components/webapps/browser/installable/installable_logging.h"
 #include "components/webapps/browser/installable/installable_metrics.h"
@@ -54,8 +56,8 @@ WebAppInstallFinalizer::FinalizeOptions GetFinalizerOptionForSyncInstall() {
 InstallFromSyncCommand::Params::~Params() = default;
 
 InstallFromSyncCommand::Params::Params(
-    const AppId& app_id,
-    const ManifestId& manifest_id,
+    const webapps::AppId& app_id,
+    const webapps::ManifestId& manifest_id,
     const GURL& start_url,
     const std::string& title,
     const GURL& scope,
@@ -78,19 +80,15 @@ InstallFromSyncCommand::Params::Params(
 InstallFromSyncCommand::Params::Params(const Params&) = default;
 
 InstallFromSyncCommand::InstallFromSyncCommand(
-    WebAppUrlLoader* url_loader,
     Profile* profile,
-    std::unique_ptr<WebAppDataRetriever> data_retriever,
     const Params& params,
     OnceInstallCallback install_callback)
     : WebAppCommandTemplate<SharedWebContentsWithAppLock>(
           "InstallFromSyncCommand"),
       lock_description_(
           std::make_unique<SharedWebContentsWithAppLockDescription,
-                           base::flat_set<AppId>>({params.app_id})),
-      url_loader_(url_loader),
+                           base::flat_set<webapps::AppId>>({params.app_id})),
       profile_(profile),
-      data_retriever_(std::move(data_retriever)),
       params_(params),
       install_callback_(std::move(install_callback)),
       install_error_log_entry_(true, webapps::WebappInstallSource::SYNC) {
@@ -139,6 +137,8 @@ const LockDescription& InstallFromSyncCommand::lock_description() const {
 void InstallFromSyncCommand::StartWithLock(
     std::unique_ptr<SharedWebContentsWithAppLock> lock) {
   lock_ = std::move(lock);
+  url_loader_ = lock_->web_contents_manager().CreateUrlLoader();
+  data_retriever_ = lock_->web_contents_manager().CreateDataRetriever();
 
   url_loader_->LoadUrl(
       params_.start_url, &lock_->shared_web_contents(),
@@ -223,7 +223,7 @@ void InstallFromSyncCommand::OnDidPerformInstallableCheck(
   }
 
   // Ensure that the manifest linked is the right one.
-  AppId generated_app_id =
+  webapps::AppId generated_app_id =
       GenerateAppIdFromManifestId(install_info_->manifest_id);
   if (params_.app_id != generated_app_id) {
     // Add the error to the log.
@@ -248,6 +248,7 @@ void InstallFromSyncCommand::OnDidPerformInstallableCheck(
   data_retriever_->GetIcons(
       &lock_->shared_web_contents(), std::move(icon_urls),
       /*skip_page_favicons=*/true,
+      /*fail_all_if_any_fail=*/false,
       base::BindOnce(&InstallFromSyncCommand::OnIconsRetrievedFinalizeInstall,
                      weak_ptr_factory_.GetWeakPtr(),
                      FinalizeMode::kNormalWebAppInfo));
@@ -279,7 +280,7 @@ void InstallFromSyncCommand::OnIconsRetrievedFinalizeInstall(
 }
 
 void InstallFromSyncCommand::OnInstallFinalized(FinalizeMode mode,
-                                                const AppId& app_id,
+                                                const webapps::AppId& app_id,
                                                 webapps::InstallResultCode code,
                                                 OsHooksErrors os_hooks_errors) {
   if (mode == FinalizeMode::kNormalWebAppInfo && !IsSuccess(code)) {
@@ -311,13 +312,14 @@ void InstallFromSyncCommand::InstallFallback(webapps::InstallResultCode code) {
   data_retriever_->GetIcons(
       &lock_->shared_web_contents(), std::move(icon_urls),
       /*skip_page_favicons=*/true,
+      /*fail_all_if_any_fail=*/false,
       base::BindOnce(&InstallFromSyncCommand::OnIconsRetrievedFinalizeInstall,
                      weak_ptr_factory_.GetWeakPtr(),
                      FinalizeMode::kFallbackWebAppInfo));
 }
 
 void InstallFromSyncCommand::ReportResultAndDestroy(
-    const AppId& app_id,
+    const webapps::AppId& app_id,
     webapps::InstallResultCode code) {
   bool success = IsSuccess(code);
   debug_value_.Set("result_code", base::ToString(code));

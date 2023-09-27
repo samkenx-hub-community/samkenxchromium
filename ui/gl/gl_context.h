@@ -21,7 +21,6 @@
 #include "ui/gl/gl_implementation_wrapper.h"
 #include "ui/gl/gl_share_group.h"
 #include "ui/gl/gl_state_restorer.h"
-#include "ui/gl/gl_workarounds.h"
 #include "ui/gl/gpu_preference.h"
 
 namespace gl {
@@ -119,12 +118,6 @@ struct GL_EXPORT GLContextAttribs {
   // If true, ANGLE will support the creation of client arrays.
   bool angle_create_context_client_arrays = false;
 
-  // If true, an ANGLE external context will be created with
-  // EGL_EXTERNAL_CONTEXT_SAVE_STATE_ANGLE is true, so when ReleaseCurrent is
-  // called, ANGLE will restore the GL state of the native EGL context to the
-  // state when MakeCurrent was previously called.
-  bool angle_restore_external_context_state = false;
-
   AngleContextVirtualizationGroup angle_context_virtualization_group_number =
       AngleContextVirtualizationGroup::kDefault;
 
@@ -169,9 +162,6 @@ class GL_EXPORT GLContext : public base::RefCounted<GLContext>,
 
   // Creates a GPUTimingClient class which abstracts various GPU Timing exts.
   virtual scoped_refptr<GPUTimingClient> CreateGPUTimingClient() = 0;
-
-  // Set the GL workarounds.
-  void SetGLWorkarounds(const GLWorkarounds& workarounds);
 
   void SetDisabledGLExtensions(const std::string& disabled_gl_extensions);
 
@@ -335,7 +325,6 @@ class GL_EXPORT GLContext : public base::RefCounted<GLContext>,
 
   static bool switchable_gpus_supported_;
 
-  GLWorkarounds gl_workarounds_;
   std::string disabled_gl_extensions_;
 
   bool static_bindings_initialized_ = false;

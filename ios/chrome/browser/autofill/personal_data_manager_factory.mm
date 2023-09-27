@@ -25,11 +25,7 @@
 #import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/signin/identity_manager_factory.h"
 #import "ios/chrome/browser/sync/sync_service_factory.h"
-#import "ios/chrome/browser/webdata_services/web_data_service_factory.h"
-
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
+#import "ios/chrome/browser/webdata_services/model/web_data_service_factory.h"
 
 namespace autofill {
 
@@ -103,8 +99,7 @@ PersonalDataManagerFactory::BuildServiceInstanceFor(
       local_storage, account_storage, chrome_browser_state->GetPrefs(),
       GetApplicationContext()->GetLocalState(),
       IdentityManagerFactory::GetForBrowserState(chrome_browser_state),
-      history_service, sync_service, strike_database, autofill_image_fetcher,
-      chrome_browser_state->IsOffTheRecord());
+      history_service, sync_service, strike_database, autofill_image_fetcher);
 
   return service;
 }

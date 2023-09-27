@@ -12,9 +12,12 @@
 #include <vector>
 
 #include "base/memory/raw_ptr.h"
+#include "base/scoped_observation.h"
 #include "base/task/deferred_sequenced_task_runner.h"
-#include "components/bookmarks/browser/bookmark_client.h"
+#include "components/bookmarks/browser/base_bookmark_model_observer.h"
+#include "components/bookmarks/browser/bookmark_model.h"
 #include "components/offline_pages/buildflags/buildflags.h"
+#include "components/power_bookmarks/core/bookmark_client_base.h"
 
 class BookmarkUndoService;
 class GURL;
@@ -36,7 +39,11 @@ class OfflinePageBookmarkObserver;
 }  // namespace offline_pages
 #endif
 
-class ChromeBookmarkClient : public bookmarks::BookmarkClient {
+namespace power_bookmarks {
+class SuggestedSaveLocationProvider;
+}
+
+class ChromeBookmarkClient : public power_bookmarks::BookmarkClientBase {
  public:
   ChromeBookmarkClient(
       Profile* profile,
@@ -63,8 +70,7 @@ class ChromeBookmarkClient : public bookmarks::BookmarkClient {
   bookmarks::metrics::StorageStateForUma GetStorageStateForUma() override;
   bool CanSetPermanentNodeTitle(
       const bookmarks::BookmarkNode* permanent_node) override;
-  bool CanSyncNode(const bookmarks::BookmarkNode* node) override;
-  bool CanBeEditedByUser(const bookmarks::BookmarkNode* node) override;
+  bool IsNodeManaged(const bookmarks::BookmarkNode* node) override;
   std::string EncodeBookmarkSyncMetadata() override;
   void DecodeBookmarkSyncMetadata(
       const std::string& metadata_str,
@@ -92,10 +98,19 @@ class ChromeBookmarkClient : public bookmarks::BookmarkClient {
 
   raw_ptr<bookmarks::BookmarkModel> model_ = nullptr;
 
+  std::unique_ptr<power_bookmarks::SuggestedSaveLocationProvider>
+      shopping_save_location_provider_;
+
 #if BUILDFLAG(ENABLE_OFFLINE_PAGES)
   // Owns the observer used by Offline Page listening to Bookmark Model events.
   std::unique_ptr<offline_pages::OfflinePageBookmarkObserver>
       offline_page_observer_;
+
+  // Observation of this by the bookmark model.
+  std::unique_ptr<base::ScopedObservation<bookmarks::BookmarkModel,
+                                          bookmarks::BaseBookmarkModelObserver>>
+      model_observation_{};
+
 #endif
 };
 

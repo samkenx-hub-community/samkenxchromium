@@ -98,6 +98,7 @@ class ASH_EXPORT PaletteTray : public TrayBackgroundView,
 
   // TrayBackgroundView:
   void ClickedOutsideBubble() override;
+  void UpdateTrayItemColor(bool is_active) override;
   void OnThemeChanged() override;
   std::u16string GetAccessibleNameForTray() override;
   void HandleLocaleChange() override;
@@ -113,14 +114,13 @@ class ASH_EXPORT PaletteTray : public TrayBackgroundView,
   // PaletteToolManager::Delegate:
   void HidePalette() override;
   void HidePaletteImmediately() override;
-  void RecordPaletteOptionsUsage(PaletteTrayOptions option,
-                                 PaletteInvocationMethod method) override;
 
   // ProjectorSessionObserver:
   void OnProjectorSessionActiveStateChanged(bool active) override;
 
  private:
   friend class PaletteTrayTestApi;
+  friend class StatusAreaInternalsHandler;
 
   // ui::InputDeviceObserver:
   void OnInputDeviceConfigurationChanged(uint8_t input_device_types) override;

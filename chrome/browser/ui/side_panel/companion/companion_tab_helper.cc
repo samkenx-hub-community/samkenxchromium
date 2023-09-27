@@ -9,6 +9,7 @@
 #include "base/strings/strcat.h"
 #include "chrome/browser/companion/core/features.h"
 #include "chrome/browser/companion/core/mojom/companion.mojom.h"
+#include "chrome/browser/companion/core/utils.h"
 #include "chrome/browser/translate/chrome_translate_client.h"
 #include "chrome/browser/ui/side_panel/companion/companion_side_panel_controller_utils.h"
 #include "chrome/browser/ui/webui/side_panel/companion/companion_page_handler.h"
@@ -28,7 +29,9 @@ namespace companion {
 
 CompanionTabHelper::CompanionTabHelper(content::WebContents* web_contents)
     : content::WebContentsUserData<CompanionTabHelper>(*web_contents),
-      delegate_(CreateDelegate(web_contents)) {}
+      delegate_(CreateDelegate(web_contents)) {
+  Observe(web_contents);
+}
 
 CompanionTabHelper::~CompanionTabHelper() = default;
 
@@ -52,8 +55,7 @@ void CompanionTabHelper::ShowCompanionSidePanelForImage(
   CHECK(delegate_);
 
   // Create upload URL to load in companion.
-  std::string upload_url_string =
-      companion::features::kImageUploadURLForCompanion.Get();
+  std::string upload_url_string = companion::GetImageUploadURLForCompanion();
   base::StrAppend(&upload_url_string, {"?", additional_query_params_modified});
   GURL upload_url = GURL(upload_url_string);
   CHECK(upload_url.is_valid());
@@ -116,6 +118,11 @@ CompanionTabHelper::GetCompanionPageHandler() {
   return companion_page_handler_;
 }
 
+void CompanionTabHelper::AddCompanionFinishedLoadingCallback(
+    CompanionTabHelper::CompanionLoadedCallback callback) {
+  delegate_->AddCompanionFinishedLoadingCallback(std::move(callback));
+}
+
 content::WebContents* CompanionTabHelper::GetCompanionWebContentsForTesting() {
   return delegate_->GetCompanionWebContentsForTesting();  // IN-TEST
 }
@@ -125,17 +132,26 @@ CompanionTabHelper::GetImageQuery() {
   return std::move(image_query_);
 }
 
+bool CompanionTabHelper::HasImageQuery() {
+  return image_query_ != nullptr;
+}
+
 std::string CompanionTabHelper::GetTextQuery() {
   std::string copy = text_query_;
   text_query_.clear();
   return copy;
 }
 
+std::unique_ptr<base::Time> CompanionTabHelper::GetTextQueryStartTime() {
+  return std::move(text_query_start_time_);
+}
+
 void CompanionTabHelper::SetTextQuery(const std::string& text_query) {
   CHECK(!text_query.empty());
+  text_query_start_time_ = std::make_unique<base::Time>(base::Time::Now());
   text_query_ = text_query;
   if (companion_page_handler_) {
-    companion_page_handler_->OnSearchTextQuery(GetTextQuery());
+    companion_page_handler_->OnSearchTextQuery();
   }
 }
 
@@ -167,8 +183,10 @@ std::string CompanionTabHelper::GetTextQueryFromSearchUrl(
   return text_query_param_value;
 }
 
-void CompanionTabHelper::StartRegionSearch(content::WebContents* web_contents,
-                                           bool use_fullscreen_capture) {
+void CompanionTabHelper::StartRegionSearch(
+    content::WebContents* web_contents,
+    bool use_fullscreen_capture,
+    lens::AmbientSearchEntryPoint entry_point) {
 #if BUILDFLAG(ENABLE_LENS_DESKTOP_GOOGLE_BRANDED_FEATURES)
   // TODO(shaktisahu): Pass a UI entry point for accurate metrics.
   Browser* browser = companion::GetBrowserForWebContents(web_contents);
@@ -179,7 +197,7 @@ void CompanionTabHelper::StartRegionSearch(content::WebContents* web_contents,
   }
   lens_region_search_controller_->Start(web_contents, use_fullscreen_capture,
                                         /*is_google_default_search_provider=*/
-                                        true);
+                                        true, entry_point);
 #endif
 }
 
@@ -193,6 +211,26 @@ CompanionTabHelper::GetAndResetMostRecentSidePanelOpenTrigger() {
   auto copy = side_panel_open_trigger_;
   side_panel_open_trigger_ = absl::nullopt;
   return copy;
+}
+
+void CompanionTabHelper::DidOpenRequestedURL(
+    content::WebContents* new_contents,
+    content::RenderFrameHost* source_render_frame_host,
+    const GURL& url,
+    const content::Referrer& referrer,
+    WindowOpenDisposition disposition,
+    ui::PageTransition transition,
+    bool started_from_context_menu,
+    bool renderer_initiated) {
+  // We catch link clicks that open in a new tab, so we can open CSC in that new
+  // tab.
+  if (disposition == WindowOpenDisposition::NEW_BACKGROUND_TAB ||
+      disposition == WindowOpenDisposition::NEW_FOREGROUND_TAB) {
+    if (!delegate_->IsCompanionShowing()) {
+      return;
+    }
+    delegate_->SetCompanionAsActiveEntry(new_contents);
+  }
 }
 
 WEB_CONTENTS_USER_DATA_KEY_IMPL(CompanionTabHelper);

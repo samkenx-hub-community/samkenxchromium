@@ -58,7 +58,6 @@ import org.chromium.base.test.util.Batch;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.JniMocker;
-import org.chromium.chrome.browser.flags.CachedFeatureFlags;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.optimization_guide.OptimizationGuideBridge;
@@ -68,7 +67,6 @@ import org.chromium.chrome.browser.price_tracking.PriceTrackingFeatures;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.tab.MockTab;
 import org.chromium.chrome.browser.tab.Tab;
-import org.chromium.chrome.browser.tab.state.CriticalPersistedTabData;
 import org.chromium.chrome.browser.tab.state.LevelDBPersistedDataStorage;
 import org.chromium.chrome.browser.tab.state.LevelDBPersistedDataStorageJni;
 import org.chromium.chrome.browser.tab.state.PersistedTabDataConfiguration;
@@ -188,7 +186,7 @@ public class TabListViewHolderTest extends BlankUiTestActivityTestCase {
     private OptimizationGuideBridge.Natives mOptimizationGuideBridgeJniMock;
 
     private TabListMediator.ThumbnailFetcher mMockThumbnailProvider =
-            new TabListMediator.ThumbnailFetcher(new TabListMediator.ThumbnailProvider() {
+            new TabListMediator.ThumbnailFetcher(new ThumbnailProvider() {
                 @Override
                 public void getTabThumbnailWithCallback(int tabId, Size thumbnailSize,
                         Callback<Bitmap> callback, boolean forceUpdate, boolean writeToCache,
@@ -337,7 +335,7 @@ public class TabListViewHolderTest extends BlankUiTestActivityTestCase {
     }
 
     private void testSelectableTabClickToSelect(
-            ViewGroup view, PropertyModel model, boolean isLongClick) {
+            View view, PropertyModel model, boolean isLongClick) {
         Runnable clickTask = () -> {
             if (isLongClick) {
                 view.performLongClick();
@@ -443,7 +441,7 @@ public class TabListViewHolderTest extends BlankUiTestActivityTestCase {
         TabGridThumbnailView thumbnail = mTabGridView.findViewById(R.id.tab_thumbnail);
         assertNull("Thumbnail should be set to no drawable.", thumbnail.getDrawable());
         assertNotNull("Thumbnail should have a background drawable.", thumbnail.getBackground());
-        assertTrue("Thumbnail should be set to a place holder.", thumbnail.isPlaceHolder());
+        assertTrue("Thumbnail should be set to a place holder.", thumbnail.isPlaceholder());
         mGridModel.set(TabProperties.THUMBNAIL_FETCHER, null);
         Assert.assertNull("Thumbnail should be release when thumbnail fetcher is set to null.",
                 thumbnail.getDrawable());
@@ -453,7 +451,7 @@ public class TabListViewHolderTest extends BlankUiTestActivityTestCase {
         assertThat("Thumbnail should be set.", thumbnail.getDrawable(),
                 instanceOf(BitmapDrawable.class));
         assertNull("Thumbnail should not have a background drawable.", thumbnail.getBackground());
-        assertFalse("Thumbnail should not be set to a place holder.", thumbnail.isPlaceHolder());
+        assertFalse("Thumbnail should not be set to a place holder.", thumbnail.isPlaceholder());
         Assert.assertEquals(2, mThumbnailFetchedCount.get());
     }
 
@@ -465,19 +463,19 @@ public class TabListViewHolderTest extends BlankUiTestActivityTestCase {
         TabGridThumbnailView thumbnail = mTabGridView.findViewById(R.id.tab_thumbnail);
         assertNull("Thumbnail should be set to no drawable.", thumbnail.getDrawable());
         assertNotNull("Thumbnail should have a background drawable.", thumbnail.getBackground());
-        assertTrue("Thumbnail should be set to a place holder.", thumbnail.isPlaceHolder());
+        assertTrue("Thumbnail should be set to a place holder.", thumbnail.isPlaceholder());
 
         mShouldReturnBitmap = true;
         mGridModel.set(TabProperties.THUMBNAIL_FETCHER, mMockThumbnailProvider);
         assertNull("Thumbnail should be set to no drawable.", thumbnail.getDrawable());
         assertNotNull("Thumbnail should have a background drawable.", thumbnail.getBackground());
-        assertTrue("Thumbnail should be set to a place holder.", thumbnail.isPlaceHolder());
+        assertTrue("Thumbnail should be set to a place holder.", thumbnail.isPlaceholder());
         mGridModel.set(TabProperties.GRID_CARD_SIZE, new Size(100, 500));
         mGridModel.set(TabProperties.THUMBNAIL_FETCHER, mMockThumbnailProvider);
         assertThat("Thumbnail should be set.", thumbnail.getDrawable(),
                 instanceOf(BitmapDrawable.class));
         assertNull("Thumbnail should not have a background drawable.", thumbnail.getBackground());
-        assertFalse("Thumbnail should not be set to a place holder.", thumbnail.isPlaceHolder());
+        assertFalse("Thumbnail should not be set to a place holder.", thumbnail.isPlaceholder());
         Assert.assertEquals(2, mThumbnailFetchedCount.get());
     }
 
@@ -651,12 +649,16 @@ public class TabListViewHolderTest extends BlankUiTestActivityTestCase {
         ViewGroup selectableTabListContent = mSelectableTabListView.findViewById(R.id.content_view);
         testSelectableTabClickToSelect(selectableTabListContent, mSelectableModel, false);
         testSelectableTabClickToSelect(selectableTabListContent, mSelectableModel, true);
+        // Also test the end button.
+        testSelectableTabClickToSelect(
+                selectableTabListContent.findViewById(R.id.end_button), mSelectableModel, false);
+        testSelectableTabClickToSelect(
+                selectableTabListContent.findViewById(R.id.end_button), mSelectableModel, true);
     }
 
     @Test
     @MediumTest
     @UiThreadTest
-    @Features.EnableFeatures(ChromeFeatureList.TAB_GROUPS_CONTINUATION_ANDROID)
     public void testCloseButtonDescription() {
         ImageView listActionButton = mTabListView.findViewById(R.id.end_button);
         ImageView gridActionButton = mTabGridView.findViewById(R.id.action_button);
@@ -674,7 +676,6 @@ public class TabListViewHolderTest extends BlankUiTestActivityTestCase {
     @Test
     @MediumTest
     @UiThreadTest
-    @Features.EnableFeatures(ChromeFeatureList.TAB_GROUPS_CONTINUATION_ANDROID)
     public void testCloseButtonColor() {
         ImageView listActionButton = mTabListView.findViewById(R.id.end_button);
         ImageView gridActionButton = mTabGridView.findViewById(R.id.action_button);
@@ -920,7 +921,7 @@ public class TabListViewHolderTest extends BlankUiTestActivityTestCase {
             MockTab tab = (MockTab) MockTab.createAndInitialize(1, false);
             tab.setGurlOverrideForTesting(TEST_GURL);
             tab.setIsInitialized(true);
-            CriticalPersistedTabData.from(tab).setTimestampMillis(System.currentTimeMillis());
+            tab.setTimestampMillis(System.currentTimeMillis());
             TabListMediator.ShoppingPersistedTabDataFetcher fetcher =
                     new TabListMediator.ShoppingPersistedTabDataFetcher(tab, null);
             mGridModel.set(TabProperties.SHOPPING_PERSISTED_TAB_DATA_FETCHER, fetcher);
@@ -946,7 +947,6 @@ public class TabListViewHolderTest extends BlankUiTestActivityTestCase {
     @Test
     @MediumTest
     @UiThreadTest
-    @Features.EnableFeatures(ChromeFeatureList.TAB_GROUPS_CONTINUATION_ANDROID)
     public void testFaviconFetcherAllViewsAndModels() {
         final TabFavicon tabFavicon =
                 new ResourceTabFavicon(newDrawable(), StaticTabFaviconType.ROUNDED_GLOBE);
@@ -1038,11 +1038,9 @@ public class TabListViewHolderTest extends BlankUiTestActivityTestCase {
     @Override
     public void tearDownTest() throws Exception {
         TestThreadUtils.runOnUiThreadBlocking(() -> {
-            PriceTrackingFeatures.setPriceTrackingEnabledForTesting(null);
             mStripMCP.destroy();
             mGridMCP.destroy();
             mSelectableMCP.destroy();
-            CachedFeatureFlags.resetFlagsForTesting();
         });
         super.tearDownTest();
     }

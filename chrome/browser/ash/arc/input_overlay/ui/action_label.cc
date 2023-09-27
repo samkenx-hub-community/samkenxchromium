@@ -9,8 +9,10 @@
 
 #include "ash/style/style_util.h"
 #include "chrome/app/vector_icons/vector_icons.h"
+#include "chrome/browser/ash/arc/input_overlay/actions/action.h"
 #include "chrome/browser/ash/arc/input_overlay/constants.h"
 #include "chrome/browser/ash/arc/input_overlay/ui/action_view.h"
+#include "chrome/browser/ash/arc/input_overlay/ui/touch_point.h"
 #include "chrome/browser/ash/arc/input_overlay/ui/ui_utils.h"
 #include "chrome/browser/ash/arc/input_overlay/util.h"
 #include "chrome/grit/generated_resources.h"
@@ -97,7 +99,7 @@ class ActionLabelTap : public ActionLabel {
       return;
     }
 
-    auto* action_view = static_cast<ActionView*>(parent());
+    auto* action_view = GetParent();
 
     switch (label_position_) {
       case TapLabelPosition::kBottomLeft:
@@ -152,7 +154,7 @@ class ActionLabelTap : public ActionLabel {
       TapLabelPosition label_position) {
     DCHECK_NE(label_position_, label_position);
     DCHECK_NE(label_position, TapLabelPosition::kNone);
-    auto* action_view = static_cast<ActionView*>(parent());
+    auto* action_view = GetParent();
     auto fix_pos = action_view->GetTouchCenterInWindow();
     fix_pos.Offset(-touch_point_size_.width() / 2,
                    -touch_point_size_.height() / 2);
@@ -202,8 +204,7 @@ class ActionLabelMove : public ActionLabel {
     int y = center + kDirection[index_][1] * offset_to_center -
             label_size.height() / 2;
     SetPosition(gfx::Point(x, y));
-    static_cast<ActionView*>(parent())->SetTouchPointCenter(
-        gfx::Point(center, center));
+    GetParent()->SetTouchPointCenter(gfx::Point(center, center));
   }
 
   void UpdateLabelPositionType(TapLabelPosition label_position) override {}
@@ -281,7 +282,11 @@ ActionLabel::ActionLabel(MouseAction mouse_action)
     : mouse_action_(mouse_action) {}
 
 ActionLabel::ActionLabel(const std::u16string& text, size_t index)
-    : views::LabelButton(views::Button::PressedCallback(), text),
+    : views::LabelButton(
+          IsBeta() ? base::BindRepeating(&ActionLabel::OnButtonPressed,
+                                         base::Unretained(this))
+                   : views::Button::PressedCallback(),
+          text),
       index_(index) {
   DCHECK(index_ >= 0 && index_ < kActionMoveKeysSize);
 }
@@ -291,6 +296,16 @@ ActionLabel::~ActionLabel() = default;
 void ActionLabel::SetTextActionLabel(const std::u16string& text) {
   label()->SetText(text);
   SetAccessibleName(CalculateAccessibleName());
+
+  if (!IsBeta()) {
+    return;
+  }
+
+  if (text == kUnknownBind && !GetParent()->action()->is_new()) {
+    SetToEditUnbindInput();
+  } else {
+    SetToEditDefault();
+  }
 }
 
 void ActionLabel::SetImageActionLabel(MouseAction mouse_action) {
@@ -311,10 +326,15 @@ void ActionLabel::SetDisplayMode(DisplayMode mode) {
       break;
     case DisplayMode::kEdit:
       SetToEditMode();
-      SetFocusBehavior(FocusBehavior::ALWAYS);
-      static_cast<ActionView*>(parent())->ShowInfoMsg(
-          l10n_util::GetStringUTF8(IDS_INPUT_OVERLAY_EDIT_INSTRUCTIONS_ALPHAV2),
-          this);
+      if (IsBeta()) {
+        SetFocusBehavior(FocusBehavior::ACCESSIBLE_ONLY);
+      } else {
+        SetFocusBehavior(FocusBehavior::ALWAYS);
+        GetParent()->ShowInfoMsg(
+            l10n_util::GetStringUTF8(
+                IDS_INPUT_OVERLAY_EDIT_INSTRUCTIONS_ALPHAV2),
+            this);
+      }
       break;
     case DisplayMode::kEditedSuccess:
       SetToEditFocus();
@@ -332,6 +352,10 @@ void ActionLabel::SetDisplayMode(DisplayMode mode) {
       NOTREACHED();
       break;
   }
+}
+
+void ActionLabel::RemoveNewState() {
+  SetBackgroundForEdit();
 }
 
 void ActionLabel::ClearFocus() {
@@ -360,6 +384,12 @@ void ActionLabel::OnSiblingUpdateFocus(bool sibling_focused) {
   }
 }
 
+ActionView* ActionLabel::GetParent() {
+  auto* view = static_cast<ActionView*>(parent());
+  DCHECK(view);
+  return view;
+}
+
 gfx::Size ActionLabel::CalculatePreferredSize() const {
   auto size = LabelButton::CalculatePreferredSize();
   size.SetToMax(kLabelSize);
@@ -374,7 +404,7 @@ void ActionLabel::ChildPreferredSizeChanged(View* child) {
 bool ActionLabel::OnKeyPressed(const ui::KeyEvent& event) {
   DCHECK(parent());
   auto code = event.code();
-  auto* parent_view = static_cast<ActionView*>(parent());
+  auto* parent_view = GetParent();
   if (GetDisplayText(code) == GetText() ||
       parent_view->ShouldShowErrorMsg(code)) {
     return true;
@@ -399,15 +429,14 @@ void ActionLabel::OnMouseExited(const ui::MouseEvent& event) {
 void ActionLabel::OnFocus() {
   SetToEditFocus();
   LabelButton::OnFocus();
-  static_cast<ActionView*>(parent())->OnChildLabelUpdateFocus(this,
-                                                              /*focus=*/true);
+  GetParent()->OnChildLabelUpdateFocus(this, /*focus=*/true);
 
   if (IsInputUnbound()) {
-    static_cast<ActionView*>(parent())->ShowErrorMsg(
+    GetParent()->ShowErrorMsg(
         l10n_util::GetStringUTF8(IDS_INPUT_OVERLAY_EDIT_MISSING_BINDING), this,
         /*ax_annouce=*/false);
   } else {
-    static_cast<ActionView*>(parent())->ShowFocusInfoMsg(
+    GetParent()->ShowFocusInfoMsg(
         l10n_util::GetStringUTF8(IDS_INPUT_OVERLAY_EDIT_FOCUSED_KEY), this);
   }
 }
@@ -415,9 +444,13 @@ void ActionLabel::OnFocus() {
 void ActionLabel::OnBlur() {
   SetToEditDefault();
   LabelButton::OnBlur();
-  static_cast<ActionView*>(parent())->OnChildLabelUpdateFocus(this,
-                                                              /*focus=*/false);
-  static_cast<ActionView*>(parent())->RemoveMessage();
+  GetParent()->OnChildLabelUpdateFocus(this, /*focus=*/false);
+  GetParent()->RemoveMessage();
+}
+
+void ActionLabel::OnButtonPressed() {
+  DCHECK(IsBeta());
+  GetParent()->ShowButtonOptionsMenu();
 }
 
 void ActionLabel::SetToViewMode() {
@@ -529,7 +562,9 @@ void ActionLabel::SetToEditInactive() {
 
 void ActionLabel::SetBackgroundForEdit() {
   SetBackground(views::CreateRoundedRectBackground(
-      IsInputUnbound() ? kEditedUnboundBgColor : kBackgroundColorDefault,
+      IsInputUnbound() && !(GetParent()->action()->is_new())
+          ? kEditedUnboundBgColor
+          : kBackgroundColorDefault,
       kCornerRadius));
 }
 

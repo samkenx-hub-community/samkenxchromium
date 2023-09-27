@@ -51,8 +51,7 @@ void PartitionAllocGlobalInit(OomFunction on_out_of_memory) {
   STATIC_ASSERT_OR_PA_CHECK(
       (internal::PartitionPageSize() & internal::SystemPageOffsetMask()) == 0,
       "ok partition page multiple");
-  static_assert(sizeof(internal::PartitionPage<internal::ThreadSafe>) <=
-                    internal::kPageMetadataSize,
+  static_assert(sizeof(internal::PartitionPage) <= internal::kPageMetadataSize,
                 "PartitionPage should not be too big");
   STATIC_ASSERT_OR_PA_CHECK(
       internal::kPageMetadataSize * internal::NumPartitionPagesPerSuperPage() <=
@@ -107,26 +106,28 @@ void PartitionAllocGlobalUninitForTesting() {
   internal::g_oom_handling_function = nullptr;
 }
 
-namespace internal {
+PartitionAllocator::PartitionAllocator() = default;
 
-template <bool thread_safe>
-PartitionAllocator<thread_safe>::~PartitionAllocator() {
+PartitionAllocator::~PartitionAllocator() {
   MemoryReclaimer::Instance()->UnregisterPartition(&partition_root_);
 }
 
-template <bool thread_safe>
-void PartitionAllocator<thread_safe>::init(PartitionOptions opts) {
+void PartitionAllocator::init(PartitionOptions opts) {
 #if BUILDFLAG(USE_PARTITION_ALLOC_AS_MALLOC)
-  PA_CHECK(opts.thread_cache == PartitionOptions::ThreadCache::kDisabled)
+  PA_CHECK(opts.thread_cache == PartitionOptions::kDisabled)
       << "Cannot use a thread cache when PartitionAlloc is malloc().";
 #endif
   partition_root_.Init(opts);
-  MemoryReclaimer::Instance()->RegisterPartition(&partition_root_);
+#if BUILDFLAG(ENABLE_THREAD_ISOLATION)
+  // The MemoryReclaimer won't have write access to the partition, so skip
+  // registration.
+  const bool use_memory_reclaimer = !opts.thread_isolation.enabled;
+#else
+  constexpr bool use_memory_reclaimer = true;
+#endif
+  if (use_memory_reclaimer) {
+    MemoryReclaimer::Instance()->RegisterPartition(&partition_root_);
+  }
 }
-
-template PartitionAllocator<internal::ThreadSafe>::~PartitionAllocator();
-template void PartitionAllocator<internal::ThreadSafe>::init(PartitionOptions);
-
-}  // namespace internal
 
 }  // namespace partition_alloc

@@ -44,6 +44,7 @@ class COMPONENT_EXPORT(OZONE_BASE) InputController {
   using GetTouchEventLogReply =
       base::OnceCallback<void(const std::vector<base::FilePath>&)>;
   using GetStylusSwitchStateReply = base::OnceCallback<void(ui::StylusState)>;
+  using DescribeForLogReply = base::OnceCallback<void(const std::string&)>;
 
   InputController() {}
 
@@ -140,6 +141,9 @@ class COMPONENT_EXPORT(OZONE_BASE) InputController {
   // Touchscreen log settings.
   virtual void SetTouchEventLoggingEnabled(bool enabled) = 0;
 
+  // Describe internal state for system log.
+  virtual void DescribeForLog(DescribeForLogReply) const = 0;
+
   // Temporarily enable/disable Tap-to-click. Used to enhance the user
   // experience in some use cases (e.g., typing, watching video).
   virtual void SetTapToClickPaused(bool state) = 0;
@@ -179,6 +183,8 @@ class COMPONENT_EXPORT(OZONE_BASE) InputController {
   virtual void GetGesturePropertiesService(
       mojo::PendingReceiver<ui::ozone::mojom::GesturePropertiesService>
           receiver) = 0;
+
+  virtual bool AreAnyKeysPressed() = 0;
 };
 
 // Create an input controller that does nothing.

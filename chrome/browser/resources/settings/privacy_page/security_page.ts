@@ -23,9 +23,7 @@ import {CrSettingsPrefs} from 'chrome://resources/cr_components/settings_prefs/p
 import {I18nMixin} from 'chrome://resources/cr_elements/i18n_mixin.js';
 import {assert} from 'chrome://resources/js/assert_ts.js';
 import {focusWithoutInk} from 'chrome://resources/js/focus_without_ink.js';
-// <if expr="is_chromeos or chrome_root_store_supported">
 import {OpenWindowProxyImpl} from 'chrome://resources/js/open_window_proxy.js';
-// </if>
 
 import {PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
@@ -83,28 +81,17 @@ export class SettingsSecurityPageElement extends
         notify: true,
       },
 
-      // <if expr="chrome_root_store_supported">
       /**
        * Whether we should adjust Manage Certificates links to indicate
        * support for Chrome Root Store.
        */
+      // TODO(crbug.com/1412591): remove when CRS enterprise policy is removed
+      // for ChromeOS and Linux
       showChromeRootStoreCertificates_: {
         type: Boolean,
         readOnly: true,
         value: function() {
           return loadTimeData.getBoolean('showChromeRootStoreCertificates');
-        },
-      },
-      // </if>
-
-      /**
-       * Whether the HTTPS-Only Mode setting should be displayed.
-       */
-      showHttpsOnlyModeSetting_: {
-        type: Boolean,
-        readOnly: true,
-        value: function() {
-          return loadTimeData.getBoolean('showHttpsOnlyModeSetting');
         },
       },
 
@@ -166,13 +153,25 @@ export class SettingsSecurityPageElement extends
         observer: 'focusConfigChanged_',
       },
 
+      enableFriendlierSafeBrowsingSettings_: {
+        type: Boolean,
+        value() {
+          return loadTimeData.getBoolean(
+              'enableFriendlierSafeBrowsingSettings');
+        },
+      },
+
+      enableHashPrefixRealTimeLookups_: {
+        type: Boolean,
+        value() {
+          return loadTimeData.getBoolean('enableHashPrefixRealTimeLookups');
+        },
+      },
+
       showDisableSafebrowsingDialog_: Boolean,
     };
   }
-  // <if expr="chrome_root_store_supported">
   private showChromeRootStoreCertificates_: boolean;
-  // </if>
-  private showHttpsOnlyModeSetting_: boolean;
   private showSecureDnsSetting_: boolean;
 
   // <if expr="is_chromeos">
@@ -182,6 +181,8 @@ export class SettingsSecurityPageElement extends
   private enableSecurityKeysSubpage_: boolean;
   focusConfig: FocusConfig;
   private showDisableSafebrowsingDialog_: boolean;
+  private enableFriendlierSafeBrowsingSettings_: boolean;
+  private enableHashPrefixRealTimeLookups_: boolean;
 
   private browserProxy_: PrivacyPageBrowserProxy =
       PrivacyPageBrowserProxyImpl.getInstance();
@@ -281,18 +282,60 @@ export class SettingsSecurityPageElement extends
         SafeBrowsingSetting.STANDARD;
   }
 
+  private getSafeBrowsingDisabledSubLabel_(): string {
+    return this.i18n(
+        this.enableFriendlierSafeBrowsingSettings_ ?
+            'safeBrowsingNoneDescUpdated' :
+            'safeBrowsingNoneDesc');
+  }
+
+  private getSafeBrowsingEnhancedSubLabel_(): string {
+    return this.i18n(
+        this.enableFriendlierSafeBrowsingSettings_ ?
+            'safeBrowsingEnhancedDescUpdated' :
+            'safeBrowsingEnhancedDesc');
+  }
+
+  private getSafeBrowsingStandardSubLabel_(): string {
+    return this.i18n(
+        this.enableFriendlierSafeBrowsingSettings_ ?
+            this.enableHashPrefixRealTimeLookups_ ?
+            'safeBrowsingStandardDescUpdatedProxy' :
+            'safeBrowsingStandardDescUpdated' :
+            'safeBrowsingStandardDesc');
+  }
+
+  private getSafeBrowsingStandardBulTwo_(): string {
+    return this.i18n(
+        this.enableHashPrefixRealTimeLookups_ ?
+            'safeBrowsingStandardBulTwoProxy' :
+            'safeBrowsingStandardBulTwo');
+  }
+
+  private getPasswordsLeakToggleLabel_(): string {
+    return this.i18n(
+        this.enableFriendlierSafeBrowsingSettings_ ?
+            'passwordsLeakDetectionLabelUpdated' :
+            'passwordsLeakDetectionLabel');
+  }
+
   private getPasswordsLeakToggleSubLabel_(): string {
-    let subLabel = this.i18n('passwordsLeakDetectionGeneralDescription');
+    let subLabel = this.i18n(
+        this.enableFriendlierSafeBrowsingSettings_ ?
+            'passwordsLeakDetectionGeneralDescriptionUpdated' :
+            'passwordsLeakDetectionGeneralDescription');
     // If the backing password leak detection preference is enabled, but the
     // generated preference is off and user control is disabled, then additional
     // text explaining that the feature will be enabled if the user signs in is
     // added.
-    const generatedPref = this.getPref('generated.password_leak_detection');
-    if (this.getPref('profile.password_manager_leak_detection').value &&
-        !generatedPref.value && generatedPref.userControlDisabled) {
-      subLabel +=
-          ' ' +  // Whitespace is a valid sentence separator w.r.t. i18n.
-          this.i18n('passwordsLeakDetectionSignedOutEnabledDescription');
+    if (this.prefs !== undefined) {
+      const generatedPref = this.getPref('generated.password_leak_detection');
+      if (this.getPref('profile.password_manager_leak_detection').value &&
+          !generatedPref.value && generatedPref.userControlDisabled) {
+        subLabel +=
+            ' ' +  // Whitespace is a valid sentence separator w.r.t. i18n.
+            this.i18n('passwordsLeakDetectionSignedOutEnabledDescription');
+      }
     }
     return subLabel;
   }
@@ -320,12 +363,10 @@ export class SettingsSecurityPageElement extends
         PrivacyElementInteractions.MANAGE_CERTIFICATES);
   }
 
-  // <if expr="chrome_root_store_supported">
   private onChromeCertificatesClick_() {
     OpenWindowProxyImpl.getInstance().openUrl(
         loadTimeData.getString('chromeRootStoreHelpCenterURL'));
   }
-  // </if>
 
   private onAdvancedProtectionProgramLinkClick_() {
     window.open(loadTimeData.getString('advancedProtectionURL'));

@@ -6,16 +6,15 @@
 
 #include <memory>
 
+#include "base/containers/contains.h"
 #include "base/task/single_thread_task_runner.h"
 #include "build/build_config.h"
 #include "chrome/browser/media/webrtc/media_capture_devices_dispatcher.h"
 #include "chrome/browser/media/webrtc/media_stream_capture_indicator.h"
-#include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/ui/browser.h"
-#include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/vr/vr_tab_helper.h"
 #include "chrome/browser/vr/win/vr_browser_renderer_thread_win.h"
 #include "components/content_settings/browser/page_specific_content_settings.h"
+#include "content/public/browser/browser_context.h"
 #include "content/public/browser/device_service.h"
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/permission_controller.h"
@@ -297,21 +296,6 @@ void VRUiHostImpl::StopUiRendering() {
   ui_rendering_thread_ = nullptr;
 }
 
-void VRUiHostImpl::SetLocationInfoOnUi() {
-  GURL gurl;
-  if (web_contents_) {
-    content::NavigationEntry* entry =
-        web_contents_->GetController().GetVisibleEntry();
-    if (entry) {
-      gurl = entry->GetVirtualURL();
-    }
-  }
-  // TODO(https://crbug.com/905375): The below call should eventually be
-  // rewritten to take a LocationBarState and not just GURL. See
-  // VRBrowserRendererThreadWin::StartOverlay() also.
-  ui_rendering_thread_->SetLocationInfo(gurl);
-}
-
 void VRUiHostImpl::OnPromptAdded() {
   ShowExternalNotificationPrompt();
 }
@@ -333,8 +317,6 @@ void VRUiHostImpl::ShowExternalNotificationPrompt() {
     DVLOG(1) << __func__ << ": no ui_rendering_thread_";
     return;
   }
-
-  SetLocationInfoOnUi();
 
   if (indicators_visible_) {
     indicators_visible_ = false;
@@ -421,17 +403,18 @@ void VRUiHostImpl::PollCapturingState() {
           settings->IsContentAllowed(ContentSettingsType::GEOLOCATION);
 
       active_capturing.audio_capture_enabled =
-          (settings->GetMicrophoneCameraState() &
-           content_settings::PageSpecificContentSettings::
-               MICROPHONE_ACCESSED) &&
-          !(settings->GetMicrophoneCameraState() &
-            content_settings::PageSpecificContentSettings::MICROPHONE_BLOCKED);
+          settings->GetMicrophoneCameraState().Has(
+              content_settings::PageSpecificContentSettings::
+                  kMicrophoneAccessed) &&
+          !settings->GetMicrophoneCameraState().Has(
+              content_settings::PageSpecificContentSettings::
+                  kMicrophoneBlocked);
 
       active_capturing.video_capture_enabled =
-          (settings->GetMicrophoneCameraState() &
-           content_settings::PageSpecificContentSettings::CAMERA_ACCESSED) &
-          !(settings->GetMicrophoneCameraState() &
-            content_settings::PageSpecificContentSettings::CAMERA_BLOCKED);
+          settings->GetMicrophoneCameraState().Has(
+              content_settings::PageSpecificContentSettings::kCameraAccessed) &&
+          !settings->GetMicrophoneCameraState().Has(
+              content_settings::PageSpecificContentSettings::kCameraBlocked);
 
       active_capturing.midi_connected =
           settings->IsContentAllowed(ContentSettingsType::MIDI_SYSEX);

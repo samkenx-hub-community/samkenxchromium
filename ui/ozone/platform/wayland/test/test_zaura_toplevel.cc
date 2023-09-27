@@ -81,7 +81,12 @@ void SetFloat(struct wl_client* client, struct wl_resource* resource) {
 }
 
 void UnSetFloat(struct wl_client* client, struct wl_resource* resource) {
-  NOTREACHED();
+  auto* toplevel = GetUserDataAs<TestZAuraToplevel>(resource);
+  if (toplevel->set_unset_float_callback()) {
+    toplevel->set_unset_float_callback().Run(/*floated=*/false, 0);
+  } else {
+    NOTIMPLEMENTED_LOG_ONCE();
+  }
 }
 
 void SetZOrder(struct wl_client* client,
@@ -147,6 +152,50 @@ void SetShape(wl_client* client,
                       : absl::nullopt);
 }
 
+void SetTopInset(wl_client* client, wl_resource* resource, int32_t height) {
+  GetUserDataAs<TestZAuraToplevel>(resource)->set_top_inset(height);
+}
+
+void AckRotateFocus(wl_client* client,
+                    wl_resource* resource,
+                    uint32_t serial,
+                    uint32_t handled) {
+  auto* toplevel = GetUserDataAs<TestZAuraToplevel>(resource);
+  if (toplevel->ack_rotate_focus_callback()) {
+    toplevel->ack_rotate_focus_callback().Run(serial, handled);
+  } else {
+    NOTIMPLEMENTED_LOG_ONCE();
+  }
+}
+
+void SetCanMaximize(wl_client* client, wl_resource* resource) {
+  GetUserDataAs<TestZAuraToplevel>(resource)->set_can_maximize(true);
+}
+
+void UnsetCanMaximize(wl_client* client, wl_resource* resource) {
+  GetUserDataAs<TestZAuraToplevel>(resource)->set_can_maximize(false);
+}
+
+void SetCanFullscreen(wl_client* client, wl_resource* resource) {
+  GetUserDataAs<TestZAuraToplevel>(resource)->set_can_fullscreen(true);
+}
+
+void UnsetCanFullscreen(wl_client* client, wl_resource* resource) {
+  GetUserDataAs<TestZAuraToplevel>(resource)->set_can_fullscreen(false);
+}
+
+void SetFloatToLocation(struct wl_client* client,
+                        struct wl_resource* resource,
+                        uint32_t float_start_location) {
+  auto* toplevel = GetUserDataAs<TestZAuraToplevel>(resource);
+  if (toplevel->set_unset_float_callback()) {
+    toplevel->set_unset_float_callback().Run(/*floated=*/true,
+                                             float_start_location);
+  } else {
+    NOTIMPLEMENTED_LOG_ONCE();
+  }
+}
+
 }  // namespace
 
 TestZAuraToplevel::TestZAuraToplevel(wl_resource* resource)
@@ -179,6 +228,13 @@ const struct zaura_toplevel_interface kTestZAuraToplevelImpl = {
     &UnsetSnap,
     &SetPersistable,
     &SetShape,
+    &SetTopInset,
+    &AckRotateFocus,
+    &SetCanMaximize,
+    &UnsetCanMaximize,
+    &SetCanFullscreen,
+    &UnsetCanFullscreen,
+    &SetFloatToLocation,
 };
 
 }  // namespace wl
